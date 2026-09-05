@@ -8,6 +8,12 @@
 #   powershell -ExecutionPolicy Bypass -File reset-clean.ps1
 #   powershell -ExecutionPolicy Bypass -File reset-clean.ps1 -WhatIf   무엇을 지울지 보기만 한다
 #
+# 받아서 바로 돌리는 한 줄 (명령 프롬프트 창에서도 같다)
+#   powershell -NoProfile -ExecutionPolicy Bypass -Command "irm https://jarvis.godmeyou.kr/install/reset-clean.ps1 -OutFile ([Environment]::GetFolderPath('UserProfile')+'\reset-clean.ps1'); powershell -ExecutionPolicy Bypass -File ([Environment]::GetFolderPath('UserProfile')+'\reset-clean.ps1')"
+#   내려받는 자리를 임시 폴더가 아니라 사용자 폴더로 둔 까닭은 설치 도우미와 같다:
+#   임시 폴더는 언제든 비워지고, 회사 컴퓨터는 그 자리에서의 실행 자체를 막아 두는 설정이 흔하다.
+#   그 설정에 걸리면 지우기 도구조차 못 돌아 아무것도 시작할 수 없다.
+#
 # 되돌릴 수 없다. 지우기 전에 목록을 보여 주고 한 번 묻는다.
 #
 # cys 프로그램 자체는 이 스크립트가 지우지 않는다 — 윈도우 설정 앱에서 지우시게 안내한다.
@@ -31,6 +37,9 @@ $CysHome    = Join-Path $env:USERPROFILE '.cys'
 $ClaudeDir  = Join-Path $env:USERPROFILE '.claude'
 $ClaudeJson = Join-Path $env:USERPROFILE '.claude.json'
 $ClaudeExe  = Join-Path $env:USERPROFILE '.local\bin\claude.exe'
+# 받아 둔 설치기 사본 — 2026-09-06 부터 사용자 폴더에 받는다.
+# 옛 자리(임시 폴더)도 함께 지운다: 그 전에 한 번이라도 돌린 컴퓨터에는 거기에 남아 있다.
+$HomePs1    = Join-Path $env:USERPROFILE 'install-jarvis.ps1'
 $TempPs1    = Join-Path $env:TEMP 'install-jarvis.ps1'
 
 function Show($label, $path) {
@@ -47,7 +56,8 @@ Show '클로드 프로그램'         $ClaudeExe
 Show '클로드 설정 폴더'        $ClaudeDir
 Show '클로드 설정 파일'        $ClaudeJson
 Show '자비스 작업 폴더'        $JarvisDir
-Show '내려받은 설치 스크립트'  $TempPs1
+Show '내려받은 설치 스크립트'      $HomePs1
+Show '내려받은 설치 스크립트(옛 자리)' $TempPs1
 Write-Host ''
 Write-Host '이 일은 되돌릴 수 없습니다.'
 Write-Host '로그인 정보도 함께 지워지므로, 다시 설치할 때 로그인을 한 번 더 하셔야 합니다.'
@@ -93,7 +103,7 @@ Start-Sleep -Seconds 2
 foreach ($p in @($CysDir, $CysHome, $ClaudeDir, $JarvisDir)) {
     if (Test-Path $p) { Remove-Item $p -Recurse -Force -ErrorAction SilentlyContinue }
 }
-foreach ($f in @($ClaudeJson, $ClaudeExe, $TempPs1)) {
+foreach ($f in @($ClaudeJson, $ClaudeExe, $HomePs1, $TempPs1)) {
     if (Test-Path $f) { Remove-Item $f -Force -ErrorAction SilentlyContinue }
 }
 if (Test-Path $RegKey) { Remove-Item $RegKey -Recurse -Force -ErrorAction SilentlyContinue }
@@ -107,7 +117,8 @@ Show '클로드 프로그램'         $ClaudeExe
 Show '클로드 설정 폴더'        $ClaudeDir
 Show '클로드 설정 파일'        $ClaudeJson
 Show '자비스 작업 폴더'        $JarvisDir
-Show '내려받은 설치 스크립트'  $TempPs1
+Show '내려받은 설치 스크립트'      $HomePs1
+Show '내려받은 설치 스크립트(옛 자리)' $TempPs1
 Write-Host ''
 Write-Host '모두 「없음」이면 깨끗한 상태입니다.'
 Write-Host '「있음」이 남아 있으면 그 줄을 알려 주십시오. 까닭은 보통 셋 중 하나입니다:'

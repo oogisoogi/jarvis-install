@@ -19,7 +19,7 @@ irm https://jarvis.godmeyou.kr/install/bootstrap.ps1 -OutFile $env:TEMP\install-
 2. 아래 한 줄을 통째로 붙여넣고 Enter를 누릅니다.
 
 ```
-curl -fsSL https://jarvis.godmeyou.kr/install/bootstrap.sh -o /tmp/install-jarvis.sh && bash /tmp/install-jarvis.sh
+curl -fsSL https://jarvis.godmeyou.kr/install/bootstrap.sh -o "$HOME/install-jarvis.sh" && bash "$HOME/install-jarvis.sh"
 ```
 
 ## 진행 순서

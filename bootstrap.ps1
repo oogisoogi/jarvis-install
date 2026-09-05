@@ -13,15 +13,22 @@
 #   powershell -File bootstrap.ps1 -DryRun         판정은 다 하되 바깥을 바꾸는 행위는 하지 않는다
 #
 # 배포 한 줄 (사람이 붙여넣는 것 — cmd 창과 PowerShell 창 어느 쪽에서도 같은 줄이 돈다)
-#   powershell -NoProfile -ExecutionPolicy Bypass -Command "irm https://jarvis.godmeyou.kr/install/bootstrap.ps1 -OutFile ([IO.Path]::GetTempPath()+'install-jarvis.ps1'); powershell -ExecutionPolicy Bypass -File ([IO.Path]::GetTempPath()+'install-jarvis.ps1')"
+#   powershell -NoProfile -ExecutionPolicy Bypass -Command "irm https://jarvis.godmeyou.kr/install/bootstrap.ps1 -OutFile ([Environment]::GetFolderPath('UserProfile')+'\install-jarvis.ps1'); powershell -ExecutionPolicy Bypass -File ([Environment]::GetFolderPath('UserProfile')+'\install-jarvis.ps1')"
 #   -ExecutionPolicy Bypass 가 없으면 윈도우 기본값(Restricted)에서 스크립트가 로드되지 않는다.
 #   왜 이 모양인가 (구판은 cmd 창에 붙여넣으면 안 돌았다)
 #     - 구판은 맨 앞이 irm 이라 cmd 창에서는 그런 명령이 없다는 오류가 난다.
-#       그리고 임시 폴더를 $env:TEMP 로 가리키는데, cmd 는 $ 를 확장하지 않아 폴더 이름이 글자 그대로 들어간다.
-#     - 새 줄에는 $ 가 한 글자도 없다. 임시 폴더는 PowerShell 안에서 [IO.Path]::GetTempPath() 로 구한다.
-#       그 값은 늘 역슬래시로 끝나므로 파일 이름을 바로 이어 붙일 수 있다.
-#     - 폴더 경로에 공백이 있어도 괄호 안의 식이 한 덩어리로 넘어가므로 인자가 쪼개지지 않는다.
+#     - 이 줄에는 $ 도 % 도 없다. 자리는 PowerShell 안에서 .NET 으로 직접 구한다.
+#       (cmd 는 큰따옴표 안에서 %이름% 만 바꾸고 $ 는 건드리지 않는다. 그래도 둘 다 안 쓰는 편이
+#        읽는 사람에게 「이 줄은 어느 창에서든 같다」를 분명히 보여 준다.)
+#     - 폴더 경로에 공백이나 우리말이 있어도 괄호 안의 식이 한 덩어리로 넘어가므로 인자가 쪼개지지 않는다.
 #     - cmd 는 큰따옴표 안의 ( 와 ' 를 특별하게 보지 않으므로 그대로 통과한다.
+#   내려받는 자리를 임시 폴더에서 사용자 폴더로 옮겼다(2026-09-06)
+#     - 임시 폴더는 다른 프로그램이나 정책이 언제든 비울 수 있고, 회사 컴퓨터에서는
+#       그 자리에서의 실행 자체를 막아 두는 설정이 흔하다. 그러면 받기는 받았는데 실행에서 막힌다.
+#     - 사용자 폴더에 두면 나중에 무엇이 걸렸는지 물을 때 그 파일이 그대로 남아 있다.
+#     - 자리는 사용자 폴더 바로 아래 한 파일이다. 새 폴더를 만들지 않는다 —
+#       한 줄에 만드는 단계를 더하면 그 단계가 또 하나의 시험 안 된 자리가 된다.
+#     - 지우는 법은 reset-clean.ps1 이 안다(옛 임시 폴더 자리도 함께 지운다).
 #   이 줄은 아직 윈도우 실물에서 돌려 본 적이 없다. 첫 실기에서 확인한다.
 #
 # 이 파일은 UTF-8 with BOM 으로 저장한다.

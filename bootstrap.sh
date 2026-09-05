@@ -14,7 +14,10 @@
 #   bash bootstrap.sh --dry-run       판정은 다 하되 바깥을 바꾸는 행위는 하지 않는다
 #
 # 배포 한 줄 (사람이 터미널에 붙여넣는 것)
-#   curl -fsSL https://jarvis.godmeyou.kr/install/bootstrap.sh -o /tmp/install-jarvis.sh && bash /tmp/install-jarvis.sh
+#   curl -fsSL https://jarvis.godmeyou.kr/install/bootstrap.sh -o "$HOME/install-jarvis.sh" && bash "$HOME/install-jarvis.sh"
+#   내려받는 자리를 임시 폴더에서 사용자 폴더로 옮겼다(2026-09-06 · 윈도우판과 같은 성질).
+#   임시 폴더는 언제든 비워질 수 있고, 무엇이 걸렸는지 나중에 물을 때 그 파일이 남아 있어야 한다.
+#   따옴표로 감싼 까닭 = 사용자 폴더 이름에 공백이나 우리말이 들어 있어도 한 덩어리로 넘어가게.
 #   `curl ... | bash` 형태를 쓰지 않는다: 그 형태에서는 $0 이 파일이 아니라 -h 가 깨지고,
 #   마지막에 클로드를 띄울 때 EOF 파이프를 stdin 으로 물려받아 대화형 세션이 서지 않는다.
 #   아래 두 방어는 그래도 파이프로 들어왔을 때를 위한 것이다.
