@@ -275,7 +275,13 @@ write_report() {
     printf '%s\n' "- 종합 판정: **$verdict** (ok $ok · blocked $blocked · failed $failed · unknown $unknown / 전 ${total}행)"
     printf '%s\n\n' "  - \`unknown\` 은 「완료됨」으로 세지 않는다."
     printf '\n## 지금 상태 → 다음 행동\n'
-    if [ -n "$BLOCKED_STEP" ]; then
+    if [ "$MODE" = "dry" ]; then
+      #   dry 모드에서는 아래 「앞 단계는 이미 끝났습니다」가 거짓이다 — 아무것도 안 했기 때문이다.
+      #   깨끗한 기계 실측(2026-09-06 Tart)에서 그 줄이 실제로 찍혔다: 클로드도 로그인도 없는 기계가
+      #   「클로드 설치·로그인이 이미 끝났다」는 보고서를 받았다. 모드가 다르면 문장도 달라야 한다.
+      printf -- '- (미리보기) 아무것도 하지 않았습니다 — 이 보고는 **지금 이 컴퓨터의 상태**일 뿐입니다.\n'
+      printf -- '- 실제로 설치하시려면 `--dry-run` 없이 같은 한 줄을 돌리십시오.\n'
+    elif [ -n "$BLOCKED_STEP" ]; then
       printf -- '- **막힌 단계: %s**\n' "$BLOCKED_STEP"
       printf -- '- 앞 단계(클로드 설치·로그인·자비스 준비)는 **이미 끝났습니다.** 여기부터 다시 이어서 갑니다.\n'
       printf -- '- 그 **다음 단계들은 아직 하지 않았습니다** — 실패한 것이 아니라 순서가 안 온 것입니다.\n'
@@ -292,6 +298,45 @@ write_report() {
   } > "$REPORT_FILE"
 
   say "환경 보고를 썼습니다: $(redact "$REPORT_FILE")  (종합 판정 = $verdict)"
+}
+
+# 🔴2026-09-06 신설 (깨끗한 맥 실기 · T-M2 실측). **공식 클로드 설치기는 셸 프로필에 아무것도 안 쓴다.**
+#   깨끗한 맥에서 설치한 직후 `~/.zprofile`·`~/.zshrc`·`~/.zshenv`·`~/.bash_profile`·`~/.bashrc`·
+#   `~/.profile` 여섯을 다시 재 보니 **여섯 개 다 여전히 없었다.** 설치기는 대신 화면에 이렇게 적는다 —
+#   「Native installation exists but ~/.local/bin is not in your PATH. Run: echo 'export
+#   PATH="$HOME/.local/bin:$PATH"' >> ~/.zshrc && source ~/.zshrc」. 즉 **사람에게 시킨다.**
+#   ⇒ 우리가 안 넣어 주면, 설치가 끝난 뒤 사용자가 터미널을 새로 열었을 때 `claude` 가 없다(실측:
+#     새 로그인 셸의 PATH 에 `~/.local/bin` 이 없다).
+#   ⚠**`[9/11]`·`[10/11]` 때문이 아니다.** cys 가 띄우는 창은 cysd 가 `~/.local/bin` 을 앞에 심어 줘서
+#     거기서는 잘 잡힌다(실측으로 확인 — 이것은 처음에 우리가 세운 예측이 틀렸던 자리다).
+#     이 줄이 필요한 이유는 오직 **사용자가 스스로 새 터미널을 열었을 때**다.
+seed_local_bin_path() {
+  local marker="# added by jarvis installer (claude PATH)" rc_file f
+  [ -d "$HOME/.local/bin" ] || return 0
+
+  #   🔴적대검증 지적 채택(2026-09-06) — 앞 판은 `~/.zprofile` **하나만** 보고 판단했다.
+  #   공식 설치기가 사람에게 시키는 자리는 `~/.zshrc` 다 ⇒ 그 말을 이미 따른 사람의 `~/.zshrc` 에는
+  #   그 줄이 있는데 우리는 `~/.zprofile` 만 보고 「없다」고 판단해 **또 넣는다.** 중복이 쌓인다.
+  #   ⇒ 읽힐 수 있는 프로필을 **전부** 먼저 훑고, 어디든 이미 있으면 아무것도 안 한다.
+  for f in "$HOME/.zprofile" "$HOME/.zshrc" "$HOME/.zshenv" "$HOME/.profile" "$HOME/.bash_profile" "$HOME/.bashrc"; do
+    [ -f "$f" ] || continue
+    grep -qF "$marker" "$f" 2>/dev/null && return 0
+    grep -q '\.local/bin' "$f" 2>/dev/null && return 0
+  done
+
+  #   같은 지적의 둘째 갈래 — 셸이 zsh 가 아니면 `~/.zprofile` 을 아무도 안 읽는다(그 사람에게는
+  #   아무 일도 안 일어난다). 맥 기본은 zsh 지만 바꾼 사람이 있다 ⇒ **그 사람의 셸이 읽는 자리**에 쓴다.
+  case "${SHELL##*/}" in
+    bash) rc_file="$HOME/.bash_profile" ;;
+    zsh|"") rc_file="$HOME/.zprofile" ;;
+    *)    rc_file="$HOME/.profile" ;;   # 그 밖의 셸 — 가장 널리 읽히는 자리
+  esac
+
+  {
+    printf '\n%s\n' "$marker"
+    printf '%s\n' 'export PATH="$HOME/.local/bin:$PATH"'
+  } >> "$rc_file" 2>/dev/null || return 0
+  log "seeded PATH line into $rc_file (SHELL=${SHELL:-미상})"
 }
 
 # ── 하는 일 2 — 공식 설치기 호출 (멱등: 이미 있으면 건너뛴다) ─────
@@ -320,6 +365,7 @@ step_install_claude() {
     *) PATH="$HOME/.local/bin:$PATH"; export PATH ;;
   esac
   hash -r 2>/dev/null || true
+  seed_local_bin_path
   # 실행 결과 검사 = 설치기의 종료 코드가 아니라 명령이 답하는가
   if ! claude --version >/dev/null 2>&1; then
     say "[2/11] 설치기는 끝났는데 claude 명령이 아직 안 잡힙니다. 창을 새로 열고 다시 돌려 주십시오."
@@ -555,12 +601,44 @@ step_download_cys() {
 
 # ── 하는 일 6 — cys 설치 ──────────────────────────────────────────
 # 완료 판정은 설치기의 종료 코드가 아니라 프로그램 실체가 생겼는가로 한다.
+#
+# 🔴2026-09-06 재작성 (깨끗한 맥 첫 실기 · Tart 가상 맥 실측). 앞 판은 **어떤 맥에서도 성공할 수
+#   없었다.** 이 기계에서 한 번도 안 돌려 봤기 때문에 두 가지를 동시에 틀렸다.
+#   ⑴ `hdiutil attach -nobrowse -quiet` 는 **마운트는 하지만 표준출력에 아무것도 안 찍는다.**
+#      그래서 마운트 지점을 뽑던 awk 가 언제나 빈 문자열을 돌려주고, 그 다음 검사에서 곧바로
+#      「설치 파일을 열지 못했습니다」로 끝났다. 게다가 그 실패 분기는 detach 앞에서 return 해서
+#      **마운트한 디스크를 그대로 두고 나갔다** — 다시 돌릴 때마다 볼륨이 쌓인다.
+#   ⑵ 더 근본적으로, 이 dmg 에는 **`cys.app` 이 최상위에 없다.** 안에 든 것은 `Install cys.app`
+#      (설치 도우미)과 숨김 `.support/cys.app`(실물)이다. 그래서 `[ -d "$mnt/cys.app" ]` 이 거짓이라
+#      **복사를 조용히 건너뛰고** 아무 에러 없이 다음 검사에서 실패했다.
+#   ⇒ ★그리고 우리가 하려던 `cp -R` 자체가 **벤더가 일부러 막아 둔 방식**이었다. 설치 도우미의
+#      원문 주석이 이유를 적어 놨다 — 최종 경로로 직접 복사하면 복사 도중 「반쪽 번들」이 노출되고,
+#      그 순간 앱을 열면 Gatekeeper 가 미완본을 보고 **「손상되었기 때문에 열 수 없습니다」**로
+#      막는다. 설치 도우미는 그 경합을 **원자 교체**(숨김 스테이징 → 단일 rename)로 없앤다.
+#      우리 옛 코드는 그 경합을 그대로 재현하는 코드였다.
+#   ⇒ 그래서 이제 **벤더가 dmg 안에 넣어 둔 CLI 진입점**을 그대로 부른다. 종료 코드 계약도 그
+#      스크립트 주석에 명시돼 있다(0=완료 1=권한 실패 2=소스 아님 3=도구 결손 4=진위 실패).
+#      GUI 경로(`open "Install cys.app"`)는 쓰지 않는다 — 대화상자가 둘 떠서 **사람 손이 2 늘어난다.**
+CYS_DMG_MNT=""
+cys_dmg_detach() {
+  # 어느 경로로 나가든 마운트를 남기지 않는다. 실패 분기가 볼륨을 남기던 것이 앞 판의 결함이었다.
+  [ -n "$CYS_DMG_MNT" ] || return 0
+  hdiutil detach "$CYS_DMG_MNT" -quiet >/dev/null 2>&1 || hdiutil detach "$CYS_DMG_MNT" -force -quiet >/dev/null 2>&1 || true
+  CYS_DMG_MNT=""
+}
+cys_dmg_remount() {
+  # 권한 갈래에서만 쓴다 — 이미 붙어 있으면 그대로 쓰고, 떨어졌으면 다시 붙인다.
+  [ -n "$CYS_DMG_MNT" ] && [ -d "$CYS_DMG_MNT" ] && return 0
+  CYS_DMG_MNT="$(hdiutil attach -nobrowse "$DL_DIR/$CYS_MAC_FILE" 2>>"$LOG_FILE" | awk '/\/Volumes\//{ $1=""; $2=""; sub(/^[ \t]+/,""); print; exit }')"
+  [ -n "$CYS_DMG_MNT" ] && [ -d "$CYS_DMG_MNT" ]
+}
+
 step_install_cys() {
   if [ -d /Applications/cys.app ]; then
     say "[6/11] cys 가 이미 설치돼 있습니다 — 건너뜁니다."
     return 0
   fi
-  local dst mnt
+  local dst core src rc
   if [ "$MODE" = "dry" ]; then
     say "[6/11] (dry-run) 설치 파일을 열지 않았습니다."
     return 0
@@ -568,20 +646,74 @@ step_install_cys() {
   dst="$DL_DIR/$CYS_MAC_FILE"
   [ -f "$dst" ] || { say "[6/11] 설치 파일이 없습니다."; return 6; }
   say "[6/11] cys 를 설치합니다."
-  mnt="$(hdiutil attach -nobrowse -quiet "$dst" 2>/dev/null | awk '/\/Volumes\//{ $1=""; $2=""; sub(/^[ \t]+/,""); print; exit }')"
-  if [ -z "$mnt" ] || [ ! -d "$mnt" ]; then
+
+  # ⚠`-quiet` 를 주면 안 된다(위 ⑴). 사람에게 보일 필요는 없으니 화면 대신 기록 파일로만 흘린다.
+  CYS_DMG_MNT="$(hdiutil attach -nobrowse "$dst" 2>>"$LOG_FILE" | awk '/\/Volumes\//{ $1=""; $2=""; sub(/^[ \t]+/,""); print; exit }')"
+  if [ -z "$CYS_DMG_MNT" ] || [ ! -d "$CYS_DMG_MNT" ]; then
     say "[6/11] 설치 파일을 열지 못했습니다."
+    cys_dmg_detach
     return 6
   fi
-  if [ -d "$mnt/cys.app" ]; then
-    cp -R "$mnt/cys.app" /Applications/ 2>/dev/null || {
-      say "[6/11] 프로그램 폴더에 복사하지 못했습니다."
-      hdiutil detach "$mnt" -quiet 2>/dev/null || true
-      return 6
-    }
+
+  core="$CYS_DMG_MNT/Install cys.app/Contents/Resources/install-core.sh"
+  src="$CYS_DMG_MNT/.support/cys.app"
+  if [ ! -f "$core" ] || [ ! -d "$src/Contents" ]; then
+    # 배포물의 속 모양이 바뀐 경우다. 우리가 짐작으로 복사하지 않는다 — 짐작 복사가 앞 판의 결함이었다.
+    say "[6/11] 설치 파일의 속 모양이 예상과 다릅니다. 공식 페이지에서 직접 받아 열어 주십시오: $CYS_SITE_URL"
+    cys_dmg_detach
+    return 6
   fi
-  hdiutil detach "$mnt" -quiet 2>/dev/null || true
-  # 처음 여는 프로그램에는 보안 확인이 뜰 수 있다 — 사람이 눌러야 한다.
+
+  # 벤더 정본 원자 설치기. 관리자 권한을 쓰지 않고 먼저 시도하는 것도 그 스크립트가 한다.
+  /bin/bash "$core" "$src" /Applications/cys.app >>"$LOG_FILE" 2>&1
+  rc=$?
+  #   rc=1(권한 실패)은 아래에서 설치 도우미를 열어야 하므로 그 갈래에서 다시 마운트한다.
+  [ "$rc" = "1" ] || cys_dmg_detach
+
+  case "$rc" in
+    0) : ;;
+    1) # 🔴적대검증이 무너뜨린 자리다(2026-09-06). 앞 판은 여기서 「그 창은 사람이 직접 눌러야 하는
+       #   자리입니다」라고 안내하고 끝냈다. **그런데 그 창은 뜨지 않는다** — 비밀번호 창을 띄우는
+       #   책임은 벤더의 `Install cys.app`(AppleScript) 에 있고, 우리는 그 안의 셸 코어만 직접 불러서
+       #   **GUI 승격 갈래를 통째로 우회**했기 때문이다. 셸은 스스로 그 창을 못 띄운다.
+       #   ⇒ 사용자는 **영원히 안 뜰 창**을 기다리게 된다. 안내문이 거짓말이 되는 자리였다.
+       #   ⇒ 무승격으로 안 되는 것이 확인된 **이때만** 벤더 설치 도우미를 연다. 그 도우미가
+       #   자기 대화상자로 비밀번호를 묻는다(누르는 것은 사람이다 — 우리가 대신 넣지 않는다).
+       #   ⚠평소 경로에는 손이 늘지 않는다. 여는 것은 「안 그러면 설치가 불가능한」 경우뿐이다.
+       cys_dmg_remount || { say "[6/11] 설치 파일을 다시 열지 못했습니다."; return 6; }
+       say "[6/11] 이 계정에는 프로그램 폴더에 넣을 권한이 없습니다 — 설치 도우미를 엽니다."
+       say "     창이 뜨면 「설치」를 누르시고, 이 컴퓨터의 관리자 비밀번호를 넣어 주십시오."
+       say "     (자비스는 비밀번호를 대신 넣지 않습니다. 넣으신 뒤 끝나면 「닫기」를 누르십시오.)"
+       open "$CYS_DMG_MNT/Install cys.app" >>"$LOG_FILE" 2>&1 || {
+         say "     설치 도우미를 열지 못했습니다. 공식 페이지에서 직접 받아 열어 주십시오: $CYS_SITE_URL"
+         cys_dmg_detach; return 6; }
+       #   사람이 창을 다 누를 때까지 기다린다. 끝났는지는 **프로그램 실체가 생겼는가**로 본다.
+       local waited=0
+       while [ "$waited" -lt 300 ]; do
+         [ -d /Applications/cys.app ] && break
+         sleep 3; waited=$((waited + 3))
+       done
+       cys_dmg_detach
+       if [ -d /Applications/cys.app ]; then
+         say "[6/11] 설치를 마쳤습니다."
+         return 0
+       fi
+       say "[6/11] 5분 동안 설치가 확인되지 않았습니다. 같은 한 줄을 다시 돌리면 여기서부터 이어서 갑니다."
+       return 6 ;;
+    2|3) say "[6/11] 설치 파일이 온전하지 않습니다. 같은 한 줄을 다시 돌리면 다시 받습니다."
+         rm -f "$dst"
+         return 6 ;;
+    4) say "[6/11] 받은 설치 파일이 공식 서명 검사를 통과하지 못했습니다 — 설치를 멈춥니다."
+       say "     받다가 바뀐 파일이거나, 이 컴퓨터가 애플의 확인 서비스에 닿지 못한 경우입니다."
+       say "     공식 페이지에서 직접 받아 열어 주십시오: $CYS_SITE_URL"
+       #   ⛔받은 파일을 지우지 않는다. 검사 실패의 원인이 파일이 아니라 **확인 경로**일 수 있고
+       #   (2026-09-06 실측: 가상 맥에서는 공증된 앱이 전부 거절됐는데 같은 파일이 실물 맥에서는
+       #   통과했다), 그때 지워 버리면 멀쩡한 260MB 를 다시 받게 만든다. 걸렸을 때 그 파일이 단서다.
+       return 6 ;;
+    *) say "[6/11] 설치가 끝나지 않았습니다 (종료 코드 $rc). 자세한 내용은 기록 파일에 있습니다: $(redact "$LOG_FILE")"
+       return 6 ;;
+  esac
+
   if [ -d /Applications/cys.app ]; then
     say "[6/11] 설치를 마쳤습니다."
     return 0
@@ -594,6 +726,14 @@ step_install_cys() {
 # 프로그램 실체와 버전 응답 두 가지를 본다.
 step_verify_cys() {
   local c ver
+  #   dry 분기가 이 단에만 없었다. 깨끗한 기계에는 /Applications/cys.app 이 없으므로 미리보기가
+  #   여기서 rc 7 로 끊겨 **[8/11] 이 호출조차 안 됐다**(화면이 7 다음에 9 로 건너뛴다). 다른 아홉 단은
+  #   전부 dry 분기를 갖고 있었고, 이 단만 없어서 미리보기가 기계 상태에 따라 다른 길을 갔다.
+  #   ⇒ cys 가 이미 깔린 기계(개발기)에서는 안 드러나고 깨끗한 기계에서만 드러나는 형태였다.
+  if [ "$MODE" = "dry" ]; then
+    say "[7/11] (dry-run) cys 를 확인하지 않았습니다."
+    return 0
+  fi
   if [ ! -d /Applications/cys.app ]; then
     say "[7/11] cys 프로그램을 찾지 못했습니다."
     return 7
@@ -954,7 +1094,10 @@ step_wake() {
     # 여는 명령에 문장을 실으면 안 된다(윈도우에서 두 번 실측: 우리말이 깨졌고, 따옴표가 벗겨졌다).
     # 문장은 파일에 넣고 여는 명령은 그 파일 하나만 가리킨다 — 맥도 같은 모양으로 맞춘다.
     wake_file="$JARVIS_HOME/wake.sh"
-    printf '#!/bin/bash\nexec claude --dangerously-skip-permissions %s\n' "'$first_prompt'" > "$wake_file" 2>/dev/null
+    #   보험이다. 결함 봉합이 아니다 — cys 가 띄우는 창은 cysd 가 `~/.local/bin` 을 PATH 앞에 심어 줘서
+    #   `claude` 만 써도 잡힌다(2026-09-06 깨끗한 맥 실측). 다만 그 주입은 **cys 쪽 구현이지 우리 계약이
+    #   아니다.** 우리 창이 아닌 곳에서 도는 파일이므로, 남의 구현에 기대지 않고 우리가 아는 자리를 먼저 본다.
+    printf '#!/bin/bash\nCLAUDE="$HOME/.local/bin/claude"\n[ -x "$CLAUDE" ] || CLAUDE=claude\nexec "$CLAUDE" --dangerously-skip-permissions %s\n' "'$first_prompt'" > "$wake_file" 2>/dev/null
     chmod +x "$wake_file" 2>/dev/null
     cmd_line="bash $wake_file"
     if [ ! -f "$wake_file" ] || case "$wake_file" in *" "*) true ;; *) false ;; esac; then
@@ -986,7 +1129,12 @@ step_wake() {
     say "     지금은 이 창에서 바로 띄웁니다."
   fi
   cd "$JARVIS_HOME" 2>/dev/null || true
-  if ! command -v claude >/dev/null 2>&1; then
+  # 같은 보험을 이 창에도 건다 — 우리가 방금 깐 자리를 먼저 보고, 없을 때만 PATH 에 맡긴다.
+  local claude_bin="$HOME/.local/bin/claude"
+  if [ ! -x "$claude_bin" ]; then
+    claude_bin="$(command -v claude 2>/dev/null)"
+  fi
+  if [ -z "$claude_bin" ]; then
     say "[9/11] 자비스를 띄우지 못했습니다 — 클로드 명령을 찾지 못했습니다."
     say "     창을 새로 열고 같은 한 줄을 다시 돌려 주십시오."
     return 9
@@ -994,7 +1142,7 @@ step_wake() {
   if [ ! -t 0 ] && [ -r /dev/tty ]; then
     exec < /dev/tty
   fi
-  exec claude --dangerously-skip-permissions "$first_prompt"
+  exec "$claude_bin" --dangerously-skip-permissions "$first_prompt"
 }
 
 # ── 본문 ──────────────────────────────────────────────────────────
