@@ -12,9 +12,17 @@
 #   powershell -File bootstrap.ps1 -DetectOnly     살펴보기만 하고 환경 보고 1장을 쓴 뒤 끝낸다
 #   powershell -File bootstrap.ps1 -DryRun         판정은 다 하되 바깥을 바꾸는 행위는 하지 않는다
 #
-# 배포 한 줄 (사람이 PowerShell 에 붙여넣는 것)
-#   irm https://jarvis.godmeyou.kr/install/bootstrap.ps1 -OutFile $env:TEMP\install-jarvis.ps1; powershell -ExecutionPolicy Bypass -File $env:TEMP\install-jarvis.ps1
+# 배포 한 줄 (사람이 붙여넣는 것 — cmd 창과 PowerShell 창 어느 쪽에서도 같은 줄이 돈다)
+#   powershell -NoProfile -ExecutionPolicy Bypass -Command "irm https://jarvis.godmeyou.kr/install/bootstrap.ps1 -OutFile ([IO.Path]::GetTempPath()+'install-jarvis.ps1'); powershell -ExecutionPolicy Bypass -File ([IO.Path]::GetTempPath()+'install-jarvis.ps1')"
 #   -ExecutionPolicy Bypass 가 없으면 윈도우 기본값(Restricted)에서 스크립트가 로드되지 않는다.
+#   왜 이 모양인가 (구판은 cmd 창에 붙여넣으면 안 돌았다)
+#     - 구판은 맨 앞이 irm 이라 cmd 창에서는 그런 명령이 없다는 오류가 난다.
+#       그리고 임시 폴더를 $env:TEMP 로 가리키는데, cmd 는 $ 를 확장하지 않아 폴더 이름이 글자 그대로 들어간다.
+#     - 새 줄에는 $ 가 한 글자도 없다. 임시 폴더는 PowerShell 안에서 [IO.Path]::GetTempPath() 로 구한다.
+#       그 값은 늘 역슬래시로 끝나므로 파일 이름을 바로 이어 붙일 수 있다.
+#     - 폴더 경로에 공백이 있어도 괄호 안의 식이 한 덩어리로 넘어가므로 인자가 쪼개지지 않는다.
+#     - cmd 는 큰따옴표 안의 ( 와 ' 를 특별하게 보지 않으므로 그대로 통과한다.
+#   이 줄은 아직 윈도우 실물에서 돌려 본 적이 없다. 첫 실기에서 확인한다.
 #
 # 이 파일은 UTF-8 with BOM 으로 저장한다.
 #   Windows PowerShell 5.1 은 BOM 없는 .ps1 을 ANSI(cp949)로 읽어 한글 리터럴과 정규식이 깨진다.
@@ -439,13 +447,13 @@ function Write-Report {
 
 # ── 하는 일 2 — 공식 설치기 호출 (멱등: 이미 있으면 건너뛴다) ─────
 function Step-InstallClaude {
-    if ($script:ClaudeOk) { Say '[2/10] 클로드가 이미 있습니다 — 건너뜁니다 (멱등).'; return 0 }
+    if ($script:ClaudeOk) { Say '[2/11] 클로드가 이미 있습니다 — 건너뜁니다 (멱등).'; return 0 }
     if (Get-Command claude -ErrorAction SilentlyContinue) {
-        Say "[2/10] 이 컴퓨터의 클로드가 낡았습니다. 최신판을 설치합니다."
+        Say "[2/11] 이 컴퓨터의 클로드가 낡았습니다. 최신판을 설치합니다."
     }
-    if ($Mode -eq 'dry')  { Say "[2/10] (dry-run) 설치기를 부르지 않았습니다. 부를 줄 = irm $ClaudeInstallUrl | iex"; return 0 }
+    if ($Mode -eq 'dry')  { Say "[2/11] (dry-run) 설치기를 부르지 않았습니다. 부를 줄 = irm $ClaudeInstallUrl | iex"; return 0 }
 
-    Say '[2/10] 클로드 코드를 설치합니다. 글자가 주르륵 올라갑니다 — 정상입니다.'
+    Say '[2/11] 클로드 코드를 설치합니다. 글자가 주르륵 올라갑니다 — 정상입니다.'
     #   호출부의 `$rc` 가 배열이 되고, 설치에 성공해도 `$rc -ne 0` 이 참이 된다.
     #   `iex` 는 설치기 본문을 현재 프로세스·현재 스코프에서 돌린다. 공식 `install.ps1` 은
     #   ⇒ in-process 로 돌리면 그 `exit` 가 부트스트랩을 통째로 그 자리에서 죽여 아래 실패 안내·
@@ -455,11 +463,11 @@ function Step-InstallClaude {
         & $psExe -NoProfile -Command "irm '$ClaudeInstallUrl' | iex" | Out-Host
         $installRc = $LASTEXITCODE
     } catch {
-        Say "[2/10] 실패: $($_.Exception.Message). 인터넷 연결을 확인해 주십시오. 같은 한 줄을 다시 돌리면 여기서부터 이어서 갑니다."
+        Say "[2/11] 실패: $($_.Exception.Message). 인터넷 연결을 확인해 주십시오. 같은 한 줄을 다시 돌리면 여기서부터 이어서 갑니다."
         return 4
     }
     if ($installRc -ne 0) {
-        Say "[2/10] 실패 (종료 코드 $installRc). 같은 한 줄을 다시 돌리면 여기서부터 이어서 갑니다."
+        Say "[2/11] 실패 (종료 코드 $installRc). 같은 한 줄을 다시 돌리면 여기서부터 이어서 갑니다."
         return 4
     }
     #   ⇒ 이 프로세스의 `$env:Path` 를 사용자·시스템 환경변수에서 다시 읽어 붙인다.
@@ -469,30 +477,30 @@ function Step-InstallClaude {
     } catch { }
     # 실행 결과 검사 = 설치기의 종료 코드가 아니라 명령이 답하는가
     if (-not (Get-Command claude -ErrorAction SilentlyContinue)) {
-        Say '[2/10] 설치기는 끝났는데 claude 명령이 아직 안 잡힙니다. 창을 새로 열고 다시 돌려 주십시오.'
+        Say '[2/11] 설치기는 끝났는데 claude 명령이 아직 안 잡힙니다. 창을 새로 열고 다시 돌려 주십시오.'
         return 4
     }
     if (-not (Test-ClaudeAuthCmd)) {
-        Say '[2/10] 설치는 끝났는데 아직 낡은 판본이 잡힙니다. 창을 새로 열고 다시 돌려 주십시오.'
+        Say '[2/11] 설치는 끝났는데 아직 낡은 판본이 잡힙니다. 창을 새로 열고 다시 돌려 주십시오.'
         return 4
     }
     $script:ClaudeOk = $true
-    Say "[2/10] 완료: $((& claude --version 2>$null | Select-Object -First 1)) ($(Redact (Get-Command claude).Source))"
+    Say "[2/11] 완료: $((& claude --version 2>$null | Select-Object -First 1)) ($(Redact (Get-Command claude).Source))"
     return 0
 }
 
 # ── 하는 일 3 — 로그인 유도 + 완료 감지 ───────────────────────────
 function Step-Login {
-    if ($script:LoggedIn) { Say '[3/10] 이미 로그인돼 있습니다 — 건너뜁니다 (멱등).'; return 0 }
-    if ($Mode -eq 'dry')  { Say "[3/10] (dry-run) 폴링하지 않았습니다. 간격 $LoginPollInterval 초 · 상한 $LoginPollTimeout 초."; return 0 }
+    if ($script:LoggedIn) { Say '[3/11] 이미 로그인돼 있습니다 — 건너뜁니다 (멱등).'; return 0 }
+    if ($Mode -eq 'dry')  { Say "[3/11] (dry-run) 폴링하지 않았습니다. 간격 $LoginPollInterval 초 · 상한 $LoginPollTimeout 초."; return 0 }
 
     if (-not (Test-ClaudeAuthCmd)) {
-        Say '[3/10] 이 판본의 클로드는 로그인 확인 명령을 모릅니다. 판올림이 먼저 필요합니다.'
+        Say '[3/11] 이 판본의 클로드는 로그인 확인 명령을 모릅니다. 판올림이 먼저 필요합니다.'
         Say '     같은 한 줄을 다시 돌리면 판올림부터 이어서 갑니다.'
         return 6
     }
     Human '벤더' '로그인 승인 클릭 — 클로드 회사 화면에서만 할 수 있다(우리가 대신 못 누른다)'
-    Say '[3/10] 지금 로그인 화면을 엽니다. 브라우저가 뜨면 승인을 눌러 주십시오.'
+    Say '[3/11] 지금 로그인 화면을 엽니다. 브라우저가 뜨면 승인을 눌러 주십시오.'
     & claude auth login | Out-Host
     Say "     승인이 끝났는지 확인합니다. 최대 $([int]($LoginPollTimeout / 60))분까지 기다립니다."
     $waited = 0
@@ -500,13 +508,13 @@ function Step-Login {
         $auth = (& claude auth status 2>$null) -join "`n"
         if ($auth -match '"loggedIn"\s*:\s*true') {
             $script:LoggedIn = $true
-            Say '[3/10] 로그인 확인했습니다.'
+            Say '[3/11] 로그인 확인했습니다.'
             return 0
         }
         Start-Sleep -Seconds $LoginPollInterval
         $waited += $LoginPollInterval
     }
-    Say "[3/10] $([int]($LoginPollTimeout / 60))분 동안 로그인이 확인되지 않았습니다. 같은 한 줄을 다시 돌리면 여기서부터 이어서 갑니다."
+    Say "[3/11] $([int]($LoginPollTimeout / 60))분 동안 로그인이 확인되지 않았습니다. 같은 한 줄을 다시 돌리면 여기서부터 이어서 갑니다."
     return 5
 }
 
@@ -720,11 +728,11 @@ function Set-AllProfiles {
 function Step-Prepare {
     Write-Directive
     if ($Mode -eq 'dry') {
-        Say '[4/10] (dry-run) 사전 설정(.claude.json · settings.json)을 쓰지 않았습니다(바깥 변경 0).'
+        Say '[4/11] (dry-run) 사전 설정(.claude.json · settings.json)을 쓰지 않았습니다(바깥 변경 0).'
         return 0
     }
     Set-AllProfiles | Out-Null
-    Say '[4/10] 자비스가 쓸 것을 갖춰 두었습니다.'
+    Say '[4/11] 자비스가 쓸 것을 갖춰 두었습니다.'
     return 0
 }
 
@@ -735,19 +743,19 @@ function Step-DownloadCys {
     New-Item -ItemType Directory -Force -Path $DlDir | Out-Null
     $dst = Join-Path $DlDir $CysWinFile
     if ((Test-Path $dst) -and ((Get-Item $dst).Length -eq $CysWinBytes)) {
-        Say '[5/10] 설치 파일이 이미 있습니다 — 건너뜁니다.'
+        Say '[5/11] 설치 파일이 이미 있습니다 — 건너뜁니다.'
         return 0
     }
-    if ($Mode -eq 'dry') { Say "[5/10] (dry-run) 받지 않았습니다. 받을 곳 = $CysDownloadUrl"; return 0 }
+    if ($Mode -eq 'dry') { Say "[5/11] (dry-run) 받지 않았습니다. 받을 곳 = $CysDownloadUrl"; return 0 }
     for ($try = 1; $try -le 2; $try++) {
         if (Test-Path $dst) { Remove-Item $dst -Force -ErrorAction SilentlyContinue }
-        Say "[5/10] cys 설치 파일을 받습니다 (약 132MB · 잠시 걸립니다)."
+        Say "[5/11] cys 설치 파일을 받습니다 (약 132MB · 잠시 걸립니다)."
         $pref = $ProgressPreference
         try {
             $ProgressPreference = 'SilentlyContinue'
             Invoke-WebRequest -Uri $CysDownloadUrl -OutFile $dst -UseBasicParsing -ErrorAction Stop
         } catch {
-            Say "[5/10] 받지 못했습니다: $($_.Exception.Message)"
+            Say "[5/11] 받지 못했습니다: $($_.Exception.Message)"
             continue
         } finally {
             # 실패해서 빠져나가도 이 창의 설정을 원래대로 돌려놓는다.
@@ -756,17 +764,17 @@ function Step-DownloadCys {
         # 다 받았는데 파일이 없다 = 백신이 그 자리에서 격리했을 때 나는 모양이다.
         # 이것을 크기 불일치로 적으면 망 문제로 오해된다.
         if (-not (Test-Path $dst)) {
-            Say '[5/10] 받은 파일이 사라졌습니다 — 백신이 격리했을 수 있습니다.'
+            Say '[5/11] 받은 파일이 사라졌습니다 — 백신이 격리했을 수 있습니다.'
             Say '     백신 알림이 떴다면 그 화면의 이름, 대상 파일, 조치(차단·격리·삭제) 세 가지를 알려 주십시오.'
             continue
         }
         $got = (Get-Item $dst -ErrorAction SilentlyContinue).Length
-        if ($got -eq $CysWinBytes) { Say '[5/10] 받았습니다 (크기 확인 완료).'; return 0 }
-        Say "[5/10] 크기가 맞지 않습니다 (받은 것 $got · 기대 $CysWinBytes). 다시 받습니다."
+        if ($got -eq $CysWinBytes) { Say '[5/11] 받았습니다 (크기 확인 완료).'; return 0 }
+        Say "[5/11] 크기가 맞지 않습니다 (받은 것 $got · 기대 $CysWinBytes). 다시 받습니다."
     }
     # 두 번 다 실패했으면 반쯤 받은 파일을 남기지 않는다 — 다음 실행이 그것을 온전한 것으로 볼 수 있다.
     if (Test-Path $dst) { Remove-Item $dst -Force -ErrorAction SilentlyContinue }
-    Say '[5/10] 설치 파일을 온전히 받지 못했습니다.'
+    Say '[5/11] 설치 파일을 온전히 받지 못했습니다.'
     Say "     공식 페이지에서 직접 받으실 수 있습니다: $CysSiteUrl"
     Say "     받을 파일 이름 = $CysWinFile"
     return 5
@@ -777,10 +785,10 @@ function Step-DownloadCys {
 # 조용히 설치하는 방법은 설치기 종류에 따라 다르고 아직 확인되지 않았다 — 후보를 차례로 시도하고,
 # 모두 실패하면 설치 창을 띄워 사람이 진행하게 한다.
 function Step-InstallCys {
-    if ((Test-CysBody).Body) { Say '[6/10] cys 가 이미 설치돼 있습니다 — 건너뜁니다.'; return 0 }
-    if ($Mode -eq 'dry') { Say '[6/10] (dry-run) 설치기를 실행하지 않았습니다.'; return 0 }
+    if ((Test-CysBody).Body) { Say '[6/11] cys 가 이미 설치돼 있습니다 — 건너뜁니다.'; return 0 }
+    if ($Mode -eq 'dry') { Say '[6/11] (dry-run) 설치기를 실행하지 않았습니다.'; return 0 }
     $dst = Join-Path $DlDir $CysWinFile
-    if (-not (Test-Path $dst)) { Say '[6/10] 설치 파일이 없습니다.'; return 6 }
+    if (-not (Test-Path $dst)) { Say '[6/11] 설치 파일이 없습니다.'; return 6 }
 
     # 지난 설치가 끝까지 못 간 컴퓨터에서는, 설치 목록에만 항목이 남아 있고 지우는 프로그램이 없다.
     # 그 상태로 설치를 시작하면 설치기가 「먼저 지우겠다」로 갔다가 지울 것을 못 찾아 그 자리에서 멈춘다.
@@ -798,18 +806,18 @@ function Step-InstallCys {
             # 되돌릴 파일이 실제로 만들어졌을 때에만 지운다. 백업이 없으면 손대지 않는다.
             if (Test-Path $bkFile) {
                 Remove-Item $key -Recurse -Force -ErrorAction SilentlyContinue
-                Say '[6/10] 지난 설치의 목록 항목만 정리했습니다 (프로그램 실체가 없어 설치가 멈추는 것을 막기 위해서입니다).'
+                Say '[6/11] 지난 설치의 목록 항목만 정리했습니다 (프로그램 실체가 없어 설치가 멈추는 것을 막기 위해서입니다).'
                 Say "     되돌리려면 이 파일을 두 번 누르십시오: $(Redact $bkFile)"
                 Write-Log "removed stale uninstall entry · backup=$(Redact $bkFile)"
             } else {
-                Say '[6/10] 지난 설치의 목록 항목을 백업하지 못해 그대로 두었습니다.'
+                Say '[6/11] 지난 설치의 목록 항목을 백업하지 못해 그대로 두었습니다.'
                 Say '     설치가 「먼저 지우겠다」에서 멈추면 그 화면을 알려 주십시오.'
             }
         }
     }
 
     Human 'OS' '설치 파일 실행 확인 — 처음 보는 프로그램이라 경고 창이 뜰 수 있습니다'
-    Say '[6/10] cys 를 설치합니다.'
+    Say '[6/11] cys 를 설치합니다.'
     Say '     파랗게 「Windows에서 PC를 보호했습니다」 창이 뜨면 [추가 정보] → [실행] 을 눌러 주십시오.'
     Say '     이 창은 서명되지 않은 프로그램에 뜨는 것이며 공식 안내에도 적혀 있습니다.'
     # 안내는 설치기를 띄우기 「전에」 해야 한다 — 백신이 이 창을 종료시키면 뒤에 적은 말은 나오지 못한다.
@@ -841,7 +849,7 @@ function Step-InstallCys {
         }
         # 설치기가 끝나도 파일이 자리를 잡기까지 잠깐 걸릴 수 있다
         for ($i = 0; $i -lt 20; $i++) {
-            if ((Test-CysBody).Body) { Say '[6/10] 설치를 마쳤습니다.'; return 0 }
+            if ((Test-CysBody).Body) { Say '[6/11] 설치를 마쳤습니다.'; return 0 }
             Start-Sleep -Seconds 3
         }
         # 앞의 설치기가 아직 돌고 있으면 다음 방법으로 넘어가지 않는다.
@@ -855,7 +863,7 @@ function Step-InstallCys {
         # 설치기는 실패를 종류별로 알려 준다. 종료 코드 4 는 「원래 있던 판은 그대로이고 새 판이 안 들어갔다」는 뜻이다.
         # 그리고 무엇을 못 바꿨는지 설치 폴더에 파일로 적어 둔다 — 그것을 그대로 사람에게 보여 준다.
         if ($p -and $p.HasExited -and $p.ExitCode -eq 4) {
-            Say '[6/10] 새 판을 넣지 못했습니다. 원래 쓰시던 것은 그대로 있습니다.'
+            Say '[6/11] 새 판을 넣지 못했습니다. 원래 쓰시던 것은 그대로 있습니다.'
         }
         $note = Join-Path (Join-Path $env:LOCALAPPDATA 'cys') 'cys-install-failure.txt'
         if (Test-Path $note) {
@@ -865,7 +873,7 @@ function Step-InstallCys {
         }
         Say '     이 방법으로는 설치되지 않았습니다. 다음 방법을 시도합니다.'
     }
-    Say '[6/10] 설치가 확인되지 않았습니다.'
+    Say '[6/11] 설치가 확인되지 않았습니다.'
     # 만든 사람이 정한 복구 순서다. 이 순서를 지키지 않으면 쓰던 것까지 잃을 수 있다.
     Say '     ⓘ 이럴 때 프로그램을 제거하지 마십시오.'
     Say '       cys 를 창에서 종료하고(세션이 저장됩니다) 10초 기다린 뒤,'
@@ -878,8 +886,8 @@ function Step-InstallCys {
 # 설치 목록(등록)만 보고 판정하지 않는다. 프로그램 실체와 버전 응답 두 가지를 본다.
 function Step-VerifyCys {
     $b = Test-CysBody
-    if (-not $b.Body) { Say '[7/10] cys 프로그램을 찾지 못했습니다.'; return 7 }
-    Say "[7/10] cys 프로그램을 찾았습니다: $(Redact $b.Path)"
+    if (-not $b.Body) { Say '[7/11] cys 프로그램을 찾지 못했습니다.'; return 7 }
+    Say "[7/11] cys 프로그램을 찾았습니다: $(Redact $b.Path)"
     # 명령이 이 창의 경로 목록에 없을 수 있다 — 새 프로세스로 다시 본다
     # 지금 창에만 있던 경로가 사라지지 않도록 덮어쓰지 않고 덧붙인다.
     # (앞 단계에서 클로드를 설치하며 이 창에만 잡아 둔 경로가 있을 수 있다.)
@@ -900,17 +908,17 @@ function Step-VerifyCys {
         try { $ver = (Get-Item $b.Cli).VersionInfo.ProductVersion } catch { }
         if ($ver) { $script:CysCli = $b.Cli; Say '     (명령이 아직 답하지 않아 파일에 적힌 판본을 읽었습니다.)' }
     }
-    if ($ver) { Say "[7/10] cys 가 답합니다: $ver"; Say "     부르는 길: $(Redact $script:CysCli)"; return 0 }
-    Say '[7/10] 프로그램은 있는데 아직 명령으로 부를 수 없습니다. 창을 새로 열고 같은 줄을 다시 돌려 주십시오.'
+    if ($ver) { Say "[7/11] cys 가 답합니다: $ver"; Say "     부르는 길: $(Redact $script:CysCli)"; return 0 }
+    Say '[7/11] 프로그램은 있는데 아직 명령으로 부를 수 없습니다. 창을 새로 열고 같은 줄을 다시 돌려 주십시오.'
     return 7
 }
 
 # ── 하는 일 8 — 이 계정에 자리 잡기 ───────────────────────────────
 # 관리자 권한을 쓰지 않는다. 마지막 판정은 자가진단이 전부 통과하는가로 한다.
 function Step-PrepareAccount {
-    if ($Mode -eq 'dry') { Say '[8/10] (dry-run) 계정 준비를 하지 않았습니다.'; return 0 }
+    if ($Mode -eq 'dry') { Say '[8/11] (dry-run) 계정 준비를 하지 않았습니다.'; return 0 }
     $cli = if ($script:CysCli) { $script:CysCli } else { 'cys' }
-    Say '[8/10] 이 계정에 자리를 잡습니다.'
+    Say '[8/11] 이 계정에 자리를 잡습니다.'
     Invoke-Logged 'init-pack' $cli @('init-pack') | Out-Null
     Invoke-Logged 'daemon install' $cli @('daemon', 'install') | Out-Null
     # 한 번 응답을 받았으면 그것으로 판정한다. 다시 물으면 그 순간의 흔들림으로 성공이 실패가 된다.
@@ -928,7 +936,7 @@ function Step-PrepareAccount {
         $sideCar = Join-Path $cysHome 'cys-app.exe'
         if (-not (Test-Path $sideCar)) { $sideCar = Join-Path $cysHome 'cysd.exe' }
         if (Test-Path $sideCar) {
-            Say '[8/10] 자동으로 켜지도록 등록하지는 못했습니다. 이번에는 프로그램을 직접 열어 보겠습니다.'
+            Say '[8/11] 자동으로 켜지도록 등록하지는 못했습니다. 이번에는 프로그램을 직접 열어 보겠습니다.'
             try { Start-Process -FilePath $sideCar | Out-Null } catch { Say "       직접 열지 못했습니다: $($_.Exception.Message)" }
             for ($i = 0; $i -lt 10; $i++) {
                 $pong = (& $cli ping 2>&1) -join ' '
@@ -937,7 +945,7 @@ function Step-PrepareAccount {
             }
             if ($alive) {
                 $script:DaemonTemporary = $true
-                Say '[8/10] 켜졌습니다.'
+                Say '[8/11] 켜졌습니다.'
                 Say '     자동으로 켜지도록 등록하는 것은 이 계정에서 막혀 있습니다(윈도우 설정).'
                 Say '     다음에 컴퓨터를 켜시면 cys 를 한 번 열어 주시면 됩니다. 그러면 그때부터 다시 돕니다.'
                 Write-Log 'daemon started by launching the app (auto-start registration blocked by policy)'
@@ -945,7 +953,7 @@ function Step-PrepareAccount {
         }
     }
     if (-not $alive) {
-        Say '[8/10] 준비는 됐는데 아직 응답이 없습니다.'
+        Say '[8/11] 준비는 됐는데 아직 응답이 없습니다.'
         # 어느 층에서 멈췄는지 알려 주는 값이 따로 있다 — 추측하지 말고 그것을 그대로 보인다.
         #   등록됐는가 / 올라왔는가 / 창구가 살아 있는가, 셋이 갈라져 나온다.
         Invoke-Logged 'daemon status' $cli @('daemon', 'status') | Out-Null
@@ -962,17 +970,17 @@ function Step-PrepareAccount {
     if ($m.Success) {
         $nOk = $m.Groups[1].Value; $nWarn = $m.Groups[2].Value
         $bad = [int]$m.Groups[3].Value; $nSkip = $m.Groups[4].Value
-        Say "[8/10] 자가진단: 통과 $nOk · 주의 $nWarn · 실패 $bad · 판정 못 함 $nSkip"
+        Say "[8/11] 자가진단: 통과 $nOk · 주의 $nWarn · 실패 $bad · 판정 못 함 $nSkip"
     } else {
         # 요약 줄을 못 찾으면 항목 표시로 센다(문구가 바뀐 경우).
         $bad = [regex]::Matches($doc, '\[FAIL\s*\]').Count
         $nSkip = [regex]::Matches($doc, '\[SKIP\s*\]').Count
-        Say "[8/10] 자가진단 요약 줄을 찾지 못해 항목을 세었습니다: 실패 $bad"
+        Say "[8/11] 자가진단 요약 줄을 찾지 못해 항목을 세었습니다: 실패 $bad"
     }
     # 통과 기준은 실패 0 이다. 주의는 성한 컴퓨터에도 나온다.
     # 판정 못 한 항목은 「됐다」로 세지 않는다 — 몇 개인지 그대로 알린다.
     if ($bad -gt 0) {
-        Say "[8/10] 자가진단에서 $bad 가지가 통과하지 못했습니다."
+        Say "[8/11] 자가진단에서 $bad 가지가 통과하지 못했습니다."
         Say '     아래 자비스가 무엇이 걸렸는지 사람 말로 알려 드립니다.'
         return 8
     }
@@ -981,7 +989,7 @@ function Step-PrepareAccount {
     # 사전 설정을 여기서 한 번 더 심는다 — 안 그러면 동료들이 첫 실행 질문 앞에서 멈춰 선다(실측).
     Set-AllProfiles | Out-Null
     Copy-LoginToIsolated | Out-Null
-    Say '[8/10] 자리를 잡았습니다 (실패 0).'
+    Say '[8/11] 자리를 잡았습니다 (실패 0).'
     return 0
 }
 
@@ -995,12 +1003,13 @@ function Step-Wake {
     #   중간에 글자가 바뀔 자리가 없다.
     $firstPrompt = "Read the file $DirectiveFile and do exactly what it says. Your first line must be the fixed line specified there."
     if ($Mode -eq 'dry') {
-        Say '[9/10] (dry-run) 자비스를 띄우지 않았습니다.'
+        Say '[9/11] (dry-run) 자비스를 띄우지 않았습니다.'
         Say "     (지금까지 사람 손이 필요했던 횟수: $($script:HumanHands)번)"
         [void](Step-Fleet '')
+        [void](Step-Agora)
         return
     }
-    Say '[9/10] 자비스를 깨웁니다.'
+    Say '[9/11] 자비스를 깨웁니다.'
     Say "     (지금까지 사람 손이 필요했던 횟수: $($script:HumanHands)번)"
     $cli = if ($script:CysCli) { $script:CysCli } else { 'cys' }
     # 창 이름도 같은 이유로 ASCII 다 — 이 이름이 거절당한 자리다.
@@ -1051,6 +1060,9 @@ function Step-Wake {
             # 창이 열렸으면 곧바로 동료들을 부른다. 여기서 부르는 까닭 = 아래 폴백(이 창에서 자비스를
             # 띄우는 길)로 내려가면 그 순간부터 이 스크립트는 자비스 화면에 갇혀 다음 줄을 못 간다.
             [void](Step-Fleet $script:WakeRef)
+            # 아고라 참가는 함대와 의존이 없다. 함대가 못 선 가장 흔한 까닭은 그 한마디를 아직 안 치신 것이고,
+            # 그것은 고장이 아니다. 고장이 아닌 까닭으로 기능을 없애지 않는다.
+            [void](Step-Agora)
             return
         }
         # 왜 못 열었는지를 화면과 기록 파일 양쪽에 남긴다. 이 값이 없으면 다음에도 원인을 모른다.
@@ -1068,14 +1080,14 @@ function Step-Wake {
     }
     Set-Location -Path $JarvisHome -ErrorAction SilentlyContinue
     if (-not (Get-Command claude -ErrorAction SilentlyContinue)) {
-        Say '[9/10] 자비스를 띄우지 못했습니다 — 클로드 명령을 찾지 못했습니다.'
+        Say '[9/11] 자비스를 띄우지 못했습니다 — 클로드 명령을 찾지 못했습니다.'
         Say '     창을 새로 열고 같은 한 줄을 다시 돌려 주십시오.'
         return
     }
     try {
         & claude --dangerously-skip-permissions $firstPrompt
     } catch {
-        Say "[9/10] 자비스를 띄우지 못했습니다: $($_.Exception.Message)"
+        Say "[9/11] 자비스를 띄우지 못했습니다: $($_.Exception.Message)"
         Say '     창을 새로 열고 같은 한 줄을 다시 돌려 주십시오.'
         return
     }
@@ -1105,10 +1117,10 @@ function Get-LiveRoles {
 }
 function Step-Fleet {
     param([string]$SurfaceRef)
-    if ($Mode -eq 'dry') { Say '[10/10] (dry-run) 함대를 부르지 않았습니다.'; return 0 }
+    if ($Mode -eq 'dry') { Say '[10/11] (dry-run) 함대를 부르지 않았습니다.'; return 0 }
     $cli = if ($script:CysCli) { $script:CysCli } else { 'cys' }
     if (-not $SurfaceRef) {
-        Say '[10/10] 자비스 창을 못 열어 동료들을 부르지 못했습니다.'
+        Say '[10/11] 자비스 창을 못 열어 동료들을 부르지 못했습니다.'
         Say "     cys 창에서 자비스에게 이렇게 말해 주십시오: $FleetTrigger"
         return 10
     }
@@ -1138,11 +1150,11 @@ function Step-Fleet {
     }
     $missing = @($FleetRoles | Where-Object { $live -notcontains $_ })
     if ($missing.Count -eq 0) {
-        Say ("[10/10] 함대가 섰습니다: " + ($live -join ' · '))
+        Say ("[10/11] 함대가 섰습니다: " + ($live -join ' · '))
         return 0
     }
     # 성공보다 이 문구가 중요하다 — 무엇이 없어서 못 섰는지를 그대로 말한다.
-    Say ("[10/10] 아직 서지 않은 자리가 있습니다: " + ($missing -join ' · '))
+    Say ("[10/11] 아직 서지 않은 자리가 있습니다: " + ($missing -join ' · '))
     Say ("     선 자리 = " + $(if ($live.Count) { $live -join ' · ' } else { '없음' }))
     Say '     아직 그 한마디를 치지 않으셨다면, cys 창에서 지금 쳐 주시면 됩니다.'
     Say '     치셨는데도 서지 않았다면 cys 창의 자비스에게 물어보십시오 — 무엇이 걸렸는지 사람 말로 알려 줍니다.'
@@ -1150,10 +1162,273 @@ function Step-Fleet {
     return 10
 }
 
+# ── 하는 일 11 — 아고라 참가 ───────────────────────────────────────
+# 아고라는 여러 자비스가 한자리에 모여 토론하는 곳이다. 이 단은 이 컴퓨터를 그 명부에 올린다.
+# 파이썬을 쓰지 않는다. 필요한 것(열쇠 만들기·지문·소유 증명 서명·주고받기)이 전부
+# 윈도우에 이미 들어 있다. 프로그램을 하나도 더 깔지 않는다는 뜻이다.
+$AgoraRelayUrl = if ($env:AGORA_RELAY_URL) { $env:AGORA_RELAY_URL } else { 'https://agora.godmeyou.kr' }
+$AgoraSignNs   = 'jarvis-agora@godmeyou.kr'
+$AgoraHome     = if ($env:AGORA_HOME) { $env:AGORA_HOME } else { Join-Path $env:USERPROFILE '.config\agora' }
+$AgoraKey      = Join-Path $AgoraHome 'id_ed25519'
+$AgoraConf     = Join-Path $AgoraHome 'participant.json'
+# 클라이언트 파일은 설치 사이트 사본에서 받는다. 주소가 비어 있으면 그 부분만 건너뛴다
+# (명부 등재는 클라이언트 파일과 아무 의존이 없다).
+$AgoraCliUrl   = if ($env:AGORA_CLI_URL) { $env:AGORA_CLI_URL } else { '' }
+$AgoraCliSha   = if ($env:AGORA_CLI_SHA) { $env:AGORA_CLI_SHA } else { '' }
+
+# 이름에는 사람에 관한 것을 넣지 않는다.
+# 컴퓨터 이름을 쓰지 않는 까닭: 이 컴퓨터의 이름은 대개 계정 이름을 담고 있다.
+# 읽지 않으면 심사할 것도 없다.
+function New-AgoraId {
+    # New-Object System.Random 을 쓰지 않는다 — 시각으로 씨를 뿌리므로 같은 순간에 두 번 부르면
+    # 똑같은 이름이 나온다. 이름이 겹쳐서 다시 해 보는 자리에서 하필 그 일이 일어난다.
+    $chars = 'abcdefghijklmnopqrstuvwxyz0123456789'.ToCharArray()
+    $buf = New-Object System.Text.StringBuilder
+    for ($i = 0; $i -lt 10; $i++) { [void]$buf.Append($chars[(Get-Random -Minimum 0 -Maximum $chars.Length)]) }
+    return ('jarvis-' + $buf.ToString())
+}
+
+# 서명 도구가 이 컴퓨터에서 소유 증명을 실제로 만들 수 있는지 본다.
+# 판본이 낮으면 -Y 자체를 모른다 — 한 번 서명해 보는 것이 유일하게 확실한 판정이다.
+# 열쇠가 암호로 잠겨 있으면 서명 도구가 암호를 물으며 그 자리에서 멈춘다.
+# 물어보기 전에 파일만 보고 판별한다 — 잠기지 않은 열쇠는 둘째 줄이 늘 이 글자로 시작한다(실측).
+function Test-AgoraKeyOpen {
+    if (-not (Test-Path $AgoraKey)) { return $false }
+    $lines = Get-Content -LiteralPath $AgoraKey -TotalCount 2 -ErrorAction SilentlyContinue
+    if (-not $lines -or $lines.Count -lt 2) { return $false }
+    return ([string]$lines[1]).StartsWith('b3BlbnNzaC1rZXktdjEAAAAABG5vbmU')
+}
+
+function Test-AgoraSigner {
+    if (-not (Get-Command ssh-keygen -ErrorAction SilentlyContinue)) { return $false }
+    if (-not (Test-AgoraKeyOpen)) { Write-Log 'agora: key is locked - not signing'; return $false }
+    $probe = Join-Path $AgoraHome '.signprobe'
+    try { Write-TextNoBom $probe 'probe' } catch { return $false }
+    $ok = $false
+    try {
+        # 물어볼 입력을 아예 닫아 둔다. 무언가를 묻게 되면 기다리지 않고 그 자리에서 실패한다.
+        $null | & ssh-keygen -Y sign -q -n $AgoraSignNs -f $AgoraKey $probe 2>&1 | Out-Null
+        $ok = ($LASTEXITCODE -eq 0) -and (Test-Path ($probe + '.sig'))
+    } catch { $ok = $false }
+    Remove-Item -LiteralPath $probe, ($probe + '.sig') -Force -ErrorAction SilentlyContinue
+    return $ok
+}
+
+# cys 가 함께 가져온 파이썬을 경로로 찾는다.
+# 이름으로만 부르면 컴퓨터에 원래 있던 것이 잡힐 수 있다.
+function Get-BundledPython {
+    $roots = @()
+    if ($env:LOCALAPPDATA) { $roots += (Join-Path $env:LOCALAPPDATA 'cys') }
+    if ($env:PROGRAMFILES) { $roots += (Join-Path $env:PROGRAMFILES 'cys') }
+    foreach ($root in $roots) {
+        if (-not (Test-Path $root)) { continue }
+        $hit = Get-ChildItem -Path $root -Filter 'python.exe' -Recurse -Depth 6 -File -ErrorAction SilentlyContinue |
+               Select-Object -First 1
+        if ($hit) { return $hit.FullName }
+    }
+    # cys 창 안에서 돌고 있으면 PATH 에 이미 번들 것이 잡힌다.
+    $cmd = Get-Command python -ErrorAction SilentlyContinue
+    if ($cmd -and $cmd.Source -and ($cmd.Source -notmatch 'WindowsApps')) { return $cmd.Source }
+    return ''
+}
+
+# 릴레이에 말을 거는 자리는 여기 하나뿐이다. 주고받는 형태가 바뀌면 이 함수만 고친다.
+# 결과: 0 = 올랐다(새로 또는 이미) · 3 = 이름이 이미 다른 열쇠의 것 · 그 밖 = 못 올렸다
+function Invoke-AgoraRegister {
+    param([string]$ParticipantId, [string]$PublicKey, [string]$Fingerprint)
+    $msg = Join-Path $AgoraHome '.register.json'
+    # 서명 대상은 다섯 칸을 이 순서로 이어 붙인 것 하나다.
+    # 끝에 줄바꿈이나 표시 바이트가 붙으면 다른 것을 서명한 셈이 되므로 그 둘이 없는 쓰기만 쓴다.
+    $canon = '{"display_name":"' + $ParticipantId + '","fingerprint":"' + $Fingerprint +
+             '","participant_id":"' + $ParticipantId + '","public_key":"' + $PublicKey +
+             '","purpose":"agora-register-v1"}'
+    Write-TextNoBom $msg $canon
+    Remove-Item -LiteralPath ($msg + '.sig') -Force -ErrorAction SilentlyContinue
+    $null | & ssh-keygen -Y sign -q -n $AgoraSignNs -f $AgoraKey $msg 2>&1 | Out-Null
+    if (($LASTEXITCODE -ne 0) -or -not (Test-Path ($msg + '.sig'))) {
+        Write-Log 'agora: sign failed'
+        Remove-Item -LiteralPath $msg -Force -ErrorAction SilentlyContinue
+        return 1
+    }
+    $sigLines = Get-Content -LiteralPath ($msg + '.sig')
+    $sig = ($sigLines -join '\n') + '\n'
+    $body = '{"participant_id":"' + $ParticipantId + '","display_name":"' + $ParticipantId +
+            '","public_key":"' + $PublicKey + '","fingerprint":"' + $Fingerprint +
+            '","signature":"' + $sig + '"}'
+    Remove-Item -LiteralPath $msg, ($msg + '.sig') -Force -ErrorAction SilentlyContinue
+    $bytes = [System.Text.Encoding]::UTF8.GetBytes($body)
+    $code = 0
+    try {
+        $resp = Invoke-WebRequest -Uri ($AgoraRelayUrl + '/register') -Method Post `
+                    -ContentType 'application/json' -Body $bytes -TimeoutSec 30 `
+                    -UseBasicParsing -ErrorAction Stop
+        $code = [int]$resp.StatusCode
+        Write-TextNoBom (Join-Path $AgoraHome '.register.resp.json') ([string]$resp.Content)
+    } catch {
+        # 실패해도 답의 내용이 중요하다 — 무엇이 걸렸는지는 본문에 적혀 있다.
+        $r = $_.Exception.Response
+        if ($r) {
+            try { $code = [int]$r.StatusCode } catch { $code = 0 }
+            try {
+                $sr = New-Object System.IO.StreamReader($r.GetResponseStream())
+                Write-TextNoBom (Join-Path $AgoraHome '.register.resp.json') $sr.ReadToEnd()
+                $sr.Close()
+            } catch { }
+        }
+        Write-Log ("agora: register error " + $_.Exception.Message)
+    }
+    # 응답 코드를 한 줄로 남긴다(맥판과 같은 자리·같은 이름).
+    Write-TextNoBom (Join-Path $AgoraHome '.register.http') ([string]$code)
+    Write-Log "agora: register http=$code"
+    if (($code -eq 201) -or ($code -eq 200)) { return 0 }
+    if ($code -eq 409) { return 3 }
+    return 4
+}
+
+# 명부 사본을 내려받는다. 없어도 등재 자체는 이미 끝난 것이므로 실패로 세지 않는다.
+function Sync-AgoraRoster {
+    $got = 0
+    foreach ($n in @('allowed_signers', 'revoked_keys', 'operators')) {
+        try {
+            Invoke-WebRequest -Uri ($AgoraRelayUrl + '/participants/' + $n) `
+                -OutFile (Join-Path $AgoraHome $n) -TimeoutSec 20 -UseBasicParsing -ErrorAction Stop
+            $got++
+        } catch { Write-Log ("agora: roster $n failed") }
+    }
+    Write-Log "agora: roster files=$got"
+    return ($got -gt 0)
+}
+
+# 클라이언트 파일을 받아 놓고, cys 가 가져온 파이썬으로 도는 실행 파일을 하나 만든다.
+function Set-AgoraClient {
+    if (-not $AgoraCliUrl) { Write-Log 'agora: client url empty - skip'; return $false }
+    $py = Get-BundledPython
+    if (-not $py) { Write-Log 'agora: bundled python not found'; return $false }
+    $zip = Join-Path $AgoraHome '.client.zip'
+    try {
+        Invoke-WebRequest -Uri $AgoraCliUrl -OutFile $zip -TimeoutSec 120 -UseBasicParsing -ErrorAction Stop
+    } catch { Write-Log 'agora: client download failed'; return $false }
+    if ($AgoraCliSha) {
+        $h = Get-FileHash -LiteralPath $zip -Algorithm SHA256 -ErrorAction SilentlyContinue
+        $got = if ($h -and $h.Hash) { ([string]$h.Hash).ToLower() } else { '' }
+        # 지문을 못 얻었으면 「맞는지 모른다」이지 「맞다」가 아니다 - 빈 값은 아래 대조에서 반드시 어긋난다.
+        if ($got -ne $AgoraCliSha.ToLower()) {
+            Write-Log "agora: client sha mismatch got=$got"
+            Remove-Item -LiteralPath $zip -Force -ErrorAction SilentlyContinue
+            return $false
+        }
+    }
+    $lib = Join-Path $AgoraHome 'lib'
+    $bin = Join-Path $AgoraHome 'bin'
+    [void](New-Item -ItemType Directory -Path $lib -Force -ErrorAction SilentlyContinue)
+    [void](New-Item -ItemType Directory -Path $bin -Force -ErrorAction SilentlyContinue)
+    try {
+        Add-Type -AssemblyName System.IO.Compression.FileSystem -ErrorAction SilentlyContinue
+        # 이 방법은 같은 이름이 이미 있으면 그 자리에서 던진다 — 다시 돌릴 때가 바로 그 자리다.
+        # 우리가 만든 폴더이므로 통째로 비우고 새로 푼다(남의 파일은 이 아래에 없다).
+        Remove-Item -LiteralPath $lib -Recurse -Force -ErrorAction SilentlyContinue
+        [void](New-Item -ItemType Directory -Path $lib -Force -ErrorAction SilentlyContinue)
+        [System.IO.Compression.ZipFile]::ExtractToDirectory($zip, $lib)
+    } catch {
+        Write-Log ('agora: client unzip failed ' + $_.Exception.Message)
+        Remove-Item -LiteralPath $zip -Force -ErrorAction SilentlyContinue
+        return $false
+    }
+    Remove-Item -LiteralPath $zip -Force -ErrorAction SilentlyContinue
+    $shim = '@echo off' + "`r`n" + '"' + $py + '" "' + (Join-Path $lib 'bin\agora') + '" %*' + "`r`n"
+    Write-TextNoBom (Join-Path $bin 'agora.cmd') $shim
+    Write-Log "agora: client placed with $py"
+    return $true
+}
+
+function Step-Agora {
+    if ($Mode -eq 'dry') {
+        Say "[11/11] (dry-run) 아고라에 등재하지 않았습니다. 등재할 곳 = $AgoraRelayUrl"
+        return
+    }
+    [void](New-Item -ItemType Directory -Path $AgoraHome -Force -ErrorAction SilentlyContinue)
+    # 이름을 정한다. 이미 있으면 그대로 쓴다(다시 돌려도 사고가 되지 않게).
+    $participantId = ''
+    if (Test-Path $AgoraConf) {
+        # 있는지 본 것과 읽히는 것은 다르다(그 사이에 잠길 수 있다). 읽은 값이 빌 수 있다고 보고 다룬다.
+        $confRaw = Get-Content -LiteralPath $AgoraConf -Raw -ErrorAction SilentlyContinue
+        if ($confRaw) {
+            $m = [regex]::Match([string]$confRaw, '"id"\s*:\s*"([^"]*)"')
+            if ($m.Success) { $participantId = $m.Groups[1].Value }
+        }
+    }
+    if (-not $participantId) { $participantId = New-AgoraId }
+    # 열쇠를 만든다. 이미 있으면 덮어쓰지 않는다 —
+    # 덮어쓰면 그 열쇠로 서명한 지난 글을 아무도 확인할 수 없다.
+    $madeKey = $false
+    if (-not (Test-Path $AgoraKey)) {
+        # 빈 암호를 넘기는 자리다. 윈도우에서는 따옴표 두 개를 그대로 넘겨야 받는 쪽이 빈 값으로 읽는다.
+        # 그래도 잠긴 열쇠가 만들어질 여지가 있으므로, 바로 아래에서 파일을 보고 다시 확인한다.
+        $null | & ssh-keygen -t ed25519 -N '""' -C ('agora:' + $participantId) -f $AgoraKey -q 2>&1 | Out-Null
+        if (-not (Test-Path $AgoraKey)) {
+            Say '[11/11] 아고라 참가는 지금 하지 못했습니다 (참가 열쇠를 만들지 못했습니다).'
+            Say '     나중에 자비스에게 아고라에 참가해 달라고 말하면 됩니다.'
+                return
+        }
+        $madeKey = $true
+    }
+    # 원인을 하나로 단정하지 않는다. 「열쇠가 잠겼다」와 「도구가 낡았다」는 다른 일이고
+    # 사람이 해야 할 일도 다르다 — 앞의 것은 열쇠를 치우면 되고 뒤의 것은 그렇지 않다.
+    if (-not (Test-AgoraKeyOpen)) {
+        Say '[11/11] 아고라 참가는 지금 하지 못했습니다 (참가 열쇠에 암호가 걸려 있습니다).'
+        Say ("     " + (Redact $AgoraKey) + " 를 다른 이름으로 옮겨 두시고 같은 줄을 다시 돌리면 새로 만듭니다.")
+        Write-Log 'agora: key is locked'
+        return
+    }
+    if (-not (Test-AgoraSigner)) {
+        Say '[11/11] 아고라 참가는 지금 하지 못했습니다 (이 컴퓨터의 서명 도구가 낡았습니다).'
+        Say '     나중에 자비스에게 아고라에 참가해 달라고 말하면 됩니다.'
+        Write-Log 'agora: signer too old'
+        return
+    }
+    # 값이 비어 있을 수 있는 자리에 바로 점을 찍지 않는다 —
+    # 파일이 없거나 못 읽으면 값이 비고, 그때 점을 찍으면 그 자리에서 오류가 뜬다.
+    $pubRaw = Get-Content -LiteralPath ($AgoraKey + '.pub') -Raw -ErrorAction SilentlyContinue
+    $publicKey = if ($pubRaw) { ([string]$pubRaw).Trim() } else { '' }
+    $fingerprint = ''
+    $fpOut = ($null | & ssh-keygen -l -f ($AgoraKey + '.pub') 2>&1) -join ' '
+    $fm = [regex]::Match($fpOut, 'SHA256:[A-Za-z0-9+/=]+')
+    if ($fm.Success) { $fingerprint = $fm.Value }
+    if ((-not $publicKey) -or (-not $fingerprint)) {
+        Say '[11/11] 아고라 참가는 지금 하지 못했습니다 (참가 열쇠를 읽지 못했습니다).'
+        return
+    }
+    $rc = Invoke-AgoraRegister $participantId $publicKey $fingerprint
+    # 이름이 이미 다른 열쇠의 것일 때, 이번에 열쇠를 새로 만들었다면 다른 이름으로 한 번만 다시 해 본다.
+    # 열쇠가 원래 있었다면 다시 해도 같은 이유로 막힌다(한 열쇠는 한 이름만 가진다) — 그래서 하지 않는다.
+    if (($rc -eq 3) -and $madeKey) {
+        $participantId = New-AgoraId
+        $rc = Invoke-AgoraRegister $participantId $publicKey $fingerprint
+    }
+    if ($rc -ne 0) {
+        Say '[11/11] 아고라 참가는 지금 하지 못했습니다.'
+        Say '     나중에 자비스에게 아고라에 참가해 달라고 말하면 됩니다.'
+        return
+    }
+    $conf = '{' + "`n" + '  "id": "' + $participantId + '",' + "`n" +
+            '  "display_name": "' + $participantId + '",' + "`n" +
+            '  "key_fingerprint": "' + $fingerprint + '",' + "`n" +
+            '  "namespace": "' + $AgoraSignNs + '",' + "`n" +
+            '  "operator": false,' + "`n" +
+            '  "relay": "' + $AgoraRelayUrl + '"' + "`n" + '}' + "`n"
+    Write-TextNoBom $AgoraConf $conf
+    if (-not (Sync-AgoraRoster)) { Say '     (참가자 명부 사본은 나중에 받아도 됩니다.)' }
+    [void](Set-AgoraClient)
+    Say "[11/11] 아고라에 참가했습니다. 이 컴퓨터의 참가 이름은 $participantId 입니다."
+    Say ("     이 이름과 열쇠는 " + (Redact $AgoraHome) + " 에 있습니다.")
+    # 이 함수의 값은 아무도 쓰지 않는다. 값을 돌려주면 화면에 숫자 한 줄로 새어 나온다.
+    return
+}
+
 # ── 본문 ──────────────────────────────────────────────────────────
 Say "=== 자비스 설치 도우미 $BootstrapVersion (모드: $Mode) ==="
 Show-PrevRunNote
-Say '[1/10] 이 컴퓨터를 살펴봅니다.'
+Say '[1/11] 이 컴퓨터를 살펴봅니다.'
 Invoke-DetectStage1
 Invoke-DetectStage2
 Write-Report
