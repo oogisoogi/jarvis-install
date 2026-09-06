@@ -259,7 +259,7 @@ function Invoke-DetectStage1 {
     } else {
         $probeClaude = Join-Path $env:USERPROFILE '.local\bin\claude.exe'
         if (Test-Path $probeClaude) {
-            Add-Row '1-2' '클로드 판본' '-' 'blocked' "파일은 있는데 **이 창의 PATH 에서 안 잡힌다**($(Redact $probeClaude)) — 창을 새로 열면 잡힌다"
+            Add-Row '1-2' '클로드 판본' '-' 'blocked' "파일은 있는데 **이 창의 PATH 에서 안 잡힌다**($(Redact $probeClaude)) — [2/11] 이 사용자 PATH 에 등록하고 이 창에서도 잡히게 한다"
         } else {
             Add-Row '1-2' '클로드 판본' '-' 'unknown' 'claude 명령이 없다 (설치 전 정상값)'
         }
@@ -457,6 +457,47 @@ function Write-Report {
     Say "환경 보고를 썼습니다: $(Redact $ReportFile)  (종합 판정 = $verdict)"
 }
 
+# ── 사용자 PATH 에 ~\.local\bin 을 심는다 (2026-09-06 실사용자 2건 · F-W18 확정) ─────
+#   🔴공식 설치기는 윈도우에서도 PATH 를 안 건드린다 — 화면에 「System Properties → Environment
+#   Variables → Edit User PATH → New」라고 **사람에게 시킨다**(실사용자 사진 2026-09-06 20:05 · 2.1.263 ·
+#   공식 문서 「Verify your PATH」도 설치 뒤 PATH 부재를 정상 사례로 안내한다).
+#   앞 판은 그 뒤에 `Get-Command claude` 가 실패하면 「창을 새로 열고 다시」라고만 했다 — 새 창에도
+#   PATH 가 없으니 **같은 문장이 무한히 되풀이됐다**(실사용자 1차 제보 「계속 … 안 잡힌다」).
+#   맥은 같은 날 아침 seed_local_bin_path 로 고쳤는데 윈도우엔 대응물이 0 이었다 — 대상 유형에 묶인
+#   규율의 재발. ⇒ 공식 문서의 명령 그대로 **사용자 PATH 에 멱등으로** 넣고, 이 창의 PATH 도 갱신한다.
+#   ⚠사용자 PATH 만 만진다(시스템 PATH = 권한 상승 = 우리 상한 밖). 값은 %USERPROFILE% 확장·대소문자
+#   무시·끝 역슬래시 무시로 비교한다 — 사람이 손으로 넣은 다른 표기와 중복 누적되지 않게.
+function Seed-LocalBinPath {
+    $bin = (Join-Path $env:USERPROFILE '.local\bin').TrimEnd('\')
+    if (-not (Test-Path $bin)) { Write-Log "seed-path: $bin absent - skip"; return $false }
+    try {
+        $user = [Environment]::GetEnvironmentVariable('Path','User')
+        $have = $false
+        if ($user) {
+            foreach ($p in ($user -split ';')) {
+                if (-not $p) { continue }
+                $x = [Environment]::ExpandEnvironmentVariables($p).TrimEnd('\')
+                if ($x -ieq $bin) { $have = $true; break }
+            }
+        }
+        if ($have) {
+            Write-Log 'seed-path: already in User PATH'
+        } else {
+            $new = if ($user) { "$user;$bin" } else { $bin }
+            [Environment]::SetEnvironmentVariable('Path', $new, 'User')
+            Write-Log "seed-path: added $bin to User PATH"
+        }
+    } catch {
+        Write-Log "seed-path: failed - $($_.Exception.Message)"
+        return $false
+    }
+    # 등록은 새 창부터 먹는다 — 이 창의 다음 단계가 바로 부를 수 있게 앞에 붙인다(있으면 안 붙인다).
+    $inProc = $false
+    foreach ($p in ($env:Path -split ';')) { if ($p -and ($p.TrimEnd('\') -ieq $bin)) { $inProc = $true; break } }
+    if (-not $inProc) { $env:Path = "$bin;$env:Path" }
+    return $true
+}
+
 # ── 하는 일 2 — 공식 설치기 호출 (멱등: 이미 있으면 건너뛴다) ─────
 function Step-InstallClaude {
     if ($script:ClaudeOk) { Say '[2/11] 클로드가 이미 있습니다 — 건너뜁니다 (멱등).'; return 0 }
@@ -487,9 +528,22 @@ function Step-InstallClaude {
         $env:Path = [Environment]::GetEnvironmentVariable('Path','Machine') + ';' +
                     [Environment]::GetEnvironmentVariable('Path','User')
     } catch { }
+    # 🔴설치기가 PATH 를 안 심으므로 우리가 심는다(F-W18 · 2026-09-06). 위 갱신 **뒤에** 부른다 —
+    #   위 줄이 이 창의 PATH 를 통째로 덮어쓰므로, 앞에서 붙였다면 여기서 지워진다.
+    [void](Seed-LocalBinPath)
     # 실행 결과 검사 = 설치기의 종료 코드가 아니라 명령이 답하는가
     if (-not (Get-Command claude -ErrorAction SilentlyContinue)) {
-        Say '[2/11] 설치기는 끝났는데 claude 명령이 아직 안 잡힙니다. 창을 새로 열고 다시 돌려 주십시오.'
+        #   「창을 새로 열고 다시」만 말하면 사람은 같은 자리를 돈다(실사용자 1차 제보). 사실 3개를 같이 적는다 —
+        #   파일이 있는가 · 사용자 PATH 에 들어갔는가 · 설치기 종료 코드. 이 세 값이 다음 판정을 가른다.
+        $exe = Join-Path $env:USERPROFILE '.local\bin\claude.exe'
+        $bin = (Join-Path $env:USERPROFILE '.local\bin').TrimEnd('\')
+        $inUser = '아니오'
+        $u = [Environment]::GetEnvironmentVariable('Path','User')
+        if ($u) { foreach ($p in ($u -split ';')) { if ($p -and ([Environment]::ExpandEnvironmentVariables($p).TrimEnd('\') -ieq $bin)) { $inUser = '예'; break } } }
+        $hasExe = if (Test-Path $exe) { '예' } else { '아니오' }
+        Say '[2/11] 설치기는 끝났는데 claude 명령이 아직 안 잡힙니다.'
+        Say "     파일 있음: $hasExe ($(Redact $exe)) · 사용자 PATH 등록: $inUser · 설치기 종료 코드: $installRc"
+        Say '     이 화면을 사진으로 남겨 주십시오. 창을 새로 열고 같은 한 줄을 다시 돌리면 여기서부터 이어서 갑니다.'
         return 4
     }
     if (-not (Test-ClaudeAuthCmd)) {
