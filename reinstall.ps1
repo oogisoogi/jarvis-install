@@ -25,7 +25,8 @@ param([switch]$List)
 $ErrorActionPreference = 'Continue'
 try { [Console]::OutputEncoding = [System.Text.Encoding]::UTF8 } catch { }
 
-$Base          = 'https://jarvis.godmeyou.kr/install'
+# 주소는 하나다. JARVIS_BASE_URL 은 검증 하네스가 가짜 지우개를 심을 때만 쓴다(맥 reinstall.sh 와 같은 손잡이).
+$Base          = if ($env:JARVIS_BASE_URL) { $env:JARVIS_BASE_URL } else { 'https://jarvis.godmeyou.kr/install' }
 $Home_         = [Environment]::GetFolderPath('UserProfile')
 $ResetFile     = Join-Path $Home_ 'reset-clean.ps1'
 $BootstrapFile = Join-Path $Home_ 'install-jarvis.ps1'
