@@ -42,13 +42,29 @@ curl -fsSL https://jarvis.godmeyou.kr/install/bootstrap.sh -o "$HOME/install-jar
 
 화면에 **「함대가 섰습니다: master · cso · worker」**가 나오고, cys 창에 자비스와 동료들의 창이 열려 있으면 끝난 것입니다.
 
-## 깨끗이 지우기 (처음 상태로 되돌리기)
+## 삭제하고 재설치하기
 
-설치 도우미가 놓은 것과 cys · 클로드를 모두 지웁니다. 되돌릴 수 없고, 로그인도 지워집니다. 먼저 윈도우 설정 → 앱에서 cys를 제거한 뒤 실행하십시오.
+중간에 멈췄거나 뭔가 꼬인 것 같을 때 쓰십시오. 지금 상태가 어떻든 깨끗이 지우고 처음부터 다시 깝니다. 먼저 무엇을 지울지 목록으로 보여 드리고 한 번 여쭙니다. 그때 그만두셔도 됩니다.
+
+- **되돌릴 수 없습니다.** 「지웁니다」라고 치시면 그때부터 지워집니다.
+- **로그인은 그대로 둡니다.** 다시 깐 뒤에도 로그인 화면이 다시 뜨지 않습니다.
+- **사진·문서·내려받기 같은 파일은 손대지 않습니다.** 설치 도우미가 놓은 것만 지웁니다.
+
+윈도우 — PowerShell:
 
 ```
-irm https://jarvis.godmeyou.kr/install/reset-clean.ps1 -OutFile $env:TEMP\reset-clean.ps1; powershell -ExecutionPolicy Bypass -File $env:TEMP\reset-clean.ps1
+powershell -NoProfile -ExecutionPolicy Bypass -Command "irm https://jarvis.godmeyou.kr/install/reinstall.ps1 -OutFile ([Environment]::GetFolderPath('UserProfile')+'\reinstall-jarvis.ps1'); powershell -ExecutionPolicy Bypass -File ([Environment]::GetFolderPath('UserProfile')+'\reinstall-jarvis.ps1')"
 ```
+
+맥 — 터미널:
+
+```
+curl -fsSL https://jarvis.godmeyou.kr/install/reinstall.sh -o "$HOME/reinstall-jarvis.sh" && bash "$HOME/reinstall-jarvis.sh"
+```
+
+지우지 않고 무엇이 깔려 있는지만 보시려면 `reset-clean.sh --list`(맥) 또는 `reset-clean.ps1 -List`(윈도우)를 쓰십시오. 아무것도 바꾸지 않고 목록만 보여 드립니다. 윈도우에서 cys 프로그램은 설정 → 앱에서 직접 제거하셔야 합니다(스크립트가 그 화면으로 안내합니다).
+
+계정을 바꾸고 싶으신 경우는 다른 일입니다. 창에 `claude auth logout`을 치신 뒤 다시 로그인하시면 됩니다. 다시 깔 필요는 없습니다.
 
 ## 파일
 
@@ -56,7 +72,10 @@ irm https://jarvis.godmeyou.kr/install/reset-clean.ps1 -OutFile $env:TEMP\reset-
 |---|---|
 | `bootstrap.ps1` | 윈도우 설치 도우미 (PowerShell 5.1 이상) |
 | `bootstrap.sh` | 맥 설치 도우미 (bash) |
-| `reset-clean.ps1` | 윈도우 깨끗이 지우기 |
+| `reinstall.ps1` | 윈도우 삭제 후 재설치 진입점 (지우기가 실패하면 설치로 넘어가지 않음) |
+| `reinstall.sh` | 맥 삭제 후 재설치 진입점 |
+| `reset-clean.ps1` | 윈도우 상태 진단(`-List`)·깨끗이 지우기 |
+| `reset-clean.sh` | 맥 상태 진단(`--list`)·깨끗이 지우기 |
 
 이 스크립트는 사용자 폴더 안에서만 동작하며 관리자 권한을 요구하지 않습니다. 설치는 클로드 공식 설치 경로와 cys 공식 배포 파일만 사용합니다.
 
