@@ -52,7 +52,17 @@ $ClaudeExe  = Join-Path $env:USERPROFILE '.local\bin\claude.exe'
 $ClaudeBin  = (Join-Path $env:USERPROFILE '.local\bin').TrimEnd('\')
 $AgoraDir   = Join-Path $env:USERPROFILE '.config\agora'
 $SettingsJs = Join-Path $ClaudeDir 'settings.json'
-$CredFile   = Join-Path $ClaudeDir '.credentials.json'
+# ★로그인 파일 자리는 고정이 아니다 — 공식 문서(2026-09-08 확인 · code.claude.com/docs/en/team
+#   「Credential management」): 「If you've set the CLAUDE_CONFIG_DIR environment variable, Claude Code
+#   keeps the .credentials.json file under that directory instead」.
+#   ⇒ 그 변수가 선 창에서 이 스크립트를 돌리면 **우리가 보는 자리와 클로드가 보는 자리가 갈린다.**
+#   갈린 채로 「[있음] 로그인」이라고 적으면 그 줄이 거짓이 된다. 클로드가 보는 자리를 본다.
+$ClaudeCfgDir = if ($env:CLAUDE_CONFIG_DIR) { $env:CLAUDE_CONFIG_DIR } else { $ClaudeDir }
+$CredFile   = Join-Path $ClaudeCfgDir '.credentials.json'
+# 자비스 창(cys)이 띄우는 클로드는 CLAUDE_CONFIG_DIR 을 ~\.cys\claude 로 두고 뜬다.
+#   그 폴더는 아래에서 「cys 계정 자리」로 **통째로 지워진다** — 거기 든 로그인도 같이 사라진다.
+#   지우는 것을 바꾸지는 않는다(그것은 사람이 결정할 일이다). 다만 **말은 해 준다.**
+$CysCredFile = Join-Path $CysHome 'claude\.credentials.json'
 # 받아 둔 설치기 사본 — 2026-09-06 부터 사용자 폴더에 받는다. 옛 자리(임시 폴더)도 함께 본다.
 $HomePs1    = Join-Path $env:USERPROFILE 'install-jarvis.ps1'
 $TempPs1    = Join-Path $env:TEMP 'install-jarvis.ps1'
@@ -95,6 +105,30 @@ function Get-CysCmd {
     if ($g) { return $g.Source }
     return $null
 }
+# 🔴🔴적대검증 [3] BLOCK 채택(2026-09-08): 앞 판은 `-TaskName '*cys*'` 로 잡히는 것을 **전부 지웠다.**
+#   `macys-backup`·`cys-project` 처럼 이름이 스치기만 하는 **남의 작업이 함께 영구 삭제된다.**
+#   ★이름이 스친다고 우리 것이 아니다. 우리 것의 근거는 이름이 아니라 **그 작업이 무엇을 실행하는가**다.
+function Get-CysTasks {
+    $cand = @()
+    try { $cand = @(Get-ScheduledTask -ErrorAction SilentlyContinue | Where-Object { $_.TaskName -like '*cys*' }) }
+    catch { return @() }
+    $roots = @($CysDir, $CysDirOld) | Where-Object { $_ }
+    $ours = @()
+    foreach ($tk in $cand) {
+        $mine = $false
+        # 이름이 정확히 우리 것이거나(느슨한 부분일치가 아니다) 우리 회사 표식을 달고 있으면 우리 것이다.
+        if ($tk.TaskName -ieq 'cys' -or $tk.TaskName -ieq 'cysd' -or $tk.TaskName -imatch 'cysjavis') { $mine = $true }
+        # 그리고 결정적인 근거 — 실행하는 파일이 우리 설치 자리 안에 있는가.
+        foreach ($a in @($tk.Actions)) {
+            $x = $null; try { $x = $a.Execute } catch { }
+            if (-not $x) { continue }
+            foreach ($r in $roots) { if ($r -and $x -like ($r + '*')) { $mine = $true } }
+            if ($x -imatch 'cysd?\.exe$') { $mine = $true }
+        }
+        if ($mine) { $ours += $tk }
+    }
+    return $ours
+}
 function Test-UserPathSeed {
     $u = [Environment]::GetEnvironmentVariable('Path','User')
     if (-not $u) { return $false }
@@ -106,13 +140,15 @@ function Test-UserPathSeed {
 }
 function Test-JsonKey($file, $key) {
     if (-not (Test-Path $file)) { return $false }
-    try { $o = Get-Content $file -Raw -ErrorAction Stop | ConvertFrom-Json -ErrorAction Stop }
-    catch { return $false }
+    $t = Read-TextUtf8 $file
+    if ($null -eq $t -or $t -eq '') { return $false }
+    try { $o = $t | ConvertFrom-Json -ErrorAction Stop } catch { return $false }
     return ($null -ne $o.PSObject.Properties[$key])
 }
 function Test-Hooks($file) {
     if (-not (Test-Path $file)) { return $false }
-    try { $t = Get-Content $file -Raw -ErrorAction Stop } catch { return $false }
+    $t = Read-TextUtf8 $file
+    if ($null -eq $t) { return $false }
     return ($t -match 'session-start\.(sh|ps1)|role-bootstrap\.(sh|ps1)')
 }
 function Test-LoginPresent {
@@ -130,9 +166,8 @@ function Invoke-Diagnose {
     # footprint: W-REG
     [void](Row 'cys 설치 목록 항목' $RegKey)
     # footprint: W-DAEMON
-    $t = $null
-    try { $t = Get-ScheduledTask -TaskName '*cys*' -ErrorAction SilentlyContinue } catch { }
-    RowFlag 'cys 상시 가동 등록' ($null -ne $t) '작업 스케줄러'
+    $tk = @(Get-CysTasks)
+    RowFlag 'cys 상시 가동 등록' ($tk.Count -gt 0) '작업 스케줄러'
     # footprint: W-CYSHOME
     [void](Row 'cys 계정 자리' $CysHome)
     # footprint: W-CLAUDEBIN
@@ -166,6 +201,11 @@ function Invoke-Diagnose {
         Write-Host '         기본으로 남깁니다. 재설치 뒤 로그인을 다시 하지 않으셔도 됩니다.'
     }
     # footprint: W-CLAUDEUSER
+    if (Test-Path $CysCredFile) {
+        Write-Host ('  [있음] 자비스 창 전용 로그인 · ' + (Short $CysCredFile))
+        Write-Host '         ⚠이것은 위의 「cys 계정 자리」 안에 들어 있어 **함께 지워집니다.**'
+        Write-Host '         자비스 창에서 하신 로그인은 다시 하셔야 합니다 — 윈도우에서 하신 로그인과는 별개입니다.'
+    }
     if (Test-Path $ClaudeDir) { Write-Host ('  [있음] 클로드 대화·기록 · ' + (Short $ClaudeDir) + ' (남깁니다)') }
     else { Write-Host ('  [없음] 클로드 대화·기록 · ' + (Short $ClaudeDir)) }
     Write-Host '  사진·문서·내려받기 등 개인 파일은 목록에 없습니다 — 손대지 않습니다.'
@@ -190,20 +230,73 @@ function Invoke-Diagnose {
 #     통째로 못 읽게 만드는** 것이다.
 #   ⑵원본에 바로 쓰면 쓰는 도중 멈췄을 때(백신 개입·강제 종료) 남의 파일이 **반쪽으로 남는다.**
 #   ⇒ BOM 없는 인코딩으로 **임시 파일에 다 쓴 뒤** 한 번에 자리를 바꾼다.
-function Write-JsonNoBom($file, $obj) {
+# 🔴🔴적대검증·러너 실측 채택(2026-09-08 · run 34209137309 이 실물에서 잡았다).
+#   `Get-Content $file -Raw` 는 **인코딩을 안 적으면 PowerShell 5.1 에서 ANSI(cp1252·cp949)로 읽는다.**
+#   남의 `.claude.json` 은 UTF-8 이다 ⇒ 「자비스 연구소」가 「ìž\x90ë¹„ìŠ¤」 가 되고, 그 깨진 글자를
+#   우리가 다시 UTF-8 로 써 넣는다. **칸 하나 빼려다 남의 설정 파일을 통째로 훼손하는 것이다.**
+#   (러너가 잡은 실피해: 한글 값·키가 전부 mojibake · `한글칸` 이 깨진 이름의 새 칸으로 생김 ·
+#    2048자 문자열이 6144자가 됨 · `projects` 의 우리말 경로 칸이 사라지고 깨진 이름으로 재생성.)
+#   ⚠형제 파일 `bootstrap.ps1` 은 같은 자리에서 이미 `-Encoding UTF8` 을 쓰고 있었다(701·723·749).
+#   **깔 때는 맞게 읽고 지울 때는 틀리게 읽고 있었다** — 한 쌍으로 도는 일인데 한쪽만 고쳐져 있었다.
+function Read-TextUtf8($file) {
+    # 성공 = 글자 · 실패 = $null. ★못 알아본 파일은 **손대지 않는다**(반쪽으로 만드는 것보다 낫다).
+    try { $bytes = [System.IO.File]::ReadAllBytes($file) } catch { return $null }
+    if ($bytes.Length -eq 0) { return '' }
+    $skip = 0
+    if ($bytes.Length -ge 3 -and $bytes[0] -eq 0xEF -and $bytes[1] -eq 0xBB -and $bytes[2] -eq 0xBF) { $skip = 3 }
+    $body = New-Object byte[] ($bytes.Length - $skip)
+    [Array]::Copy($bytes, $skip, $body, 0, $body.Length)
+    if ($body.Length -eq 0) { return '' }
+    # throwOnInvalidBytes — UTF-8 이 아닌 바이트가 있으면 여기서 걸린다(조용히 뭉개지 않는다).
+    $enc = New-Object System.Text.UTF8Encoding($false, $true)
+    try { $text = $enc.GetString($body) } catch { return $null }
+    # 되짚어 본다: 읽은 글자를 다시 바이트로 만들면 원래 바이트와 같아야 한다.
+    try { $again = $enc.GetBytes($text) } catch { return $null }
+    if ($again.Length -ne $body.Length) { return $null }
+    if ([Convert]::ToBase64String($again) -ne [Convert]::ToBase64String($body)) { return $null }
+    return $text
+}
+
+# ★쓰기에도 자기검증을 붙인다(이중 방어 — 검사 축과 같은 논리를 지우개 안에 넣는다).
+#   ⑴글로 옮겼다가 되읽어 **뜻이 같은가**(왕복 손실 — 깊이 잘림·배열 벗겨짐·날짜 변환)
+#   ⑵쓴 파일을 되읽어 **글자가 같은가**(인코딩 손실)
+#   하나라도 어긋나면 **원본을 건드리지 않고** 사실대로 [남음] 으로 남긴다.
+#   되돌릴 수 없는 일에서는 「아마 됐을 것」보다 「안 했다」가 낫다.
+function Write-JsonChecked($file, $obj) {
     $json = $obj | ConvertTo-Json -Depth 40
-    $tmp  = "$file.jarvis-tmp"
-    $enc  = New-Object System.Text.UTF8Encoding($false)
-    [System.IO.File]::WriteAllText($tmp, $json, $enc)
-    Move-Item -Path $tmp -Destination $file -Force -ErrorAction Stop
+    try { $back = $json | ConvertFrom-Json -ErrorAction Stop } catch { return '글로 옮긴 것을 되읽지 못했습니다' }
+    if (($back | ConvertTo-Json -Depth 40 -Compress) -ne ($obj | ConvertTo-Json -Depth 40 -Compress)) {
+        return '글로 옮겼다가 되읽으니 뜻이 달라졌습니다'
+    }
+    $tmp = "$file.jarvis-tmp"
+    $enc = New-Object System.Text.UTF8Encoding($false)
+    try { [System.IO.File]::WriteAllText($tmp, $json, $enc) } catch { return $_.Exception.Message }
+    $rt = Read-TextUtf8 $tmp
+    if ($null -eq $rt -or $rt -ne $json) {
+        Remove-Item $tmp -Force -ErrorAction SilentlyContinue
+        return '쓴 파일을 되읽으니 글자가 달라졌습니다'
+    }
+    try { Move-Item -Path $tmp -Destination $file -Force -ErrorAction Stop } catch { return $_.Exception.Message }
+    return $null
 }
 function Remove-JsonKey($file, $key) {
     if (-not (Test-Path $file)) { return }
+    $raw = Read-TextUtf8 $file
+    if ($null -eq $raw) {
+        $script:KeptFail++
+        Write-Host ("  [남음] " + (Short $file) + " 의 " + $key + " 칸 — 이 파일을 UTF-8 로 읽지 못했습니다. 손대지 않았습니다.")
+        return
+    }
     try {
-        $o = Get-Content $file -Raw -ErrorAction Stop | ConvertFrom-Json -ErrorAction Stop
+        $o = $raw | ConvertFrom-Json -ErrorAction Stop
         if ($null -eq $o.PSObject.Properties[$key]) { return }
         $o.PSObject.Properties.Remove($key)
-        Write-JsonNoBom $file $o
+        $why = Write-JsonChecked $file $o
+        if ($why) {
+            $script:KeptFail++
+            Write-Host ("  [남음] " + (Short $file) + " 의 " + $key + " 칸 — " + $why + " 원본은 그대로 두었습니다.")
+            return
+        }
         $script:Removed++; Write-Host ("  지움: " + (Short $file) + " 의 " + $key + " 칸 (파일은 그대로)")
     } catch {
         # 주석이 든 설정 파일(JSONC)은 5.1 의 ConvertFrom-Json 이 못 읽는다 — 그때는 안 고치고 사실대로 말한다.
@@ -212,8 +305,14 @@ function Remove-JsonKey($file, $key) {
 }
 function Remove-OurHooks($file) {
     if (-not (Test-Hooks $file)) { return }
+    $raw = Read-TextUtf8 $file
+    if ($null -eq $raw) {
+        $script:KeptFail++
+        Write-Host ("  [남음] " + (Short $file) + " 의 각성 훅 — 이 파일을 UTF-8 로 읽지 못했습니다. 손대지 않았습니다.")
+        return
+    }
     try {
-        $o = Get-Content $file -Raw -ErrorAction Stop | ConvertFrom-Json -ErrorAction Stop
+        $o = $raw | ConvertFrom-Json -ErrorAction Stop
         $h = $o.PSObject.Properties['hooks']
         if ($null -eq $h) { return }
         foreach ($ev in @($h.Value.PSObject.Properties.Name)) {
@@ -225,7 +324,12 @@ function Remove-OurHooks($file) {
             if ($keep.Count -gt 0) { $h.Value.$ev = $keep } else { $h.Value.PSObject.Properties.Remove($ev) }
         }
         if ($h.Value.PSObject.Properties.Name.Count -eq 0) { $o.PSObject.Properties.Remove('hooks') }
-        Write-JsonNoBom $file $o
+        $why = Write-JsonChecked $file $o
+        if ($why) {
+            $script:KeptFail++
+            Write-Host ("  [남음] " + (Short $file) + " 의 각성 훅 — " + $why + " 원본은 그대로 두었습니다.")
+            return
+        }
         $script:Removed++; Write-Host ("  지움: " + (Short $file) + " 의 각성 훅 (다른 설정은 그대로)")
     } catch { $script:KeptFail++; Write-Host ("  [남음] " + (Short $file) + " 의 각성 훅 — " + $_.Exception.Message) }
 }
@@ -283,10 +387,9 @@ function Invoke-Purge {
     #   윈도우에는 없었다 — 두 OS 가 갈리는 자리였다. 스케줄러를 직접 떼는 길을 둔다.
     if (-not $daemonDone) {
         try {
-            $tasks = Get-ScheduledTask -TaskName '*cys*' -ErrorAction SilentlyContinue
-            foreach ($t in $tasks) {
-                Unregister-ScheduledTask -TaskName $t.TaskName -Confirm:$false -ErrorAction Stop
-                $script:Removed++; Write-Host ('  지움: cys 상시 가동 등록 (' + $t.TaskName + ')')
+            foreach ($tk in @(Get-CysTasks)) {
+                Unregister-ScheduledTask -TaskName $tk.TaskName -Confirm:$false -ErrorAction Stop
+                $script:Removed++; Write-Host ('  지움: cys 상시 가동 등록 (' + $tk.TaskName + ')')
             }
         } catch { $script:KeptFail++; Write-Host ('  [남음] cys 상시 가동 등록 — ' + $_.Exception.Message) }
     }

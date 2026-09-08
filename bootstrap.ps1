@@ -557,6 +557,17 @@ function Step-InstallClaude {
 
 # ── 하는 일 3 — 로그인 유도 + 완료 감지 ───────────────────────────
 function Step-Login {
+    # 🔴[1/11] 의 로그인 판정은 **클로드가 없던 시점**의 것이다 — 그 자리에서는 물어볼 상대가 없어
+    #   unknown 으로 적고 지나간다. 그런데 [2/11] 에서 방금 클로드를 깔았다.
+    #   ⇒ 브라우저를 열기 전에 **한 번 다시 본다.**
+    #   왜 이 줄이 생겼나(2026-09-08 오너 실기): 「지우고 다시 깔기」에서 지우개는 로그인을 남겼는데
+    #   (화면에 「남김: 로그인」), 판정만 옛것이라 [3/11] 이 로그인 화면을 다시 열었다.
+    #   ★첫 설치에서는 이 줄이 아무 일도 하지 않는다. 어긋나는 것은 지우고 다시 까는 길 하나뿐이다.
+    #   ⚠능력 확인을 먼저 통과할 때만 묻는다 — 낡은 판본에서 auth status 는 질문으로 나간다.
+    if ((-not $script:LoggedIn) -and (Test-ClaudeAuthCmd)) {
+        $reauth = (& claude auth status 2>$null) -join "`n"
+        if ($reauth -match '"loggedIn"\s*:\s*true') { $script:LoggedIn = $true }
+    }
     if ($script:LoggedIn) { Say '[3/11] 이미 로그인돼 있습니다 — 건너뜁니다 (멱등).'; return 0 }
     if ($Mode -eq 'dry')  { Say "[3/11] (dry-run) 폴링하지 않았습니다. 간격 $LoginPollInterval 초 · 상한 $LoginPollTimeout 초."; return 0 }
 

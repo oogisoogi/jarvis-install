@@ -73,7 +73,17 @@ hook_present() { # 각성 훅이 남의 settings.json 에 병합돼 있는가
 #    write, such as when it's locked in an SSH session …, Claude Code saves your login to the
 #    plaintext ~/.claude/.credentials.json file instead.」
 #   ⇒ 열쇠고리만 보면 **원격으로 로그인한 기계에서는 못 찾는다.** 둘 다 본다.
-CRED_FILE="$HOME/.claude/.credentials.json"
+#   ⑶그리고 자리는 **고정이 아니다**: 「If you've set the CLAUDE_CONFIG_DIR environment variable,
+#     Claude Code keeps the .credentials.json file under that directory instead, including the file
+#     the macOS fallback writes, and keys the macOS Keychain entry to that directory too」
+#     (같은 문서 · 2026-09-08 확인). ⇒ 그 변수가 선 창에서 이 스크립트를 돌리면 **우리가 보는 자리와
+#     클로드가 보는 자리가 갈린다.** 갈린 채로 「있음」이라고 적으면 그 줄이 거짓이 된다.
+CLAUDE_CFG_DIR="${CLAUDE_CONFIG_DIR:-$HOME/.claude}"
+CRED_FILE="$CLAUDE_CFG_DIR/.credentials.json"
+# 자비스 창(cys)이 띄우는 클로드는 CLAUDE_CONFIG_DIR 을 ~/.cys/claude 로 두고 뜬다. 그 폴더는
+#   아래에서 「cys 계정 자리」로 **통째로 지워진다** — 거기 든 로그인도 같이 사라진다.
+#   지우는 것을 바꾸지는 않는다(그것은 사람이 결정할 일이다). 다만 **말은 해 준다.**
+CYS_CRED_FILE="$HOME/.cys/claude/.credentials.json"
 login_present() {
   security find-generic-password -s "$KEYCHAIN_SERVICE" >/dev/null 2>&1 && return 0
   [ -f "$CRED_FILE" ]
@@ -143,6 +153,11 @@ diagnose() {
     say "         (클로드가 그렇게 만들어 두었습니다 — 우리가 고를 수 있는 것이 아닙니다.)"
   else
     say "         기본으로 남깁니다. 재설치 뒤 로그인을 다시 하지 않으셔도 됩니다."
+  fi
+  if [ -f "$CYS_CRED_FILE" ]; then
+    say "  [있음] 자비스 창 전용 로그인 · $(short "$CYS_CRED_FILE")"
+    say "         ⚠이것은 위의 「cys 계정 자리」 안에 들어 있어 함께 지워집니다."
+    say "         자비스 창에서 하신 로그인은 다시 하셔야 합니다 — 따로 하신 로그인과는 별개입니다."
   fi
   # footprint: M-CLAUDEUSER
   [ -d "$HOME/.claude" ] && say "  [있음] 클로드 대화·기록 · $(short "$HOME/.claude") (남깁니다)" \
@@ -258,7 +273,9 @@ strip_hooks() { # 각성 훅만 뺀다. 사용자의 다른 훅은 건드리지 
   if "$py" - "$sf" > "$tmp" 2>/dev/null <<'PY'
 import json,sys
 p=sys.argv[1]
-d=json.load(open(p))
+# ⚠인코딩을 안 적으면 그 기계의 로케일로 읽는다 — 남의 설정 파일은 UTF-8 이다.
+#   같은 병이 윈도우판에서 실제로 났다(러너 실측 2026-09-08: 한글이 통째로 깨져 다시 쓰였다).
+d=json.load(open(p,encoding="utf-8"))
 h=d.get("hooks")
 def ours(entry):
     s=json.dumps(entry)
@@ -271,7 +288,8 @@ if isinstance(h,dict):
             if kept: h[ev]=kept
             else: del h[ev]
     if not h: d.pop("hooks",None)
-json.dump(d,sys.stdout,ensure_ascii=False,indent=2)
+# 화면(stdout)도 로케일을 타므로 바이트로 직접 내보낸다.
+sys.stdout.buffer.write(json.dumps(d,ensure_ascii=False,indent=2).encode("utf-8"))
 PY
   then
     if cat "$tmp" > "$sf" 2>/dev/null; then REMOVED=$((REMOVED+1)); say "  지움: $(short "$sf") 의 각성 훅 (다른 설정은 그대로)"
@@ -297,6 +315,16 @@ purge_login_first() {
     local did=0
     security delete-generic-password -s "$KEYCHAIN_SERVICE" >/dev/null 2>&1 && did=1
     [ -f "$CRED_FILE" ] && rm -f "$CRED_FILE" 2>/dev/null && did=1
+    # 🔴적대검증 [1] **부분** 채택(2026-09-08). 열쇠고리에는 같은 이름의 항목이 **여럿** 있을 수 있다 —
+    #   클로드가 설정 폴더마다 따로 걸기 때문이다(공식 문서 · 이 개발기에 실측 8개).
+    #   `security delete-generic-password` 는 그 가운데 **하나만** 지운다.
+    #   ⛔「없어질 때까지 반복해 지운다」는 안 한다 — 그러면 **이 사람의 다른 클로드 로그인까지**
+    #     지운다(우리가 깔지 않은 것도 포함). 지우는 범위를 넓히는 것은 사람이 정할 일이다.
+    #   ✅우리가 할 수 있는 것은 **사실대로 말하는 것**이다. 조용히 지나가면 「로그인까지 지웠다」가 거짓이 된다.
+    if security find-generic-password -s "$KEYCHAIN_SERVICE" >/dev/null 2>&1; then
+      say "  ⚠열쇠고리에 같은 이름의 로그인 항목이 더 남아 있습니다(클로드가 설정 폴더마다 따로 겁니다)."
+      say "     우리가 아는 자리 하나만 지웠습니다. 나머지는 그 폴더를 쓰는 클로드에서 로그아웃해 주십시오."
+    fi
     if [ "$did" = "1" ]; then REMOVED=$((REMOVED+1)); say "  지움: 로그인 (자리를 직접 치웠습니다)"
     else say "  로그인: 지울 것이 없었습니다."; fi
   fi
