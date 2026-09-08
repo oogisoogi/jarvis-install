@@ -73,6 +73,11 @@ $LoginPollTimeout  = 600   # 초 (10분)
 # 설치기를 기다리는 한도. 한도가 없으면 백신 경고 창 같은 것이 떠 있는 동안 영원히 서 있게 된다.
 $InstallWaitMs    = 300000   # 조용한 설치 (5분)
 $InstallGuiWaitMs = 900000   # 설치 창을 띄웠을 때 (15분 · 사람이 누르는 시간)
+# 🔴2026-09-09 실사용자 3호 실기 — 클로드 설치기가 백신 창에 붙들려 **아무 말 없이** 멈췄다.
+#   그 자리에는 상한도 안내도 없었다(설치기를 부르고 그냥 기다렸다). 사람은 화면이 멈춘 것만 보고,
+#   정작 눌러야 할 창은 다른 곳에 떠 있었다. ⇒ 기다리는 동안 말을 하고, 끝이 있는 기다림으로 바꾼다.
+$ClaudeInstallWaitMs  = 600000   # 클로드 설치 상한 (10분 · 넘으면 조용히 다음으로 가지 않는다)
+$InstallNoteEverySec  = 30       # 기다리는 동안 몇 초마다 한 줄을 적는가
 
 $Mode = if ($DetectOnly) { 'detect' } elseif ($DryRun) { 'dry' } else { 'full' }
 
@@ -160,6 +165,18 @@ function Show-PrevRunNote {
     Say '     이어서 진행합니다 — 이미 끝난 단계는 다시 하지 않습니다.'
 }
 
+# 백신이 파일을 붙들었을 때 하는 말은 한 자리에서만 만든다 — 두 곳(설치 대기·받은 파일 사라짐)에서
+# 같은 일이 나는데 문장이 갈리면, 같은 사고를 두 가지 이름으로 배우게 된다.
+# ⛔여기에 백신을 끄거나 예외로 등록하는 안내를 넣지 않는다. 우리가 하는 일은 「막혔다」를 알아볼 수
+#   있게 적어 두는 것뿐이다.
+function Say-AntivirusHold($what) {
+    Say '     백신이 그 파일을 붙들고 있는 것으로 보입니다.'
+    Say ("     대상 = " + $what)
+    Say '     작업 표시줄과 화면 오른쪽 아래에 백신 창이 떠 있는지 확인해 주십시오.'
+    Say '     「클라우드 자동 분석 요청」 창이면 [파일 전송] 을, 실행 알림이면 [실행] 을 누르시고 창을 닫지 마십시오.'
+    Say '     그 뒤 같은 한 줄을 다시 돌리시면 여기서부터 이어서 갑니다.'
+}
+
 function Redact($s) {
     if ($null -eq $s) { return '' }
     return ([string]$s).Replace($env:USERPROFILE, '~')
@@ -170,6 +187,40 @@ function Redact($s) {
 function Test-ClaudeAuthCmd {
     $h = (& claude --help 2>$null) -join "`n"
     return ($h -match '(?m)^\s*auth\s')
+}
+
+#   cys 쪽 능력도 같은 까닭으로 `--help` 로 묻는다(판본 숫자를 게이트로 쓰지 않는다).
+#   묻는 것 = 자리를 열 때 「이 자리에서 무엇을 띄우는지」를 적어 두는 칸이 있는가.
+#   그 칸이 있어야 컴퓨터를 껐다 켠 뒤 복원이 자비스 자리를 「무엇을 띄울지 모름」으로 건너뛰지 않는다.
+#   ⚠지금 배포된 판본(0.14.29)에는 그 칸이 없다 — 없는 판본에 붙이면 자리가 아예 안 열린다.
+#   그래서 붙이기 전에 물어본다. 한 번만 묻고 그 답을 기록 파일에 한 줄 남긴다.
+#   ⚠답을 기억해 두지 않는다. 이 스크립트가 도는 동안 cys 는 **없다가 생기고 낡았다가 새로워진다** —
+#   설치 전에 물어 둔 답을 설치 뒤에 그대로 쓰면 옛 판본에 대고 판정하는 셈이 된다.
+#   기록은 한 줄만 남긴다(답이 바뀐 때만 또 남긴다 — 바뀌었다는 것 자체가 알 값이다).
+$script:CysAgentFlag = ''    # 마지막으로 기록한 답 · '' 아직 기록 안 함
+function Test-CysAgentFlag {
+    $cli = if ($script:CysCli) { $script:CysCli } else { 'cys' }
+    $h = ''
+    if (Get-Command $cli -ErrorAction SilentlyContinue) {
+        # 읽기만 하는 물음이므로 데몬을 깨우지 않는다(이 파일이 이미 쓰는 감싸개를 그대로 쓴다 —
+        # 남이 켜 둔 값을 지우지 않고 되돌려 준다).
+        $h = (Invoke-CysProbe $cli @('new-surface', '--help')) -join "`n"
+    }
+    $ans = if ($h -match '--agent') { 'yes' } else { 'no' }
+    if ($ans -ne $script:CysAgentFlag) {
+        $script:CysAgentFlag = $ans
+        Write-Log "cys new-surface --agent supported: $ans"
+    }
+    return ($ans -eq 'yes')
+}
+
+# 이 컴퓨터의 cys 가 스스로 말하는 판본 한 줄(없으면 빈 글자).
+function Get-CysVersionLine {
+    $cli = if ($script:CysCli) { $script:CysCli } else { 'cys' }
+    if (Get-Command $cli -ErrorAction SilentlyContinue) {
+        return ((Invoke-CysProbe $cli @('--version')) | Select-Object -First 1)
+    }
+    return ''
 }
 
 # cys 가 이 컴퓨터에 있는가 — 세 가지는 서로 다른 질문이다.
@@ -398,6 +449,14 @@ function Invoke-DetectStage2 {
     else    { Add-Row '2-5' 'cys 자가점검' '-' 'unknown' '요약 줄을 찾지 못했습니다' }
 
     Add-Row '2-8' '첫 세션 지시 주입' '-' 'unknown' '아직 확인하는 방법이 없습니다'
+
+    #   컴퓨터를 껐다 켠 뒤 자비스 자리가 스스로 되살아나는가 — 그 답은 판본이 정한다.
+    #   이 행은 「무엇을 했는가」가 아니라 「이 컴퓨터에서 무엇이 되는가」를 적는다(맥판 2-9 와 같은 행).
+    if (Test-CysAgentFlag) {
+        Add-Row '2-9' 'master 좌석 복원 플래그' '전달' 'ok' '껐다 켠 뒤 자비스 자리가 자동으로 되살아납니다'
+    } else {
+        Add-Row '2-9' 'master 좌석 복원 플래그' "미지원($(Get-CysVersionLine))" 'ok' '이 판본에는 그 칸이 없어 붙이지 않았습니다 — 껐다 켜면 자비스 자리는 손으로 다시 엽니다'
+    }
 }
 
 function Write-Report {
@@ -512,14 +571,49 @@ function Step-InstallClaude {
     #   ⇒ in-process 로 돌리면 그 `exit` 가 부트스트랩을 통째로 그 자리에서 죽여 아래 실패 안내·
     #   재개 안내가 한 줄도 못 나간다. 맥판 `curl | bash` 는 자식 bash 라 같은 `exit` 가 부모를 못 죽인다
     $psExe = if ($PSVersionTable.PSVersion.Major -ge 6) { 'pwsh' } else { 'powershell' }
+    #   -Wait 도 `& ` 도 쓰지 않는다: 둘 다 **한도 없이** 기다리므로, 백신 창 하나에 영원히 서 있게 된다
+    #   (실사용자 3호 실기 · 07:09~07:20 화면 정지). 창은 살아 있는데 아무 말이 없으니 사람은 무엇을
+    #   해야 할지 알 수 없다. ⇒ 띄워 놓고 지켜보며, 30초마다 한 줄을 적고, 상한을 넘기면 멈춘다.
+    #   ⚠자식의 화면 출력은 그대로 이 창에 흐르게 둔다(리다이렉트하지 않는다) — 「글자가 주르륵」이
+    #     정상이라고 바로 위에서 말했고, 리다이렉트는 자식 안에서 공식 설치기가 쓰는 명령을 흔든다.
     try {
-        & $psExe -NoProfile -Command "irm '$ClaudeInstallUrl' | iex" | Out-Host
-        $installRc = $LASTEXITCODE
+        $p = Start-Process -FilePath $psExe -NoNewWindow -PassThru -ErrorAction Stop `
+                           -ArgumentList @('-NoProfile', '-Command', "irm '$ClaudeInstallUrl' | iex")
     } catch {
         Say "[2/11] 실패: $($_.Exception.Message). 인터넷 연결을 확인해 주십시오. 같은 한 줄을 다시 돌리면 여기서부터 이어서 갑니다."
         return 4
     }
-    if ($installRc -ne 0) {
+    $waitedMs = 0
+    $sinceNoteMs = 0
+    while ((-not $p.HasExited) -and ($waitedMs -lt $ClaudeInstallWaitMs)) {
+        Start-Sleep -Milliseconds 1000
+        $waitedMs += 1000
+        $sinceNoteMs += 1000
+        if ($sinceNoteMs -ge ($InstallNoteEverySec * 1000)) {
+            $sinceNoteMs = 0
+            $mm = [int]($waitedMs / 60000); $ss = [int]($waitedMs / 1000) % 60
+            Say ("     아직 설치 중입니다 (" + $mm + "분 " + $ss + "초 지남 · 최대 " + [int]($ClaudeInstallWaitMs / 60000) + "분). 작업 표시줄에 백신 창이 떠 있는지 확인해 주십시오 — 「파일 전송」이나 [실행] 을 누르시면 이어집니다.")
+        }
+    }
+    if (-not $p.HasExited) {
+        # 조용히 다음 단계로 가지 않는다. 여기서 멈춰야 사람이 무엇을 누를지 알게 된다.
+        Say ("[2/11] 설치가 " + [int]($ClaudeInstallWaitMs / 60000) + "분 안에 끝나지 않았습니다.")
+        Say-AntivirusHold '클로드 설치 파일 (이름이 claude 로 시작하는 파일)'
+        return 4
+    }
+    # PowerShell 5.1 은 갓 끝난 프로세스의 ExitCode 를 늦게 채우는 일이 있다(agy R1 [2] 지적 채택).
+    #   WaitForExit() 를 한 번 더 부른다 — 이미 끝났으므로 곧바로 돌아온다.
+    # 🔴⛔**읽지 못한 값을 0(성공)으로 덮지 않는다** — 그러면 실패 코드를 우리가 삼킨다.
+    #   실측 2026-09-09(러너 run 34289192025 · 대조 34271220513): 설치기가 오류로 죽었는데 화면에는
+    #   「설치기는 끝났는데 … 설치기 종료 코드: 0」이 나갔다. 같은 실패를 앞 판은 「실패 (종료 코드 1)」로
+    #   적었다. 사람이 읽는 문장이 **설치기가 성공한 것처럼** 바뀐 것이다 — 첫 판(0 으로 덮기)이 만든 후퇴다.
+    #   ⇒ 못 읽었으면 못 읽었다고 적고, 판정은 이 파일 원래 규칙 — **클로드 명령이 답하는가** — 로 넘긴다.
+    [void]$p.WaitForExit()
+    $installRc = $p.ExitCode
+    $rcShown = if ($null -eq $installRc) { '읽지 못함' } else { [string]$installRc }
+    if ($null -eq $installRc) {
+        Say '[2/11] 설치기가 끝났는데 종료 코드를 읽지 못했습니다 — 숫자 대신 클로드 명령이 답하는지로 판정합니다.'
+    } elseif ($installRc -ne 0) {
         Say "[2/11] 실패 (종료 코드 $installRc). 같은 한 줄을 다시 돌리면 여기서부터 이어서 갑니다."
         return 4
     }
@@ -542,7 +636,7 @@ function Step-InstallClaude {
         if ($u) { foreach ($p in ($u -split ';')) { if ($p -and ([Environment]::ExpandEnvironmentVariables($p).TrimEnd('\') -ieq $bin)) { $inUser = '예'; break } } }
         $hasExe = if (Test-Path $exe) { '예' } else { '아니오' }
         Say '[2/11] 설치기는 끝났는데 claude 명령이 아직 안 잡힙니다.'
-        Say "     파일 있음: $hasExe ($(Redact $exe)) · 사용자 PATH 등록: $inUser · 설치기 종료 코드: $installRc"
+        Say "     파일 있음: $hasExe ($(Redact $exe)) · 사용자 PATH 등록: $inUser · 설치기 종료 코드: $rcShown"
         Say '     이 화면을 사진으로 남겨 주십시오. 창을 새로 열고 같은 한 줄을 다시 돌리면 여기서부터 이어서 갑니다.'
         return 4
     }
@@ -842,6 +936,7 @@ function Step-DownloadCys {
         # 이것을 크기 불일치로 적으면 망 문제로 오해된다.
         if (-not (Test-Path $dst)) {
             Say '[5/11] 받은 파일이 사라졌습니다 — 백신이 격리했을 수 있습니다.'
+            Say-AntivirusHold (Redact $dst)
             Say '     백신 알림이 떴다면 그 화면의 이름, 대상 파일, 조치(차단·격리·삭제) 세 가지를 알려 주십시오.'
             continue
         }
@@ -1133,7 +1228,15 @@ function Step-Wake {
             Write-Log "wake path unusable: $wakeArg"
             $ref = ''
         } else {
-            $ref = (& $cli new-surface --role master --cwd $JarvisHome --title $surfaceTitle --cmd $cmd 2>&1) -join ''
+            # 「무엇을 띄우는지」 칸은 그 칸이 있는 판본에서만 붙인다 — 없는 판본에 붙이면
+            # 모르는 인자라며 거절당해 자리 자체가 안 열린다(조건을 둔 유일한 까닭이다).
+            # ⚠맥판은 이 두 줄을 함수 하나로 묶었는데, 이쪽은 검사 축이 「못 쓸 경로 판정 뒤에
+            #   이 줄이 온다」를 줄 순서로 재기 때문에 부르는 자리에 그대로 둔다(같은 동작·다른 모양).
+            if (Test-CysAgentFlag) {
+                $ref = (& $cli new-surface --role master --cwd $JarvisHome --title $surfaceTitle --agent claude --cmd $cmd 2>&1) -join ''
+            } else {
+                $ref = (& $cli new-surface --role master --cwd $JarvisHome --title $surfaceTitle --cmd $cmd 2>&1) -join ''
+            }
         }
         if ($ref -match 'surface:') {
             Say "     cys 안에서 자비스를 열었습니다 ($ref). cys 창에서 이어서 이야기하십시오."
@@ -1255,8 +1358,10 @@ $AgoraKey      = Join-Path $AgoraHome 'id_ed25519'
 $AgoraConf     = Join-Path $AgoraHome 'participant.json'
 # 클라이언트 파일은 설치 사이트 사본에서 받는다. 주소가 비어 있으면 그 부분만 건너뛴다
 # (명부 등재는 클라이언트 파일과 아무 의존이 없다).
-$AgoraCliUrl   = if ($env:AGORA_CLI_URL) { $env:AGORA_CLI_URL } else { '' }
-$AgoraCliSha   = if ($env:AGORA_CLI_SHA) { $env:AGORA_CLI_SHA } else { '' }
+# ★핀 두 줄 = 「어디서 받는가」와 「무엇을 받았어야 하는가」다. 둘은 **함께** 바뀐다 -
+#   주소만 새 판으로 바꾸고 지문을 두면 그 자리에서 거부된다(그게 맞는 동작이다).
+$AgoraCliUrl   = if ($env:AGORA_CLI_URL) { $env:AGORA_CLI_URL } else { 'https://jarvis.godmeyou.kr/install/agora-client-0.1.0.zip' }
+$AgoraCliSha   = if ($env:AGORA_CLI_SHA) { $env:AGORA_CLI_SHA } else { '5171b1161fc5e326486e9ffdd96034a22e194dafba610ee94eeb670aa81e4b64' }
 
 # 이름에는 사람에 관한 것을 넣지 않는다.
 # 컴퓨터 이름을 쓰지 않는 까닭: 이 컴퓨터의 이름은 대개 계정 이름을 담고 있다.
@@ -1368,6 +1473,59 @@ function Invoke-AgoraRegister {
 }
 
 # 명부 사본을 내려받는다. 없어도 등재 자체는 이미 끝난 것이므로 실패로 세지 않는다.
+# 자비스가 「아고라에 참가해」를 알아듣게 하는 자리.
+# ★내용을 여기 적지 않는다 - **가리키기만 한다.** 실제 안내는 클라이언트 꾸러미 안에 있고,
+#   꾸러미가 새 판으로 바뀌면 그 안내도 함께 바뀐다. 여기에 베껴 두면 둘이 갈라지고,
+#   갈라진 날 자비스는 **낡은 안내를 따른다**(그리고 아무 소리도 나지 않는다).
+function Get-AgoraSkillDirs {
+    $dirs = @((Join-Path $env:USERPROFILE '.claude\skills'))
+    $alt = Join-Path $env:USERPROFILE '.cys\claude'
+    if (Test-Path -LiteralPath $alt) { $dirs += (Join-Path $alt 'skills') }
+    return $dirs
+}
+
+function Set-AgoraSkill {
+    $target = Join-Path $AgoraHome 'lib\skills\agora-delegate\SKILL.md'
+    $probe  = Join-Path $AgoraHome 'bin\agora'
+    $desc = '광장(아고라)에 대리인을 파송한다 - 둘러보고 참가하고 발언한다. "아고라에 참가해" 같은 말을 들으면 이 스킬을 쓴다.'
+    $body = '---' + "`n" + 'name: agora-delegate' + "`n" +
+            ('description: ' + $desc) + "`n" + '---' + "`n`n" +
+            '# 광장 대리인' + "`n`n" +
+            '아래 파일을 **먼저 읽고 그대로 따른다.** 이 문서에는 절차를 적지 않는다 -' + "`n" +
+            '절차의 정본은 그 파일이고, 클라이언트가 새 판으로 바뀌면 그 파일이 함께 바뀐다.' + "`n`n" +
+            ('    ' + $target) + "`n`n" +
+            '읽을 수 없으면 그 사실을 사람에게 말하고 멈춘다. 절차를 기억으로 지어내지 마라.' + "`n" +
+            '설치 상태가 궁금하면 먼저 이것을 돌린다:' + "`n`n" +
+            ('    ' + $probe + ' selfcheck') + "`n"
+    $got = 0
+    foreach ($base in Get-AgoraSkillDirs) {
+        $d = Join-Path $base 'agora-delegate'
+        try {
+            [void](New-Item -ItemType Directory -Path $d -Force -ErrorAction Stop)
+            Write-TextNoBom (Join-Path $d 'SKILL.md') $body
+            $got = $got + 1
+        } catch { }
+    }
+    Write-Log "agora: skill pointer dirs=$got"
+    return ($got -gt 0)
+}
+
+# 운영 설정을 적는다. 여기에 릴레이 주소가 들어간다 - 참가자 신원 파일에는 못 넣는다
+# (그 파일은 계약된 다섯 칸만 받고, 한 칸이라도 더 있으면 통째로 거부된다).
+# ★사람 승인 겹은 **켠 채로 둔다.** 설치기가 보안 겹을 끄고 다니면 안 된다 -
+#   끄는 것은 대리인을 보내는 사람이 그 자리에서 할 일이고, 그렇게 꺼진 사실은
+#   whoami 첫 줄에 늘 적힌다.
+# ★이미 있으면 덮어쓰지 않는다 - 사람이 고쳐 둔 설정을 다시 돌릴 때마다 되돌리면 안 된다.
+function Write-AgoraConfig {
+    $conf = Join-Path $AgoraHome 'config.json'
+    if (Test-Path -LiteralPath $conf) { Write-Log 'agora: config exists - keep'; return $true }
+    $body = '{' + "`n" + '  "transport": "relay",' + "`n" +
+            '  "relay": {"url": "' + $AgoraRelayUrl + '", "timeout_seconds": 30}' + "`n" + '}' + "`n"
+    try { Write-TextNoBom $conf $body } catch { Write-Log 'agora: config write failed'; return $false }
+    Write-Log 'agora: config written'
+    return $true
+}
+
 function Sync-AgoraRoster {
     $got = 0
     foreach ($n in @('allowed_signers', 'revoked_keys', 'operators')) {
@@ -1384,21 +1542,23 @@ function Sync-AgoraRoster {
 # 클라이언트 파일을 받아 놓고, cys 가 가져온 파이썬으로 도는 실행 파일을 하나 만든다.
 function Set-AgoraClient {
     if (-not $AgoraCliUrl) { Write-Log 'agora: client url empty - skip'; return $false }
+    # ★주소가 있는데 지문이 없으면 **받지 않는다.** 지문 없는 내려받기는 「무엇을 받았는지 모르는
+    #   채로 실행 파일을 놓는 것」이고, 그때 아래의 지문 대조는 검사가 아니라 장식이 된다.
+    #   ⚠비어 있어도 통과하던 자리다(2026-09-09 맥에서 뮤턴트로 실측 - rc 0 으로 놓였다).
+    if (-not $AgoraCliSha) { Write-Log 'agora: client sha empty - refuse'; return $false }
     $py = Get-BundledPython
     if (-not $py) { Write-Log 'agora: bundled python not found'; return $false }
     $zip = Join-Path $AgoraHome '.client.zip'
     try {
         Invoke-WebRequest -Uri $AgoraCliUrl -OutFile $zip -TimeoutSec 120 -UseBasicParsing -ErrorAction Stop
     } catch { Write-Log 'agora: client download failed'; return $false }
-    if ($AgoraCliSha) {
-        $h = Get-FileHash -LiteralPath $zip -Algorithm SHA256 -ErrorAction SilentlyContinue
-        $got = if ($h -and $h.Hash) { ([string]$h.Hash).ToLower() } else { '' }
-        # 지문을 못 얻었으면 「맞는지 모른다」이지 「맞다」가 아니다 - 빈 값은 아래 대조에서 반드시 어긋난다.
-        if ($got -ne $AgoraCliSha.ToLower()) {
-            Write-Log "agora: client sha mismatch got=$got"
-            Remove-Item -LiteralPath $zip -Force -ErrorAction SilentlyContinue
-            return $false
-        }
+    $h = Get-FileHash -LiteralPath $zip -Algorithm SHA256 -ErrorAction SilentlyContinue
+    $got = if ($h -and $h.Hash) { ([string]$h.Hash).ToLower() } else { '' }
+    # 지문을 못 얻었으면 「맞는지 모른다」이지 「맞다」가 아니다 - 빈 값은 이 대조에서 반드시 어긋난다.
+    if ($got -ne $AgoraCliSha.ToLower()) {
+        Write-Log "agora: client sha mismatch got=$got"
+        Remove-Item -LiteralPath $zip -Force -ErrorAction SilentlyContinue
+        return $false
     }
     $lib = Join-Path $AgoraHome 'lib'
     $bin = Join-Path $AgoraHome 'bin'
@@ -1417,7 +1577,13 @@ function Set-AgoraClient {
         return $false
     }
     Remove-Item -LiteralPath $zip -Force -ErrorAction SilentlyContinue
-    $shim = '@echo off' + "`r`n" + '"' + $py + '" "' + (Join-Path $lib 'bin\agora') + '" %*' + "`r`n"
+    # 서명 열쇠의 자리를 껍데기가 알려 준다. 클라이언트는 열쇠 경로를 스스로 정하지 않고
+    # 환경이 정한 것만 쓴다 - 그 환경이 바로 여기다. 이 줄이 없으면 서명이 필요한 모든 일이
+    # 「서명 키가 지정되지 않았다」로 멈춘다.
+    # ★이미 정해 둔 사람이 있으면 그것을 이긴다(빈 값일 때만 채운다).
+    $shim = '@echo off' + "`r`n" +
+            'if "%AGORA_SIGNING_KEY%"=="" set "AGORA_SIGNING_KEY=' + $AgoraKey + '"' + "`r`n" +
+            '"' + $py + '" "' + (Join-Path $lib 'bin\agora') + '" %*' + "`r`n"
     Write-TextNoBom (Join-Path $bin 'agora.cmd') $shim
     Write-Log "agora: client placed with $py"
     return $true
@@ -1492,15 +1658,21 @@ function Step-Agora {
         Say '     나중에 자비스에게 아고라에 참가해 달라고 말하면 됩니다.'
         return
     }
+    # 이 파일의 칸은 **클라이언트 계약이 정한다**(agora/contract_open.py PARTICIPANT_FIELDS 다섯 칸).
+    # ⚠계약 밖 칸이 하나라도 있으면 클라이언트는 파일 **전체를 거부**한다 - 한 칸 더 적는 것이
+    #   「조금 더 알려 주는 것」이 아니라 「아무것도 못 읽게 하는 것」이다(2026-09-09 맥에서 실측:
+    #   여기에 relay 칸이 있어서 whoami 가 code 2 로 죽었다). 릴레이 주소의 자리는 아래 config.json 이다.
     $conf = '{' + "`n" + '  "id": "' + $participantId + '",' + "`n" +
             '  "display_name": "' + $participantId + '",' + "`n" +
             '  "key_fingerprint": "' + $fingerprint + '",' + "`n" +
             '  "namespace": "' + $AgoraSignNs + '",' + "`n" +
-            '  "operator": false,' + "`n" +
-            '  "relay": "' + $AgoraRelayUrl + '"' + "`n" + '}' + "`n"
+            '  "operator": false' + "`n" + '}' + "`n"
     Write-TextNoBom $AgoraConf $conf
+    [void](Write-AgoraConfig)
     if (-not (Sync-AgoraRoster)) { Say '     (참가자 명부 사본은 나중에 받아도 됩니다.)' }
-    [void](Set-AgoraClient)
+    # 안내를 놓는 것은 **클라이언트가 놓인 뒤에만** 뜻이 있다 - 가리킬 파일이 없으면
+    # 자비스가 「읽을 수 없다」에 부딪히고, 그것은 안내가 없느니만 못하다.
+    if (Set-AgoraClient) { [void](Set-AgoraSkill) } else { Write-Log 'agora: client not placed' }
     Say "[11/11] 아고라에 참가했습니다. 이 컴퓨터의 참가 이름은 $participantId 입니다."
     Say ("     이 이름과 열쇠는 " + (Redact $AgoraHome) + " 에 있습니다.")
     # 이 함수의 값은 아무도 쓰지 않는다. 값을 돌려주면 화면에 숫자 한 줄로 새어 나온다.

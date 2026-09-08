@@ -51,6 +51,12 @@ $ClaudeJson = Join-Path $env:USERPROFILE '.claude.json'
 $ClaudeExe  = Join-Path $env:USERPROFILE '.local\bin\claude.exe'
 $ClaudeBin  = (Join-Path $env:USERPROFILE '.local\bin').TrimEnd('\')
 $AgoraDir   = Join-Path $env:USERPROFILE '.config\agora'
+# 광장 안내를 가리키는 자리(설치기 Set-AgoraSkill 과 같은 규칙 - 있는 것만).
+$AgoraSkillDirs = @((Join-Path $env:USERPROFILE '.claude\skills\agora-delegate'))
+$AgoraAltHome = Join-Path $env:USERPROFILE '.cys\claude'
+if (Test-Path -LiteralPath $AgoraAltHome) {
+    $AgoraSkillDirs += (Join-Path $AgoraAltHome 'skills\agora-delegate')
+}
 $SettingsJs = Join-Path $ClaudeDir 'settings.json'
 # ★로그인 파일 자리는 고정이 아니다 — 공식 문서(2026-09-08 확인 · code.claude.com/docs/en/team
 #   「Credential management」): 「If you've set the CLAUDE_CONFIG_DIR environment variable, Claude Code
@@ -85,6 +91,25 @@ function RowFlag($label, $exists, $note) {
     $mark = if ($exists) { '있음' } else { '없음' }
     Write-Host ("  [{0}] {1} · {2}" -f $mark, $label, $note)
 }
+# 시작 메뉴 바로가기는 cys 설치기가 만든다. 공식 제거기가 지워 주는 것이라 평소에는 우리가 안 본다 —
+# 그런데 제거기를 못 쓰는 자리(등록 항목이 없는 잔재)에서는 우리가 지우지 않으면 고아로 남는다.
+# 자리가 판본마다 다를 수 있으므로 후보를 훑고 **있는 것만** 돌려준다(없으면 빈 목록 = 「없음」).
+function Get-StartMenuLinks {
+    # ⛔바로가기 **파일(.lnk)만** 후보로 넣는다. 앞 판은 확장자 없는 `cys` 도 넣었는데, 그것이 사람이
+    #   다른 뜻으로 만든 폴더면 Drop 이 -Recurse -Force 로 **통째로 지운다**(agy R1 [3] 지적 채택
+    #   2026-09-09 · 남의 것을 지울 위험은 「있으면 함께 지운다」의 편의보다 무겁다).
+    # ⚠전체 사용자 공용 시작 메뉴(C:\ProgramData\...)는 **후보에 넣지 않는다** — 그 자리는 관리자
+    #   영역이고, 이 스크립트는 관리자 권한을 쓰지 않는다(HKLM 을 안 건드리는 것과 같은 규율).
+    $out = New-Object System.Collections.ArrayList
+    $r = Join-Path $env:APPDATA 'Microsoft\Windows\Start Menu\Programs'
+    if ($r) {
+        foreach ($c in @((Join-Path $r 'cys.lnk'), (Join-Path $r 'cys\cys.lnk'))) {
+            if (Test-Path $c -PathType Leaf) { [void]$out.Add($c) }
+        }
+    }
+    return $out.ToArray()
+}
+
 function Drop($label, $path) {
     if (-not (Test-Path $path)) { return }
     try { Remove-Item $path -Recurse -Force -ErrorAction Stop; $script:Removed++; Write-Host ("  지움: " + (Short $path)) }
@@ -163,6 +188,7 @@ function Invoke-Diagnose {
     # footprint: W-APP
     [void](Row 'cys 프로그램' $CysDir)
     [void](Row 'cys 프로그램(옛 자리)' $CysDirOld)
+    foreach ($lnk in (Get-StartMenuLinks)) { [void](Row 'cys 시작 메뉴 바로가기' $lnk) }
     # footprint: W-REG
     [void](Row 'cys 설치 목록 항목' $RegKey)
     # footprint: W-DAEMON
@@ -179,6 +205,10 @@ function Invoke-Diagnose {
     [void](Row '받아 둔 설치 스크립트(옛 자리)' $TempPs1)
     # footprint: W-AGORA
     [void](Row '참가 열쇠·이름' $AgoraDir)
+    # footprint: W-AGORASKILL
+    $skillHere = $false
+    foreach ($sd in $AgoraSkillDirs) { if (Test-Path -LiteralPath $sd) { $skillHere = $true } }
+    RowFlag '광장 안내 가리키기' $skillHere ($AgoraSkillDirs[0])
     # footprint: W-PATH
     RowFlag '실행 경로 등록' (Test-UserPathSeed) '사용자 Path 환경변수'
     # footprint: W-CLAUDEJSON
@@ -399,6 +429,14 @@ function Invoke-Purge {
 
     # cys 프로그램 지우기 — 기본은 사람이 설정 앱에서 한다(위 머리글의 이유).
     # footprint: W-APP
+    # 🔴2026-09-09 실사용자 3호 실기 — 여기가 교착이 났던 자리다.
+    #   그 기계는 **폴더는 있는데 설치 목록 항목이 없었다**(지난 설치가 끝까지 못 간 흔한 자리).
+    #   설정 앱이 보는 곳이 바로 그 항목이므로, 설정 앱에는 cys 가 **아예 없었다.**
+    #   그런데 앞 판은 판별을 「uninstall.exe 가 있는가」 하나로만 했다 ⇒ 사람에게
+    #   **설정 앱에서 지우라고 8번 요구**했고, 사람은 할 수 없는 일이라 q 로 빠져나갈 수밖에 없었다.
+    #   ⇒ 판별을 두 축으로 가른다. **요구하기 전에 그 항목이 실제로 있는지 먼저 본다** —
+    #     사람이 할 수 없는 일을 요구하는 고리가 구조적으로 생기지 못하게.
+    $hasRegEntry = Test-Path $RegKey
     if ((Test-Path $UninstExe) -and $UseUninstaller) {
         Write-Host '  cys 제거 프로그램을 실행합니다. (백신이 이 행위를 막을 수 있습니다)'
         try {
@@ -409,7 +447,7 @@ function Invoke-Purge {
             Write-Host '    백신이 막았을 수 있습니다. 그 화면의 이름, 대상 파일, 조치(차단·격리·종료)를 알려 주십시오.'
         }
         Start-Sleep -Seconds 3
-    } elseif (Test-Path $UninstExe) {
+    } elseif ((Test-Path $UninstExe) -and $hasRegEntry) {
         Write-Host ''
         Write-Host '  cys 프로그램은 윈도우 설정 앱에서 지워 주십시오 (이 스크립트가 직접 지우지 않습니다).'
         Write-Host '    시작 단추 > 설정 > 앱 > 설치된 앱 > cys > 제거'
@@ -437,6 +475,41 @@ function Invoke-Purge {
             Write-Host '         설정 앱에서 제거를 마치신 뒤 같은 줄을 한 번 더 돌려 주십시오.'
             $script:SkipCysDir = $true
         }
+    } elseif ((Test-Path $CysDir) -or (Test-Path $CysDirOld)) {
+        # 정식 제거 경로를 쓸 수 없는 자리다. 까닭이 둘인데 **사람에게 하는 말이 달라야 한다** —
+        #   ⑴목록 항목이 없다  ⇒ 설정 앱에 cys 가 아예 안 보인다(3호가 만난 자리)
+        #   ⑵항목은 있는데 제거 프로그램이 없다 ⇒ 설정 앱에서 눌러도 그 자리에서 실패한다
+        #   ⛔한 문장으로 뭉뚱그리면 둘 중 하나는 **거짓말**이 된다(agy R1 [1] 지적 채택 2026-09-09 —
+        #     앞 판은 ⑵에서도 「항목이 없습니다」라고 적었다. 사람이 설정 앱을 열어 보면 항목이 있다).
+        #   ⇒ 이때만 우리가 직접 지운다. 대신 지우기 전에 두 가지를 확인한다 —
+        #     ⑴돌고 있지 않은가(돌고 있으면 폴더가 안 지워지고 [남음] 이 거짓이 된다)
+        #     ⑵사람이 지금 지워도 된다고 하는가(한 번만 묻는다 · 반복 요구 없음).
+        Write-Host ''
+        if ($hasRegEntry) {
+            Write-Host '  cys 폴더는 있는데 제거 프로그램이 없습니다 (지난 설치가 끝까지 못 간 자리입니다).'
+            Write-Host '    설정 앱에 항목은 보이지만 눌러도 그 자리에서 실패합니다 — 그래서 이번에는 이 스크립트가 직접 지웁니다.'
+        } else {
+            Write-Host '  cys 폴더는 있는데 설치 목록에는 항목이 없습니다 (지난 설치가 끝까지 못 간 자리입니다).'
+            Write-Host '    설정 앱에는 cys 가 보이지 않습니다 — 그래서 이번에는 이 스크립트가 직접 지웁니다.'
+        }
+        foreach ($n in @('cys-app', 'cysd', 'cys')) {
+            Get-Process -Name $n -ErrorAction SilentlyContinue | Stop-Process -Force -ErrorAction SilentlyContinue
+        }
+        Start-Sleep -Seconds 2
+        $alive = @(foreach ($n in @('cys-app', 'cysd', 'cys')) { Get-Process -Name $n -ErrorAction SilentlyContinue })
+        if ($alive.Count -gt 0) {
+            $script:KeptFail++
+            $script:SkipCysDir = $true
+            Write-Host '  [남음] cys 프로그램 — 아직 실행 중이라 폴더를 지울 수 없습니다.'
+            Write-Host '         작업 관리자에서 cys 를 끝내신 뒤 같은 줄을 한 번 더 돌려 주십시오.'
+        } elseif (-not $Yes) {
+            $a = Read-Host '  이 폴더를 지웁니다. 계속하시려면 Enter 를 눌러 주십시오 (그만두려면 q)'
+            if ($a -eq 'q') {
+                $script:KeptFail++
+                $script:SkipCysDir = $true
+                Write-Host '  [남음] cys 프로그램 — 지우지 않고 그만두셨습니다.'
+            }
+        }
     }
 
     # cys 가 돌고 있으면 폴더가 지워지지 않는다 — 먼저 멈춘다.
@@ -448,9 +521,25 @@ function Invoke-Purge {
     if (-not $script:SkipCysDir) {
         Drop 'cys 프로그램' $CysDir
         Drop 'cys 프로그램(옛 자리)' $CysDirOld
+        # 공식 제거기가 해 주던 뒷정리다. 우리가 폴더를 지운 길에서는 우리가 함께 지운다.
+        $links = @(Get-StartMenuLinks)
+        if ($links.Count -eq 0) { Write-Host '  [없음] cys 시작 메뉴 바로가기' }
+        else { foreach ($lnk in $links) { Drop 'cys 시작 메뉴 바로가기' $lnk } }
     }
     # footprint: W-REG
-    Drop 'cys 설치 목록 항목' $RegKey
+    # 🔴2026-09-09 자기규명 — 앞 판은 이 줄이 **조건 없이** 돌았다. 그래서 사람이 설정 앱 제거를 미루고
+    #   q 를 누르면(폴더는 그대로 남는데) **목록 항목만 사라졌다.** 그 순간 설정 앱에서 cys 가 없어진다 —
+    #   우리가 「저기서 지우십시오」라고 가리킨 바로 그 길을 우리가 없앤 것이다. 다음 실행은 폴더만 남은
+    #   상태를 만나고, 앞 판은 거기서 또 설정 앱을 요구했다(= 3호가 만난 교착의 자가 생산 경로).
+    #   ⇒ 프로그램을 남겨 두기로 한 실행에서는 그 항목도 함께 남긴다. 둘은 한 쌍이다.
+    #   ⚠남긴다는 말은 **설정 앱에서 마저 지우실 수 있을 때만** 참이다. 항목이 애초에 없으면 그 문장은
+    #     앞의 안내와 정면으로 어긋난다(agy R1 [1] 지적 채택 — 「항목이 없습니다」라고 말해 놓고
+    #     「설정 앱에서 지우실 수 있게 둡니다」라고 적고 있었다).
+    if ($script:SkipCysDir -and $hasRegEntry) {
+        Write-Host '  남김: cys 설치 목록 항목 (프로그램이 남아 있어 설정 앱에서 지우실 수 있게 둡니다)'
+    } else {
+        Drop 'cys 설치 목록 항목' $RegKey
+    }
     # footprint: W-CYSHOME
     Drop 'cys 계정 자리' $CysHome
     # footprint: W-CLAUDEBIN
@@ -462,6 +551,10 @@ function Invoke-Purge {
     Drop '받아 둔 설치 스크립트(옛 자리)' $TempPs1
     # footprint: W-AGORA
     Drop '참가 열쇠·이름' $AgoraDir
+    # footprint: W-AGORASKILL
+    #   ★가리키던 파일이 사라지면 가리키는 쪽도 같이 지운다 - 남겨 두면 다음 자비스가
+    #     없는 파일을 읽으려다 막히고, 그것은 안내가 없느니만 못하다.
+    foreach ($sd in $AgoraSkillDirs) { Drop '광장 안내 가리키기' $sd }
 
     # 남의 파일 속 우리 줄 — 파일을 지우지 않는다
     # footprint: W-PATH

@@ -32,6 +32,17 @@ done
 
 JARVIS_HOME="${JARVIS_HOME:-$HOME/install-jarvis}"
 AGORA_HOME="${AGORA_HOME:-$HOME/.config/agora}"
+# 광장 안내를 가리키는 자리(설치기 agora_place_skill 과 같은 규칙 — 있는 것만).
+agora_skill_dirs() {
+  printf '%s\n' "$HOME/.claude/skills/agora-delegate"
+  [ -d "$HOME/.cys/claude" ] && printf '%s\n' "$HOME/.cys/claude/skills/agora-delegate"
+  return 0
+}
+agora_skill_present() {
+  local d
+  for d in $(agora_skill_dirs); do [ -d "$d" ] && return 0; done
+  return 1
+}
 CYS_APP="/Applications/cys.app"
 CYS_CLI=""
 for c in "$CYS_APP/Contents/MacOS/cys" "$HOME/.local/bin/cys" "/usr/local/bin/cys"; do
@@ -131,6 +142,8 @@ diagnose() {
   [ -f "$HOME/install-jarvis.sh" ]; row $? '받아 둔 설치 스크립트' "$HOME/install-jarvis.sh"
   # footprint: M-AGORA
   [ -d "$AGORA_HOME" ]; row $? '참가 열쇠·이름' "$AGORA_HOME"
+  # footprint: M-AGORASKILL
+  agora_skill_present; row $? '광장 안내 가리키기' "$HOME/.claude/skills/agora-delegate"
   # footprint: M-PROFILE
   local pf; pf="$(profile_with_marker | head -1)"
   [ -n "$pf" ]; row $? '실행 경로 한 줄' "${pf:-$HOME/.zprofile}"
@@ -368,6 +381,10 @@ purge() {
   drop_file "$HOME/install-jarvis.sh"
   # footprint: M-AGORA
   drop_dir "$AGORA_HOME"
+  # footprint: M-AGORASKILL
+  #   ★가리키던 파일이 사라지면 가리키는 쪽도 같이 지운다 — 남겨 두면 다음 자비스가
+  #     없는 파일을 읽으려다 막히고, 그것은 안내가 없느니만 못하다.
+  for _sk in $(agora_skill_dirs); do drop_dir "$_sk"; done
 
   # 남의 파일 속 우리 줄 — 파일을 지우지 않는다
   # footprint: M-PROFILE

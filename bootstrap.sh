@@ -87,6 +87,41 @@ claude_has_auth_cmd() {
   claude --help 2>/dev/null | grep -qE '^[[:space:]]*auth[[:space:]]'
 }
 
+#   cys 쪽 능력도 같은 이유로 `--help` 로 묻는다(판본 숫자를 게이트로 쓰지 않는다).
+#   묻는 것 = 좌석을 열 때 「이 자리에서 무엇을 띄우는지」를 적어 두는 칸이 있는가.
+#   그 칸이 있어야 컴퓨터를 껐다 켠 뒤 복원이 자비스 자리를 「무엇을 띄울지 모름」으로 건너뛰지 않는다.
+#   ⚠지금 배포된 판본(0.14.29)에는 그 칸이 없다 — 없는 판본에 붙이면 좌석이 아예 안 열린다.
+#   그래서 붙이기 전에 물어본다. 한 번만 묻고 그 답을 기록 파일에 한 줄 남긴다.
+#   ⚠답을 기억해 두지 않는다. 이 스크립트가 도는 동안 cys 는 **없다가 생기고 낡았다가 새로워진다** —
+#   설치 전에 물어 둔 답을 설치 뒤에 그대로 쓰면, 방금 깐 판본이 아니라 옛 판본에 대고 판정하는 셈이 된다.
+#   대신 기록은 한 줄만 남긴다(답이 바뀐 때만 또 남긴다 — 바뀌었다는 것 자체가 알 값이다).
+CYS_AGENT_FLAG=""      # 마지막으로 기록한 답 · "" 아직 기록 안 함
+cys_supports_agent_flag() {
+  local cli out ans
+  cli="${CYS_CLI:-cys}"
+  out=""
+  if command -v "$cli" >/dev/null 2>&1 || [ -x "$cli" ]; then
+    out="$(CYS_NO_AUTOSTART=1 "$cli" new-surface --help 2>&1)"
+  fi
+  case "$out" in
+    *--agent*) ans="yes" ;;
+    *)         ans="no" ;;
+  esac
+  if [ "$ans" != "$CYS_AGENT_FLAG" ]; then
+    CYS_AGENT_FLAG="$ans"
+    log "cys new-surface --agent supported: $ans"
+  fi
+  [ "$ans" = "yes" ]
+}
+
+# 이 컴퓨터의 cys 가 스스로 말하는 판본 한 줄(없으면 빈 문자열).
+cys_version_line() {
+  local cli="${CYS_CLI:-cys}"
+  if command -v "$cli" >/dev/null 2>&1 || [ -x "$cli" ]; then
+    CYS_NO_AUTOSTART=1 "$cli" --version 2>/dev/null | head -1
+  fi
+}
+
 # ── 감지 행 적재 ──────────────────────────────────────────────────
 # 한 행 = 번호 \t 무엇 \t 값 \t enum \t 비고   (bash 3.2 이므로 연관배열을 안 쓴다)
 ROWS_FILE="$(mktemp -t jarvis-rows)"
@@ -253,6 +288,14 @@ detect_stage2() {
   else row "2-5" "cys 자가점검" "-" "unknown" "-"; fi
 
   row "2-8" "첫 세션 지시 주입" "-" "unknown" "아직 확인하는 방법이 없습니다"
+
+  #   컴퓨터를 껐다 켠 뒤 자비스 자리가 스스로 되살아나는가 — 그 답은 판본이 정한다.
+  #   이 행은 「무엇을 했는가」가 아니라 「이 컴퓨터에서 무엇이 되는가」를 적는다.
+  if cys_supports_agent_flag; then
+    row "2-9" "master 좌석 복원 플래그" "전달" "ok" "껐다 켠 뒤 자비스 자리가 자동으로 되살아납니다"
+  else
+    row "2-9" "master 좌석 복원 플래그" "미지원($(cys_version_line))" "ok" "이 판본에는 그 칸이 없어 붙이지 않았습니다 — 껐다 켜면 자비스 자리는 손으로 다시 엽니다"
+  fi
 }
 
 write_report() {
@@ -904,8 +947,11 @@ AGORA_KEY="$AGORA_HOME/id_ed25519"
 AGORA_CONF="$AGORA_HOME/participant.json"
 # 클라이언트 파일은 설치 사이트 사본에서 받는다. 주소가 비어 있으면 그 부분만 건너뛴다
 # (명부 등재는 클라이언트 파일과 아무 의존이 없다).
-AGORA_CLI_URL="${AGORA_CLI_URL:-}"
-AGORA_CLI_SHA="${AGORA_CLI_SHA:-}"
+# ★핀 두 줄 = 「어디서 받는가」와 「무엇을 받았어야 하는가」다. 둘은 **함께** 바뀐다 —
+#   주소만 새 판으로 바꾸고 지문을 두면 그 자리에서 거부된다(그게 맞는 동작이다).
+#   판본을 올릴 때는 빌더(`tools/build_client_zip.py`)가 내는 두 줄을 그대로 옮겨 적는다.
+AGORA_CLI_URL="${AGORA_CLI_URL:-https://jarvis.godmeyou.kr/install/agora-client-0.1.0.zip}"
+AGORA_CLI_SHA="${AGORA_CLI_SHA:-5171b1161fc5e326486e9ffdd96034a22e194dafba610ee94eeb670aa81e4b64}"
 
 # 이름에는 사람에 관한 것을 넣지 않는다.
 # 컴퓨터 이름을 쓰지 않는 이유: 이 컴퓨터의 이름은 대개 계정 이름을 담고 있다
@@ -982,6 +1028,25 @@ agora_register() {
   esac
 }
 
+# 운영 설정을 적는다. 여기에 릴레이 주소가 들어간다 - 참가자 신원 파일에는 못 넣는다
+# (그 파일은 계약된 다섯 칸만 받고, 한 칸이라도 더 있으면 통째로 거부된다).
+# ★사람 승인 겹은 **켠 채로 둔다.** 설치기가 보안 겹을 끄고 다니면 안 된다 -
+#   끄는 것은 대리인을 보내는 사람이 그 자리에서 할 일이고(agora register --unattended),
+#   그렇게 꺼진 사실은 whoami 첫 줄에 늘 적힌다.
+# ★이미 있으면 덮어쓰지 않는다 - 사람이 고쳐 둔 설정을 다시 돌릴 때마다 되돌리면 안 된다.
+agora_write_config() {
+  local conf="$AGORA_HOME/config.json"
+  if [ -f "$conf" ]; then
+    log "agora: config exists - keep"
+    return 0
+  fi
+  printf '{\n  "transport": "relay",\n  "relay": {"url": "%s", "timeout_seconds": 30}\n}\n' \
+    "$AGORA_RELAY_URL" > "$conf" || { log "agora: config write failed"; return 1; }
+  chmod 600 "$conf" 2>/dev/null
+  log "agora: config written"
+  return 0
+}
+
 # 명부 사본을 내려받는다. 없어도 등재 자체는 이미 끝난 것이므로 실패로 세지 않는다.
 agora_sync_roster() {
   local n got=0
@@ -996,24 +1061,68 @@ agora_sync_roster() {
 
 # 클라이언트 파일을 받아 놓고, cys 가 가져온 파이썬으로 도는 실행 파일을 하나 만든다.
 agora_place_client() {
-  local py zip
+  local py zip got
   [ -n "$AGORA_CLI_URL" ] || { log "agora: client url empty - skip"; return 1; }
+  # ★주소가 있는데 지문이 없으면 **받지 않는다.** 지문 없는 내려받기는 「무엇을 받았는지 모르는
+  #   채로 실행 파일을 놓는 것」이고, 그때 아래의 지문 대조는 검사가 아니라 장식이 된다.
+  #   ⚠비어 있어도 통과하던 자리다(2026-09-09 뮤턴트로 실측 — rc 0 으로 놓였다). 여기를 열어 두면
+  #   「급해서 지문 없이 한 번만」이 생기고, 그 한 번이 배포 경로의 기본값이 된다.
+  [ -n "$AGORA_CLI_SHA" ] || { log "agora: client sha empty - refuse"; return 1; }
   py="$(agora_bundled_python)" || { log "agora: bundled python not found"; return 1; }
   zip="$AGORA_HOME/.client.zip"
   curl -fsSL -m 120 -o "$zip" "$AGORA_CLI_URL" 2>>"$LOG_FILE" || { log "agora: client download failed"; return 1; }
-  if [ -n "$AGORA_CLI_SHA" ]; then
-    local got; got="$(shasum -a 256 "$zip" 2>/dev/null | awk '{print $1}')"
-    [ "$got" = "$AGORA_CLI_SHA" ] || { log "agora: client sha mismatch got=$got"; rm -f "$zip"; return 1; }
-  fi
+  # 지문을 못 얻었으면 「맞는지 모른다」이지 「맞다」가 아니다 - 빈 값은 이 대조에서 반드시 어긋난다.
+  got="$(shasum -a 256 "$zip" 2>/dev/null | awk '{print $1}')"
+  [ "$got" = "$AGORA_CLI_SHA" ] || { log "agora: client sha mismatch got=$got"; rm -f "$zip"; return 1; }
   # 우리가 만든 폴더이므로 통째로 비우고 새로 푼다 - 덮어쓰기만 하면 지난 판의 지워진 파일이 남는다.
   rm -rf "$AGORA_HOME/lib" 2>/dev/null
   mkdir -p "$AGORA_HOME/lib" "$AGORA_HOME/bin" 2>/dev/null
   (cd "$AGORA_HOME/lib" && unzip -oq "$zip") 2>>"$LOG_FILE" || { log "agora: client unzip failed"; rm -f "$zip"; return 1; }
   rm -f "$zip" 2>/dev/null
-  printf '#!/bin/sh\nexec %s %s/lib/bin/agora "$@"\n' "$py" "$AGORA_HOME" > "$AGORA_HOME/bin/agora"
+  # 서명 키의 자리를 껍데기가 알려 준다. 클라이언트는 키 경로를 스스로 정하지 않고
+  # 환경이 정한 것만 쓴다 - 그 환경이 바로 여기다. 이 줄이 없으면 서명이 필요한 모든 일이
+  # 「서명 키가 지정되지 않았다」로 멈춘다.
+  # ★이미 정해 둔 사람이 있으면 그것을 이긴다(:- 는 비어 있을 때만 채운다).
+  printf '#!/bin/sh\nAGORA_SIGNING_KEY="${AGORA_SIGNING_KEY:-%s}"\nexport AGORA_SIGNING_KEY\nexec %s %s/lib/bin/agora "$@"\n' \
+    "$AGORA_KEY" "$py" "$AGORA_HOME" > "$AGORA_HOME/bin/agora"
   chmod +x "$AGORA_HOME/bin/agora" 2>/dev/null
   log "agora: client placed with $py"
   return 0
+}
+
+# 자비스가 「아고라에 참가해」를 알아듣게 하는 자리.
+# ★내용을 여기 적지 않는다 — **가리키기만 한다.** 실제 안내는 클라이언트 꾸러미 안에 있고,
+#   꾸러미가 새 판으로 바뀌면 그 안내도 함께 바뀐다. 여기에 베껴 두면 둘이 갈라지고,
+#   갈라진 날 자비스는 **낡은 안내를 따른다**(그리고 아무 소리도 나지 않는다).
+# ★자리는 짐작하지 않고 **있는 것만** 쓴다(설정 파일 자리를 고르는 규칙과 같다).
+agora_skill_dirs() {
+  printf '%s\n' "$HOME/.claude/skills"
+  [ -d "$HOME/.cys/claude" ] && printf '%s\n' "$HOME/.cys/claude/skills"
+  return 0
+}
+
+agora_place_skill() {
+  local base d target got=0
+  for base in $(agora_skill_dirs); do
+    d="$base/agora-delegate"
+    mkdir -p "$d" 2>/dev/null || continue
+    target="$AGORA_HOME/lib/skills/agora-delegate/SKILL.md"
+    {
+      printf -- '---\n'
+      printf 'name: agora-delegate\n'
+      printf 'description: %s\n' '광장(아고라)에 대리인을 파송한다 — 둘러보고 참가하고 발언한다. "아고라에 참가해" 같은 말을 들으면 이 스킬을 쓴다.'
+      printf -- '---\n\n'
+      printf '# 광장 대리인\n\n'
+      printf '아래 파일을 **먼저 읽고 그대로 따른다.** 이 문서에는 절차를 적지 않는다 —\n'
+      printf '절차의 정본은 그 파일이고, 클라이언트가 새 판으로 바뀌면 그 파일이 함께 바뀐다.\n\n'
+      printf '    %s\n\n' "$target"
+      printf '읽을 수 없으면 그 사실을 사람에게 말하고 멈춘다. 절차를 기억으로 지어내지 마라.\n'
+      printf '설치 상태가 궁금하면 먼저 이것을 돌린다:\n\n'
+      printf '    %s/bin/agora selfcheck\n' "$AGORA_HOME"
+    } > "$d/SKILL.md" 2>/dev/null && got=$((got + 1))
+  done
+  log "agora: skill pointer dirs=$got"
+  [ "$got" -gt 0 ]
 }
 
 step_agora() {
@@ -1075,14 +1184,36 @@ step_agora() {
     say "     나중에 자비스에게 아고라에 참가해 달라고 말하면 됩니다."
     return 0
   fi
-  printf '{\n  "id": "%s",\n  "display_name": "%s",\n  "key_fingerprint": "%s",\n  "namespace": "%s",\n  "operator": false,\n  "relay": "%s"\n}\n' \
-    "$pid" "$pid" "$fp" "$AGORA_SIGN_NS" "$AGORA_RELAY_URL" > "$AGORA_CONF"
+  # 이 파일의 칸은 **클라이언트 계약이 정한다**(agora/contract_open.py PARTICIPANT_FIELDS 다섯 칸).
+  # ⚠계약 밖 칸이 하나라도 있으면 클라이언트는 파일 **전체를 거부**한다 — 한 칸 더 적는 것이
+  #   「조금 더 알려 주는 것」이 아니라 「아무것도 못 읽게 하는 것」이다(2026-09-09 실측:
+  #   여기에 relay 칸이 있어서 whoami 가 code 2 로 죽었다). 릴레이 주소의 자리는 아래 config.json 이다.
+  printf '{\n  "id": "%s",\n  "display_name": "%s",\n  "key_fingerprint": "%s",\n  "namespace": "%s",\n  "operator": false\n}\n' \
+    "$pid" "$pid" "$fp" "$AGORA_SIGN_NS" > "$AGORA_CONF"
   chmod 600 "$AGORA_CONF" 2>/dev/null
+  agora_write_config
   agora_sync_roster || say "     (참가자 명부 사본은 나중에 받아도 됩니다.)"
-  agora_place_client || log "agora: client not placed"
+  # 안내를 놓는 것은 **클라이언트가 놓인 뒤에만** 뜻이 있다 — 가리킬 파일이 없으면
+  # 자비스가 「읽을 수 없다」에 부딪히고, 그것은 안내가 없느니만 못하다.
+  if agora_place_client; then
+    agora_place_skill || log "agora: skill pointer not placed"
+  else
+    log "agora: client not placed"
+  fi
   say "[11/11] 아고라에 참가했습니다. 이 컴퓨터의 참가 이름은 $pid 입니다."
   say "     이 이름과 열쇠는 $(redact "$AGORA_HOME") 에 있습니다."
   return 0
+}
+
+# 자비스 자리를 연다. 「무엇을 띄우는지」 칸은 그 칸이 있는 판본에서만 붙인다 —
+# 없는 판본에 붙이면 모르는 인자라며 거절당해 자리 자체가 안 열린다(그것이 조건을 둔 유일한 까닭이다).
+cys_open_master_seat() {   # $1 = 여는 명령 · 화면으로 나가는 것 = cys 가 답한 내용
+  local cli="${CYS_CLI:-cys}"
+  if cys_supports_agent_flag; then
+    "$cli" new-surface --role master --cwd "$JARVIS_HOME" --title "jarvis" --agent claude --cmd "$1" 2>&1
+  else
+    "$cli" new-surface --role master --cwd "$JARVIS_HOME" --title "jarvis" --cmd "$1" 2>&1
+  fi
 }
 
 # ── 하는 일 9 — 자비스 깨우기 ─────────────────────────────────────
@@ -1118,8 +1249,7 @@ step_wake() {
       log "wake path unusable: $wake_file"
       ref=""
     else
-      ref="$("$cli" new-surface --role master --cwd "$JARVIS_HOME" --title "jarvis" \
-             --cmd "$cmd_line" 2>&1 | tr -d '\n')"
+      ref="$(cys_open_master_seat "$cmd_line" | tr -d '\n')"
     fi
     case "$ref" in
       *surface:*)
@@ -1157,6 +1287,13 @@ step_wake() {
   fi
   exec "$claude_bin" --dangerously-skip-permissions "$first_prompt"
 }
+
+# 시험이 이 파일을 「함수 묶음」으로만 읽는 문. 여기서 멈추므로 본문은 한 줄도 돌지 않는다.
+#   왜 필요한가: 좌석 여는 자리가 실제로 무엇을 넘기는지는 **글자로 세면 알 수 없다** —
+#   조건 갈래 양쪽이 파일에 다 적혀 있기 때문이다. 재려면 그 함수를 실제로 불러야 하고,
+#   부르려면 설치 단계를 지나지 않고 이 파일을 읽어 들일 길이 있어야 한다.
+#   ⚠사람이 쓰는 길이 아니다(설치기는 이 변수 없이 돈다 — 없으면 이 줄은 아무 일도 하지 않는다).
+[ "${JARVIS_LIB_ONLY:-}" = "1" ] && { return 0 2>/dev/null || exit 0; }
 
 # ── 본문 ──────────────────────────────────────────────────────────
 say "=== 자비스 설치 도우미 $BOOTSTRAP_VERSION (모드: $MODE) ==="
