@@ -50,7 +50,7 @@ $ReportHead = '[자비스] 환경 보고 v0'   # ④단 첫 응답의 고정 첫
 
 # ── 핀 (외부 URL은 이 두 줄이 전부다) ─────────────────────────────
 $ClaudeInstallUrl = 'https://claude.ai/install.ps1'
-$CysSiteUrl       = 'https://www.cysinsight.com/'   # 공식 안내 문서가 쓰는 주소 문자열을 그대로 따른다
+$CysSiteUrl       = 'https://github.com/oogisoogi/cys-terminal/releases/latest'   # 손으로 받을 때의 자리 = 우리 릴리스 페이지
 
 # ── 자리 ──────────────────────────────────────────────────────────
 $JarvisHome = if ($env:JARVIS_HOME) { $env:JARVIS_HOME } else { Join-Path $env:USERPROFILE 'install-jarvis' }
@@ -61,10 +61,14 @@ $DlDir         = Join-Path $JarvisHome 'dl'
 
 # cys 설치 파일 — 판본을 파일 이름에 박아 배포하므로 여기에 핀한다.
 # 크기가 안 맞으면 받다 끊긴 것이거나 배포가 바뀐 것이다. 어느 쪽이든 진단하고 멈춘다.
-$CysVersion     = '0.14.29'
-$CysDownloadDir = 'https://www.cysinsight.com/downloads/'
+# ★2026-09-09 자체 배포 전환(윈도우): 받을 곳 = 우리가 서명해 발행한 릴리스. 벤더 판을 깔면 그 뒤의
+#   업데이트도 벤더 궤도를 타서 우리 수리가 그 기계에 닿지 않는다(노트북 실기 2026-09-09).
+#   맥(bootstrap.sh)은 우리 빌드가 무서명이라 아직 벤더 dmg 그대로다.
+$CysVersion     = '0.14.33'
+$CysDownloadDir = "https://github.com/oogisoogi/cys-terminal/releases/download/v${CysVersion}/"
 $CysWinFile     = "cys_${CysVersion}_x64-setup.exe"
-$CysWinBytes    = 138676916
+$CysWinBytes    = 139720664
+$CysWinSha256   = 'bfd7dd208d0135206482e47cc681bdb6cd91c654a17268a6b1fbd6c2f2cd755d'   # 릴리스 SHA256SUMS.txt 의 줄
 $CysDownloadUrl = $CysDownloadDir + $CysWinFile
 
 $LoginPollInterval = 3     # 초
@@ -196,6 +200,19 @@ function Write-JCode($code, $desc) {
 #   그것이 바로 이 티켓이 없애려던 거짓 안내다(하네스가 「막기 전인데 ours」로 잡아냈다).
 #   ⚠맥판은 처음부터 이 성질을 갖고 있었다 — `curl -sS -I` 는 -f 를 안 쓰므로 403 이든 404 든 rc 0 이다.
 #     두 OS 가 같은 뜻을 갖게 맞춘 것이지 새 규칙을 만든 것이 아니다.
+function Get-CysFileSha256($path) {
+    # 지문 도구가 없는 기계(러너에서 본 자리)를 위해 .NET 으로 폴백한다. 못 재면 $null — 호출자가 「확인 없이 설치 안 함」으로 다룬다.
+    try { return (Get-FileHash -Algorithm SHA256 -LiteralPath $path -ErrorAction Stop).Hash.ToLower() } catch { }
+    $sha = $null; $fs = $null
+    try {
+        $sha = [System.Security.Cryptography.SHA256]::Create()
+        $fs = [System.IO.File]::OpenRead($path)
+        return ([System.BitConverter]::ToString($sha.ComputeHash($fs)) -replace '-','').ToLower()
+    } catch { return $null } finally {
+        if ($fs)  { $fs.Dispose() }
+        if ($sha) { $sha.Dispose() }
+    }
+}
 function Test-UrlReachable($url) {
     try {
         [void](Invoke-WebRequest -Uri $url -Method Head -TimeoutSec 6 -UseBasicParsing -ErrorAction Stop)
@@ -211,7 +228,8 @@ function Test-UrlReachable($url) {
 #   멀쩡한 사람에게 30분 동안 「인터넷이 없습니다」라고 우겼을 것이다. 목적지 둘을 먼저 믿는다.
 function Get-NetCause {
     $ours   = Test-UrlReachable $JarvisSiteUrl
-    $theirs = Test-UrlReachable $ClaudeInstallUrl
+    # 바깥 서버 = 클로드 설치 원 + cys 릴리스 자산(최종 호스트가 다른 곳으로 넘어가므로 자산 주소 자체를 짚는다 · 검토 지적 2026-09-09)
+    $theirs = (Test-UrlReachable $ClaudeInstallUrl) -and (Test-UrlReachable $CysDownloadUrl)
     if ($ours -and $theirs)        { return 'fine' }
     if ($ours -and -not $theirs)   { return 'theirs' }
     if ($theirs -and -not $ours)   { return 'ours' }
@@ -1057,8 +1075,14 @@ function Step-DownloadCys {
     New-Item -ItemType Directory -Force -Path $DlDir | Out-Null
     $dst = Join-Path $DlDir $CysWinFile
     if ((Test-Path $dst) -and ((Get-Item $dst).Length -eq $CysWinBytes)) {
-        Say '[5/10] 설치 파일이 이미 있습니다 — 건너뜁니다.'
-        return 0
+        # 크기만 보고 건너뛰면 같은 크기의 다른 파일이 재실행 경로로 들어온다(검토 지적 2026-09-09) — 지문까지 본다.
+        $have = Get-CysFileSha256 $dst
+        if ($have -eq $CysWinSha256) { Say '[5/10] 설치 파일이 이미 있습니다 (지문 확인) — 건너뜁니다.'; return 0 }
+        if ($null -eq $have) { Say '[5/10] 남아 있던 설치 파일의 지문을 재지 못했습니다 — 확인 없이 쓰지 않고 다시 받습니다.' }
+        else { Say '[5/10] 남아 있던 설치 파일의 지문이 다릅니다 — 버리고 다시 받습니다.' }
+        # dry-run 은 아무것도 지우지 않는다(2R 지적) — 지울 것이 있다는 사실만 말한다.
+        if ($Mode -eq 'dry') { Say "[5/10] (dry-run) 위 파일을 지우고 다시 받을 것입니다. 받을 곳 = $CysDownloadUrl"; return 0 }
+        Remove-Item $dst -Force -ErrorAction SilentlyContinue
     }
     if ($Mode -eq 'dry') { Say "[5/10] (dry-run) 받지 않았습니다. 받을 곳 = $CysDownloadUrl"; return 0 }
     # 132MB 를 받기 전에 자리가 있는지 본다. 받다 중간에 꽉 차면 「받다 끊긴 파일」로만 보여
@@ -1097,7 +1121,7 @@ function Step-DownloadCys {
                 $script:NextStep = '연결이 된 뒤 같은 한 줄을 다시 돌려 주십시오. 받은 데까지는 건너뛰고 이어서 갑니다.'
                 return 5
             }
-            continue
+            # 회복 뒤 받은 파일은 아래 검증으로 **그대로 넘긴다** — 여기서 continue 하면 다음 회차가 그 파일을 지운다(검토 지적 2026-09-09).
         } finally {
             # 실패해서 빠져나가도 이 창의 설정을 원래대로 돌려놓는다.
             $ProgressPreference = $pref
@@ -1112,8 +1136,24 @@ function Step-DownloadCys {
             continue
         }
         $got = (Get-Item $dst -ErrorAction SilentlyContinue).Length
-        if ($got -eq $CysWinBytes) { Say '[5/10] 받았습니다 (크기 확인 완료).'; return 0 }
-        Say "[5/10] 크기가 맞지 않습니다 (받은 것 $got · 기대 $CysWinBytes). 다시 받습니다."
+        if ($got -ne $CysWinBytes) {
+            Say "[5/10] 크기가 맞지 않습니다 (받은 것 $got · 기대 $CysWinBytes). 다시 받습니다."
+            continue
+        }
+        # 크기가 맞아도 지문을 본다 — 크기는 같은데 내용이 다른 파일이 「받았습니다」로 지나가면
+        # 그 뒤의 모든 단계가 남의 파일 위에서 돈다. 지문 도구가 없으면 .NET 으로 잰다(러너에 없던 자리).
+        $hash = Get-CysFileSha256 $dst
+        if ($null -eq $hash) {
+            Say '[5/10] 받은 파일의 지문을 잴 수 없습니다 — 확인 없이 설치하지 않습니다.'
+            Write-JCode 'J-DL-03' '설치 파일 지문을 잴 수 없음'
+            if (Test-Path $dst) { Remove-Item $dst -Force -ErrorAction SilentlyContinue }
+            return 5
+        }
+        if ($hash -eq $CysWinSha256) { Say '[5/10] 받았습니다 (크기·지문 확인 완료).'; return 0 }
+        Say "[5/10] 지문이 맞지 않습니다 (받은 것 $($hash.Substring(0,12))… · 기대 $($CysWinSha256.Substring(0,12))…). 이 파일은 쓰지 않습니다."
+        Write-JCode 'J-DL-04' '설치 파일 지문 불일치'
+        if (Test-Path $dst) { Remove-Item $dst -Force -ErrorAction SilentlyContinue }
+        return 5
     }
     # 두 번 다 실패했으면 반쯤 받은 파일을 남기지 않는다 — 다음 실행이 그것을 온전한 것으로 볼 수 있다.
     if (Test-Path $dst) { Remove-Item $dst -Force -ErrorAction SilentlyContinue }
