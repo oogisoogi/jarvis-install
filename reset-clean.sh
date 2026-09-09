@@ -31,18 +31,21 @@ for a in "$@"; do
 done
 
 JARVIS_HOME="${JARVIS_HOME:-$HOME/install-jarvis}"
+# 아고라(토론장) 자리 — 🔴**우리가 만들지 않는다**(v0.3.5부터 설치기에서 뗐다).
+#   따로 참가하신 분의 자산이므로 **지우지 않고 「있음 · 남깁니다」로 보이기만 한다.**
+#   ⚠여기 있는 것은 지우려고 두는 것이 아니라 **손대지 않는다고 말하려고** 두는 것이다.
 AGORA_HOME="${AGORA_HOME:-$HOME/.config/agora}"
-# 광장 안내를 가리키는 자리(설치기 agora_place_skill 과 같은 규칙 — 있는 것만).
-agora_skill_dirs() {
-  printf '%s\n' "$HOME/.claude/skills/agora-delegate"
-  [ -d "$HOME/.cys/claude" ] && printf '%s\n' "$HOME/.cys/claude/skills/agora-delegate"
-  return 0
-}
-agora_skill_present() {
-  local d
-  for d in $(agora_skill_dirs); do [ -d "$d" ] && return 0; done
-  return 1
-}
+AGORA_SKILL="$HOME/.claude/skills/agora-delegate"             # 밖 — 남는다
+AGORA_SKILL_IN_CYS="$HOME/.cys/claude/skills/agora-delegate"  # cys 계정 자리 안 — 함께 지워진다
+# 🔴🔴**보존 경로 목록 — 지우는 자리 「안에」 들어 있어도 지우지 않는다**(검토 지적 채택 2026-09-09).
+#   왜 이 목록이 필요한가: 참가 자리는 사람이 `AGORA_HOME` 으로 옮겨 둘 수 있다. 그것이
+#   `~/.cys/forum` 이나 `~/install-jarvis/forum` 처럼 **우리가 지우는 자리 안**이면,
+#   화면은 「남깁니다」라고 말한 뒤 **상위를 통째로 지워** 열쇠를 함께 날린다.
+#   ⇒ 말이 아니라 **지우는 동작**이 보존을 알아야 한다.
+#   ⛔임시로 옮겼다 되돌리는 방식은 쓰지 않는다 — 되돌리는 도중 멈추면 그 자리에서 유실된다.
+#   한 줄에 한 경로다(공백 든 경로를 쪼개지 않으려고 줄로 나눈다).
+PRESERVE_PATHS="$AGORA_HOME
+$AGORA_SKILL"
 CYS_APP="/Applications/cys.app"
 CYS_CLI=""
 for c in "$CYS_APP/Contents/MacOS/cys" "$HOME/.local/bin/cys" "/usr/local/bin/cys"; do
@@ -140,10 +143,6 @@ diagnose() {
   [ -d "$JARVIS_HOME" ]; row $? '자비스 작업 폴더' "$JARVIS_HOME"
   # footprint: M-SCRIPTCOPY
   [ -f "$HOME/install-jarvis.sh" ]; row $? '받아 둔 설치 스크립트' "$HOME/install-jarvis.sh"
-  # footprint: M-AGORA
-  [ -d "$AGORA_HOME" ]; row $? '참가 열쇠·이름' "$AGORA_HOME"
-  # footprint: M-AGORASKILL
-  agora_skill_present; row $? '광장 안내 가리키기' "$HOME/.claude/skills/agora-delegate"
   # footprint: M-PROFILE
   local pf; pf="$(profile_with_marker | head -1)"
   [ -n "$pf" ]; row $? '실행 경로 한 줄' "${pf:-$HOME/.zprofile}"
@@ -175,6 +174,27 @@ diagnose() {
   # footprint: M-CLAUDEUSER
   [ -d "$HOME/.claude" ] && say "  [있음] 클로드 대화·기록 · $(short "$HOME/.claude") (남깁니다)" \
                          || say "  [없음] 클로드 대화·기록 · $(short "$HOME/.claude")"
+  # footprint: M-AGORA
+  #   🔴설치기가 만들지 않는다. 토론장에 따로 참가하신 분이 만든 것이므로 **지우지 않는다.**
+  [ -d "$AGORA_HOME" ] && say "  [있음] 토론장 참가 열쇠·이름 · $(short "$AGORA_HOME") (남깁니다)" \
+                       || say "  [없음] 토론장 참가 열쇠·이름 · $(short "$AGORA_HOME")"
+  # footprint: M-AGORASKILL
+  #   🔴자리가 둘이고 **운명이 다르다.** 밖(`~/.claude/`)은 남고, cys 계정 자리 안(`~/.cys/claude/`)은
+  #   위의 「cys 계정 자리」를 통째로 지울 때 **함께 지워진다.** 「남깁니다」라고 한 줄로 뭉치면
+  #   그 줄이 거짓말이 된다 — 이 표가 막으려는 바로 그 형태다. 그래서 두 자리를 갈라 말한다.
+  [ -d "$AGORA_SKILL" ] \
+    && say "  [있음] 토론장 안내 가리키기 · $(short "$AGORA_SKILL") (남깁니다)" \
+    || say "  [없음] 토론장 안내 가리키기 · $(short "$AGORA_SKILL")"
+  if [ -d "$AGORA_SKILL_IN_CYS" ]; then
+    say "  [있음] 토론장 안내 가리키기(자비스 창 쪽) · $(short "$AGORA_SKILL_IN_CYS")"
+    say "         ⚠이것은 위의 「cys 계정 자리」 안에 들어 있어 함께 지워집니다(cys 설치의 일부입니다)."
+    if [ -d "$AGORA_SKILL" ]; then
+      say "         같은 안내가 $(short "$AGORA_SKILL") 에도 있어 그쪽은 남습니다."
+    else
+      say "         지우기 전에 $(short "$AGORA_SKILL") 로 옮겨 둡니다 — 없어지지 않습니다."
+    fi
+    say "         토론장 참가 열쇠·이름은 어느 경우에도 그대로 남습니다."
+  fi
   say "  사진·문서·내려받기 등 개인 파일은 목록에 없습니다 — 손대지 않습니다."
 
   say ""
@@ -187,13 +207,120 @@ diagnose() {
     say "  설치가 중간에 멈춘 상태로 보입니다 (찾은 자국 $FOUND 개)."
     say "  고장이 아닙니다 — 지우고 처음부터 다시 하면 됩니다."
   fi
-  [ -d "$AGORA_HOME" ] && say "  ⚠참가 열쇠를 지우면 다시 설치할 때 참가 이름이 새로 생깁니다(전에 하신 말은 옛 이름으로 남습니다)."
 }
 
 # ── 지우기 ────────────────────────────────────────────────────────
-REMOVED=0; KEPT_FAIL=0
+REMOVED=0; KEPT_FAIL=0; PRESERVED=0
+
+# 🔴🔴**경로를 실경로로 푼 뒤에 비교한다**(2차 검토 지적 채택 2026-09-09).
+#   앞 판은 **끝 슬래시만** 떼고 글자로 비교했다. 그러면 `~/.cys/./forum` · `~/.cys/../.cys/forum` ·
+#   심볼릭 링크로 적어 둔 자리가 **중첩 판정을 빠져나가** 열쇠가 지워진다 — 첫 비교는 중첩으로 받는데
+#   `find` 가 내는 정규화된 경로와 저장해 둔 날것 경로가 서로 달라 남길 대상을 못 알아본다.
+#   ⇒ 양쪽을 **같은 방식으로 푼 뒤** 비교한다. `realpath` 는 맥 기본이 아니라 셸로 푼다.
+canon() {  # 실경로를 찍는다. 못 풀면 아무것도 안 찍고 rc 1.
+  local p="$1" d b
+  [ -n "$p" ] || return 1
+  if [ -d "$p" ]; then ( cd -P "$p" 2>/dev/null && pwd -P ) && return 0; return 1; fi
+  d="$(dirname "$p")"; b="$(basename "$p")"
+  d="$( cd -P "$d" 2>/dev/null && pwd -P )" || return 1
+  printf '%s/%s\n' "${d%/}" "$b"
+}
+# 보존 경로 가운데 이 자리 **안에** 있는 것을 실경로로 한 줄씩 찍는다.
+preserved_under() {
+  local root="$1" p c
+  printf '%s\n' "$PRESERVE_PATHS" | while IFS= read -r p; do
+    [ -n "$p" ] || continue; [ -e "$p" ] || continue
+    c="$(canon "$p")" || continue
+    case "$c" in "$root"/*) printf '%s\n' "$c" ;; esac
+  done
+}
+# 이 자리 **자신이** 보존 대상이거나 보존 경로의 아래인가(그러면 손대지 않는다).
+preserve_covers() {
+  local t="$1" p c
+  printf '%s\n' "$PRESERVE_PATHS" | while IFS= read -r p; do
+    [ -n "$p" ] || continue; [ -e "$p" ] || continue
+    c="$(canon "$p")" || continue
+    case "$t" in "$c"|"$c"/*) printf '%s\n' "$c" ;; esac
+  done
+}
+# 보존 경로만 남기고 그 자리를 비운다. 보존 경로와 **그 위 조상들**은 건드리지 않는다.
+#   ★깊은 것부터(-depth) 지운다 — 자식을 먼저 치우지 않으면 부모를 못 지운다.
+#   🔴**못 지운 것을 세어 돌려준다**(2차 검토 지적 채택): 앞 판은 개별 실패를 통째로 삼키고도
+#   「지움」이라 말했다. 지우는 도구가 「거의 다 지웠다」를 성공으로 보고하면 그것이 곧 거짓 상태 보고다.
+#   ⚠`find | while` 은 딴 프로세스라 변수를 못 돌려준다 ⇒ 실패 수를 파일에 적어 넘긴다.
+prune_except() {
+  local root="$1" keeps="$2" cnt p k skip
+  cnt="$(mktemp -t jarvis-prune)" || return 1
+  printf '0' > "$cnt"
+  find "$root" -depth -mindepth 1 2>/dev/null | while IFS= read -r p; do
+    skip=0
+    printf '%s\n' "$keeps" | while IFS= read -r k; do
+      [ -n "$k" ] || continue
+      case "$p" in "$k"|"$k"/*) exit 9 ;; esac   # 보존 경로 자신 또는 그 아래
+      case "$k" in "$p"/*) exit 9 ;; esac        # 보존 경로의 조상
+    done || skip=1
+    [ "$skip" = "1" ] && continue
+    rm -rf "$p" 2>/dev/null || printf '%s' "$(( $(cat "$cnt") + 1 ))" > "$cnt"
+  done
+  PRUNE_FAIL="$(cat "$cnt" 2>/dev/null || printf '0')"
+  rm -f "$cnt"
+  [ "${PRUNE_FAIL:-0}" -eq 0 ]
+}
+
+# 두 자리의 **파일 목록과 내용**이 같은가. 「폴더가 생겼다」로는 옮겼다고 말할 수 없다.
+#   ⚠임시 파일은 **바깥**에 만든다 — 대조하는 자리 안에 만들면 그 파일이 목록에 끼어 자기 자신을 어긋나게 한다.
+sha_of() { shasum -a 256 "$1" 2>/dev/null | awk '{print $1}'; }
+tree_same() {
+  local a="$1" b="$2" la lb rel rc=0
+  [ -d "$a" ] && [ -d "$b" ] || return 1
+  la="$(mktemp -t jarvis-ta)" || return 1
+  lb="$(mktemp -t jarvis-tb)" || { rm -f "$la"; return 1; }
+  ( cd "$a" 2>/dev/null && find . -type f | LC_ALL=C sort ) > "$la" 2>/dev/null || rc=1
+  ( cd "$b" 2>/dev/null && find . -type f | LC_ALL=C sort ) > "$lb" 2>/dev/null || rc=1
+  if [ "$rc" -eq 0 ] && cmp -s "$la" "$lb"; then
+    while IFS= read -r rel; do
+      [ -n "$rel" ] || continue
+      [ "$(sha_of "$a/$rel")" = "$(sha_of "$b/$rel")" ] || { rc=1; break; }
+    done < "$la"
+  else
+    rc=1
+  fi
+  rm -f "$la" "$lb"
+  return "$rc"
+}
+
+PRUNE_FAIL=0
 drop_dir()  {
   [ -e "$1" ] || return 0
+  # 🔴지우기 전에 보존 경로와의 중첩을 먼저 본다(검토 지적 채택 2026-09-09).
+  local t covers keeps
+  # ★실경로를 못 풀면 **지우지 않는다**(fail-closed). 무엇을 지우는지 확신할 수 없는 상태에서
+  #   지우는 것이 이 도구가 낼 수 있는 가장 나쁜 실패다.
+  t="$(canon "$1")" || {
+    KEPT_FAIL=$((KEPT_FAIL+1))
+    say "  🔴못 지움: $(short "$1") — 이 자리의 실제 경로를 확인하지 못해 **지우지 않았습니다.**"
+    say "         (확인할 수 없는 자리를 지우면 엉뚱한 것을 지울 수 있습니다.)"
+    return 1
+  }
+  covers="$(preserve_covers "$t")"
+  if [ -n "$covers" ]; then
+    PRESERVED=$((PRESERVED+1))
+    say "  보존(중첩): $(short "$1") — 참가 자리와 겹쳐 지우지 않습니다."
+    return 0
+  fi
+  keeps="$(preserved_under "$t")"
+  if [ -n "$keeps" ]; then
+    PRESERVED=$((PRESERVED+1))
+    say "  보존(중첩): $(short "$1") 안에 참가 자리가 있어 **그것만 남기고** 지웁니다."
+    printf '%s\n' "$keeps" | while IFS= read -r k; do [ -n "$k" ] && say "           남기는 자리: $(short "$k")"; done
+    if prune_except "$t" "$keeps"; then
+      REMOVED=$((REMOVED+1)); say "  지움: $(short "$1") (참가 자리는 그대로)"
+      return 0
+    fi
+    KEPT_FAIL=$((KEPT_FAIL+1))
+    say "  🔴일부 남음: $(short "$1") — ${PRUNE_FAIL}가지를 지우지 못했습니다(참가 자리는 그대로입니다)."
+    return 1
+  fi
   if rm -rf "$1" 2>/dev/null; then REMOVED=$((REMOVED+1)); say "  지움: $(short "$1")"; return 0; fi
   KEPT_FAIL=$((KEPT_FAIL+1)); say "  🔴못 지움: $(short "$1")"
   #   가장 흔한 까닭이 권한이다 — 다른 계정이 깐 프로그램은 이 계정으로 못 지운다.
@@ -367,8 +494,36 @@ purge() {
 
   # footprint: M-APP
   drop_dir "$CYS_APP"
+  # 🔴cys 계정 자리를 지우기 **전에** 토론장 안내 파일을 밖으로 옮겨 둔다(검토 지적 채택 2026-09-09).
+  #   까닭: `~/.cys/claude/skills/agora-delegate` 는 cys 설치의 일부라 cys 와 함께 사라지는 것이 맞다.
+  #   그런데 그대로 두면 다시 깐 뒤 「아고라에 참가해」가 **안 먹는 공백**이 생긴다 — 참가 열쇠는
+  #   남아 있는데 그걸 어떻게 쓰는지 적은 종이만 없어진 꼴이다.
+  #   ⇒ 밖(`~/.claude/skills/`)에 같은 것이 **없을 때만** 옮겨 둔다(있으면 손대지 않는다 = 멱등).
+  #   ⛔밖에 이미 있는 것을 덮어쓰지 않는다 — 사람이 손수 고쳐 둔 것일 수 있다.
+  #   🔴🔴**옮겼다고 말하기 전에 바이트를 대조한다**(2차 검토 지적 채택). 앞 판은 `cp` 의 종료값만 봤다 —
+  #   폴더만 만들어지고 알맹이가 반만 복사돼도 「옮겼습니다」라고 말한 뒤 원본을 지웠고,
+  #   ★**다음 실행은 「대상이 이미 있다」며 이전을 건너뛰어 반쪽이 영구히 고착된다.**
+  #   ⇒ 대조에 실패하면 **원본(`~/.cys`)을 지우지 않는다**(fail-closed). 사람 손 한 번이 유실보다 싸다.
+  AGORA_MIGRATE_OK=1
+  if [ -d "$AGORA_SKILL_IN_CYS" ] && [ ! -d "$AGORA_SKILL" ]; then
+    if mkdir -p "$(dirname "$AGORA_SKILL")" 2>/dev/null && cp -R "$AGORA_SKILL_IN_CYS" "$AGORA_SKILL" 2>/dev/null \
+       && tree_same "$AGORA_SKILL_IN_CYS" "$AGORA_SKILL"; then
+      say "  옮김: 토론장 안내를 $(short "$AGORA_SKILL") 로 옮겨 두었습니다(내용까지 같은지 확인했습니다)."
+    else
+      AGORA_MIGRATE_OK=0
+      KEPT_FAIL=$((KEPT_FAIL+1))
+      say "  🔴토론장 안내를 밖으로 옮기지 못했습니다 — 그래서 $(short "$HOME/.cys") 를 **지우지 않았습니다.**"
+      say "         지웠다면 그 안내가 영영 사라졌을 것입니다. 참가 열쇠·이름은 그대로 있습니다."
+      say "         $(short "$AGORA_SKILL_IN_CYS") 를 손으로 $(short "$AGORA_SKILL") 에 옮기신 뒤 같은 줄을 다시 돌려 주십시오."
+      # 반쪽만 생긴 대상은 치운다 — 그대로 두면 다음 실행이 「이미 있다」며 건너뛴다(고착).
+      [ -d "$AGORA_SKILL" ] && ! tree_same "$AGORA_SKILL_IN_CYS" "$AGORA_SKILL" && rm -rf "$AGORA_SKILL" 2>/dev/null
+    fi
+  fi
+
   # footprint: M-CYSHOME   (M-CYSPROFILE 은 이 안에 들어 있다)
-  drop_dir "$HOME/.cys"
+  if [ "$AGORA_MIGRATE_OK" = "1" ]; then
+    drop_dir "$HOME/.cys"
+  fi
   # footprint: M-CYSSTATE
   drop_dir "$HOME/.local/state/cys"
   # footprint: M-CLAUDEBIN
@@ -379,13 +534,6 @@ purge() {
   drop_dir "$JARVIS_HOME"
   # footprint: M-SCRIPTCOPY
   drop_file "$HOME/install-jarvis.sh"
-  # footprint: M-AGORA
-  drop_dir "$AGORA_HOME"
-  # footprint: M-AGORASKILL
-  #   ★가리키던 파일이 사라지면 가리키는 쪽도 같이 지운다 — 남겨 두면 다음 자비스가
-  #     없는 파일을 읽으려다 막히고, 그것은 안내가 없느니만 못하다.
-  for _sk in $(agora_skill_dirs); do drop_dir "$_sk"; done
-
   # 남의 파일 속 우리 줄 — 파일을 지우지 않는다
   # footprint: M-PROFILE
   strip_profile_marker
@@ -405,6 +553,8 @@ purge() {
   say "  남김: 클로드 대화·기록"
 
   say ""
+  # 보존한 것이 있으면 반드시 말한다 — 「지웠는데 왜 남아 있지」를 미리 답한다.
+  [ "$PRESERVED" -gt 0 ] && say "    (참가 자리와 겹쳐 그대로 둔 자리 $PRESERVED 곳이 있습니다 — 위 「보존(중첩)」 줄)"
   if [ "$KEPT_FAIL" -eq 0 ]; then
     say "=== 끝났습니다 — $REMOVED 가지를 지웠고, 못 지운 것은 없습니다. ==="
     return 0

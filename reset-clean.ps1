@@ -50,13 +50,18 @@ $ClaudeDir  = Join-Path $env:USERPROFILE '.claude'
 $ClaudeJson = Join-Path $env:USERPROFILE '.claude.json'
 $ClaudeExe  = Join-Path $env:USERPROFILE '.local\bin\claude.exe'
 $ClaudeBin  = (Join-Path $env:USERPROFILE '.local\bin').TrimEnd('\')
-$AgoraDir   = Join-Path $env:USERPROFILE '.config\agora'
-# 광장 안내를 가리키는 자리(설치기 Set-AgoraSkill 과 같은 규칙 - 있는 것만).
-$AgoraSkillDirs = @((Join-Path $env:USERPROFILE '.claude\skills\agora-delegate'))
-$AgoraAltHome = Join-Path $env:USERPROFILE '.cys\claude'
-if (Test-Path -LiteralPath $AgoraAltHome) {
-    $AgoraSkillDirs += (Join-Path $AgoraAltHome 'skills\agora-delegate')
-}
+# 아고라(토론장) 자리 - 우리가 만들지 않는다(v0.3.5 부터 설치기에서 뗐다).
+#   따로 참가하신 분의 자산이므로 지우지 않고 「있음 · 남깁니다」로 보이기만 한다.
+#   여기 있는 것은 지우려고 두는 것이 아니라 손대지 않는다고 말하려고 두는 것이다.
+# 맥판과 같은 해석이다 - AGORA_HOME 이 서 있으면 그것을 쓴다(검토 지적: 윈도우만 안 읽어 갈렸다).
+$AgoraDir   = if ($env:AGORA_HOME) { $env:AGORA_HOME } else { Join-Path $env:USERPROFILE '.config\agora' }
+$AgoraSkill      = Join-Path $env:USERPROFILE '.claude\skills\agora-delegate'          # 밖 - 남는다
+$AgoraSkillInCys = Join-Path $env:USERPROFILE '.cys\claude\skills\agora-delegate'      # cys 계정 자리 안 - 함께 지워진다
+# 보존 경로 목록 - 지우는 자리 「안에」 들어 있어도 지우지 않는다(검토 지적 채택 2026-09-09).
+#   참가 자리는 사람이 AGORA_HOME 으로 옮겨 둘 수 있고, 그것이 우리가 지우는 자리 안이면
+#   화면은 「남깁니다」라고 말한 뒤 상위를 통째로 지워 열쇠를 함께 날린다.
+#   말이 아니라 지우는 동작이 보존을 알아야 한다. 임시 이동·복원 방식은 쓰지 않는다(도중에 멈추면 유실).
+$PreservePaths = @($AgoraDir, $AgoraSkill)
 $SettingsJs = Join-Path $ClaudeDir 'settings.json'
 # ★로그인 파일 자리는 고정이 아니다 — 공식 문서(2026-09-08 확인 · code.claude.com/docs/en/team
 #   「Credential management」): 「If you've set the CLAUDE_CONFIG_DIR environment variable, Claude Code
@@ -76,6 +81,7 @@ $TempPs1    = Join-Path $env:TEMP 'install-jarvis.ps1'
 $script:Found = 0
 $script:Removed = 0
 $script:KeptFail = 0
+$script:Preserved = 0
 $script:SkipCysDir = $false
 
 function Short($p) { return ([string]$p).Replace($env:USERPROFILE, '~') }
@@ -96,7 +102,7 @@ function RowFlag($label, $exists, $note) {
 # 자리가 판본마다 다를 수 있으므로 후보를 훑고 **있는 것만** 돌려준다(없으면 빈 목록 = 「없음」).
 function Get-StartMenuLinks {
     # ⛔바로가기 **파일(.lnk)만** 후보로 넣는다. 앞 판은 확장자 없는 `cys` 도 넣었는데, 그것이 사람이
-    #   다른 뜻으로 만든 폴더면 Drop 이 -Recurse -Force 로 **통째로 지운다**(agy R1 [3] 지적 채택
+    #   다른 뜻으로 만든 폴더면 Drop 이 -Recurse -Force 로 **통째로 지운다**(검토 지적 채택
     #   2026-09-09 · 남의 것을 지울 위험은 「있으면 함께 지운다」의 편의보다 무겁다).
     # ⚠전체 사용자 공용 시작 메뉴(C:\ProgramData\...)는 **후보에 넣지 않는다** — 그 자리는 관리자
     #   영역이고, 이 스크립트는 관리자 권한을 쓰지 않는다(HKLM 을 안 건드리는 것과 같은 규율).
@@ -110,8 +116,172 @@ function Get-StartMenuLinks {
     return $out.ToArray()
 }
 
+# 경로 비교는 문자열로 한다. 끝 구분자와 대소문자를 맞춰 두지 않으면 「안에 있다」를 놓친다.
+#   🔴🔴끝 구분자만 떼는 것으로는 부족하다(2차 검토 지적 채택 2026-09-09).
+#   `%USERPROFILE%\.cys\.\forum` 이나 `..` 이 낀 자리, 링크로 적어 둔 자리는 글자가 달라
+#   중첩 판정을 빠져나가고, 그러면 참가 열쇠가 지워진다. ⇒ **실경로로 푼 뒤** 비교한다.
+function Norm-Path($p) {
+    if (-not $p) { return '' }
+    return ([string]$p).TrimEnd('\','/')
+}
+# 🔴이 자리는 **파일 경로만** 다룬다. `Drop` 은 레지스트리 항목(`HKCU:\...`)에도 쓰이는데
+#   그것을 파일 경로로 풀려 하면 실패하고, fail-closed 규칙에 걸려 **멀쩡한 등록 항목을 안 지운다**
+#   (2026-09-09 러너 실측 — 이 가드를 넣은 내가 낸 회귀다).
+#   ★보존해야 할 참가 자리는 언제나 파일이다 ⇒ 파일 경로가 아니면 중첩 검사 자체가 뜻이 없다.
+#   판별: `D:\…`(드라이브 한 글자) 또는 `\\서버\공유`. `HKCU:\…` 는 한 글자가 아니라 안 걸린다.
+function Test-IsFilePath($p) {
+    if (-not $p) { return $false }
+    return (([string]$p) -match '^(\\\\|[A-Za-z]:[\\/])')
+}
+# 실경로. 못 풀면 빈 문자열을 돌려준다(그때 부르는 쪽은 지우지 않는다 = fail-closed).
+function Canon-Path($p) {
+    if (-not $p) { return '' }
+    try {
+        $full = [System.IO.Path]::GetFullPath(([string]$p))
+        $rp = Resolve-Path -LiteralPath $full -ErrorAction SilentlyContinue
+        if ($rp) { return (Norm-Path $rp.ProviderPath) }
+        return (Norm-Path $full)
+    } catch { return '' }
+}
+function Path-IsUnder($child, $parent) {
+    $c = Norm-Path $child; $r = Norm-Path $parent
+    if (-not $c -or -not $r) { return $false }
+    return $c.StartsWith($r + '\', [System.StringComparison]::OrdinalIgnoreCase)
+}
+function Path-IsSame($a, $b) {
+    return ((Norm-Path $a) -ieq (Norm-Path $b))
+}
+# 이 자리 안에 있는 보존 경로들(실경로로 · 없으면 빈 배열).
+function Get-PreservedUnder($root) {
+    $out = @()
+    foreach ($p in $PreservePaths) {
+        if (-not $p) { continue }
+        if (-not (Test-Path -LiteralPath $p)) { continue }
+        $c = Canon-Path $p
+        if (-not $c) { continue }
+        if (Path-IsUnder $c $root) { $out += $c }
+    }
+    return $out
+}
+# 이 자리 자신이 보존 대상이거나 보존 경로의 아래인가.
+function Test-PreserveCovers($target) {
+    foreach ($p in $PreservePaths) {
+        if (-not $p) { continue }
+        if (-not (Test-Path -LiteralPath $p)) { continue }
+        $c = Canon-Path $p
+        if (-not $c) { continue }
+        if ((Path-IsSame $target $c) -or (Path-IsUnder $target $c)) { return $true }
+    }
+    return $false
+}
+# 보존 경로와 그 조상만 남기고 그 자리를 비운다. 깊은 것부터 지운다.
+#   🔴**못 지운 것을 세어 돌려준다**(2차 검토 지적 채택): 앞 판은 개별 실패를 통째로 삼키고도
+#   「지움」이라 말했다. 지우는 도구가 「거의 다 지웠다」를 성공으로 보고하면 그것이 곧 거짓 상태 보고다.
+function Remove-ExceptPreserved($root, $keeps) {
+    $fails = 0
+    $items = Get-ChildItem -LiteralPath $root -Recurse -Force -ErrorAction SilentlyContinue |
+             Sort-Object { $_.FullName.Length } -Descending
+    foreach ($it in $items) {
+        $f = Canon-Path $it.FullName
+        if (-not $f) { $f = Norm-Path $it.FullName }
+        $skip = $false
+        foreach ($k in $keeps) {
+            if ((Path-IsSame $f $k) -or (Path-IsUnder $f $k) -or (Path-IsUnder $k $f)) { $skip = $true; break }
+        }
+        if ($skip) { continue }
+        if (-not (Test-Path -LiteralPath $it.FullName)) { continue }   # 부모를 지우며 함께 사라진 것
+        try { Remove-Item -LiteralPath $it.FullName -Recurse -Force -ErrorAction Stop }
+        catch { $fails++ }
+    }
+    return $fails
+}
+
+# 두 자리의 파일 목록과 내용이 같은가. 「폴더가 생겼다」로는 옮겼다고 말할 수 없다.
+# 🔴**`Get-FileHash` 에 기대지 않는다**(러너 실측 2026-09-09 · 이 저장소가 이미 아는 함정).
+#   사용자 폴더를 갈아 끼운 5.1 환경에서 그 명령을 **못 찾는 일이 있다**(모듈 자동 적재가 어긋난다).
+#   참가자 기계에서도 같은 일이 날 수 있고, 그때 「대조 실패」로 읽혀 제거기가 멈춘다.
+#   ⇒ .NET 으로 직접 센다. 어느 판본·어느 환경에서도 있는 길이다.
+function Get-Sha256File($path) {
+    $fs = $null; $sha = $null
+    try {
+        $sha = [System.Security.Cryptography.SHA256]::Create()
+        $fs = [System.IO.File]::Open($path, [System.IO.FileMode]::Open, [System.IO.FileAccess]::Read, [System.IO.FileShare]::ReadWrite)
+        return [System.BitConverter]::ToString($sha.ComputeHash($fs)).Replace('-', '')
+    } finally {
+        if ($fs) { $fs.Dispose() }
+        if ($sha) { $sha.Dispose() }
+    }
+}
+
+$script:TreeSameWhy = ''
+function Test-TreeSame($a, $b) {
+    $script:TreeSameWhy = ''
+    if (-not (Test-Path -LiteralPath $a)) { $script:TreeSameWhy = "원본이 없다: $a"; return $false }
+    if (-not (Test-Path -LiteralPath $b)) { $script:TreeSameWhy = "옮긴 자리가 없다: $b"; return $false }
+    try {
+        $ra = (Resolve-Path -LiteralPath $a).ProviderPath.TrimEnd('\')
+        $rb = (Resolve-Path -LiteralPath $b).ProviderPath.TrimEnd('\')
+        $fa = @(Get-ChildItem -LiteralPath $ra -Recurse -File -Force -ErrorAction Stop |
+                ForEach-Object { $_.FullName.Substring($ra.Length) } | Sort-Object)
+        $fb = @(Get-ChildItem -LiteralPath $rb -Recurse -File -Force -ErrorAction Stop |
+                ForEach-Object { $_.FullName.Substring($rb.Length) } | Sort-Object)
+        if ($fa.Count -ne $fb.Count) {
+            $script:TreeSameWhy = ("파일 수가 다르다: 원본 {0} · 옮긴 것 {1} (원본=[{2}] 옮긴것=[{3}])" -f $fa.Count, $fb.Count, ($fa -join ','), ($fb -join ','))
+            return $false
+        }
+        for ($i = 0; $i -lt $fa.Count; $i++) {
+            if ($fa[$i] -ne $fb[$i]) { $script:TreeSameWhy = ("이름이 다르다: {0} vs {1}" -f $fa[$i], $fb[$i]); return $false }
+        }
+        foreach ($rel in $fa) {
+            $ha = Get-Sha256File ($ra + $rel)
+            $hb = Get-Sha256File ($rb + $rel)
+            if ($ha -ne $hb) { $script:TreeSameWhy = ("내용이 다르다: " + $rel); return $false }
+        }
+        return $true
+    } catch {
+        $script:TreeSameWhy = ("대조 중 오류: " + $_.Exception.Message)
+        return $false
+    }
+}
+
 function Drop($label, $path) {
     if (-not (Test-Path $path)) { return }
+    # 지우기 전에 보존 경로와의 중첩을 먼저 본다(검토 지적 채택 2026-09-09).
+    # ★실경로를 못 풀면 지우지 않는다(fail-closed). 무엇을 지우는지 확신할 수 없는 상태에서
+    #   지우는 것이 이 도구가 낼 수 있는 가장 나쁜 실패다.
+    # 파일이 아닌 자리(레지스트리 등)는 중첩 검사 대상이 아니다 - 종전대로 지운다.
+    if (-not (Test-IsFilePath $path)) {
+        try { Remove-Item $path -Recurse -Force -ErrorAction Stop; $script:Removed++; Write-Host ("  지움: " + (Short $path)) }
+        catch { $script:KeptFail++; Write-Host ("  [남음] " + (Short $path) + " — " + $_.Exception.Message) }
+        return
+    }
+    $t = Canon-Path $path
+    if (-not $t) {
+        $script:KeptFail++
+        Write-Host ("  [남음] " + (Short $path) + " - 이 자리의 실제 경로를 확인하지 못해 지우지 않았습니다.")
+        Write-Host '         (확인할 수 없는 자리를 지우면 엉뚱한 것을 지울 수 있습니다.)'
+        return
+    }
+    if (Test-PreserveCovers $t) {
+        $script:Preserved++
+        Write-Host ("  보존(중첩): " + (Short $path) + " - 참가 자리와 겹쳐 지우지 않습니다.")
+        return
+    }
+    $keeps = @(Get-PreservedUnder $t)
+    if ($keeps.Count -gt 0) {
+        $script:Preserved++
+        Write-Host ("  보존(중첩): " + (Short $path) + " 안에 참가 자리가 있어 그것만 남기고 지웁니다.")
+        foreach ($k in $keeps) { Write-Host ("           남기는 자리: " + (Short $k)) }
+        $fails = Remove-ExceptPreserved $t $keeps
+        if ($fails -gt 0) {
+            $script:KeptFail++
+            Write-Host ("  [일부 남음] " + (Short $path) + " - {0}가지를 지우지 못했습니다(참가 자리는 그대로입니다)." -f $fails)
+            return
+        }
+        $script:Removed++
+        Write-Host ("  지움: " + (Short $path) + " (참가 자리는 그대로)")
+        return
+    }
     try { Remove-Item $path -Recurse -Force -ErrorAction Stop; $script:Removed++; Write-Host ("  지움: " + (Short $path)) }
     catch { $script:KeptFail++; Write-Host ("  [남음] " + (Short $path) + " — " + $_.Exception.Message) }
 }
@@ -203,12 +373,6 @@ function Invoke-Diagnose {
     # footprint: W-SCRIPTCOPY
     [void](Row '받아 둔 설치 스크립트' $HomePs1)
     [void](Row '받아 둔 설치 스크립트(옛 자리)' $TempPs1)
-    # footprint: W-AGORA
-    [void](Row '참가 열쇠·이름' $AgoraDir)
-    # footprint: W-AGORASKILL
-    $skillHere = $false
-    foreach ($sd in $AgoraSkillDirs) { if (Test-Path -LiteralPath $sd) { $skillHere = $true } }
-    RowFlag '광장 안내 가리키기' $skillHere ($AgoraSkillDirs[0])
     # footprint: W-PATH
     RowFlag '실행 경로 등록' (Test-UserPathSeed) '사용자 Path 환경변수'
     # footprint: W-CLAUDEJSON
@@ -238,6 +402,25 @@ function Invoke-Diagnose {
     }
     if (Test-Path $ClaudeDir) { Write-Host ('  [있음] 클로드 대화·기록 · ' + (Short $ClaudeDir) + ' (남깁니다)') }
     else { Write-Host ('  [없음] 클로드 대화·기록 · ' + (Short $ClaudeDir)) }
+    # footprint: W-AGORA
+    #   설치기가 만들지 않는다. 토론장에 따로 참가하신 분이 만든 것이므로 지우지 않는다.
+    if (Test-Path $AgoraDir) { Write-Host ('  [있음] 토론장 참가 열쇠·이름 · ' + (Short $AgoraDir) + ' (남깁니다)') }
+    else { Write-Host ('  [없음] 토론장 참가 열쇠·이름 · ' + (Short $AgoraDir)) }
+    # footprint: W-AGORASKILL
+    #   자리가 둘이고 운명이 다르다. 밖(.claude)은 남고, cys 계정 자리 안(.cys\claude)은
+    #   위의 「cys 계정 자리」를 통째로 지울 때 함께 지워진다. 한 줄로 뭉치면 그 줄이 거짓말이 된다.
+    if (Test-Path -LiteralPath $AgoraSkill) { Write-Host ('  [있음] 토론장 안내 가리키기 · ' + (Short $AgoraSkill) + ' (남깁니다)') }
+    else { Write-Host ('  [없음] 토론장 안내 가리키기 · ' + (Short $AgoraSkill)) }
+    if (Test-Path -LiteralPath $AgoraSkillInCys) {
+        Write-Host ('  [있음] 토론장 안내 가리키기(자비스 창 쪽) · ' + (Short $AgoraSkillInCys))
+        Write-Host '         이것은 위의 「cys 계정 자리」 안에 들어 있어 함께 지워집니다(cys 설치의 일부입니다).'
+        if (Test-Path -LiteralPath $AgoraSkill) {
+            Write-Host ('         같은 안내가 ' + (Short $AgoraSkill) + ' 에도 있어 그쪽은 남습니다.')
+        } else {
+            Write-Host ('         지우기 전에 ' + (Short $AgoraSkill) + ' 로 옮겨 둡니다 - 없어지지 않습니다.')
+        }
+        Write-Host '         토론장 참가 열쇠·이름은 어느 경우에도 그대로 남습니다.'
+    }
     Write-Host '  사진·문서·내려받기 등 개인 파일은 목록에 없습니다 — 손대지 않습니다.'
 
     Write-Host ''
@@ -250,7 +433,6 @@ function Invoke-Diagnose {
         Write-Host ("  설치가 중간에 멈춘 상태로 보입니다 (찾은 자국 {0} 개)." -f $script:Found)
         Write-Host '  고장이 아닙니다 — 지우고 처음부터 다시 하면 됩니다.'
     }
-    if (Test-Path $AgoraDir) { Write-Host '  참가 열쇠를 지우면 다시 설치할 때 참가 이름이 새로 생깁니다(전에 하신 말은 옛 이름으로 남습니다).' }
 }
 
 # ── 남의 파일 속 우리 줄 — 파일을 지우지 않는다 ──────────────────
@@ -479,7 +661,7 @@ function Invoke-Purge {
         # 정식 제거 경로를 쓸 수 없는 자리다. 까닭이 둘인데 **사람에게 하는 말이 달라야 한다** —
         #   ⑴목록 항목이 없다  ⇒ 설정 앱에 cys 가 아예 안 보인다(3호가 만난 자리)
         #   ⑵항목은 있는데 제거 프로그램이 없다 ⇒ 설정 앱에서 눌러도 그 자리에서 실패한다
-        #   ⛔한 문장으로 뭉뚱그리면 둘 중 하나는 **거짓말**이 된다(agy R1 [1] 지적 채택 2026-09-09 —
+        #   ⛔한 문장으로 뭉뚱그리면 둘 중 하나는 **거짓말**이 된다(검토 지적 채택 2026-09-09 -
         #     앞 판은 ⑵에서도 「항목이 없습니다」라고 적었다. 사람이 설정 앱을 열어 보면 항목이 있다).
         #   ⇒ 이때만 우리가 직접 지운다. 대신 지우기 전에 두 가지를 확인한다 —
         #     ⑴돌고 있지 않은가(돌고 있으면 폴더가 안 지워지고 [남음] 이 거짓이 된다)
@@ -533,15 +715,60 @@ function Invoke-Purge {
     #   상태를 만나고, 앞 판은 거기서 또 설정 앱을 요구했다(= 3호가 만난 교착의 자가 생산 경로).
     #   ⇒ 프로그램을 남겨 두기로 한 실행에서는 그 항목도 함께 남긴다. 둘은 한 쌍이다.
     #   ⚠남긴다는 말은 **설정 앱에서 마저 지우실 수 있을 때만** 참이다. 항목이 애초에 없으면 그 문장은
-    #     앞의 안내와 정면으로 어긋난다(agy R1 [1] 지적 채택 — 「항목이 없습니다」라고 말해 놓고
+    #     앞의 안내와 정면으로 어긋난다(검토 지적 채택 - 「항목이 없습니다」라고 말해 놓고
     #     「설정 앱에서 지우실 수 있게 둡니다」라고 적고 있었다).
     if ($script:SkipCysDir -and $hasRegEntry) {
         Write-Host '  남김: cys 설치 목록 항목 (프로그램이 남아 있어 설정 앱에서 지우실 수 있게 둡니다)'
     } else {
         Drop 'cys 설치 목록 항목' $RegKey
     }
+    # cys 계정 자리를 지우기 전에 토론장 안내 파일을 밖으로 옮겨 둔다(검토 지적 채택 2026-09-09).
+    #   .cys\claude\skills\agora-delegate 는 cys 설치의 일부라 함께 사라지는 것이 맞다. 그런데 그대로 두면
+    #   다시 깐 뒤 「아고라에 참가해」가 안 먹는 공백이 생긴다 - 참가 열쇠는 남았는데 쓰는 법만 없어진 꼴이다.
+    #   밖(.claude\skills)에 같은 것이 없을 때만 옮긴다(있으면 손대지 않는다 = 멱등 · 손수 고친 것을 덮지 않는다).
+    #   🔴🔴옮겼다고 말하기 전에 바이트를 대조한다(2차 검토 지적 채택). 앞 판은 Copy-Item 이 던지지만
+    #   않으면 「옮겼습니다」라고 말한 뒤 원본을 지웠다 - 폴더만 생기고 알맹이가 반만 와도 그랬고,
+    #   ★다음 실행은 「대상이 이미 있다」며 이전을 건너뛰어 반쪽이 영구히 고착된다.
+    #   대조에 실패하면 원본(.cys)을 지우지 않는다(fail-closed). 사람 손 한 번이 유실보다 싸다.
+    $agoraMigrateOk = $true
+    if ((Test-Path -LiteralPath $AgoraSkillInCys) -and -not (Test-Path -LiteralPath $AgoraSkill)) {
+        $copied = $false
+        $why = ''
+        try {
+            $parent = Split-Path -Parent $AgoraSkill
+            if (-not (Test-Path -LiteralPath $parent)) { [void](New-Item -ItemType Directory -Path $parent -Force -ErrorAction Stop) }
+            # ⚠`Copy-Item <폴더> -Destination <없는 폴더> -Recurse` 는 판본에 따라 안을 복사하기도,
+            #   그 폴더째 안에 넣기도 한다. 어느 쪽이든 되게 하려고 목적지를 먼저 만들고 안엣것을 하나씩 옮긴다.
+            # 🔴⛔와일드카드(`\*`)를 `-LiteralPath` 로 넘기지 마라 — **글자 그대로 `*` 라는 이름을 찾는다.**
+            #   러너 실측(2026-09-09): 아무것도 복사되지 않았는데 **던지지도 않았다** ⇒ 목적지 폴더만 생겼다.
+            #   ★바이트 대조가 그것을 잡았다(「파일 수가 다르다: 원본 1 · 옮긴 것 0」). 종료값만 봤다면
+            #   「옮겼습니다」라고 말한 뒤 원본을 지웠을 것이다 — 이 축이 막으려던 바로 그 사고다.
+            #   ⇒ 자식을 **하나씩 실제 경로로** 옮긴다(대괄호 든 이름에도 안전하다).
+            if (-not (Test-Path -LiteralPath $AgoraSkill)) { [void](New-Item -ItemType Directory -Path $AgoraSkill -Force -ErrorAction Stop) }
+            foreach ($child in @(Get-ChildItem -LiteralPath $AgoraSkillInCys -Force -ErrorAction SilentlyContinue)) {
+                Copy-Item -LiteralPath $child.FullName -Destination $AgoraSkill -Recurse -Force -ErrorAction Stop
+            }
+            $copied = $true
+        } catch { $copied = $false; $why = "복사가 실패했다: " + $_.Exception.Message }
+        if ($copied) { if (-not (Test-TreeSame $AgoraSkillInCys $AgoraSkill)) { $why = $script:TreeSameWhy } }
+        if ($copied -and -not $why) {
+            Write-Host ("  옮김: 토론장 안내를 " + (Short $AgoraSkill) + " 로 옮겨 두었습니다(내용까지 같은지 확인했습니다).")
+        } else {
+            $agoraMigrateOk = $false
+            $script:KeptFail++
+            Write-Host ("  [남음] 토론장 안내를 밖으로 옮기지 못했습니다 - 그래서 " + (Short $CysHome) + " 를 지우지 않았습니다.")
+            if ($why) { Write-Host ("         까닭: " + $why) }
+            Write-Host '         지웠다면 그 안내가 영영 사라졌을 것입니다. 참가 열쇠·이름은 그대로 있습니다.'
+            Write-Host ("         " + (Short $AgoraSkillInCys) + " 를 손으로 " + (Short $AgoraSkill) + " 에 옮기신 뒤 같은 줄을 다시 돌려 주십시오.")
+            # 반쪽만 생긴 대상은 치운다 - 그대로 두면 다음 실행이 「이미 있다」며 건너뛴다(고착).
+            if ((Test-Path -LiteralPath $AgoraSkill) -and -not (Test-TreeSame $AgoraSkillInCys $AgoraSkill)) {
+                Remove-Item -LiteralPath $AgoraSkill -Recurse -Force -ErrorAction SilentlyContinue
+            }
+        }
+    }
+
     # footprint: W-CYSHOME
-    Drop 'cys 계정 자리' $CysHome
+    if ($agoraMigrateOk) { Drop 'cys 계정 자리' $CysHome }
     # footprint: W-CLAUDEBIN
     Drop '클로드 실행 파일' $ClaudeExe
     # footprint: W-JARVISHOME
@@ -549,13 +776,6 @@ function Invoke-Purge {
     # footprint: W-SCRIPTCOPY
     Drop '받아 둔 설치 스크립트' $HomePs1
     Drop '받아 둔 설치 스크립트(옛 자리)' $TempPs1
-    # footprint: W-AGORA
-    Drop '참가 열쇠·이름' $AgoraDir
-    # footprint: W-AGORASKILL
-    #   ★가리키던 파일이 사라지면 가리키는 쪽도 같이 지운다 - 남겨 두면 다음 자비스가
-    #     없는 파일을 읽으려다 막히고, 그것은 안내가 없느니만 못하다.
-    foreach ($sd in $AgoraSkillDirs) { Drop '광장 안내 가리키기' $sd }
-
     # 남의 파일 속 우리 줄 — 파일을 지우지 않는다
     # footprint: W-PATH
     Remove-UserPathSeed
@@ -569,6 +789,10 @@ function Invoke-Purge {
     Write-Host '  남김: 클로드 대화·기록'
 
     Write-Host ''
+    # 보존한 것이 있으면 반드시 말한다 - 「지웠는데 왜 남아 있지」를 미리 답한다.
+    if ($script:Preserved -gt 0) {
+        Write-Host ("    (참가 자리와 겹쳐 그대로 둔 자리 {0} 곳이 있습니다 - 위 「보존(중첩)」 줄)" -f $script:Preserved)
+    }
     if ($script:KeptFail -eq 0) {
         Write-Host ("=== 끝났습니다 — {0} 가지를 지웠고, 못 지운 것은 없습니다. ===" -f $script:Removed)
         return 0

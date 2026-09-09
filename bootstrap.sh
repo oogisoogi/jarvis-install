@@ -151,7 +151,7 @@ jcode() {       # jcode <코드> <한 줄 설명>
 #   unknown = 물어볼 도구가 없어 못 가름
 # ⚠셋 다 답하는데 단계가 안 나가는 경우를 「연결 문제」로 적으면 안 된다 — 그건 다른 병이다
 #   (백신이 붙들었거나 그 단계 고유의 사정). 그때는 **연결은 된다**고 사실대로 말한다.
-# 🔴순서가 아니라 **종합**으로 판단한다(agy R1 [2] 지적 채택 2026-09-09).
+# 🔴순서가 아니라 **종합**으로 판단한다(검토 지적 채택 2026-09-09).
 #   앞 판은 1.1.1.1 을 먼저 물어 실패하면 곧바로 「인터넷 없음」이라고 했다. 그런데 회사·학교 망은
 #   **그 주소만 막고 프록시로 웹은 되게** 하는 일이 흔하다 ⇒ 인터넷이 멀쩡한 사람에게 30분 동안
 #   「인터넷이 없습니다」라고 우기게 된다. 진짜 원인은 가려지고 사람은 설치기를 믿지 않게 된다.
@@ -193,7 +193,7 @@ net_cause_code() {    # 원인 → 진단 코드
 }
 
 # ── 연결 대기 (모든 연결 단계가 이 한 자리를 쓴다) ────────────────
-#   $1 = 단계 표시(예: [5/11]) · $2 = 다시 해 볼 명령(문자열로 받아 그대로 실행한다)
+#   $1 = 단계 표시(예: [5/10]) · $2 = 다시 해 볼 명령(문자열로 받아 그대로 실행한다)
 #   rc 0 = 성공(이어간다) · rc 1 = 상한 초과(정직 실패 — 부르는 쪽이 코드를 남기고 멈춘다)
 # ⚠기다리는 동안 **말을 한다.** 침묵은 사람에게 「멈췄다」로 읽히고, 그때 창을 닫는다.
 wait_for_connection() {
@@ -226,7 +226,7 @@ closing_note() {
   printf '%s\n' "다음에 할 일: ${NEXT_STEP:-같은 한 줄을 다시 돌리시면 끝난 단계는 건너뛰고 이어서 갑니다.}"
   if [ -n "$J_CODE" ]; then
     printf '%s\n' "  진단 코드: $J_CODE  (${HELP_CODE_URL}${J_CODE})"
-    # 🔴화면과 보고서가 갈리지 않게 한다(agy R1 [4] 지적 채택 2026-09-09) — 단계가 코드를 남기고 그 자리에서
+    # 🔴화면과 보고서가 갈리지 않게 한다(검토 지적 채택 2026-09-09) — 단계가 코드를 남기고 그 자리에서
     #   끝나면 보고서는 그 전에 쓰인 것이라 **옛 코드나 빈칸**이 남는다. 그 둘이 다르면 사람이 읽어 주는 코드와
     #   우리가 받는 파일이 어긋나 소통이 꼬인다. ⇒ 끝나기 직전에 보고서의 그 줄만 지금 값으로 맞춘다.
     if [ -f "$REPORT_FILE" ]; then
@@ -251,7 +251,7 @@ NEXT_STEP=""    # 단계가 자기 자리에서 더 정확한 한 줄을 넣을 
 ROWS_FILE="$(mktemp -t jarvis-rows)"
 trap 'closing_note; rm -f "$ROWS_FILE"' EXIT
 
-# 🔴자리 만들기를 **끝맺음 보증 안쪽**으로 옮겼다(agy R1 [3] 지적 채택 2026-09-09).
+# 🔴자리 만들기를 **끝맺음 보증 안쪽**으로 옮겼다(검토 지적 채택 2026-09-09).
 #   앞 판은 이 실패가 트랩 등록보다 먼저 나서, 가장 도움이 필요한 순간(권한·공간·백신으로 자리를 못 만든
 #   순간)에 「다음에 할 일」이 한 줄도 안 나오고 창이 차갑게 닫혔다.
 #   ⚠까닭을 「권한」 하나로 단정하지 않는다 — 공간이 꽉 찼거나 백신이 폴더 생성을 막아도 여기서 실패한다.
@@ -481,14 +481,14 @@ write_report() {
   say "환경 보고를 썼습니다: $(redact "$REPORT_FILE")  (종합 판정 = $verdict)"
 }
 
-# 🔴2026-09-06 신설 (깨끗한 맥 실기 · T-M2 실측). **공식 클로드 설치기는 셸 프로필에 아무것도 안 쓴다.**
+# 🔴2026-09-06 신설 (깨끗한 맥 실기 실측). **공식 클로드 설치기는 셸 프로필에 아무것도 안 쓴다.**
 #   깨끗한 맥에서 설치한 직후 `~/.zprofile`·`~/.zshrc`·`~/.zshenv`·`~/.bash_profile`·`~/.bashrc`·
 #   `~/.profile` 여섯을 다시 재 보니 **여섯 개 다 여전히 없었다.** 설치기는 대신 화면에 이렇게 적는다 —
 #   「Native installation exists but ~/.local/bin is not in your PATH. Run: echo 'export
 #   PATH="$HOME/.local/bin:$PATH"' >> ~/.zshrc && source ~/.zshrc」. 즉 **사람에게 시킨다.**
 #   ⇒ 우리가 안 넣어 주면, 설치가 끝난 뒤 사용자가 터미널을 새로 열었을 때 `claude` 가 없다(실측:
 #     새 로그인 셸의 PATH 에 `~/.local/bin` 이 없다).
-#   ⚠**`[9/11]`·`[10/11]` 때문이 아니다.** cys 가 띄우는 창은 cysd 가 `~/.local/bin` 을 앞에 심어 줘서
+#   ⚠**`[9/10]`·`[10/10]` 때문이 아니다.** cys 가 띄우는 창은 cysd 가 `~/.local/bin` 을 앞에 심어 줘서
 #     거기서는 잘 잡힌다(실측으로 확인 — 이것은 처음에 우리가 세운 예측이 틀렸던 자리다).
 #     이 줄이 필요한 이유는 오직 **사용자가 스스로 새 터미널을 열었을 때**다.
 seed_local_bin_path() {
@@ -523,23 +523,23 @@ seed_local_bin_path() {
 # ── 하는 일 2 — 공식 설치기 호출 (멱등: 이미 있으면 건너뛴다) ─────
 step_install_claude() {
   if [ "$S1_CLAUDE_OK" = "1" ]; then
-    say "[2/11] 클로드가 이미 있습니다 — 건너뜁니다 (멱등)."
+    say "[2/10] 클로드가 이미 있습니다 — 건너뜁니다 (멱등)."
     return 0
   fi
   if [ -n "$(command -v claude 2>/dev/null)" ]; then
-    say "[2/11] 이 컴퓨터의 클로드가 낡았습니다($(claude --version 2>/dev/null | head -1)). 최신판을 설치합니다."
+    say "[2/10] 이 컴퓨터의 클로드가 낡았습니다($(claude --version 2>/dev/null | head -1)). 최신판을 설치합니다."
   fi
   if [ "$MODE" = "dry" ]; then
-    say "[2/11] (dry-run) 설치기를 부르지 않았습니다. 부를 줄 = curl -fsSL $CLAUDE_INSTALL_URL | bash"
+    say "[2/10] (dry-run) 설치기를 부르지 않았습니다. 부를 줄 = curl -fsSL $CLAUDE_INSTALL_URL | bash"
     return 0
   fi
-  say "[2/11] 클로드 코드를 설치합니다. 글자가 주르륵 올라갑니다 — 정상입니다."
+  say "[2/10] 클로드 코드를 설치합니다. 글자가 주르륵 올라갑니다 — 정상입니다."
   local rc=0
   ( set -o pipefail; curl -fsSL --max-time 600 "$CLAUDE_INSTALL_URL" | bash ) || rc=$?
   if [ "$rc" -ne 0 ]; then
     # 여기서 곧바로 끝내지 않는다 — 못 나가는 까닭이 잠깐일 수 있다. 원인을 갈라 말하고 기다린다.
-    say "[2/11] 설치기를 받지 못했습니다 (종료 코드 $rc)."
-    if wait_for_connection "[2/11]" '( set -o pipefail; curl -fsSL --max-time 600 "$CLAUDE_INSTALL_URL" | bash )'; then
+    say "[2/10] 설치기를 받지 못했습니다 (종료 코드 $rc)."
+    if wait_for_connection "[2/10]" '( set -o pipefail; curl -fsSL --max-time 600 "$CLAUDE_INSTALL_URL" | bash )'; then
       rc=0
     else
       NEXT_STEP="연결이 된 뒤 같은 한 줄을 다시 돌려 주십시오. 끝난 단계는 건너뛰고 이어서 갑니다."
@@ -555,7 +555,7 @@ step_install_claude() {
   seed_local_bin_path
   # 실행 결과 검사 = 설치기의 종료 코드가 아니라 명령이 답하는가
   if ! claude --version >/dev/null 2>&1; then
-    say "[2/11] 설치기는 끝났는데 claude 명령이 아직 안 잡힙니다."
+    say "[2/10] 설치기는 끝났는데 claude 명령이 아직 안 잡힙니다."
     jcode "J-PATH-01" "깔렸는데 이 창에서 명령을 찾지 못합니다"
     NEXT_STEP="창을 새로 열고 같은 한 줄을 다시 돌려 주십시오."
     return 4
@@ -565,26 +565,26 @@ step_install_claude() {
   nowpath="$(command -v claude 2>/dev/null)"
   case "$nowpath" in
     "$HOME"/.local/bin/*) : ;;
-    *) say "[2/11] ⚠새로 깐 클로드가 아니라 $(redact "$nowpath") 가 먼저 잡힙니다. 창을 새로 열고 다시 돌려 주십시오."
+    *) say "[2/10] ⚠새로 깐 클로드가 아니라 $(redact "$nowpath") 가 먼저 잡힙니다. 창을 새로 열고 다시 돌려 주십시오."
        return 4 ;;
   esac
   if ! claude_has_auth_cmd; then
-    say "[2/11] 설치는 끝났는데 아직 낡은 판본이 잡힙니다."
+    say "[2/10] 설치는 끝났는데 아직 낡은 판본이 잡힙니다."
     jcode "J-VER-01" "낡은 판본이 먼저 잡혀 로그인 명령을 모릅니다"
     NEXT_STEP="창을 새로 열고 같은 한 줄을 다시 돌려 주십시오. 판올림부터 이어서 갑니다."
     return 4
   fi
   S1_CLAUDE_OK=1
-  say "[2/11] 완료: $(claude --version 2>/dev/null | head -1) ($(redact "$nowpath"))"
+  say "[2/10] 완료: $(claude --version 2>/dev/null | head -1) ($(redact "$nowpath"))"
 }
 
 # ── 하는 일 3 — 로그인 유도 + 완료 감지 ───────────────────────────
 step_login() {
-  # 🔴[1/11] 의 로그인 판정은 **클로드가 없던 시점**의 것이다 — 그 자리에서는 물어볼 상대가 없어
-  #   `unknown` 으로 적고 지나간다. 그런데 [2/11] 에서 방금 클로드를 깔았다.
+  # 🔴[1/10] 의 로그인 판정은 **클로드가 없던 시점**의 것이다 — 그 자리에서는 물어볼 상대가 없어
+  #   `unknown` 으로 적고 지나간다. 그런데 [2/10] 에서 방금 클로드를 깔았다.
   #   ⇒ 브라우저를 열기 전에 **한 번 다시 본다.**
   #   왜 이 줄이 생겼나(2026-09-08 오너 윈 노트북): 「지우고 다시 깔기」에서 지우개는 로그인을
-  #   남겼는데(화면에 「남김: 로그인」), 판정만 옛것이라 [3/11] 이 로그인 화면을 다시 열었다.
+  #   남겼는데(화면에 「남김: 로그인」), 판정만 옛것이라 [3/10] 이 로그인 화면을 다시 열었다.
   #   ★첫 설치에서는 이 줄이 아무 일도 하지 않는다(정말로 로그인이 없으니까). 어긋나는 것은
   #   **지우고 다시 까는 길** 하나뿐이고, 그 길은 우리가 최근에 만든 길이다.
   #   ⚠능력 확인을 먼저 통과할 때만 묻는다 — 낡은 판본에서 `auth status` 는 질문으로 나간다.
@@ -594,20 +594,20 @@ step_login() {
     fi
   fi
   if [ "$S1_LOGGED_IN" = "1" ]; then
-    say "[3/11] 이미 로그인돼 있습니다 — 건너뜁니다 (멱등)."
+    say "[3/10] 이미 로그인돼 있습니다 — 건너뜁니다 (멱등)."
     return 0
   fi
   if [ "$MODE" = "dry" ]; then
-    say "[3/11] (dry-run) 폴링하지 않았습니다. 간격 ${LOGIN_POLL_INTERVAL}초 · 상한 ${LOGIN_POLL_TIMEOUT}초."
+    say "[3/10] (dry-run) 폴링하지 않았습니다. 간격 ${LOGIN_POLL_INTERVAL}초 · 상한 ${LOGIN_POLL_TIMEOUT}초."
     return 0
   fi
   if ! claude_has_auth_cmd; then
-    say "[3/11] 이 판본의 클로드는 로그인 확인 명령을 모릅니다. 판올림이 먼저 필요합니다."
+    say "[3/10] 이 판본의 클로드는 로그인 확인 명령을 모릅니다. 판올림이 먼저 필요합니다."
     say "     같은 한 줄을 다시 돌리면 판올림부터 이어서 갑니다."
     return 6
   fi
   human "벤더" "로그인 승인 클릭 — 클로드 회사 화면에서만 할 수 있다(우리가 대신 못 누른다)"
-  say "[3/11] 지금 로그인 화면을 엽니다. 브라우저가 뜨면 승인을 눌러 주십시오."
+  say "[3/10] 지금 로그인 화면을 엽니다. 브라우저가 뜨면 승인을 눌러 주십시오."
   claude auth login || true
   say "     승인이 끝났는지 확인합니다. 최대 $((LOGIN_POLL_TIMEOUT / 60))분까지 기다립니다."
   local waited=0 logged
@@ -615,13 +615,13 @@ step_login() {
     logged="$(claude auth status 2>/dev/null | grep -o '"loggedIn"[[:space:]]*:[[:space:]]*true')"
     if [ -n "$logged" ]; then
       S1_LOGGED_IN=1
-      say "[3/11] 로그인 확인했습니다."
+      say "[3/10] 로그인 확인했습니다."
       return 0
     fi
     sleep "$LOGIN_POLL_INTERVAL"
     waited=$((waited + LOGIN_POLL_INTERVAL))
   done
-  say "[3/11] $((LOGIN_POLL_TIMEOUT / 60))분 동안 로그인이 확인되지 않았습니다."
+  say "[3/10] $((LOGIN_POLL_TIMEOUT / 60))분 동안 로그인이 확인되지 않았습니다."
   jcode "J-LOGIN-01" "로그인 승인이 시간 안에 끝나지 않았습니다"
   NEXT_STEP="브라우저에서 승인을 누르신 뒤 같은 한 줄을 다시 돌려 주십시오."
   return 5
@@ -760,11 +760,11 @@ seed_claude_prefs() {
 step_prepare() {
   write_directive
   if [ "$MODE" = "dry" ]; then
-    say "[4/11] (dry-run) 사전 설정을 쓰지 않았습니다(바깥 변경 0)."
+    say "[4/10] (dry-run) 사전 설정을 쓰지 않았습니다(바깥 변경 0)."
     return 0
   fi
   seed_all_profiles
-  say "[4/11] 자비스가 쓸 것을 갖춰 두었습니다."
+  say "[4/10] 자비스가 쓸 것을 갖춰 두었습니다."
   return 0
 }
 
@@ -776,11 +776,11 @@ step_download_cys() {
   local dst got try
   dst="$DL_DIR/$CYS_MAC_FILE"
   if [ -f "$dst" ] && [ "$(wc -c < "$dst" | tr -d ' ')" = "$CYS_MAC_BYTES" ]; then
-    say "[5/11] 설치 파일이 이미 있습니다 — 건너뜁니다."
+    say "[5/10] 설치 파일이 이미 있습니다 — 건너뜁니다."
     return 0
   fi
   if [ "$MODE" = "dry" ]; then
-    say "[5/11] (dry-run) 받지 않았습니다. 받을 곳 = $CYS_DOWNLOAD_URL"
+    say "[5/10] (dry-run) 받지 않았습니다. 받을 곳 = $CYS_DOWNLOAD_URL"
     return 0
   fi
   # 260MB 를 받기 전에 자리가 있는지 본다. 받다 중간에 꽉 차면 「받다 끊긴 파일」로만 보여
@@ -788,20 +788,20 @@ step_download_cys() {
   local freemb
   freemb="$(df -m "$DL_DIR" 2>/dev/null | awk 'NR==2 {print $4}')"
   if [ -n "$freemb" ] && [ "$freemb" -lt 3072 ] 2>/dev/null; then
-    say "[5/11] 저장 공간이 부족합니다 (남은 자리 약 ${freemb}MB · 3GB 이상을 권합니다)."
+    say "[5/10] 저장 공간이 부족합니다 (남은 자리 약 ${freemb}MB · 3GB 이상을 권합니다)."
     jcode "J-DISK-01" "저장 공간이 부족합니다"
     NEXT_STEP="공간을 3GB 이상 비우신 뒤 같은 한 줄을 다시 돌려 주십시오."
     return 5
   fi
   for try in 1 2; do
     rm -f "$dst"
-    say "[5/11] cys 설치 파일을 받습니다 (약 260MB · 잠시 걸립니다)."
+    say "[5/10] cys 설치 파일을 받습니다 (약 260MB · 잠시 걸립니다)."
     if ! curl -fsSL --max-time 900 "$CYS_DOWNLOAD_URL" -o "$dst"; then
-      say "[5/11] 받지 못했습니다."
+      say "[5/10] 받지 못했습니다."
       # 두 번 해 보고 포기하지 않는다. 연결이 돌아오면 이어간다(같은 자리·같은 문장).
       # ⚠다시 해 보는 명령에도 상한이 있어야 한다 — 없으면 curl 이 응답 없는 연결에 매달려
-      #   30분 상한이 있는 바깥 고리로 **돌아오지 못한다**(agy R1 [1] 지적 채택 2026-09-09).
-      if ! wait_for_connection "[5/11]" 'curl -fsSL --max-time 900 "$CYS_DOWNLOAD_URL" -o "$dst"'; then
+      #   30분 상한이 있는 바깥 고리로 **돌아오지 못한다**(검토 지적 채택 2026-09-09).
+      if ! wait_for_connection "[5/10]" 'curl -fsSL --max-time 900 "$CYS_DOWNLOAD_URL" -o "$dst"'; then
         NEXT_STEP="연결이 된 뒤 같은 한 줄을 다시 돌려 주십시오. 받은 데까지는 건너뛰고 이어서 갑니다."
         rm -f "$dst"
         return 5
@@ -809,21 +809,21 @@ step_download_cys() {
     fi
     if [ ! -f "$dst" ]; then
       # 다 받았는데 파일이 없다 = 백신이 그 자리에서 격리했을 때 나는 모양이다(윈도우판과 같은 갈래).
-      say "[5/11] 받은 파일이 사라졌습니다 — 백신이 격리했을 수 있습니다."
+      say "[5/10] 받은 파일이 사라졌습니다 — 백신이 격리했을 수 있습니다."
       jcode "J-AV-02" "받은 설치 파일이 사라졌습니다"
       say "     백신 알림이 떴다면 그 화면의 이름, 대상 파일, 조치(차단·격리·삭제) 세 가지를 알려 주십시오."
       continue
     fi
     got="$(wc -c < "$dst" | tr -d ' ')"
     if [ "$got" = "$CYS_MAC_BYTES" ]; then
-      say "[5/11] 받았습니다 (크기 확인 완료)."
+      say "[5/10] 받았습니다 (크기 확인 완료)."
       return 0
     fi
-    say "[5/11] 크기가 맞지 않습니다 (받은 것 $got · 기대 $CYS_MAC_BYTES). 다시 받습니다."
+    say "[5/10] 크기가 맞지 않습니다 (받은 것 $got · 기대 $CYS_MAC_BYTES). 다시 받습니다."
   done
   # 두 번 다 실패했으면 반쯤 받은 파일을 남기지 않는다 — 다음 실행이 그것을 온전한 것으로 볼 수 있다.
   rm -f "$dst"
-  say "[5/11] 설치 파일을 온전히 받지 못했습니다."
+  say "[5/10] 설치 파일을 온전히 받지 못했습니다."
   say "     공식 페이지에서 직접 받으실 수 있습니다: $CYS_SITE_URL"
   say "     받을 파일 이름 = $CYS_MAC_FILE"
   return 5
@@ -865,22 +865,22 @@ cys_dmg_remount() {
 
 step_install_cys() {
   if [ -d /Applications/cys.app ]; then
-    say "[6/11] cys 가 이미 설치돼 있습니다 — 건너뜁니다."
+    say "[6/10] cys 가 이미 설치돼 있습니다 — 건너뜁니다."
     return 0
   fi
   local dst core src rc
   if [ "$MODE" = "dry" ]; then
-    say "[6/11] (dry-run) 설치 파일을 열지 않았습니다."
+    say "[6/10] (dry-run) 설치 파일을 열지 않았습니다."
     return 0
   fi
   dst="$DL_DIR/$CYS_MAC_FILE"
-  [ -f "$dst" ] || { say "[6/11] 설치 파일이 없습니다."; return 6; }
-  say "[6/11] cys 를 설치합니다."
+  [ -f "$dst" ] || { say "[6/10] 설치 파일이 없습니다."; return 6; }
+  say "[6/10] cys 를 설치합니다."
 
   # ⚠`-quiet` 를 주면 안 된다(위 ⑴). 사람에게 보일 필요는 없으니 화면 대신 기록 파일로만 흘린다.
   CYS_DMG_MNT="$(hdiutil attach -nobrowse "$dst" 2>>"$LOG_FILE" | awk '/\/Volumes\//{ $1=""; $2=""; sub(/^[ \t]+/,""); print; exit }')"
   if [ -z "$CYS_DMG_MNT" ] || [ ! -d "$CYS_DMG_MNT" ]; then
-    say "[6/11] 설치 파일을 열지 못했습니다."
+    say "[6/10] 설치 파일을 열지 못했습니다."
     cys_dmg_detach
     return 6
   fi
@@ -889,7 +889,7 @@ step_install_cys() {
   src="$CYS_DMG_MNT/.support/cys.app"
   if [ ! -f "$core" ] || [ ! -d "$src/Contents" ]; then
     # 배포물의 속 모양이 바뀐 경우다. 우리가 짐작으로 복사하지 않는다 — 짐작 복사가 앞 판의 결함이었다.
-    say "[6/11] 설치 파일의 속 모양이 예상과 다릅니다. 공식 페이지에서 직접 받아 열어 주십시오: $CYS_SITE_URL"
+    say "[6/10] 설치 파일의 속 모양이 예상과 다릅니다. 공식 페이지에서 직접 받아 열어 주십시오: $CYS_SITE_URL"
     cys_dmg_detach
     return 6
   fi
@@ -910,8 +910,8 @@ step_install_cys() {
        #   ⇒ 무승격으로 안 되는 것이 확인된 **이때만** 벤더 설치 도우미를 연다. 그 도우미가
        #   자기 대화상자로 비밀번호를 묻는다(누르는 것은 사람이다 — 우리가 대신 넣지 않는다).
        #   ⚠평소 경로에는 손이 늘지 않는다. 여는 것은 「안 그러면 설치가 불가능한」 경우뿐이다.
-       cys_dmg_remount || { say "[6/11] 설치 파일을 다시 열지 못했습니다."; return 6; }
-       say "[6/11] 이 계정에는 프로그램 폴더에 넣을 권한이 없습니다 — 설치 도우미를 엽니다."
+       cys_dmg_remount || { say "[6/10] 설치 파일을 다시 열지 못했습니다."; return 6; }
+       say "[6/10] 이 계정에는 프로그램 폴더에 넣을 권한이 없습니다 — 설치 도우미를 엽니다."
        say "     창이 뜨면 「설치」를 누르시고, 이 컴퓨터의 관리자 비밀번호를 넣어 주십시오."
        say "     (자비스는 비밀번호를 대신 넣지 않습니다. 넣으신 뒤 끝나면 「닫기」를 누르십시오.)"
        open "$CYS_DMG_MNT/Install cys.app" >>"$LOG_FILE" 2>&1 || {
@@ -925,30 +925,30 @@ step_install_cys() {
        done
        cys_dmg_detach
        if [ -d /Applications/cys.app ]; then
-         say "[6/11] 설치를 마쳤습니다."
+         say "[6/10] 설치를 마쳤습니다."
          return 0
        fi
-       say "[6/11] 5분 동안 설치가 확인되지 않았습니다. 같은 한 줄을 다시 돌리면 여기서부터 이어서 갑니다."
+       say "[6/10] 5분 동안 설치가 확인되지 않았습니다. 같은 한 줄을 다시 돌리면 여기서부터 이어서 갑니다."
        return 6 ;;
-    2|3) say "[6/11] 설치 파일이 온전하지 않습니다. 같은 한 줄을 다시 돌리면 다시 받습니다."
+    2|3) say "[6/10] 설치 파일이 온전하지 않습니다. 같은 한 줄을 다시 돌리면 다시 받습니다."
          rm -f "$dst"
          return 6 ;;
-    4) say "[6/11] 받은 설치 파일이 공식 서명 검사를 통과하지 못했습니다 — 설치를 멈춥니다."
+    4) say "[6/10] 받은 설치 파일이 공식 서명 검사를 통과하지 못했습니다 — 설치를 멈춥니다."
        say "     받다가 바뀐 파일이거나, 이 컴퓨터가 애플의 확인 서비스에 닿지 못한 경우입니다."
        say "     공식 페이지에서 직접 받아 열어 주십시오: $CYS_SITE_URL"
        #   ⛔받은 파일을 지우지 않는다. 검사 실패의 원인이 파일이 아니라 **확인 경로**일 수 있고
        #   (2026-09-06 실측: 가상 맥에서는 공증된 앱이 전부 거절됐는데 같은 파일이 실물 맥에서는
        #   통과했다), 그때 지워 버리면 멀쩡한 260MB 를 다시 받게 만든다. 걸렸을 때 그 파일이 단서다.
        return 6 ;;
-    *) say "[6/11] 설치가 끝나지 않았습니다 (종료 코드 $rc). 자세한 내용은 기록 파일에 있습니다: $(redact "$LOG_FILE")"
+    *) say "[6/10] 설치가 끝나지 않았습니다 (종료 코드 $rc). 자세한 내용은 기록 파일에 있습니다: $(redact "$LOG_FILE")"
        return 6 ;;
   esac
 
   if [ -d /Applications/cys.app ]; then
-    say "[6/11] 설치를 마쳤습니다."
+    say "[6/10] 설치를 마쳤습니다."
     return 0
   fi
-  say "[6/11] 설치가 확인되지 않았습니다."
+  say "[6/10] 설치가 확인되지 않았습니다."
   return 6
 }
 
@@ -957,18 +957,18 @@ step_install_cys() {
 step_verify_cys() {
   local c ver
   #   dry 분기가 이 단에만 없었다. 깨끗한 기계에는 /Applications/cys.app 이 없으므로 미리보기가
-  #   여기서 rc 7 로 끊겨 **[8/11] 이 호출조차 안 됐다**(화면이 7 다음에 9 로 건너뛴다). 다른 아홉 단은
+  #   여기서 rc 7 로 끊겨 **[8/10] 이 호출조차 안 됐다**(화면이 7 다음에 9 로 건너뛴다). 다른 아홉 단은
   #   전부 dry 분기를 갖고 있었고, 이 단만 없어서 미리보기가 기계 상태에 따라 다른 길을 갔다.
   #   ⇒ cys 가 이미 깔린 기계(개발기)에서는 안 드러나고 깨끗한 기계에서만 드러나는 형태였다.
   if [ "$MODE" = "dry" ]; then
-    say "[7/11] (dry-run) cys 를 확인하지 않았습니다."
+    say "[7/10] (dry-run) cys 를 확인하지 않았습니다."
     return 0
   fi
   if [ ! -d /Applications/cys.app ]; then
-    say "[7/11] cys 프로그램을 찾지 못했습니다."
+    say "[7/10] cys 프로그램을 찾지 못했습니다."
     return 7
   fi
-  say "[7/11] cys 프로그램을 찾았습니다: /Applications/cys.app"
+  say "[7/10] cys 프로그램을 찾았습니다: /Applications/cys.app"
   # 부르는 길이 판본에 따라 다르다. 새 판은 사용자 폴더 안에 두고, 옛 판은 시스템 폴더에 두었다.
   # 옛 자리의 링크가 끊어져 있는 경우가 실제로 있으므로, 찾은 순서대로 쓰되 답하는 것만 쓴다.
   # 프로그램 안쪽 경로는 마지막 수단이고, 우리가 링크를 새로 만들지는 않는다.
@@ -983,11 +983,11 @@ step_verify_cys() {
     [ -n "$ver" ] && CYS_CLI="cys"
   fi
   if [ -n "$ver" ] && [ -n "$CYS_CLI" ]; then
-    say "[7/11] cys 가 답합니다: $ver"
+    say "[7/10] cys 가 답합니다: $ver"
     say "     부르는 길: $(redact "$CYS_CLI")"
     return 0
   fi
-  say "[7/11] 프로그램은 있는데 아직 명령으로 부를 수 없습니다. 창을 새로 열고 같은 줄을 다시 돌려 주십시오."
+  say "[7/10] 프로그램은 있는데 아직 명령으로 부를 수 없습니다. 창을 새로 열고 같은 줄을 다시 돌려 주십시오."
   return 7
 }
 
@@ -997,10 +997,10 @@ step_prepare_account() {
   local cli i pong doc bad
   cli="${CYS_CLI:-cys}"
   if [ "$MODE" = "dry" ]; then
-    say "[8/11] (dry-run) 계정 준비를 하지 않았습니다."
+    say "[8/10] (dry-run) 계정 준비를 하지 않았습니다."
     return 0
   fi
-  say "[8/11] 이 계정에 자리를 잡습니다."
+  say "[8/10] 이 계정에 자리를 잡습니다."
   "$cli" init-pack || true
   # 프로그램 안의 실제 파일을 직접 부른다 — 중간 연결 고리가 끊겨 있어도 이 길은 열려 있다.
   "$cli" daemon install || true
@@ -1013,7 +1013,7 @@ step_prepare_account() {
     sleep 2; i=$((i+1))
   done
   if [ "$alive" -ne 1 ]; then
-    say "[8/11] 준비는 됐는데 아직 응답이 없습니다. 잠시 뒤 같은 줄을 다시 돌려 주십시오."
+    say "[8/10] 준비는 됐는데 아직 응답이 없습니다. 잠시 뒤 같은 줄을 다시 돌려 주십시오."
     return 8
   fi
   doc="$(CYS_NO_AUTOSTART=1 "$cli" doctor 2>&1)"
@@ -1024,15 +1024,15 @@ step_prepare_account() {
   if [ -n "$summary" ]; then
     bad="$(printf '%s\n' "$summary" | sed -n 's/.*[^0-9]\([0-9][0-9]*\)[[:space:]]*FAIL.*/\1/p')"
     n_skip="$(printf '%s\n' "$summary" | sed -n 's/.*[^0-9]\([0-9][0-9]*\)[[:space:]]*SKIP.*/\1/p')"
-    say "[8/11] 자가진단: ${summary#*요약: }"
+    say "[8/10] 자가진단: ${summary#*요약: }"
   else
     bad="$(printf '%s\n' "$doc" | grep -c '\[FAIL *\]' | tr -d ' ')"
     n_skip="$(printf '%s\n' "$doc" | grep -c '\[SKIP *\]' | tr -d ' ')"
-    say "[8/11] 자가진단 요약 줄을 찾지 못해 항목을 세었습니다: 실패 ${bad:-0}"
+    say "[8/10] 자가진단 요약 줄을 찾지 못해 항목을 세었습니다: 실패 ${bad:-0}"
   fi
   # 통과 기준은 실패 0 이다. 주의는 성한 컴퓨터에도 나온다.
   if [ "${bad:-0}" -gt 0 ]; then
-    say "[8/11] 자가진단에서 ${bad}가지가 통과하지 못했습니다."
+    say "[8/10] 자가진단에서 ${bad}가지가 통과하지 못했습니다."
     say "     아래 자비스가 무엇이 걸렸는지 사람 말로 알려 드립니다."
     return 8
   fi
@@ -1042,7 +1042,7 @@ step_prepare_account() {
   fi
   # 자리를 잡으면서 자비스 전용 설정 자리가 새로 생긴다 — 동료들이 그 자리로 뜨므로 한 번 더 심는다.
   seed_all_profiles
-  say "[8/11] 자리를 잡았습니다 (실패 0)."
+  say "[8/10] 자리를 잡았습니다 (실패 0)."
   return 0
 }
 
@@ -1065,9 +1065,9 @@ live_roles() {
 step_fleet() {
   local ref="$1" cli i live missing r
   cli="${CYS_CLI:-cys}"
-  if [ "$MODE" = "dry" ]; then say "[10/11] (dry-run) 함대를 부르지 않았습니다."; return 0; fi
+  if [ "$MODE" = "dry" ]; then say "[10/10] (dry-run) 함대를 부르지 않았습니다."; return 0; fi
   if [ -z "$ref" ]; then
-    say "[10/11] 자비스 창을 못 열어 동료들을 부르지 못했습니다."
+    say "[10/10] 자비스 창을 못 열어 동료들을 부르지 못했습니다."
     say "     cys 창에서 자비스에게 이렇게 말해 주십시오: $FLEET_TRIGGER"
     return 10
   fi
@@ -1098,285 +1098,16 @@ step_fleet() {
     printf '%s' " $live " | grep -q " $r " || missing="$missing $r"
   done
   if [ -z "$missing" ]; then
-    say "[10/11] 함대가 섰습니다: $live"
+    say "[10/10] 함대가 섰습니다: $live"
     return 0
   fi
   # 성공보다 이 문구가 중요하다 — 무엇이 없어서 못 섰는지를 그대로 말한다.
-  say "[10/11] 아직 서지 않은 자리가 있습니다:${missing}"
+  say "[10/10] 아직 서지 않은 자리가 있습니다:${missing}"
   say "     선 자리 = ${live:-없음}"
   say "     아직 그 한마디를 치지 않으셨다면, cys 창에서 지금 쳐 주시면 됩니다."
   say "     치셨는데도 서지 않았다면 cys 창의 자비스에게 물어보십시오 — 무엇이 걸렸는지 사람 말로 알려 줍니다."
   log "fleet missing:${missing}"
   return 10
-}
-
-# ── 하는 일 11 — 아고라 참가 ───────────────────────────────────────
-# 아고라는 여러 자비스가 한자리에 모여 토론하는 곳이다. 이 단은 이 컴퓨터를 그 명부에 올린다.
-# 파이썬을 쓰지 않는다. 필요한 것(키 만들기·지문·소유 증명 서명·주고받기)이 전부
-# 운영체제에 이미 들어 있다. 프로그램을 하나도 더 깔지 않는다는 뜻이다.
-AGORA_RELAY_URL="${AGORA_RELAY_URL:-https://agora.godmeyou.kr}"
-AGORA_SIGN_NS='jarvis-agora@godmeyou.kr'
-AGORA_HOME="${AGORA_HOME:-$HOME/.config/agora}"
-AGORA_KEY="$AGORA_HOME/id_ed25519"
-AGORA_CONF="$AGORA_HOME/participant.json"
-# 클라이언트 파일은 설치 사이트 사본에서 받는다. 주소가 비어 있으면 그 부분만 건너뛴다
-# (명부 등재는 클라이언트 파일과 아무 의존이 없다).
-# ★핀 두 줄 = 「어디서 받는가」와 「무엇을 받았어야 하는가」다. 둘은 **함께** 바뀐다 —
-#   주소만 새 판으로 바꾸고 지문을 두면 그 자리에서 거부된다(그게 맞는 동작이다).
-#   판본을 올릴 때는 빌더(`tools/build_client_zip.py`)가 내는 두 줄을 그대로 옮겨 적는다.
-AGORA_CLI_URL="${AGORA_CLI_URL:-https://jarvis.godmeyou.kr/install/agora-client-0.1.0.zip}"
-AGORA_CLI_SHA="${AGORA_CLI_SHA:-5171b1161fc5e326486e9ffdd96034a22e194dafba610ee94eeb670aa81e4b64}"
-
-# 이름에는 사람에 관한 것을 넣지 않는다.
-# 컴퓨터 이름을 쓰지 않는 이유: 이 컴퓨터의 이름은 대개 계정 이름을 담고 있다
-# (맥은 처음 설정할 때 계정 이름으로 컴퓨터 이름을 짓는 것이 기본이다). 읽지 않으면 심사할 것도 없다.
-agora_new_id() {
-  local r
-  r="$(LC_ALL=C tr -dc 'a-z0-9' < /dev/urandom 2>/dev/null | head -c 10)"
-  # 난수를 못 얻으면 이름이 jarvis- 하나로 줄어 모두가 같은 이름을 쓰게 된다. 그때는 시각으로 채운다.
-  [ "${#r}" -eq 10 ] || r="$(date +%s | tail -c 11)0000000000"
-  printf 'jarvis-%s' "$(printf '%s' "$r" | head -c 10)"
-}
-
-# 서명 도구가 이 컴퓨터에서 소유 증명을 만들 수 있는지 본다(있는 것과 되는 것은 다르다).
-# 열쇠가 암호로 잠겨 있으면 서명 도구가 암호를 물으며 그 자리에서 멈춘다.
-# 물어보기 전에 파일만 보고 판별한다 - 잠기지 않은 열쇠는 둘째 줄이 늘 이 글자로 시작한다(실측).
-agora_key_is_open() {
-  [ -f "$AGORA_KEY" ] || return 1
-  case "$(sed -n '2p' "$AGORA_KEY" 2>/dev/null)" in
-    b3BlbnNzaC1rZXktdjEAAAAABG5vbmU*) return 0 ;;
-    *) return 1 ;;
-  esac
-}
-
-agora_can_sign() {
-  command -v ssh-keygen >/dev/null 2>&1 || return 1
-  agora_key_is_open || { log "agora: key is locked - not signing"; return 1; }
-  # 판본이 낮으면 -Y 자체를 모른다. 실제로 한 번 서명해 보는 것이 유일하게 확실한 판정이다.
-  local probe="$AGORA_HOME/.signprobe"
-  printf '%s' 'probe' > "$probe" 2>/dev/null || return 1
-  # 물어볼 입력을 아예 닫아 둔다. 무언가를 묻게 되면 기다리지 않고 그 자리에서 실패한다.
-  if ssh-keygen -Y sign -q -n "$AGORA_SIGN_NS" -f "$AGORA_KEY" "$probe" </dev/null >/dev/null 2>&1; then
-    rm -f "$probe" "$probe.sig" 2>/dev/null
-    return 0
-  fi
-  rm -f "$probe" "$probe.sig" 2>/dev/null
-  return 1
-}
-
-# cys 가 함께 가져온 파이썬을 절대 경로로 찾는다.
-# 이름으로 부르면 컴퓨터에 원래 있던 것이 잡히고, 깨끗한 맥에서는 그때 설치 창이 뜬다.
-agora_bundled_python() {
-  local c
-  for c in "/Applications/cys.app/Contents/Resources/runtime/python/bin/python3" \
-           "$HOME/Applications/cys.app/Contents/Resources/runtime/python/bin/python3"; do
-    [ -x "$c" ] && { printf '%s' "$c"; return 0; }
-  done
-  return 1
-}
-
-# 릴레이에 말을 거는 자리는 여기 하나뿐이다. 주고받는 형태가 바뀌면 이 함수만 고친다.
-# 결과: 0 = 올랐다(새로 또는 이미) · 3 = 이름이 이미 다른 키의 것 · 그 밖 = 못 올렸다
-agora_register() {
-  local pid="$1" pub="$2" fp="$3" msg sig body code
-  msg="$AGORA_HOME/.register.json"
-  body="$AGORA_HOME/.register.post.json"
-  # 서명 대상은 다섯 칸을 이 순서로 이어 붙인 것 하나다. 끝에 줄바꿈이 붙으면 안 되므로 printf 로만 쓴다.
-  printf '%s' "{\"display_name\":\"$pid\",\"fingerprint\":\"$fp\",\"participant_id\":\"$pid\",\"public_key\":\"$pub\",\"purpose\":\"agora-register-v1\"}" > "$msg" || return 1
-  rm -f "$msg.sig" 2>/dev/null
-  ssh-keygen -Y sign -q -n "$AGORA_SIGN_NS" -f "$AGORA_KEY" "$msg" </dev/null >/dev/null 2>&1 || { log "agora: sign failed"; return 1; }
-  [ -f "$msg.sig" ] || { log "agora: no signature file"; return 1; }
-  sig="$(awk '{printf "%s\\n", $0}' "$msg.sig")"
-  printf '%s' "{\"participant_id\":\"$pid\",\"display_name\":\"$pid\",\"public_key\":\"$pub\",\"fingerprint\":\"$fp\",\"signature\":\"$sig\"}" > "$body" || return 1
-  code="$(curl -sS -m 30 -o "$AGORA_HOME/.register.resp.json" -w '%{http_code}' \
-          -X POST -H 'Content-Type: application/json' \
-          --data-binary @"$body" "$AGORA_RELAY_URL/register" 2>>"$LOG_FILE")"
-  # 응답 코드를 한 줄로 남긴다. 나중에 무엇이 걸렸는지 물을 때 본문보다 이 값이 먼저 필요하다.
-  printf '%s' "$code" > "$AGORA_HOME/.register.http" 2>/dev/null
-  log "agora: register http=$code body=$(head -c 300 "$AGORA_HOME/.register.resp.json" 2>/dev/null)"
-  rm -f "$msg" "$msg.sig" "$body" 2>/dev/null
-  case "$code" in
-    201|200) return 0 ;;
-    409)     return 3 ;;
-    *)       return 4 ;;
-  esac
-}
-
-# 운영 설정을 적는다. 여기에 릴레이 주소가 들어간다 - 참가자 신원 파일에는 못 넣는다
-# (그 파일은 계약된 다섯 칸만 받고, 한 칸이라도 더 있으면 통째로 거부된다).
-# ★사람 승인 겹은 **켠 채로 둔다.** 설치기가 보안 겹을 끄고 다니면 안 된다 -
-#   끄는 것은 대리인을 보내는 사람이 그 자리에서 할 일이고(agora register --unattended),
-#   그렇게 꺼진 사실은 whoami 첫 줄에 늘 적힌다.
-# ★이미 있으면 덮어쓰지 않는다 - 사람이 고쳐 둔 설정을 다시 돌릴 때마다 되돌리면 안 된다.
-agora_write_config() {
-  local conf="$AGORA_HOME/config.json"
-  if [ -f "$conf" ]; then
-    log "agora: config exists - keep"
-    return 0
-  fi
-  printf '{\n  "transport": "relay",\n  "relay": {"url": "%s", "timeout_seconds": 30}\n}\n' \
-    "$AGORA_RELAY_URL" > "$conf" || { log "agora: config write failed"; return 1; }
-  chmod 600 "$conf" 2>/dev/null
-  log "agora: config written"
-  return 0
-}
-
-# 명부 사본을 내려받는다. 없어도 등재 자체는 이미 끝난 것이므로 실패로 세지 않는다.
-agora_sync_roster() {
-  local n got=0
-  for n in allowed_signers revoked_keys operators; do
-    # -f 가 없으면 없는 경로의 오류 본문이 그대로 명부 파일로 저장된다.
-    # 그러면 파일은 생겼는데 내용이 명부가 아니고, 아무도 그것을 모른다.
-    curl -fsS -m 20 -o "$AGORA_HOME/$n" "$AGORA_RELAY_URL/participants/$n" 2>>"$LOG_FILE" && got=$((got + 1))
-  done
-  log "agora: roster files=$got"
-  [ "$got" -gt 0 ]
-}
-
-# 클라이언트 파일을 받아 놓고, cys 가 가져온 파이썬으로 도는 실행 파일을 하나 만든다.
-agora_place_client() {
-  local py zip got
-  [ -n "$AGORA_CLI_URL" ] || { log "agora: client url empty - skip"; return 1; }
-  # ★주소가 있는데 지문이 없으면 **받지 않는다.** 지문 없는 내려받기는 「무엇을 받았는지 모르는
-  #   채로 실행 파일을 놓는 것」이고, 그때 아래의 지문 대조는 검사가 아니라 장식이 된다.
-  #   ⚠비어 있어도 통과하던 자리다(2026-09-09 뮤턴트로 실측 — rc 0 으로 놓였다). 여기를 열어 두면
-  #   「급해서 지문 없이 한 번만」이 생기고, 그 한 번이 배포 경로의 기본값이 된다.
-  [ -n "$AGORA_CLI_SHA" ] || { log "agora: client sha empty - refuse"; return 1; }
-  py="$(agora_bundled_python)" || { log "agora: bundled python not found"; return 1; }
-  zip="$AGORA_HOME/.client.zip"
-  curl -fsSL -m 120 -o "$zip" "$AGORA_CLI_URL" 2>>"$LOG_FILE" || { log "agora: client download failed"; return 1; }
-  # 지문을 못 얻었으면 「맞는지 모른다」이지 「맞다」가 아니다 - 빈 값은 이 대조에서 반드시 어긋난다.
-  got="$(shasum -a 256 "$zip" 2>/dev/null | awk '{print $1}')"
-  [ "$got" = "$AGORA_CLI_SHA" ] || { log "agora: client sha mismatch got=$got"; rm -f "$zip"; return 1; }
-  # 우리가 만든 폴더이므로 통째로 비우고 새로 푼다 - 덮어쓰기만 하면 지난 판의 지워진 파일이 남는다.
-  rm -rf "$AGORA_HOME/lib" 2>/dev/null
-  mkdir -p "$AGORA_HOME/lib" "$AGORA_HOME/bin" 2>/dev/null
-  (cd "$AGORA_HOME/lib" && unzip -oq "$zip") 2>>"$LOG_FILE" || { log "agora: client unzip failed"; rm -f "$zip"; return 1; }
-  rm -f "$zip" 2>/dev/null
-  # 서명 키의 자리를 껍데기가 알려 준다. 클라이언트는 키 경로를 스스로 정하지 않고
-  # 환경이 정한 것만 쓴다 - 그 환경이 바로 여기다. 이 줄이 없으면 서명이 필요한 모든 일이
-  # 「서명 키가 지정되지 않았다」로 멈춘다.
-  # ★이미 정해 둔 사람이 있으면 그것을 이긴다(:- 는 비어 있을 때만 채운다).
-  printf '#!/bin/sh\nAGORA_SIGNING_KEY="${AGORA_SIGNING_KEY:-%s}"\nexport AGORA_SIGNING_KEY\nexec %s %s/lib/bin/agora "$@"\n' \
-    "$AGORA_KEY" "$py" "$AGORA_HOME" > "$AGORA_HOME/bin/agora"
-  chmod +x "$AGORA_HOME/bin/agora" 2>/dev/null
-  log "agora: client placed with $py"
-  return 0
-}
-
-# 자비스가 「아고라에 참가해」를 알아듣게 하는 자리.
-# ★내용을 여기 적지 않는다 — **가리키기만 한다.** 실제 안내는 클라이언트 꾸러미 안에 있고,
-#   꾸러미가 새 판으로 바뀌면 그 안내도 함께 바뀐다. 여기에 베껴 두면 둘이 갈라지고,
-#   갈라진 날 자비스는 **낡은 안내를 따른다**(그리고 아무 소리도 나지 않는다).
-# ★자리는 짐작하지 않고 **있는 것만** 쓴다(설정 파일 자리를 고르는 규칙과 같다).
-agora_skill_dirs() {
-  printf '%s\n' "$HOME/.claude/skills"
-  [ -d "$HOME/.cys/claude" ] && printf '%s\n' "$HOME/.cys/claude/skills"
-  return 0
-}
-
-agora_place_skill() {
-  local base d target got=0
-  for base in $(agora_skill_dirs); do
-    d="$base/agora-delegate"
-    mkdir -p "$d" 2>/dev/null || continue
-    target="$AGORA_HOME/lib/skills/agora-delegate/SKILL.md"
-    {
-      printf -- '---\n'
-      printf 'name: agora-delegate\n'
-      printf 'description: %s\n' '광장(아고라)에 대리인을 파송한다 — 둘러보고 참가하고 발언한다. "아고라에 참가해" 같은 말을 들으면 이 스킬을 쓴다.'
-      printf -- '---\n\n'
-      printf '# 광장 대리인\n\n'
-      printf '아래 파일을 **먼저 읽고 그대로 따른다.** 이 문서에는 절차를 적지 않는다 —\n'
-      printf '절차의 정본은 그 파일이고, 클라이언트가 새 판으로 바뀌면 그 파일이 함께 바뀐다.\n\n'
-      printf '    %s\n\n' "$target"
-      printf '읽을 수 없으면 그 사실을 사람에게 말하고 멈춘다. 절차를 기억으로 지어내지 마라.\n'
-      printf '설치 상태가 궁금하면 먼저 이것을 돌린다:\n\n'
-      printf '    %s/bin/agora selfcheck\n' "$AGORA_HOME"
-    } > "$d/SKILL.md" 2>/dev/null && got=$((got + 1))
-  done
-  log "agora: skill pointer dirs=$got"
-  [ "$got" -gt 0 ]
-}
-
-step_agora() {
-  local pid pub fp made_key=0 rc
-  if [ "$MODE" = "dry" ]; then
-    say "[11/11] (dry-run) 아고라에 등재하지 않았습니다. 등재할 곳 = $AGORA_RELAY_URL"
-    return 0
-  fi
-  mkdir -p "$AGORA_HOME" 2>/dev/null && chmod 700 "$AGORA_HOME" 2>/dev/null
-  if ! command -v curl >/dev/null 2>&1; then
-    say "[11/11] 아고라 참가는 지금 하지 못했습니다 (주고받는 도구를 찾지 못했습니다)."
-    say "     나중에 자비스에게 아고라에 참가해 달라고 말하면 됩니다."
-    return 0
-  fi
-  # 이름을 정한다. 이미 있으면 그대로 쓴다(다시 돌려도 사고가 되지 않게).
-  if [ -f "$AGORA_CONF" ]; then
-    pid="$(sed -n 's/.*"id"[[:space:]]*:[[:space:]]*"\([^"]*\)".*/\1/p' "$AGORA_CONF" | head -1)"
-  fi
-  [ -n "$pid" ] || pid="$(agora_new_id)"
-  # 키를 만든다. 이미 있으면 덮어쓰지 않는다 - 덮어쓰면 그 키로 서명한 지난 글을 아무도 확인할 수 없다.
-  if [ ! -f "$AGORA_KEY" ]; then
-    if ! ssh-keygen -t ed25519 -N "" -C "agora:$pid" -f "$AGORA_KEY" -q </dev/null >/dev/null 2>&1; then
-      say "[11/11] 아고라 참가는 지금 하지 못했습니다 (참가 열쇠를 만들지 못했습니다)."
-      say "     나중에 자비스에게 아고라에 참가해 달라고 말하면 됩니다."
-      return 0
-    fi
-    chmod 600 "$AGORA_KEY" 2>/dev/null
-    made_key=1
-  fi
-  # 원인을 하나로 단정하지 않는다. 「열쇠가 잠겼다」와 「도구가 낡았다」는 다른 일이고
-  # 사람이 해야 할 일도 다르다 - 앞의 것은 열쇠를 치우면 되고 뒤의 것은 그렇지 않다.
-  if ! agora_key_is_open; then
-    say "[11/11] 아고라 참가는 지금 하지 못했습니다 (참가 열쇠에 암호가 걸려 있습니다)."
-    say "     $(redact "$AGORA_KEY") 를 다른 이름으로 옮겨 두시고 같은 줄을 다시 돌리면 새로 만듭니다."
-    log "agora: key is locked"
-    return 0
-  fi
-  if ! agora_can_sign; then
-    say "[11/11] 아고라 참가는 지금 하지 못했습니다 (이 컴퓨터의 서명 도구가 낡았습니다)."
-    say "     나중에 자비스에게 아고라에 참가해 달라고 말하면 됩니다."
-    log "agora: signer too old"
-    return 0
-  fi
-  pub="$(cat "$AGORA_KEY.pub" 2>/dev/null)"
-  fp="$(ssh-keygen -l -f "$AGORA_KEY.pub" 2>/dev/null | awk '{for(i=1;i<=NF;i++) if ($i ~ /^SHA256:/) print $i}')"
-  if [ -z "$pub" ] || [ -z "$fp" ]; then
-    say "[11/11] 아고라 참가는 지금 하지 못했습니다 (참가 열쇠를 읽지 못했습니다)."
-    return 0
-  fi
-  agora_register "$pid" "$pub" "$fp"; rc=$?
-  # 이름이 이미 다른 키의 것일 때, 이번에 열쇠를 새로 만들었다면 다른 이름으로 한 번만 다시 해 본다.
-  # 열쇠가 원래 있었다면 다시 해도 같은 이유로 막힌다(한 열쇠는 한 이름만 가진다) - 그래서 하지 않는다.
-  if [ "$rc" = "3" ] && [ "$made_key" = "1" ]; then
-    pid="$(agora_new_id)"
-    agora_register "$pid" "$pub" "$fp"; rc=$?
-  fi
-  if [ "$rc" != "0" ]; then
-    say "[11/11] 아고라 참가는 지금 하지 못했습니다."
-    say "     나중에 자비스에게 아고라에 참가해 달라고 말하면 됩니다."
-    return 0
-  fi
-  # 이 파일의 칸은 **클라이언트 계약이 정한다**(agora/contract_open.py PARTICIPANT_FIELDS 다섯 칸).
-  # ⚠계약 밖 칸이 하나라도 있으면 클라이언트는 파일 **전체를 거부**한다 — 한 칸 더 적는 것이
-  #   「조금 더 알려 주는 것」이 아니라 「아무것도 못 읽게 하는 것」이다(2026-09-09 실측:
-  #   여기에 relay 칸이 있어서 whoami 가 code 2 로 죽었다). 릴레이 주소의 자리는 아래 config.json 이다.
-  printf '{\n  "id": "%s",\n  "display_name": "%s",\n  "key_fingerprint": "%s",\n  "namespace": "%s",\n  "operator": false\n}\n' \
-    "$pid" "$pid" "$fp" "$AGORA_SIGN_NS" > "$AGORA_CONF"
-  chmod 600 "$AGORA_CONF" 2>/dev/null
-  agora_write_config
-  agora_sync_roster || say "     (참가자 명부 사본은 나중에 받아도 됩니다.)"
-  # 안내를 놓는 것은 **클라이언트가 놓인 뒤에만** 뜻이 있다 — 가리킬 파일이 없으면
-  # 자비스가 「읽을 수 없다」에 부딪히고, 그것은 안내가 없느니만 못하다.
-  if agora_place_client; then
-    agora_place_skill || log "agora: skill pointer not placed"
-  else
-    log "agora: client not placed"
-  fi
-  say "[11/11] 아고라에 참가했습니다. 이 컴퓨터의 참가 이름은 $pid 입니다."
-  say "     이 이름과 열쇠는 $(redact "$AGORA_HOME") 에 있습니다."
-  return 0
 }
 
 # 자비스 자리를 연다. 「무엇을 띄우는지」 칸은 그 칸이 있는 판본에서만 붙인다 —
@@ -1398,13 +1129,12 @@ step_wake() {
   # 우리말 문장은 인자가 아니라 지침 파일에 담아 보낸다 — 자비스가 그 파일을 직접 읽는다.
   first_prompt="Read the file ${DIRECTIVE_FILE} and do exactly what it says. Your first line must be the fixed line specified there."
   if [ "$MODE" = "dry" ]; then
-    say "[9/11] (dry-run) 자비스를 띄우지 않았습니다."
+    say "[9/10] (dry-run) 자비스를 띄우지 않았습니다."
     say "     (지금까지 사람 손이 필요했던 횟수: ${HUMAN_HANDS}번)"
     step_fleet ""
-    step_agora
     return 0
   fi
-  say "[9/11] 자비스를 깨웁니다."
+  say "[9/10] 자비스를 깨웁니다."
   say "     (지금까지 사람 손이 필요했던 횟수: ${HUMAN_HANDS}번)"
   cli="${CYS_CLI:-cys}"
   if command -v "$cli" >/dev/null 2>&1 || [ -x "$cli" ]; then
@@ -1412,7 +1142,7 @@ step_wake() {
     # 여는 명령에 문장을 실으면 안 된다(윈도우에서 두 번 실측: 우리말이 깨졌고, 따옴표가 벗겨졌다).
     # 문장은 파일에 넣고 여는 명령은 그 파일 하나만 가리킨다 — 맥도 같은 모양으로 맞춘다.
     wake_file="$JARVIS_HOME/wake.sh"
-    #   보험이다. 결함 봉합이 아니다 — cys 가 띄우는 창은 cysd 가 `~/.local/bin` 을 PATH 앞에 심어 줘서
+    #   보험이다. 결함을 메우는 것이 아니다 — cys 가 띄우는 창은 cysd 가 `~/.local/bin` 을 PATH 앞에 심어 줘서
     #   `claude` 만 써도 잡힌다(2026-09-06 깨끗한 맥 실측). 다만 그 주입은 **cys 쪽 구현이지 우리 계약이
     #   아니다.** 우리 창이 아닌 곳에서 도는 파일이므로, 남의 구현에 기대지 않고 우리가 아는 자리를 먼저 본다.
     printf '#!/bin/bash\nCLAUDE="$HOME/.local/bin/claude"\n[ -x "$CLAUDE" ] || CLAUDE=claude\nexec "$CLAUDE" --dangerously-skip-permissions %s\n' "'$first_prompt'" > "$wake_file" 2>/dev/null
@@ -1431,9 +1161,6 @@ step_wake() {
         # 창이 열렸으면 곧바로 동료들을 부른다(아래 폴백으로 내려가면 자비스 화면에 갇혀 다음 줄을 못 간다).
         step_fleet "$(printf '%s' "$ref" | sed -n 's/.*\(surface:[0-9][0-9]*\).*/\1/p')"
         fleet_rc=$?
-        # 아고라 참가는 함대와 의존이 없다. 함대가 못 선 가장 흔한 이유는 그 한마디를 아직 안 치신 것이고,
-        # 그것은 고장이 아니다. 고장이 아닌 이유로 기능을 없애지 않는다.
-        step_agora
         return $fleet_rc ;;
     esac
     # 왜 못 열었는지를 화면과 기록 파일 양쪽에 남긴다. 이 값이 없으면 다음에도 원인을 모른다.
@@ -1452,7 +1179,7 @@ step_wake() {
     claude_bin="$(command -v claude 2>/dev/null)"
   fi
   if [ -z "$claude_bin" ]; then
-    say "[9/11] 자비스를 띄우지 못했습니다 — 클로드 명령을 찾지 못했습니다."
+    say "[9/10] 자비스를 띄우지 못했습니다 — 클로드 명령을 찾지 못했습니다."
     say "     창을 새로 열고 같은 한 줄을 다시 돌려 주십시오."
     return 9
   fi
@@ -1471,7 +1198,7 @@ step_wake() {
 
 # ── 본문 ──────────────────────────────────────────────────────────
 say "=== 자비스 설치 도우미 $BOOTSTRAP_VERSION (모드: $MODE) ==="
-say "[1/11] 이 컴퓨터를 살펴봅니다."
+say "[1/10] 이 컴퓨터를 살펴봅니다."
 detect_stage1
 detect_stage2
 write_report
