@@ -225,45 +225,114 @@ canon() {  # 실경로를 찍는다. 못 풀면 아무것도 안 찍고 rc 1.
   d="$( cd -P "$d" 2>/dev/null && pwd -P )" || return 1
   printf '%s/%s\n' "${d%/}" "$b"
 }
+# 🔴보존 경로의 실경로는 **지우기 전에 한 번에** 풀어 둔다(4R 지적 채택 2026-09-09).
+#   앞 판은 `canon` 이 실패하면 `continue` 로 그 경로를 **보존 목록에서 조용히 뺐다.**
+#   그러면 지켜야 할 자리가 목록에 없는 채로 상위가 통째로 지워진다.
+#   ★「그 자리가 없다」와 「그 자리를 못 풀었다」는 다른 답인데 한 칸에 넣고 있었다.
+#   ⇒ **있는데 못 푼 경로가 하나라도 있으면 그 실행은 아무것도 지우지 않는다**(fail-closed).
+#     ⚠막는 범위를 넓히지 않는다: **없는 경로는 그냥 건너뛴다**(지킬 것이 없다는 뜻이므로 안전하다).
+PRESERVE_CANON=""
+PRESERVE_CANON_FAIL=0
+PRESERVE_CANON_BAD=""
+resolve_preserve_paths() {
+  local p c why
+  PRESERVE_CANON=""; PRESERVE_CANON_FAIL=0; PRESERVE_CANON_BAD=""
+  while IFS= read -r p; do
+    [ -n "$p" ] || continue
+    [ -e "$p" ] || continue
+    if c="$(canon "$p")" && [ -n "$c" ]; then
+      PRESERVE_CANON="${PRESERVE_CANON}${c}
+"
+    else
+      PRESERVE_CANON_FAIL=$((PRESERVE_CANON_FAIL+1))
+      #   🔴사유를 **경로별로** 함께 담는다(7R 지적 채택 2026-09-09 · 윈도우 쪽과 같은 지적).
+      #   사유를 「지금 막 실패한 것 하나」에만 담아 두면 실패가 둘이 되는 순간 첫째의 까닭이 사라진다.
+      if [ -L "$p" ]; then why="가리키는 곳을 따라갈 수 없습니다(링크가 끊겼거나 너무 깊습니다)"
+      elif [ ! -r "$p" ]; then why="이 계정으로 열 수 없습니다"
+      else why="실제 경로를 확인하지 못했습니다"; fi
+      PRESERVE_CANON_BAD="${PRESERVE_CANON_BAD}${p}	${why}
+"
+    fi
+  done <<PRESERVE_LIST
+$PRESERVE_PATHS
+PRESERVE_LIST
+}
 # 보존 경로 가운데 이 자리 **안에** 있는 것을 실경로로 한 줄씩 찍는다.
 preserved_under() {
-  local root="$1" p c
-  printf '%s\n' "$PRESERVE_PATHS" | while IFS= read -r p; do
-    [ -n "$p" ] || continue; [ -e "$p" ] || continue
-    c="$(canon "$p")" || continue
+  local root="$1" c
+  printf '%s' "$PRESERVE_CANON" | while IFS= read -r c; do
+    [ -n "$c" ] || continue
     case "$c" in "$root"/*) printf '%s\n' "$c" ;; esac
   done
 }
 # 이 자리 **자신이** 보존 대상이거나 보존 경로의 아래인가(그러면 손대지 않는다).
 preserve_covers() {
-  local t="$1" p c
-  printf '%s\n' "$PRESERVE_PATHS" | while IFS= read -r p; do
-    [ -n "$p" ] || continue; [ -e "$p" ] || continue
-    c="$(canon "$p")" || continue
+  local t="$1" c
+  printf '%s' "$PRESERVE_CANON" | while IFS= read -r c; do
+    [ -n "$c" ] || continue
     case "$t" in "$c"|"$c"/*) printf '%s\n' "$c" ;; esac
   done
+}
+# 이 **실경로**가 보존 경로 자신·그 아래·그 조상인가(그러면 지우지 않는다).
+#   ⚠넘기는 것은 항상 실경로다 — 원문 경로로 비교하면 링크를 거친 자리에서 어긋난다.
+prune_keep_hit() {
+  local p="$1" keeps="$2" k
+  [ -n "$p" ] || return 1          # 실경로를 못 푼 것은 「남겨야 한다」가 아니다
+  printf '%s\n' "$keeps" | while IFS= read -r k; do
+    [ -n "$k" ] || continue
+    case "$p" in "$k"|"$k"/*) exit 9 ;; esac   # 보존 경로 자신 또는 그 아래
+    case "$k" in "$p"/*) exit 9 ;; esac        # 보존 경로의 조상
+  done
+  [ $? -eq 9 ]
+}
+# 항목의 실경로를 **싸게** 낸다. `find` 는 링크를 따라가지 않으므로 루트 아래 조상 마디에는
+#   링크가 없다 ⇒ 「루트 실경로 + 나머지 마디」. 항목 **자신이** 링크일 때만 따로 푼다.
+item_canon() { # item_canon <항목 원문> <루트 원문> <루트 실경로>
+  local p="$1" rl="$2" rc="$3"
+  if [ -L "$p" ]; then canon "$p"; return $?; fi
+  case "$p" in
+    "$rl"/*) printf '%s%s\n' "$rc" "${p#"$rl"}" ;;
+    *) canon "$p" ;;
+  esac
 }
 # 보존 경로만 남기고 그 자리를 비운다. 보존 경로와 **그 위 조상들**은 건드리지 않는다.
 #   ★깊은 것부터(-depth) 지운다 — 자식을 먼저 치우지 않으면 부모를 못 지운다.
 #   🔴**못 지운 것을 세어 돌려준다**(2차 검토 지적 채택): 앞 판은 개별 실패를 통째로 삼키고도
 #   「지움」이라 말했다. 지우는 도구가 「거의 다 지웠다」를 성공으로 보고하면 그것이 곧 거짓 상태 보고다.
-#   ⚠`find | while` 은 딴 프로세스라 변수를 못 돌려준다 ⇒ 실패 수를 파일에 적어 넘긴다.
+#   🔴🔴**열거 자체가 실패할 수 있다**(4R 지적 채택 2026-09-09). 앞 판은 `find` 의 오류를 버리고
+#   종료값도 안 봤다 ⇒ **하나도 못 본 날이 「다 지웠다」가 된다.** 그리고 줄 단위로 읽어서
+#   **이름에 개행이 든 파일이 두 조각으로 갈렸다.** ⇒ `-print0` 로 받고 종료값을 본다.
+#   ★그리고 지운 뒤 **다시 세어** 검산한다 — 「지웠다」는 남은 것이 0일 때만 참이다.
+#   ★링크는 이 자리에서 저절로 안전하다(실측 2026-09-09): 폴더를 가리키는 심볼릭 링크에 `rm -rf` 를
+#     하면 **링크만 사라지고 대상 폴더·파일은 그대로다**. 윈도우는 그렇지 않아 따로 손을 봤다
+#     (윈은 훑는 쪽이 링크로 들어갈 수 있다 — `reset-clean.ps1` 의 `Get-TreeItems`·`Remove-OneItem` 참조.
+#      ⚠5.1 `Remove-Item -Recurse` 가 뚫는지는 판본에 따라 다르다 — 2026-09-09 러너 실측: 안 뚫었다).
+#   🔴🔴**원문 경로로 훑는다**(6R BLOCK 채택 2026-09-09 · 윈도우와 같은 결함이 여기에도 있었다).
+#   앞 판은 실경로(`$t`)를 이 함수에 넘겼다. 그래서 삭제 루트가 링크면 **그 대상 폴더**를 훑어 지웠다.
+#   ⇒ 훑는 것은 언제나 원문 루트, 실경로는 **비교에만** 쓴다.
 prune_except() {
-  local root="$1" keeps="$2" cnt p k skip
-  cnt="$(mktemp -t jarvis-prune)" || return 1
-  printf '0' > "$cnt"
-  find "$root" -depth -mindepth 1 2>/dev/null | while IFS= read -r p; do
-    skip=0
-    printf '%s\n' "$keeps" | while IFS= read -r k; do
-      [ -n "$k" ] || continue
-      case "$p" in "$k"|"$k"/*) exit 9 ;; esac   # 보존 경로 자신 또는 그 아래
-      case "$k" in "$p"/*) exit 9 ;; esac        # 보존 경로의 조상
-    done || skip=1
-    [ "$skip" = "1" ] && continue
-    rm -rf "$p" 2>/dev/null || printf '%s' "$(( $(cat "$cnt") + 1 ))" > "$cnt"
-  done
-  PRUNE_FAIL="$(cat "$cnt" 2>/dev/null || printf '0')"
-  rm -f "$cnt"
+  local root="$1" root_canon="$2" keeps="$3" list p c enum_fail left
+  PRUNE_FAIL=0; enum_fail=0; left=0
+  list="$(mktemp -t jarvis-prune)" || return 1
+  find "$root" -depth -mindepth 1 -print0 > "$list" 2>/dev/null || enum_fail=1
+  while IFS= read -r -d '' p; do
+    c="$(item_canon "$p" "$root" "$root_canon")" || c=""
+    prune_keep_hit "$c" "$keeps" && continue
+    rm -rf "$p" 2>/dev/null
+  done < "$list"
+  # ★검산 — 남은 것을 다시 센다. 지우기 실패든 열거 실패든 **결과 한 칸**으로 모인다.
+  : > "$list"
+  find "$root" -depth -mindepth 1 -print0 > "$list" 2>/dev/null || enum_fail=1
+  while IFS= read -r -d '' p; do
+    c="$(item_canon "$p" "$root" "$root_canon")" || c=""
+    prune_keep_hit "$c" "$keeps" && continue
+    left=$((left+1))
+  done < "$list"
+  rm -f "$list"
+  PRUNE_FAIL=$((left + enum_fail))
+  if [ "$enum_fail" -ne 0 ]; then
+    say "         (이 자리의 목록을 끝까지 읽지 못했습니다 — 이 계정으로 못 여는 하위 자리가 있습니다.)"
+  fi
   [ "${PRUNE_FAIL:-0}" -eq 0 ]
 }
 
@@ -291,11 +360,32 @@ tree_same() {
 
 PRUNE_FAIL=0
 drop_dir()  {
-  [ -e "$1" ] || return 0
+  [ -e "$1" ] || [ -L "$1" ] || return 0
   # 🔴지우기 전에 보존 경로와의 중첩을 먼저 본다(검토 지적 채택 2026-09-09).
   local t covers keeps
+  # ★남겨야 할 자리 가운데 **있는데 실경로를 못 푼 것**이 있으면 아무것도 지우지 않는다.
+  #   무엇을 남겨야 하는지 모르는 채로 지우면 그것이 이 도구의 가장 나쁜 실패다.
+  #   (까닭은 위 `resolve_preserve_paths` 참조. 사람이 볼 설명은 purge 가 한 번만 인쇄한다.)
+  if [ "${PRESERVE_CANON_FAIL:-0}" -ne 0 ]; then
+    KEPT_FAIL=$((KEPT_FAIL+1))
+    say "  🔴못 지움: $(short "$1") — 남겨야 할 자리를 확인하지 못해 지우지 않았습니다."
+    return 1
+  fi
+  # 🔴🔴**삭제 루트가 링크면 이름표만 지운다 — 그 안으로 들어가지 않는다**(6R BLOCK 채택 2026-09-09).
+  #   앞 판은 실경로를 먼저 구해 그 **대상**을 훑는 함수에 넘겼다. 그래서 `~/.cys` 가 남의 폴더를
+  #   가리키는 링크이고 참가 자리가 그 안에 있으면 **그 남의 폴더를 열어 안을 지웠다.**
+  #   ★링크를 따라간 것은 `rm` 이 아니라 **그 앞의 「실경로 → 훑을 자리」 변환**이었다.
+  #   ⚠keep 이 있든 없든 마찬가지다 — 「그 안에 남길 것이 있으니 들어가도 된다」가 바로 그 함정이다.
+  if [ -L "$1" ]; then
+    if rm -f "$1" 2>/dev/null; then
+      REMOVED=$((REMOVED+1)); say "  지움: $(short "$1") (가리키기만 지웠습니다 — 가리키던 자리는 그대로입니다)"
+      return 0
+    fi
+    KEPT_FAIL=$((KEPT_FAIL+1)); say "  🔴못 지움: $(short "$1")"
+    return 1
+  fi
   # ★실경로를 못 풀면 **지우지 않는다**(fail-closed). 무엇을 지우는지 확신할 수 없는 상태에서
-  #   지우는 것이 이 도구가 낼 수 있는 가장 나쁜 실패다.
+  #   지우는 것이 이 도구가 낼 수 있는 가장 나쁜 실패다. 이 값은 **비교에만** 쓴다.
   t="$(canon "$1")" || {
     KEPT_FAIL=$((KEPT_FAIL+1))
     say "  🔴못 지움: $(short "$1") — 이 자리의 실제 경로를 확인하지 못해 **지우지 않았습니다.**"
@@ -313,7 +403,7 @@ drop_dir()  {
     PRESERVED=$((PRESERVED+1))
     say "  보존(중첩): $(short "$1") 안에 참가 자리가 있어 **그것만 남기고** 지웁니다."
     printf '%s\n' "$keeps" | while IFS= read -r k; do [ -n "$k" ] && say "           남기는 자리: $(short "$k")"; done
-    if prune_except "$t" "$keeps"; then
+    if prune_except "$1" "$t" "$keeps"; then
       REMOVED=$((REMOVED+1)); say "  지움: $(short "$1") (참가 자리는 그대로)"
       return 0
     fi
@@ -474,6 +564,19 @@ purge() {
   say ""
   say "=== 지웁니다 ==="
 
+  # ★남겨야 할 자리의 실경로를 **먼저 한 번에** 푼다. 하나라도 못 풀면 이 실행은 아무것도 지우지 않는다.
+  resolve_preserve_paths
+  if [ "$PRESERVE_CANON_FAIL" -ne 0 ]; then
+    say "  🔴남겨야 할 자리 ${PRESERVE_CANON_FAIL}곳의 실제 경로를 확인하지 못했습니다 — **이번에는 아무것도 지우지 않습니다.**"
+    printf '%s' "$PRESERVE_CANON_BAD" | while IFS="$(printf '\t')" read -r bad why; do
+      [ -n "$bad" ] || continue
+      say "         확인 못한 자리: $(short "$bad")"
+      [ -n "$why" ] && say "           까닭: $why"
+    done
+    say "         무엇을 남겨야 하는지 모르는 채로 지우면 참가 열쇠를 잃을 수 있습니다."
+    say "         그 자리를 살펴보신 뒤(링크가 끊겼거나 권한이 없을 수 있습니다) 같은 줄을 다시 돌려 주십시오."
+  fi
+
   # ★순서가 중요하다 — 등록을 떼는 명령이 **프로그램 안에** 들어 있다.
   #   프로그램을 먼저 지우면 등록을 뗄 수단이 사라져 죽은 등록이 남는다.
   # footprint: M-DAEMON
@@ -504,9 +607,28 @@ purge() {
   #   폴더만 만들어지고 알맹이가 반만 복사돼도 「옮겼습니다」라고 말한 뒤 원본을 지웠고,
   #   ★**다음 실행은 「대상이 이미 있다」며 이전을 건너뛰어 반쪽이 영구히 고착된다.**
   #   ⇒ 대조에 실패하면 **원본(`~/.cys`)을 지우지 않는다**(fail-closed). 사람 손 한 번이 유실보다 싸다.
+  #   🔴🔴**「대상이 있다」로 이전을 마쳤다고 판정하지 않는다**(4R 지적 채택 2026-09-09).
+  #   앞 판의 조건은 `[ ! -d "$AGORA_SKILL" ]` 였다. 그래서 지난 실행이 **반쪽 대상을 남긴 채**
+  #   (치우기가 잠김·권한으로 실패해서) 끝났으면, **다음 실행은 그 반쪽을 「이미 있다」로 읽고
+  #   이전 분기를 통째로 건너뛰어** `AGORA_MIGRATE_OK` 기본값 1 로 `.cys` 원본을 지웠다.
+  #   ⇒ 반쪽이 영구히 고착되는 것을 막으려던 장치가, **재실행에서 스스로 그 고착을 완성**하고 있었다.
+  #   ★판정 기준을 「있다」에서 **`tree_same` 통과**로 옮긴다 — 이전은 내용이 같을 때만 끝난 것이다.
   AGORA_MIGRATE_OK=1
-  if [ -d "$AGORA_SKILL_IN_CYS" ] && [ ! -d "$AGORA_SKILL" ]; then
-    if mkdir -p "$(dirname "$AGORA_SKILL")" 2>/dev/null && cp -R "$AGORA_SKILL_IN_CYS" "$AGORA_SKILL" 2>/dev/null \
+  if [ -d "$AGORA_SKILL_IN_CYS" ]; then
+    if [ -d "$AGORA_SKILL" ] && tree_same "$AGORA_SKILL_IN_CYS" "$AGORA_SKILL"; then
+      # 이미 같은 것이 밖에 있다(멱등) — 덮지 않는다.
+      say "  이미 있음: 토론장 안내가 $(short "$AGORA_SKILL") 에 그대로 있습니다(내용까지 대조했습니다)."
+    elif [ -d "$AGORA_SKILL" ]; then
+      # 있는데 내용이 다르다 = 지난 실행의 반쪽이거나, 사람이 손수 고쳐 둔 것이다.
+      #   어느 쪽인지 우리는 모른다 ⇒ 덮지도 지우지도 않고 **원본을 남긴다**(fail-closed).
+      AGORA_MIGRATE_OK=0
+      KEPT_FAIL=$((KEPT_FAIL+1))
+      say "  🔴$(short "$AGORA_SKILL") 에 있는 토론장 안내가 $(short "$AGORA_SKILL_IN_CYS") 와 달라"
+      say "         $(short "$HOME/.cys") 를 **지우지 않았습니다.** 지웠다면 안 옮겨진 쪽이 사라졌을 것입니다."
+      say "         지난번에 옮기다 만 것일 수도, 손수 고쳐 두신 것일 수도 있어 저희가 고르지 않습니다."
+      say "         $(short "$AGORA_SKILL") 를 손으로 정리하신 뒤 같은 줄을 다시 돌려 주십시오."
+      say "         참가 열쇠·이름은 어느 경우에도 그대로 있습니다."
+    elif mkdir -p "$(dirname "$AGORA_SKILL")" 2>/dev/null && cp -R "$AGORA_SKILL_IN_CYS" "$AGORA_SKILL" 2>/dev/null \
        && tree_same "$AGORA_SKILL_IN_CYS" "$AGORA_SKILL"; then
       say "  옮김: 토론장 안내를 $(short "$AGORA_SKILL") 로 옮겨 두었습니다(내용까지 같은지 확인했습니다)."
     else
@@ -515,8 +637,12 @@ purge() {
       say "  🔴토론장 안내를 밖으로 옮기지 못했습니다 — 그래서 $(short "$HOME/.cys") 를 **지우지 않았습니다.**"
       say "         지웠다면 그 안내가 영영 사라졌을 것입니다. 참가 열쇠·이름은 그대로 있습니다."
       say "         $(short "$AGORA_SKILL_IN_CYS") 를 손으로 $(short "$AGORA_SKILL") 에 옮기신 뒤 같은 줄을 다시 돌려 주십시오."
-      # 반쪽만 생긴 대상은 치운다 — 그대로 두면 다음 실행이 「이미 있다」며 건너뛴다(고착).
-      [ -d "$AGORA_SKILL" ] && ! tree_same "$AGORA_SKILL_IN_CYS" "$AGORA_SKILL" && rm -rf "$AGORA_SKILL" 2>/dev/null
+      # 반쪽만 생긴 대상은 치운다 — 치우기가 실패해도 이제는 안전하다(다음 실행이 위 「다르다」 갈래로 들어가
+      #   원본을 남긴다). 앞 판은 이 치우기가 실패하면 다음 실행이 원본을 지웠다.
+      if [ -d "$AGORA_SKILL" ] && ! tree_same "$AGORA_SKILL_IN_CYS" "$AGORA_SKILL"; then
+        rm -rf "$AGORA_SKILL" 2>/dev/null \
+          || say "         (옮기다 만 $(short "$AGORA_SKILL") 도 치우지 못했습니다 — 그 자리를 손으로 정리해 주십시오.)"
+      fi
     fi
   fi
 

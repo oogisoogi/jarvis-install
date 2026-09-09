@@ -134,14 +134,94 @@ function Test-IsFilePath($p) {
     return (([string]$p) -match '^(\\\\|[A-Za-z]:[\\/])')
 }
 # 실경로. 못 풀면 빈 문자열을 돌려준다(그때 부르는 쪽은 지우지 않는다 = fail-closed).
+#   🔴🔴앞 판은 `Resolve-Path` 가 실패해도 `GetFullPath` 가 만든 **글자만의 경로를 정상값처럼** 돌려줬다
+#   (4R 지적 채택 2026-09-09). 그러면 링크가 끊긴 자리·이 계정으로 못 여는 자리가 「풀렸다」로 통과하고,
+#   그 값은 `find`/`Get-ChildItem` 이 내는 실경로와 달라 **보존 목록에서 조용히 빠진다** - 상위가 통째로 지워진다.
+#   ★「못 풀었다」를 성공값과 같은 모양으로 돌려주면 부르는 쪽은 그것을 영영 모른다. 실패는 실패 모양으로 돌려준다.
+#   ⚠부르는 자리는 모두 **이미 있는 것이 확인된 경로**만 넘긴다(없는 자리는 부르기 전에 걸러진다).
+#   🔴🔴그리고 `Resolve-Path` 는 **링크를 안 편다**(윈 러너 실측 2026-09-09 · 새로 넣은 symlink 모양 축이
+#   물었다). 참가 자리를 링크로 넘기면 그 값이 그대로 돌아와 `.cys` 아래로 안 보이고,
+#   **`.cys` 가 통째로 지워지며 열쇠가 사라졌다.** 맥은 `cd -P` 가 사슬을 다 펴서 멀쩡했다 — 두 OS 가
+#   같은 것을 재고 있지 않았던 것이다(그래서 `plain` 한 모양만 부르던 앞 판이 이것을 못 봤다).
+#   ⇒ 뿌리부터 **한 마디씩 내려가며** 링크(symlink·junction)를 편다. 5.1 에도 있는 길만 쓴다.
+#     (`ResolveLinkTarget` 은 .NET 6+ 라 참가자 기계의 5.1 에는 없다.)
+# 이 자리가 링크(symlink·junction)인가. 링크는 **그 자리에 있는 이름표**이지 그 안엣것이 아니다.
+function Test-IsReparse($it) {
+    try { return [bool]($it.Attributes -band [System.IO.FileAttributes]::ReparsePoint) } catch { return $false }
+}
+# 한 마디를 편다. 돌려주는 값이 **세 가지**다(5R 지적 채택 2026-09-09):
+#   · 받은 값 그대로 = 「링크가 아니다」 · 다른 경로 = 「한 겹 폈다」 · `$null` = **「폈어야 하는데 못 폈다」**
+#   앞 판은 셋째를 첫째와 같은 모양으로 돌려줘, 못 편 것이 「링크가 아니다」로 읽혔다.
+$script:ReparseWhy = ''
+function Resolve-ReparseOnce($p) {
+    $script:ReparseWhy = ''
+    $it = $null
+    try { $it = Get-Item -LiteralPath $p -Force -ErrorAction Stop }
+    catch { $script:ReparseWhy = '자리를 열지 못했다: ' + $p; return $null }
+    if (-not (Test-IsReparse $it)) { return $p }
+    $t = $null
+    try { $t = $it.Target } catch { $t = $null }
+    if ($t -is [System.Array]) { if ($t.Count -gt 0) { $t = $t[0] } else { $t = $null } }
+    if (-not $t) { $script:ReparseWhy = '링크인데 가리키는 곳을 못 읽었다: ' + $p; return $null }
+    $t = [string]$t
+    # junction 의 대상은 `\??\` 가 붙어 오는 판본이 있다.
+    if ($t.StartsWith('\??\')) { $t = $t.Substring(4) }
+    elseif ($t.StartsWith('\\?\')) { $t = $t.Substring(4) }
+    if (-not [System.IO.Path]::IsPathRooted($t)) {
+        try { $t = [System.IO.Path]::GetFullPath((Join-Path (Split-Path -Parent $p) $t)) }
+        catch { $script:ReparseWhy = '링크가 가리키는 곳을 풀지 못했다: ' + $p; return $null }
+    }
+    return $t.TrimEnd('\')
+}
+# 뿌리부터 내려가며 **처음 만나는 링크 마디**를 펴고, 그 자리에서 멈춘다.
+#   돌려주는 것: @{ ok=$bool; changed=$bool; path=<경로> }
+#   🔴🔴앞 판은 링크의 **대상 문자열을 그대로 결과로 삼았다**(6R 지적 채택 2026-09-09).
+#   그러면 그 대상 **안에 있는 중간 링크**를 못 본다 — 예: `L1` 의 대상이 `C:\H\L2\forum` 이고
+#   `L2` 가 또 링크면, 앞 판은 마지막 마디 `forum` 만 보고 「다 폈다」고 말한다.
+#   그 값은 `.cys` 아래가 아니어서 **보존 중첩을 놓치고 열쇠가 지워진다.**
+#   ⇒ 한 마디를 펼 때마다 **뿌리부터 다시** 훑는다(아래 `Canon-Path` 의 되풀이).
+function Expand-FirstReparse($full) {
+    $root = [System.IO.Path]::GetPathRoot($full)
+    if (-not $root) { $script:ReparseWhy = '뿌리를 알 수 없다: ' + $full; return @{ ok = $false } }
+    $cur = $root.TrimEnd('\')
+    $segs = @($full.Substring($root.Length) -split '[\\/]' | Where-Object { $_ -ne '' })
+    for ($i = 0; $i -lt $segs.Count; $i++) {
+        $cur = $cur + '\' + $segs[$i]
+        $next = Resolve-ReparseOnce $cur
+        if ($null -eq $next) { return @{ ok = $false } }
+        if ($next -ne $cur) {
+            # 이 마디가 링크였다 — 편 자리에 **남은 마디를 이어 붙이고** 처음부터 다시 본다.
+            $rest = ''
+            for ($j = $i + 1; $j -lt $segs.Count; $j++) { $rest = $rest + '\' + $segs[$j] }
+            return @{ ok = $true; changed = $true; path = ($next.TrimEnd('\') + $rest) }
+        }
+    }
+    return @{ ok = $true; changed = $false; path = $cur }
+}
+# 실경로. 못 풀면 빈 문자열(그때 부르는 쪽은 지우지 않는다 = fail-closed).
+#   ⛔**적어 두지 않는다**(6R 지적 채택). 앞 판은 답을 캐시했는데, 같은 실행 중에 링크의 대상이
+#   바뀌어도 **옛 답이 그대로 적중**했다(적중 검사가 「옛 답이 아직 살아 있는가」만 봤다).
+#   ★대신 **비싸지 않게** 만들었다: 열거는 링크 안으로 안 들어가므로 루트 아래 조상 마디에는 링크가
+#     없다 ⇒ 항목의 실경로는 「루트 실경로 + 나머지 마디」로 곧바로 나온다(`Get-ItemCanon`).
+#     그래서 이 무거운 함수는 **보존 경로·삭제 루트·링크 항목**에만 불린다.
 function Canon-Path($p) {
     if (-not $p) { return '' }
-    try {
-        $full = [System.IO.Path]::GetFullPath(([string]$p))
-        $rp = Resolve-Path -LiteralPath $full -ErrorAction SilentlyContinue
-        if ($rp) { return (Norm-Path $rp.ProviderPath) }
-        return (Norm-Path $full)
-    } catch { return '' }
+    $script:ReparseWhy = ''
+    $cur = ''
+    try { $cur = [System.IO.Path]::GetFullPath(([string]$p)) } catch { return '' }
+    if (-not (Test-Path -LiteralPath $cur)) { return '' }
+    # 🔴**경계가 한 칸 어긋나 있었다**(7R 지적 채택 2026-09-09): 한 바퀴가 「한 겹을 편다」인데
+    #   32바퀴만 돌면 **32겹째를 편 뒤 그것이 종단인지 확인할 바퀴가 없다** ⇒ 정확히 32겹도 실패했다.
+    #   계약은 「32겹까지 된다」이므로 **펴는 32바퀴 + 종단 확인 1바퀴** = 33바퀴를 돈다.
+    $maxHops = 32
+    for ($hop = 0; $hop -le $maxHops; $hop++) {
+        $r = Expand-FirstReparse $cur
+        if (-not $r.ok) { return '' }
+        if (-not $r.changed) { return (Norm-Path $r.path) }
+        $cur = $r.path
+    }
+    $script:ReparseWhy = ('링크 사슬이 너무 깊다(' + $maxHops + '겹까지만 따라갑니다): ' + $p)
+    return ''
 }
 function Path-IsUnder($child, $parent) {
     $c = Norm-Path $child; $r = Norm-Path $parent
@@ -151,25 +231,44 @@ function Path-IsUnder($child, $parent) {
 function Path-IsSame($a, $b) {
     return ((Norm-Path $a) -ieq (Norm-Path $b))
 }
-# 이 자리 안에 있는 보존 경로들(실경로로 · 없으면 빈 배열).
-function Get-PreservedUnder($root) {
-    $out = @()
+# 🔴남겨야 할 자리의 실경로는 **지우기 전에 한 번에** 푼다(4R 지적 채택 2026-09-09).
+#   앞 판은 `if (-not $c) { continue }` 로 **못 푼 보존 경로를 목록에서 조용히 뺐다** - 지켜야 할 자리가
+#   목록에 없는 채로 상위가 통째로 지워진다. 「그 자리가 없다」와 「그 자리를 못 풀었다」는 다른 답이다.
+#   ⇒ **있는데 못 푼 경로가 하나라도 있으면 그 실행은 파일을 지우지 않는다**(fail-closed).
+#   ⚠막는 범위를 넓히지 않는다: **없는 경로는 그냥 건너뛴다**(지킬 것이 없다는 뜻이므로 안전하다).
+#     레지스트리 항목도 막지 않는다 - 보존 대상은 언제나 파일이라 겹칠 수가 없다(r4 회귀의 교훈).
+$script:PreserveCanon = @()
+$script:PreserveCanonFail = @()
+#   🔴사유는 **경로별로** 담는다(7R 지적 채택 2026-09-09). 앞 판은 실패 목록에 경로만 넣었고,
+#   까닭은 전역 `ReparseWhy` 에만 있어 **다음 경로를 풀 때 덮였다** ⇒ 사람이 보는 화면에 안 나왔다.
+#   ★사유를 「지금 막 실패한 것 하나」에만 담아 두면, 실패가 둘이 되는 순간 첫째의 까닭이 사라진다.
+function Initialize-PreserveCanon {
+    $script:PreserveCanon = @()
+    $script:PreserveCanonFail = @()
     foreach ($p in $PreservePaths) {
         if (-not $p) { continue }
         if (-not (Test-Path -LiteralPath $p)) { continue }
+        $script:ReparseWhy = ''
         $c = Canon-Path $p
-        if (-not $c) { continue }
+        if ($c) { $script:PreserveCanon += $c }
+        else {
+            $why = $script:ReparseWhy
+            if (-not $why) { $why = '실제 경로를 확인하지 못했습니다' }
+            $script:PreserveCanonFail += @{ path = $p; why = $why }
+        }
+    }
+}
+# 이 자리 안에 있는 보존 경로들(실경로로 · 없으면 빈 배열).
+function Get-PreservedUnder($root) {
+    $out = @()
+    foreach ($c in $script:PreserveCanon) {
         if (Path-IsUnder $c $root) { $out += $c }
     }
     return $out
 }
 # 이 자리 자신이 보존 대상이거나 보존 경로의 아래인가.
 function Test-PreserveCovers($target) {
-    foreach ($p in $PreservePaths) {
-        if (-not $p) { continue }
-        if (-not (Test-Path -LiteralPath $p)) { continue }
-        $c = Canon-Path $p
-        if (-not $c) { continue }
+    foreach ($c in $script:PreserveCanon) {
         if ((Path-IsSame $target $c) -or (Path-IsUnder $target $c)) { return $true }
     }
     return $false
@@ -177,23 +276,116 @@ function Test-PreserveCovers($target) {
 # 보존 경로와 그 조상만 남기고 그 자리를 비운다. 깊은 것부터 지운다.
 #   🔴**못 지운 것을 세어 돌려준다**(2차 검토 지적 채택): 앞 판은 개별 실패를 통째로 삼키고도
 #   「지움」이라 말했다. 지우는 도구가 「거의 다 지웠다」를 성공으로 보고하면 그것이 곧 거짓 상태 보고다.
-function Remove-ExceptPreserved($root, $keeps) {
-    $fails = 0
-    $items = Get-ChildItem -LiteralPath $root -Recurse -Force -ErrorAction SilentlyContinue |
-             Sort-Object { $_.FullName.Length } -Descending
-    foreach ($it in $items) {
-        $f = Canon-Path $it.FullName
-        if (-not $f) { $f = Norm-Path $it.FullName }
-        $skip = $false
-        foreach ($k in $keeps) {
-            if ((Path-IsSame $f $k) -or (Path-IsUnder $f $k) -or (Path-IsUnder $k $f)) { $skip = $true; break }
-        }
-        if ($skip) { continue }
-        if (-not (Test-Path -LiteralPath $it.FullName)) { continue }   # 부모를 지우며 함께 사라진 것
-        try { Remove-Item -LiteralPath $it.FullName -Recurse -Force -ErrorAction Stop }
-        catch { $fails++ }
+# 항목의 실경로를 **싸게** 낸다(6R 지적 채택 2026-09-09).
+#   열거가 링크 안으로 들어가지 않으므로 **루트 아래 조상 마디에는 링크가 없다** — 그 사실을 쓴다.
+#   ⇒ 항목의 실경로 = 「루트 실경로 + 나머지 마디」. 항목 **자신이** 링크일 때만 따로 푼다.
+#   ★이래서 캐시가 필요 없다. 캐시를 없앴더니 낡은 답을 재사용하던 자리(TOCTOU)도 함께 사라졌다.
+function Get-ItemCanon($it, $rootLiteral, $rootCanon) {
+    if (Test-IsReparse $it) { return (Canon-Path $it.FullName) }
+    $full = Norm-Path $it.FullName
+    $rl = Norm-Path $rootLiteral
+    if (-not $full.StartsWith($rl + '\', [System.StringComparison]::OrdinalIgnoreCase)) {
+        return (Canon-Path $it.FullName)   # 예상 밖의 모양이면 정직하게 비싼 길로
     }
+    return (Norm-Path ($rootCanon + $full.Substring($rl.Length)))
+}
+# 이 실경로를 남겨야 하는가 — 🔴**보존 목록과 맞아떨어질 때만** 참이다(5R 지적 채택).
+#   못 푼 것(빈 문자열)은 참이 아니다 — 「모르겠다」를 「남겨야 한다」로 번역하면 다음 줄에서 「없다」가 된다.
+#   ⚠이 판정은 마지막 방어선이 아니다: 삭제는 `-Recurse` 를 아예 쓰지 않아 폴더는 **비어 있을 때만**
+#     지워진다 ⇒ 남길 자리가 든 폴더는 판정과 무관하게 안 지워진다.
+function Test-KeepHit($canon, $keeps) {
+    if (-not $canon) { return $false }
+    foreach ($k in $keeps) {
+        if ((Path-IsSame $canon $k) -or (Path-IsUnder $canon $k) -or (Path-IsUnder $k $canon)) { return $true }
+    }
+    return $false
+}
+# 🔴🔴**우리 손으로 훑는다 — `Get-ChildItem -Recurse` 는 5.1 에서 링크 안으로 들어간다.**
+#   그러면 `~\.cys` 안에 바깥을 가리키는 junction 이 하나 있을 때 그 **바깥 폴더의 파일이 목록에 올라
+#   하나씩 지워진다.** 우리가 지우기로 한 것은 `.cys` 뿐인데 남의 자리를 지우는 것이다.
+#   ⇒ 자식은 한 겹씩만 묻고, **링크면 그 안으로 들어가지 않는다.**
+#   ★내는 순서는 **깊이 우선·후위**다 — 자식이 먼저, 부모가 나중. 그래야 부모를 지울 때가 되면 비어 있다.
+#   ★맥은 이 위험이 없다(실측 2026-09-09: 폴더를 가리키는 심볼릭 링크에 `rm -rf` 를 하면
+#     **링크만 사라지고 대상 폴더·파일은 그대로다**). 윈도우를 그 뜻에 맞춘다.
+$script:EnumFail = 0
+function Add-TreeItems($dir, $out, $depth) {
+    if ($depth -gt 64) { $script:EnumFail++; return }
+    $kids = @()
+    try { $kids = @(Get-ChildItem -LiteralPath $dir -Force -ErrorAction Stop) }
+    catch { $script:EnumFail++; return }
+    foreach ($k in $kids) {
+        if ($k.PSIsContainer -and -not (Test-IsReparse $k)) { Add-TreeItems $k.FullName $out ($depth + 1) }
+        [void]$out.Add($k)
+    }
+}
+function Get-TreeItems($root) {
+    $script:EnumFail = 0
+    $out = New-Object System.Collections.ArrayList
+    Add-TreeItems $root $out 0
+    return $out.ToArray()
+}
+# 한 자리를 지운다. 🔴🔴**`-Recurse` 를 쓰지 않는다**(5R BLOCK 채택 2026-09-09).
+#   앞 판은 링크를 **열거**에서만 막고, 삭제는 일반 폴더마다 `Remove-Item -Recurse` 를 다시 불렀다.
+#   ⇒ 어떤 폴더의 열거가 실패하면(권한·경쟁) 그 폴더는 목록에 남고, **삭제 단계의 두 번째 재귀가
+#     그 안으로 들어간다.** 열거층에서 막은 것을 삭제층이 무효로 만든 것이다.
+#   ⚠그 재귀가 **링크까지 뚫는지는 판본에 따라 다르다**(2026-09-09 러너 실측: 그 러너에서는 안 뚫었다).
+#     결함의 본체는 그것이 아니라 **열거하지 못한 자리를 지운다**는 것이다 - 그쪽은 판본과 무관하다.
+#   ★한 층만 막는 것은 안 막은 것과 같다 — 지나가는 길이 둘이면 둘 다 막아야 한다.
+#   ⇒ 폴더는 **비어 있을 때만** 지워진다(비재귀). 안 비었으면 안 지우고 실패로 센다 = 그 자체가 검산이다.
+#   ⇒ 링크는 이름표만 사라진다(대상 무접촉). **끊어진 링크도 여기로 온다** — 가리키는 곳이 없어도
+#     그 자리에 이름표는 있으므로 지워야 한다(앞 판은 `Test-Path` 가 거짓이라 건너뛰고 [남음]을 냈다).
+function Remove-OneItem($it) {
+    $p = $it.FullName
+    # 읽기 전용 표시가 있으면 떼고 지운다(예전 `-Force` 가 하던 일).
+    try {
+        if ($it.Attributes -band [System.IO.FileAttributes]::ReadOnly) {
+            $it.Attributes = ($it.Attributes -band (-bnot [System.IO.FileAttributes]::ReadOnly))
+        }
+    } catch { }
+    if ($it.PSIsContainer) {
+        if (-not (Test-IsReparse $it) -and -not [System.IO.Directory]::Exists($p)) { return }  # 이미 없다
+        [System.IO.Directory]::Delete($p, $false)
+        return
+    }
+    [System.IO.File]::Delete($p)   # 없는 파일에는 아무 일도 일어나지 않는다
+}
+# 한 자리를 통째로 지운다 — 링크는 뚫지 않는다. 못 지운 수를 돌려준다.
+function Remove-TreeSafe($path) {
+    $it = $null
+    try { $it = Get-Item -LiteralPath $path -Force -ErrorAction Stop } catch { return 1 }
+    if ((-not $it.PSIsContainer) -or (Test-IsReparse $it)) {
+        try { Remove-OneItem $it; return 0 } catch { return 1 }
+    }
+    $fails = 0
+    $items = @(Get-TreeItems $it.FullName)
+    if ($script:EnumFail -gt 0) { $fails++ }
+    foreach ($x in $items) {
+        try { Remove-OneItem $x } catch { }
+    }
+    # 검산 — 뿌리는 비어 있을 때만 지워진다. 안 지워지면 무엇인가 남은 것이다.
+    try { [System.IO.Directory]::Delete($it.FullName, $false) } catch { $fails++ }
     return $fails
+}
+function Remove-ExceptPreserved($rootLiteral, $rootCanon, $keeps) {
+    $enumFail = 0
+    $items = @(Get-TreeItems $rootLiteral)
+    if ($script:EnumFail -gt 0) {
+        $enumFail = 1
+        Write-Host ('         (이 자리의 목록을 끝까지 읽지 못했습니다 - 못 연 자리 ' + $script:EnumFail + '곳.)')
+    }
+    foreach ($it in $items) {
+        if (Test-KeepHit (Get-ItemCanon $it $rootLiteral $rootCanon) $keeps) { continue }
+        try { Remove-OneItem $it } catch { }
+    }
+    # 검산 - 남은 것을 **다시 열거해서** 센다. 지우기 실패든 열거 실패든 결과 한 칸으로 모인다.
+    $left = 0
+    $rest = @(Get-TreeItems $rootLiteral)
+    if ($script:EnumFail -gt 0) { $enumFail = 1 }
+    foreach ($it in $rest) {
+        if (Test-KeepHit (Get-ItemCanon $it $rootLiteral $rootCanon) $keeps) { continue }
+        $left++
+    }
+    return ($left + $enumFail)
 }
 
 # 두 자리의 파일 목록과 내용이 같은가. 「폴더가 생겼다」로는 옮겼다고 말할 수 없다.
@@ -244,22 +436,69 @@ function Test-TreeSame($a, $b) {
     }
 }
 
+# 이 자리가 레지스트리 키인가 — 🔴**모양이 아니라 provider 로 판정한다**(6R 지적 채택 2026-09-09).
+#   앞 판은 「파일 경로처럼 안 생겼으면 레지스트리」라는 **소거법**이었다. 그러면 새 호출부가
+#   엉뚱한 모양을 넘길 때 그것이 조용히 재귀 삭제 갈래로 흘러든다.
+#   ⚠받아들이는 뿌리는 **`HKCU:` 하나뿐**이다. 이 도구는 이 계정 것만 지운다 —
+#     기계 전체(시스템 영역) 뿌리는 아예 이 갈래로 들어오지 못하게 하고, 들어오면 지우지 않는다.
+#     (검사 축이 이 파일에 그 낱말이 있는 것 자체를 막는다 — 그 축이 옳다.)
+function Test-IsRegistryPath($p) {
+    if (-not $p) { return $false }
+    if (([string]$p) -notmatch '^HKCU:\\') { return $false }
+    try {
+        $it = Get-Item -LiteralPath $p -ErrorAction Stop
+        return ($it.PSProvider.Name -eq 'Registry')
+    } catch { }
+    return $true   # 접두는 맞는데 못 열었다 - 레지스트리로 다룬다(Drop 이 Test-Path 로 이미 걸렀다)
+}
 function Drop($label, $path) {
     if (-not (Test-Path $path)) { return }
-    # 지우기 전에 보존 경로와의 중첩을 먼저 본다(검토 지적 채택 2026-09-09).
-    # ★실경로를 못 풀면 지우지 않는다(fail-closed). 무엇을 지우는지 확신할 수 없는 상태에서
-    #   지우는 것이 이 도구가 낼 수 있는 가장 나쁜 실패다.
-    # 파일이 아닌 자리(레지스트리 등)는 중첩 검사 대상이 아니다 - 종전대로 지운다.
-    if (-not (Test-IsFilePath $path)) {
+    # 레지스트리 키 — 하위 키를 함께 지우려면 `-Recurse` 가 필요하다. 레지스트리엔 링크가 없어
+    #   파일 쪽의 「두 번째 재귀」 위험이 없다. 이 파일에서 `-Recurse` 를 쓰는 유일한 자리다.
+    if (Test-IsRegistryPath $path) {
         try { Remove-Item $path -Recurse -Force -ErrorAction Stop; $script:Removed++; Write-Host ("  지움: " + (Short $path)) }
         catch { $script:KeptFail++; Write-Host ("  [남음] " + (Short $path) + " — " + $_.Exception.Message) }
         return
     }
-    $t = Canon-Path $path
+    # ★파일도 레지스트리도 아닌 모양이 들어왔다 = 부르는 쪽이 틀렸다. **지우지 않는다.**
+    if (-not (Test-IsFilePath $path)) {
+        $script:KeptFail++
+        Write-Host ("  [남음] " + (Short $path) + " - 다룰 수 있는 자리 모양이 아닙니다(지우지 않았습니다).")
+        return
+    }
+    # ★남겨야 할 자리 가운데 **있는데 실경로를 못 푼 것**이 있으면 파일은 하나도 지우지 않는다.
+    #   (까닭은 Initialize-PreserveCanon 참조. 사람이 볼 설명은 Invoke-Purge 가 한 번만 인쇄한다.)
+    if ($script:PreserveCanonFail.Count -gt 0) {
+        $script:KeptFail++
+        Write-Host ("  [남음] " + (Short $path) + " - 남겨야 할 자리를 확인하지 못해 지우지 않았습니다.")
+        return
+    }
+    # 🔴🔴**삭제 루트가 링크면 이름표만 지운다 — 그 안으로 들어가지 않는다**(6R BLOCK 채택 2026-09-09).
+    #   앞 판은 실경로를 먼저 구해 그 **대상**을 삭제 함수에 넘겼다. 그래서 `~\.cys` 가 `D:\shared` 를
+    #   가리키는 링크이고 참가 자리가 그 안에 있으면, **남의 폴더 `D:\shared` 를 열어 그 안을 지웠다.**
+    #   ★링크를 따라간 것은 삭제 API 가 아니라 **그 앞의 「실경로 → 삭제 인자」 변환**이었다.
+    #     비재귀로 바꾼 것만으로는 안 닫힌다 — 원칙을 고정한다:
+    #     ①삭제 루트는 **원문 경로 그대로** 다룬다 ②실경로는 **보존 경로 비교에만** 쓴다.
+    #     ⚠keep 이 있든 없든 마찬가지다 — 「그 안에 남길 것이 있으니 들어가도 된다」가 바로 그 함정이다.
+    $rootItem = $null
+    try { $rootItem = Get-Item -LiteralPath $path -Force -ErrorAction Stop } catch { $rootItem = $null }
+    if ($rootItem -and (Test-IsReparse $rootItem)) {
+        try {
+            Remove-OneItem $rootItem
+            $script:Removed++
+            Write-Host ("  지움: " + (Short $path) + " (가리키기만 지웠습니다 - 가리키던 자리는 그대로입니다)")
+        } catch {
+            $script:KeptFail++
+            Write-Host ("  [남음] " + (Short $path) + " — " + $_.Exception.Message)
+        }
+        return
+    }
+    $t = Canon-Path $path      # ★비교에만 쓴다. 삭제 인자로는 절대 넘기지 않는다.
     if (-not $t) {
         $script:KeptFail++
         Write-Host ("  [남음] " + (Short $path) + " - 이 자리의 실제 경로를 확인하지 못해 지우지 않았습니다.")
         Write-Host '         (확인할 수 없는 자리를 지우면 엉뚱한 것을 지울 수 있습니다.)'
+        if ($script:ReparseWhy) { Write-Host ('         까닭: ' + $script:ReparseWhy) }
         return
     }
     if (Test-PreserveCovers $t) {
@@ -272,7 +511,7 @@ function Drop($label, $path) {
         $script:Preserved++
         Write-Host ("  보존(중첩): " + (Short $path) + " 안에 참가 자리가 있어 그것만 남기고 지웁니다.")
         foreach ($k in $keeps) { Write-Host ("           남기는 자리: " + (Short $k)) }
-        $fails = Remove-ExceptPreserved $t $keeps
+        $fails = Remove-ExceptPreserved $path $t $keeps    # ★원문 경로로 열거하고, 실경로는 비교에만
         if ($fails -gt 0) {
             $script:KeptFail++
             Write-Host ("  [일부 남음] " + (Short $path) + " - {0}가지를 지우지 못했습니다(참가 자리는 그대로입니다)." -f $fails)
@@ -282,8 +521,9 @@ function Drop($label, $path) {
         Write-Host ("  지움: " + (Short $path) + " (참가 자리는 그대로)")
         return
     }
-    try { Remove-Item $path -Recurse -Force -ErrorAction Stop; $script:Removed++; Write-Host ("  지움: " + (Short $path)) }
-    catch { $script:KeptFail++; Write-Host ("  [남음] " + (Short $path) + " — " + $_.Exception.Message) }
+    $fails = Remove-TreeSafe $path
+    if ($fails -eq 0) { $script:Removed++; Write-Host ("  지움: " + (Short $path)) }
+    else { $script:KeptFail++; Write-Host ("  [남음] " + (Short $path) + " - " + $fails + "가지를 지우지 못했습니다.") }
 }
 
 function Get-ClaudeCmd {
@@ -585,6 +825,18 @@ function Invoke-Purge {
     Write-Host ''
     Write-Host '=== 지웁니다 ==='
 
+    # ★남겨야 할 자리의 실경로를 **먼저 한 번에** 푼다. 하나라도 못 풀면 이 실행은 파일을 지우지 않는다.
+    Initialize-PreserveCanon
+    if ($script:PreserveCanonFail.Count -gt 0) {
+        Write-Host ('  [남음] 남겨야 할 자리 ' + $script:PreserveCanonFail.Count + '곳의 실제 경로를 확인하지 못했습니다 - 이번에는 파일을 지우지 않습니다.')
+        foreach ($bad in $script:PreserveCanonFail) {
+            Write-Host ('         확인 못한 자리: ' + (Short $bad.path))
+            Write-Host ('           까닭: ' + $bad.why)
+        }
+        Write-Host '         무엇을 남겨야 하는지 모르는 채로 지우면 참가 열쇠를 잃을 수 있습니다.'
+        Write-Host '         그 자리를 살펴보신 뒤(링크가 끊겼거나 권한이 없을 수 있습니다) 같은 줄을 다시 돌려 주십시오.'
+    }
+
     # ★순서가 중요하다 — 등록을 떼는 명령과 로그아웃 명령이 지울 대상 **안에** 들어 있다.
     Invoke-PurgeLoginFirst
 
@@ -730,8 +982,30 @@ function Invoke-Purge {
     #   않으면 「옮겼습니다」라고 말한 뒤 원본을 지웠다 - 폴더만 생기고 알맹이가 반만 와도 그랬고,
     #   ★다음 실행은 「대상이 이미 있다」며 이전을 건너뛰어 반쪽이 영구히 고착된다.
     #   대조에 실패하면 원본(.cys)을 지우지 않는다(fail-closed). 사람 손 한 번이 유실보다 싸다.
+    #   🔴🔴**「대상이 있다」로 이전을 마쳤다고 판정하지 않는다**(4R 지적 채택 2026-09-09).
+    #   앞 판의 조건은 `-not (Test-Path $AgoraSkill)` 였다. 그래서 지난 실행이 **반쪽 대상을 남긴 채**
+    #   (치우기가 잠김·권한으로 실패해서) 끝났으면, 다음 실행은 그 반쪽을 「이미 있다」로 읽고
+    #   이 분기를 통째로 건너뛰어 $agoraMigrateOk 기본값 $true 로 .cys 원본을 지웠다.
+    #   ⇒ 반쪽 고착을 막으려던 장치가 **재실행에서 스스로 그 고착을 완성**하고 있었다.
+    #   ★판정 기준을 「있다」에서 **Test-TreeSame 통과**로 옮긴다 - 이전은 내용이 같을 때만 끝난 것이다.
     $agoraMigrateOk = $true
-    if ((Test-Path -LiteralPath $AgoraSkillInCys) -and -not (Test-Path -LiteralPath $AgoraSkill)) {
+    if ((Test-Path -LiteralPath $AgoraSkillInCys) -and (Test-Path -LiteralPath $AgoraSkill)) {
+        if (Test-TreeSame $AgoraSkillInCys $AgoraSkill) {
+            # 이미 같은 것이 밖에 있다(멱등) - 덮지 않는다.
+            Write-Host ('  이미 있음: 토론장 안내가 ' + (Short $AgoraSkill) + ' 에 그대로 있습니다(내용까지 대조했습니다).')
+        } else {
+            # 있는데 내용이 다르다 = 지난 실행의 반쪽이거나, 사람이 손수 고쳐 둔 것이다.
+            #   어느 쪽인지 우리는 모른다 ⇒ 덮지도 지우지도 않고 **원본을 남긴다**(fail-closed).
+            $agoraMigrateOk = $false
+            $script:KeptFail++
+            Write-Host ('  [남음] ' + (Short $AgoraSkill) + ' 에 있는 토론장 안내가 ' + (Short $AgoraSkillInCys) + ' 와 달라')
+            Write-Host ('         ' + (Short $CysHome) + ' 를 지우지 않았습니다. 지웠다면 안 옮겨진 쪽이 사라졌을 것입니다.')
+            Write-Host ('         까닭: ' + $script:TreeSameWhy)
+            Write-Host '         지난번에 옮기다 만 것일 수도, 손수 고쳐 두신 것일 수도 있어 저희가 고르지 않습니다.'
+            Write-Host ('         ' + (Short $AgoraSkill) + ' 를 손으로 정리하신 뒤 같은 줄을 다시 돌려 주십시오.')
+            Write-Host '         참가 열쇠·이름은 어느 경우에도 그대로 있습니다.'
+        }
+    } elseif ((Test-Path -LiteralPath $AgoraSkillInCys) -and -not (Test-Path -LiteralPath $AgoraSkill)) {
         $copied = $false
         $why = ''
         try {
@@ -760,9 +1034,13 @@ function Invoke-Purge {
             if ($why) { Write-Host ("         까닭: " + $why) }
             Write-Host '         지웠다면 그 안내가 영영 사라졌을 것입니다. 참가 열쇠·이름은 그대로 있습니다.'
             Write-Host ("         " + (Short $AgoraSkillInCys) + " 를 손으로 " + (Short $AgoraSkill) + " 에 옮기신 뒤 같은 줄을 다시 돌려 주십시오.")
-            # 반쪽만 생긴 대상은 치운다 - 그대로 두면 다음 실행이 「이미 있다」며 건너뛴다(고착).
+            # 반쪽만 생긴 대상은 치운다 - 치우기가 실패해도 이제는 안전하다(다음 실행이 위 「다르다」 갈래로
+            #   들어가 원본을 남긴다). 앞 판은 이 치우기가 실패하면 다음 실행이 원본을 지웠다.
             if ((Test-Path -LiteralPath $AgoraSkill) -and -not (Test-TreeSame $AgoraSkillInCys $AgoraSkill)) {
-                Remove-Item -LiteralPath $AgoraSkill -Recurse -Force -ErrorAction SilentlyContinue
+                [void](Remove-TreeSafe $AgoraSkill)   # 여기도 `-Recurse` 를 쓰지 않는다(같은 까닭)
+                if (Test-Path -LiteralPath $AgoraSkill) {
+                    Write-Host ('         (옮기다 만 ' + (Short $AgoraSkill) + ' 도 치우지 못했습니다 - 그 자리를 손으로 정리해 주십시오.)')
+                }
             }
         }
     }
