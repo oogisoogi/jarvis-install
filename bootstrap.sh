@@ -33,6 +33,10 @@ REPORT_HEAD="[자비스] 환경 보고 v0"      # 첫 응답의 고정 첫 줄 �
 # ── 핀 (외부 URL은 이 두 줄이 전부다) ─────────────────────────────
 CLAUDE_INSTALL_URL="https://claude.ai/install.sh"
 CYS_SITE_URL="https://www.cysinsight.com/"   # 공식 안내 문서가 쓰는 주소 문자열을 그대로 따른다
+# 우리 자리(배포 한 줄이 가리키는 곳). 새 바깥 주소가 아니라 **이미 쓰고 있던 우리 주소**를 상수로 올린 것이다 —
+# 연결이 끊겼을 때 「우리 쪽인가 바깥인가」를 가르려면 우리 주소를 물어볼 수 있어야 한다.
+JARVIS_SITE_URL="https://jarvis.godmeyou.kr/install/"
+
 
 # ── 자리 ──────────────────────────────────────────────────────────
 # 점 없는 이름을 쓴다(2026-09-04 개정 · 이유 둘):
@@ -55,6 +59,13 @@ CYS_DOWNLOAD_URL="${CYS_DOWNLOAD_DIR}${CYS_MAC_FILE}"
 LOGIN_POLL_INTERVAL=3      # 초
 LOGIN_POLL_TIMEOUT=600     # 초 (10분)
 
+# ── 멈추지 않는 설치기 (2026-09-09) ───────────────────────────────
+#   못 나가는 단계에서 침묵하거나 즉시 실패하지 않는다. 원인을 갈라 말하고, 기다리고, 이어간다.
+#   상한을 넘기면 **정직하게** 멈추고 다음에 할 일을 남긴다(조용한 성공 흉내 금지).
+NET_WAIT_TIMEOUT=1800      # 초 (30분) — 이 한 줄이 기다림의 상한이다
+NET_WAIT_INTERVAL=30       # 초 — 다시 해 보는 간격이자 화면에 한 줄 적는 간격
+HELP_CODE_URL="https://jarvis.godmeyou.kr/help/"   # 코드별 안내 자리(게시는 사이트 쪽)
+
 MODE="full"
 for a in "$@"; do
   case "$a" in
@@ -64,8 +75,6 @@ for a in "$@"; do
     *) echo "모르는 인자: $a" >&2; exit 2 ;;
   esac
 done
-
-mkdir -p "$JARVIS_HOME" || { echo "로그 자리를 만들지 못했습니다: $JARVIS_HOME" >&2; exit 3; }
 
 log() { printf '%s %s\n' "$(date '+%Y-%m-%dT%H:%M:%S%z')" "$*" >> "$LOG_FILE"; }
 
@@ -122,10 +131,137 @@ cys_version_line() {
   fi
 }
 
+# ── 진단 코드 (J-<축>-<두 자리>) ──────────────────────────────────
+# ★같은 문자열이 세 자리에 남아야 한다 — 화면 · 환경 보고 · 기록 파일.
+#   사람은 화면에서 코드를 읽어 사이트에서 찾고, 우리는 파일에서 같은 코드를 본다.
+#   자리마다 다른 이름을 쓰면 그 셋을 맞춰 보는 일이 사람 몫이 된다.
+J_CODE=""       # 마지막으로 남긴 코드(환경 보고가 이 값을 적는다)
+jcode() {       # jcode <코드> <한 줄 설명>
+  J_CODE="$1"
+  say "     진단 코드: $1 — $2"
+  say "     이 코드로 찾아보실 수 있습니다: ${HELP_CODE_URL}$1"
+  log "jcode $1 $2"
+}
+
+# ── 연결 원인 판별 (3프로브) ──────────────────────────────────────
+# ⛔「서버 사정」 한 문장으로 뭉뚱그리지 않는다 — 그러면 백신이 파일을 붙든 것(J-AV)과 섞여
+#   **거짓 안내**가 된다(2026-09-09 3호 실기의 교훈). 셋을 갈라 묻고, 못 가르면 못 갈랐다고 적는다.
+#   none   = 인터넷 자체가 안 나간다        · ours    = 우리 서버만 안 답한다
+#   theirs = 바깥(클로드·GitHub)만 안 답한다  · fine    = 셋 다 답한다(연결은 되는데 이 단계만 안 된다)
+#   unknown = 물어볼 도구가 없어 못 가름
+# ⚠셋 다 답하는데 단계가 안 나가는 경우를 「연결 문제」로 적으면 안 된다 — 그건 다른 병이다
+#   (백신이 붙들었거나 그 단계 고유의 사정). 그때는 **연결은 된다**고 사실대로 말한다.
+# 🔴순서가 아니라 **종합**으로 판단한다(agy R1 [2] 지적 채택 2026-09-09).
+#   앞 판은 1.1.1.1 을 먼저 물어 실패하면 곧바로 「인터넷 없음」이라고 했다. 그런데 회사·학교 망은
+#   **그 주소만 막고 프록시로 웹은 되게** 하는 일이 흔하다 ⇒ 인터넷이 멀쩡한 사람에게 30분 동안
+#   「인터넷이 없습니다」라고 우기게 된다. 진짜 원인은 가려지고 사람은 설치기를 믿지 않게 된다.
+#   ⇒ 목적지 둘(우리·바깥)을 먼저 믿는다. 둘 다 안 되면 그때만 중립 주소로 「망 자체인가」를 묻는다.
+net_cause() {
+  local probe ours theirs
+  command -v curl >/dev/null 2>&1 || { printf 'unknown'; return 0; }
+  probe="curl -sS -m 6 -o /dev/null -I"
+  ours=1; theirs=1
+  $probe "$JARVIS_SITE_URL"   >/dev/null 2>&1 || ours=0
+  $probe "$CLAUDE_INSTALL_URL" >/dev/null 2>&1 || theirs=0
+  if [ "$ours" = "1" ] && [ "$theirs" = "1" ]; then printf 'fine';   return 0; fi
+  if [ "$ours" = "1" ] && [ "$theirs" = "0" ]; then printf 'theirs'; return 0; fi
+  if [ "$ours" = "0" ] && [ "$theirs" = "1" ]; then printf 'ours';   return 0; fi
+  # 둘 다 안 된다 — 망 자체가 없는가, 아니면 두 곳이 함께 안 되는 드문 경우인가.
+  if $probe "https://1.1.1.1" >/dev/null 2>&1 || $probe "https://8.8.8.8" >/dev/null 2>&1; then
+    printf 'unknown'; return 0
+  fi
+  printf 'none'
+}
+
+net_cause_words() {   # 원인 → 사람에게 하는 말 조각
+  case "$1" in
+    none)   printf '인터넷 연결이 없어서' ;;
+    ours)   printf '우리 서버가 응답하지 않아서' ;;
+    theirs) printf '설치 파일을 받는 바깥 서버가 응답하지 않아서' ;;
+    fine)   printf '연결은 되는데 이 단계가 진행되지 않아서' ;;
+    *)      printf '연결 상태를 확인하지 못해서' ;;
+  esac
+}
+
+net_cause_code() {    # 원인 → 진단 코드
+  case "$1" in
+    none)   printf 'J-NET-01' ;;
+    ours)   printf 'J-NET-02' ;;
+    theirs) printf 'J-NET-03' ;;
+    *)      printf 'J-UNK-00' ;;
+  esac
+}
+
+# ── 연결 대기 (모든 연결 단계가 이 한 자리를 쓴다) ────────────────
+#   $1 = 단계 표시(예: [5/11]) · $2 = 다시 해 볼 명령(문자열로 받아 그대로 실행한다)
+#   rc 0 = 성공(이어간다) · rc 1 = 상한 초과(정직 실패 — 부르는 쪽이 코드를 남기고 멈춘다)
+# ⚠기다리는 동안 **말을 한다.** 침묵은 사람에게 「멈췄다」로 읽히고, 그때 창을 닫는다.
+wait_for_connection() {
+  local tag="$1" cmd="$2" waited=0 cause words
+  while [ "$waited" -lt "$NET_WAIT_TIMEOUT" ]; do
+    cause="$(net_cause)"
+    words="$(net_cause_words "$cause")"
+    say "$tag 현재 ${words} 진행할 수 없습니다. 다시 연결이 되면 이어서 진행하겠습니다."
+    say "     창을 닫지 말고 기다려 주십시오. 다른 작업을 하셔도 괜찮습니다."
+    say "     ($(( waited / 60 ))분 지남 · 최대 $(( NET_WAIT_TIMEOUT / 60 ))분 · ${NET_WAIT_INTERVAL}초마다 다시 해 봅니다)"
+    sleep "$NET_WAIT_INTERVAL"
+    waited=$(( waited + NET_WAIT_INTERVAL ))
+    if eval "$cmd"; then return 0; fi
+  done
+  cause="$(net_cause)"
+  say "$tag $(( NET_WAIT_TIMEOUT / 60 ))분을 기다렸지만 연결되지 않았습니다."
+  jcode "$(net_cause_code "$cause")" "$(net_cause_words "$cause") 진행하지 못했습니다"
+  return 1
+}
+
+# ── 끝맺음 (어느 끝에서도 「다음에 할 일」이 있다) ────────────────
+# ★이것을 함수 호출로 두지 않고 **트랩**에 매단 까닭: 끝나는 자리가 여럿이고(성공·실패·중단·
+#   감지만·미리보기), 사람이 새 종료 자리를 만들 때마다 이 줄을 기억해서 붙여야 한다면
+#   언젠가 빠진다. 트랩은 **기억이 아니라 구조**다.
+CLOSING_DONE=0
+closing_note() {
+  [ "$CLOSING_DONE" = "1" ] && return 0
+  CLOSING_DONE=1
+  printf '%s\n' ""
+  printf '%s\n' "다음에 할 일: ${NEXT_STEP:-같은 한 줄을 다시 돌리시면 끝난 단계는 건너뛰고 이어서 갑니다.}"
+  if [ -n "$J_CODE" ]; then
+    printf '%s\n' "  진단 코드: $J_CODE  (${HELP_CODE_URL}${J_CODE})"
+    # 🔴화면과 보고서가 갈리지 않게 한다(agy R1 [4] 지적 채택 2026-09-09) — 단계가 코드를 남기고 그 자리에서
+    #   끝나면 보고서는 그 전에 쓰인 것이라 **옛 코드나 빈칸**이 남는다. 그 둘이 다르면 사람이 읽어 주는 코드와
+    #   우리가 받는 파일이 어긋나 소통이 꼬인다. ⇒ 끝나기 직전에 보고서의 그 줄만 지금 값으로 맞춘다.
+    if [ -f "$REPORT_FILE" ]; then
+      grep -v '^- 진단 코드: ' "$REPORT_FILE" > "$REPORT_FILE.tmp" 2>/dev/null &&
+        printf '%s\n' "- 진단 코드: **$J_CODE** (${HELP_CODE_URL}${J_CODE})" >> "$REPORT_FILE.tmp" &&
+        mv "$REPORT_FILE.tmp" "$REPORT_FILE"
+      rm -f "$REPORT_FILE.tmp"
+    fi
+  fi
+  # ⚠없는 파일을 보내 달라고 하지 않는다 — 자리 자체를 못 만든 끝(J-PERM-01)에서는 그 두 줄이 거짓이다.
+  if [ -f "$REPORT_FILE" ] || [ -f "$LOG_FILE" ]; then
+    printf '%s\n' "  막히면 이 두 파일을 보내 주십시오: $(redact "$REPORT_FILE") · $(redact "$LOG_FILE")"
+    printf '%s\n' "  여는 법: open $(redact "$JARVIS_HOME")"
+  else
+    printf '%s\n' "  기록 파일은 아직 만들어지지 않았습니다 — 이 화면을 사진으로 남겨 주십시오."
+  fi
+}
+NEXT_STEP=""    # 단계가 자기 자리에서 더 정확한 한 줄을 넣을 수 있다
+
 # ── 감지 행 적재 ──────────────────────────────────────────────────
 # 한 행 = 번호 \t 무엇 \t 값 \t enum \t 비고   (bash 3.2 이므로 연관배열을 안 쓴다)
 ROWS_FILE="$(mktemp -t jarvis-rows)"
-trap 'rm -f "$ROWS_FILE"' EXIT
+trap 'closing_note; rm -f "$ROWS_FILE"' EXIT
+
+# 🔴자리 만들기를 **끝맺음 보증 안쪽**으로 옮겼다(agy R1 [3] 지적 채택 2026-09-09).
+#   앞 판은 이 실패가 트랩 등록보다 먼저 나서, 가장 도움이 필요한 순간(권한·공간·백신으로 자리를 못 만든
+#   순간)에 「다음에 할 일」이 한 줄도 안 나오고 창이 차갑게 닫혔다.
+#   ⚠까닭을 「권한」 하나로 단정하지 않는다 — 공간이 꽉 찼거나 백신이 폴더 생성을 막아도 여기서 실패한다.
+if ! mkdir -p "$JARVIS_HOME" 2>/dev/null; then
+  echo "자리를 만들지 못했습니다: $JARVIS_HOME" >&2
+  echo "     진단 코드: J-PERM-01 — 파일이나 폴더를 쓸 권한이 없습니다(공간 부족·백신 차단도 같은 모양입니다)" >&2
+  J_CODE="J-PERM-01"
+  NEXT_STEP="회사·학교에서 관리하는 컴퓨터면 담당자에게 문의해 주십시오. 개인 컴퓨터면 저장 공간과 백신 알림을 확인해 주십시오."
+  exit 3
+fi
 
 row() { printf '%s\t%s\t%s\t%s\t%s\n' "$1" "$2" "$3" "$4" "$5" >> "$ROWS_FILE"; }
 
@@ -316,6 +452,8 @@ write_report() {
     printf '%s\n' "- 언제: $(date '+%Y-%m-%dT%H:%M:%S%z')"
     printf '%s\n' "- 부트스트랩 판본: $BOOTSTRAP_VERSION · 모드: $MODE"
     printf '%s\n' "- 종합 판정: **$verdict** (ok $ok · blocked $blocked · failed $failed · unknown $unknown / 전 ${total}행)"
+    # 화면·기록 파일과 **같은 문자열**을 여기에도 남긴다 — 셋을 맞춰 보는 일이 사람 몫이 되면 안 된다.
+    [ -n "$J_CODE" ] && printf '%s\n' "- 진단 코드: **$J_CODE** (${HELP_CODE_URL}${J_CODE})"
     printf '%s\n\n' "  - \`unknown\` 은 「완료됨」으로 세지 않는다."
     printf '\n## 지금 상태 → 다음 행동\n'
     if [ "$MODE" = "dry" ]; then
@@ -397,10 +535,16 @@ step_install_claude() {
   fi
   say "[2/11] 클로드 코드를 설치합니다. 글자가 주르륵 올라갑니다 — 정상입니다."
   local rc=0
-  ( set -o pipefail; curl -fsSL "$CLAUDE_INSTALL_URL" | bash ) || rc=$?
+  ( set -o pipefail; curl -fsSL --max-time 600 "$CLAUDE_INSTALL_URL" | bash ) || rc=$?
   if [ "$rc" -ne 0 ]; then
-    say "[2/11] 실패 (종료 코드 $rc). 인터넷 연결을 확인해 주십시오. 같은 한 줄을 다시 돌리면 여기서부터 이어서 갑니다."
-    return "$rc"
+    # 여기서 곧바로 끝내지 않는다 — 못 나가는 까닭이 잠깐일 수 있다. 원인을 갈라 말하고 기다린다.
+    say "[2/11] 설치기를 받지 못했습니다 (종료 코드 $rc)."
+    if wait_for_connection "[2/11]" '( set -o pipefail; curl -fsSL --max-time 600 "$CLAUDE_INSTALL_URL" | bash )'; then
+      rc=0
+    else
+      NEXT_STEP="연결이 된 뒤 같은 한 줄을 다시 돌려 주십시오. 끝난 단계는 건너뛰고 이어서 갑니다."
+      return 4
+    fi
   fi
   #   깨끗한 기계에서 매번 rc 4 로 끝나 「한 줄」 약속이 「한 줄 · 새 창 · 한 줄」이 된다.
   case ":$PATH:" in
@@ -411,7 +555,9 @@ step_install_claude() {
   seed_local_bin_path
   # 실행 결과 검사 = 설치기의 종료 코드가 아니라 명령이 답하는가
   if ! claude --version >/dev/null 2>&1; then
-    say "[2/11] 설치기는 끝났는데 claude 명령이 아직 안 잡힙니다. 창을 새로 열고 다시 돌려 주십시오."
+    say "[2/11] 설치기는 끝났는데 claude 명령이 아직 안 잡힙니다."
+    jcode "J-PATH-01" "깔렸는데 이 창에서 명령을 찾지 못합니다"
+    NEXT_STEP="창을 새로 열고 같은 한 줄을 다시 돌려 주십시오."
     return 4
   fi
   #   새로 깐 것이 PATH 에서 이겨야 한다. 위에서 `$HOME/.local/bin` 을 앞에 붙였으므로 이기는 것이
@@ -423,7 +569,9 @@ step_install_claude() {
        return 4 ;;
   esac
   if ! claude_has_auth_cmd; then
-    say "[2/11] 설치는 끝났는데 아직 낡은 판본이 잡힙니다. 창을 새로 열고 다시 돌려 주십시오."
+    say "[2/11] 설치는 끝났는데 아직 낡은 판본이 잡힙니다."
+    jcode "J-VER-01" "낡은 판본이 먼저 잡혀 로그인 명령을 모릅니다"
+    NEXT_STEP="창을 새로 열고 같은 한 줄을 다시 돌려 주십시오. 판올림부터 이어서 갑니다."
     return 4
   fi
   S1_CLAUDE_OK=1
@@ -473,7 +621,9 @@ step_login() {
     sleep "$LOGIN_POLL_INTERVAL"
     waited=$((waited + LOGIN_POLL_INTERVAL))
   done
-  say "[3/11] $((LOGIN_POLL_TIMEOUT / 60))분 동안 로그인이 확인되지 않았습니다. 같은 한 줄을 다시 돌리면 여기서부터 이어서 갑니다."
+  say "[3/11] $((LOGIN_POLL_TIMEOUT / 60))분 동안 로그인이 확인되지 않았습니다."
+  jcode "J-LOGIN-01" "로그인 승인이 시간 안에 끝나지 않았습니다"
+  NEXT_STEP="브라우저에서 승인을 누르신 뒤 같은 한 줄을 다시 돌려 주십시오."
   return 5
 }
 
@@ -633,11 +783,35 @@ step_download_cys() {
     say "[5/11] (dry-run) 받지 않았습니다. 받을 곳 = $CYS_DOWNLOAD_URL"
     return 0
   fi
+  # 260MB 를 받기 전에 자리가 있는지 본다. 받다 중간에 꽉 차면 「받다 끊긴 파일」로만 보여
+  # 사람은 망 문제로 오해한다 — 미리 갈라 말한다.
+  local freemb
+  freemb="$(df -m "$DL_DIR" 2>/dev/null | awk 'NR==2 {print $4}')"
+  if [ -n "$freemb" ] && [ "$freemb" -lt 3072 ] 2>/dev/null; then
+    say "[5/11] 저장 공간이 부족합니다 (남은 자리 약 ${freemb}MB · 3GB 이상을 권합니다)."
+    jcode "J-DISK-01" "저장 공간이 부족합니다"
+    NEXT_STEP="공간을 3GB 이상 비우신 뒤 같은 한 줄을 다시 돌려 주십시오."
+    return 5
+  fi
   for try in 1 2; do
     rm -f "$dst"
     say "[5/11] cys 설치 파일을 받습니다 (약 260MB · 잠시 걸립니다)."
-    if ! curl -fsSL "$CYS_DOWNLOAD_URL" -o "$dst"; then
+    if ! curl -fsSL --max-time 900 "$CYS_DOWNLOAD_URL" -o "$dst"; then
       say "[5/11] 받지 못했습니다."
+      # 두 번 해 보고 포기하지 않는다. 연결이 돌아오면 이어간다(같은 자리·같은 문장).
+      # ⚠다시 해 보는 명령에도 상한이 있어야 한다 — 없으면 curl 이 응답 없는 연결에 매달려
+      #   30분 상한이 있는 바깥 고리로 **돌아오지 못한다**(agy R1 [1] 지적 채택 2026-09-09).
+      if ! wait_for_connection "[5/11]" 'curl -fsSL --max-time 900 "$CYS_DOWNLOAD_URL" -o "$dst"'; then
+        NEXT_STEP="연결이 된 뒤 같은 한 줄을 다시 돌려 주십시오. 받은 데까지는 건너뛰고 이어서 갑니다."
+        rm -f "$dst"
+        return 5
+      fi
+    fi
+    if [ ! -f "$dst" ]; then
+      # 다 받았는데 파일이 없다 = 백신이 그 자리에서 격리했을 때 나는 모양이다(윈도우판과 같은 갈래).
+      say "[5/11] 받은 파일이 사라졌습니다 — 백신이 격리했을 수 있습니다."
+      jcode "J-AV-02" "받은 설치 파일이 사라졌습니다"
+      say "     백신 알림이 떴다면 그 화면의 이름, 대상 파일, 조치(차단·격리·삭제) 세 가지를 알려 주십시오."
       continue
     fi
     got="$(wc -c < "$dst" | tr -d ' ')"
@@ -1304,6 +1478,8 @@ write_report
 
 if [ "$MODE" = "detect" ]; then
   say "감지만 하고 끝냅니다."
+  # 끝맺음 한 줄은 그 끝에 맞아야 한다 — 「살펴보기만 한 끝」에 「이어서 갑니다」는 맞지 않는다.
+  NEXT_STEP="실제로 설치하시려면 --detect-only 없이 같은 한 줄을 돌려 주십시오."
   exit 0
 fi
 

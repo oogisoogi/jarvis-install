@@ -78,6 +78,14 @@ $InstallGuiWaitMs = 900000   # 설치 창을 띄웠을 때 (15분 · 사람이 �
 #   정작 눌러야 할 창은 다른 곳에 떠 있었다. ⇒ 기다리는 동안 말을 하고, 끝이 있는 기다림으로 바꾼다.
 $ClaudeInstallWaitMs  = 600000   # 클로드 설치 상한 (10분 · 넘으면 조용히 다음으로 가지 않는다)
 $InstallNoteEverySec  = 30       # 기다리는 동안 몇 초마다 한 줄을 적는가
+# ── 멈추지 않는 설치기 (2026-09-09) ───────────────────────────────
+#   못 나가는 단계에서 침묵하거나 즉시 실패하지 않는다. 원인을 갈라 말하고, 기다리고, 이어간다.
+$NetWaitTimeoutSec   = 1800      # 30분 — 이 한 줄이 기다림의 상한이다
+$NetWaitIntervalSec  = 30        # 다시 해 보는 간격이자 화면에 한 줄 적는 간격
+$HelpCodeUrl         = 'https://jarvis.godmeyou.kr/help/'
+# 우리 자리(배포 한 줄이 가리키는 곳). 새 바깥 주소가 아니라 이미 쓰던 우리 주소를 상수로 올린 것이다 —
+# 연결이 끊겼을 때 「우리 쪽인가 바깥인가」를 가르려면 우리 주소를 물어볼 수 있어야 한다.
+$JarvisSiteUrl       = 'https://jarvis.godmeyou.kr/install/'
 
 $Mode = if ($DetectOnly) { 'detect' } elseif ($DryRun) { 'dry' } else { 'full' }
 
@@ -88,7 +96,6 @@ try { [Console]::OutputEncoding = [System.Text.Encoding]::UTF8 } catch { }
 # 기록 파일로 옮길 때 쓰는 것은 이쪽이다. 한쪽만 맞추면 화면은 멀쩡한데 기록만 깨진다.
 $OutputEncoding = [System.Text.Encoding]::UTF8
 
-New-Item -ItemType Directory -Force -Path $JarvisHome | Out-Null
 
 # 백신이 PowerShell 자체를 종료시키면 이 스크립트는 한마디도 남기지 못하고 사라진다(2026-09-05 실측).
 # 그때 유일하게 남는 것이 기록 파일의 마지막 줄이다 — 그래서 이번 실행이 한 줄이라도 적기 전에 떠 둔다.
@@ -160,9 +167,128 @@ function Show-PrevRunNote {
     if (-not $script:PrevTail) { return }
     if ($script:PrevTail -match '\[9/9\]|끝냅니다') { return }
     Say '지난번 실행이 끝을 알리지 않고 멈춘 자리가 있습니다. 그때 마지막으로 적힌 줄입니다:'
+    Write-JCode 'J-AV-03' '지난 실행이 끝을 알리지 않고 멈췄습니다(창이 갑자기 닫혔을 수 있습니다)'
     Say "       $script:PrevTail"
     Say '     창이 갑자기 닫힌 것이었다면 백신이 PowerShell 을 종료한 것일 수 있습니다.'
     Say '     이어서 진행합니다 — 이미 끝난 단계는 다시 하지 않습니다.'
+}
+
+# ── 진단 코드 (J-<축>-<두 자리>) ──────────────────────────────────
+# ★같은 문자열이 세 자리에 남아야 한다 — 화면 · 환경 보고 · 기록 파일.
+#   자리마다 다른 이름을 쓰면 그 셋을 맞춰 보는 일이 사람 몫이 된다.
+$script:JCode = ''
+$script:NextStep = ''
+function Write-JCode($code, $desc) {
+    $script:JCode = $code
+    Say ("     진단 코드: " + $code + " — " + $desc)
+    Say ("     이 코드로 찾아보실 수 있습니다: " + $HelpCodeUrl + $code)
+    Write-Log ("jcode " + $code + " " + $desc)
+}
+
+# ── 연결 원인 판별 (3프로브) ──────────────────────────────────────
+# ⛔「서버 사정」 한 문장으로 뭉뚱그리지 않는다 — 백신이 파일을 붙든 것(J-AV)과 섞여 거짓 안내가 된다
+#   (2026-09-09 3호 실기의 교훈). 셋을 갈라 묻고, 셋 다 답하면 「연결은 된다」고 사실대로 말한다.
+# 🔴러너 로그로 확정한 결함(2026-09-09 run 34292566443 · 진단 커밋 e0908ef)
+#   묻는 것은 「서버가 **답하는가**」이지 「서버가 우리를 **좋아하는가**」가 아니다.
+#   러너에서 우리 주소는 **403** 을 돌려줬다(TCP 443 = True · 86ms · pwsh 7 과 5.1 둘 다 동일 ·
+#   curl.exe 도 403 rc 0). 서버는 분명히 답했다. 그런데 앞 판은 2xx 가 아닌 것을 전부 예외로 받아
+#   「응답 없음」으로 읽었고 ⇒ 멀쩡한 서버에 대고 **「우리 서버가 응답하지 않아서」**라고 말했다.
+#   그것이 바로 이 티켓이 없애려던 거짓 안내다(하네스가 「막기 전인데 ours」로 잡아냈다).
+#   ⚠맥판은 처음부터 이 성질을 갖고 있었다 — `curl -sS -I` 는 -f 를 안 쓰므로 403 이든 404 든 rc 0 이다.
+#     두 OS 가 같은 뜻을 갖게 맞춘 것이지 새 규칙을 만든 것이 아니다.
+function Test-UrlReachable($url) {
+    try {
+        [void](Invoke-WebRequest -Uri $url -Method Head -TimeoutSec 6 -UseBasicParsing -ErrorAction Stop)
+        return $true
+    } catch {
+        # 상태코드가 딸려 온 예외 = 서버가 답한 것이다(403·404·405 …). 그것은 「닿았다」로 센다.
+        try { if ($_.Exception.Response) { return $true } } catch { }
+        return $false
+    }
+}
+# 🔴순서가 아니라 **종합**으로 판단한다(agy R1 [2] 지적 채택 2026-09-09).
+#   회사·학교 망은 1.1.1.1 같은 주소만 막고 프록시로 웹은 되게 하는 일이 흔하다 ⇒ 앞 판은 인터넷이
+#   멀쩡한 사람에게 30분 동안 「인터넷이 없습니다」라고 우겼을 것이다. 목적지 둘을 먼저 믿는다.
+function Get-NetCause {
+    $ours   = Test-UrlReachable $JarvisSiteUrl
+    $theirs = Test-UrlReachable $ClaudeInstallUrl
+    if ($ours -and $theirs)        { return 'fine' }
+    if ($ours -and -not $theirs)   { return 'theirs' }
+    if ($theirs -and -not $ours)   { return 'ours' }
+    if ((Test-UrlReachable 'https://1.1.1.1') -or (Test-UrlReachable 'https://8.8.8.8')) { return 'unknown' }
+    return 'none'
+}
+function Get-NetCauseWords($cause) {
+    switch ($cause) {
+        'none'   { return '인터넷 연결이 없어서' }
+        'ours'   { return '우리 서버가 응답하지 않아서' }
+        'theirs' { return '설치 파일을 받는 바깥 서버가 응답하지 않아서' }
+        'fine'   { return '연결은 되는데 이 단계가 진행되지 않아서' }
+        default  { return '연결 상태를 확인하지 못해서' }
+    }
+}
+function Get-NetCauseCode($cause) {
+    switch ($cause) {
+        'none'   { return 'J-NET-01' }
+        'ours'   { return 'J-NET-02' }
+        'theirs' { return 'J-NET-03' }
+        default  { return 'J-UNK-00' }
+    }
+}
+
+# ── 연결 대기 (모든 연결 단계가 이 한 자리를 쓴다) ────────────────
+#   $Tag = 단계 표시 · $Try = 다시 해 볼 일(성공하면 $true 를 돌려주는 스크립트 블록)
+#   $true = 성공(이어간다) · $false = 상한 초과(부르는 쪽이 정직하게 멈춘다)
+# ⚠기다리는 동안 말을 한다. 침묵은 「멈췄다」로 읽히고, 그때 사람이 창을 닫는다.
+function Wait-ForConnection($Tag, [scriptblock]$Try) {
+    $waited = 0
+    while ($waited -lt $NetWaitTimeoutSec) {
+        $cause = Get-NetCause
+        Say ($Tag + ' 현재 ' + (Get-NetCauseWords $cause) + ' 진행할 수 없습니다. 다시 연결이 되면 이어서 진행하겠습니다.')
+        Say '     창을 닫지 말고 기다려 주십시오. 다른 작업을 하셔도 괜찮습니다.'
+        Say ('     (' + [int]($waited / 60) + '분 지남 · 최대 ' + [int]($NetWaitTimeoutSec / 60) + '분 · ' + $NetWaitIntervalSec + '초마다 다시 해 봅니다)')
+        Start-Sleep -Seconds $NetWaitIntervalSec
+        $waited += $NetWaitIntervalSec
+        $ok = $false
+        try { $ok = [bool](& $Try) } catch { $ok = $false }
+        if ($ok) { return $true }
+    }
+    $cause = Get-NetCause
+    Say ($Tag + ' ' + [int]($NetWaitTimeoutSec / 60) + '분을 기다렸지만 연결되지 않았습니다.')
+    Write-JCode (Get-NetCauseCode $cause) ((Get-NetCauseWords $cause) + ' 진행하지 못했습니다')
+    return $false
+}
+
+# ── 끝맺음 (어느 끝에서도 「다음에 할 일」이 있다) ────────────────
+# ⚠맥판은 이 줄을 EXIT 트랩에 매달았다(끝나는 자리가 여럿이라 기억에 맡기지 않기 위해서다).
+#   PowerShell 에는 그 트랩이 없으므로 본문을 try/finally 로 감싸 **같은 성질**을 만든다 —
+#   모양은 다르고 보증은 같다. 어느 경로로 끝나도 이 블록을 지난다.
+$script:ClosingDone = $false
+function Write-ClosingNote {
+    if ($script:ClosingDone) { return }
+    $script:ClosingDone = $true
+    $next = if ($script:NextStep) { $script:NextStep } else { '같은 한 줄을 다시 돌리시면 끝난 단계는 건너뛰고 이어서 갑니다.' }
+    Say ''
+    Say ('다음에 할 일: ' + $next)
+    if ($script:JCode) {
+        Say ('  진단 코드: ' + $script:JCode + '  (' + $HelpCodeUrl + $script:JCode + ')')
+        # 🔴화면과 보고서가 갈리지 않게 한다(agy R1 [4] 지적 채택) — 단계가 코드를 남기고 그 자리에서 끝나면
+        #   보고서에는 옛 코드나 빈칸이 남는다. 끝나기 직전에 그 줄만 지금 값으로 맞춘다.
+        if (Test-Path $ReportFile) {
+            try {
+                $keep = @(Get-Content $ReportFile -Encoding UTF8 -ErrorAction Stop | Where-Object { $_ -notmatch '^- 진단 코드: ' })
+                $keep += ('- 진단 코드: **' + $script:JCode + '** (' + $HelpCodeUrl + $script:JCode + ')')
+                Write-TextNoBom $ReportFile (($keep -join "`r`n") + "`r`n")
+            } catch { }
+        }
+    }
+    # ⚠없는 파일을 보내 달라고 하지 않는다 — 자리 자체를 못 만든 끝에서는 그 두 줄이 거짓이다.
+    if ((Test-Path $ReportFile) -or (Test-Path $LogFile)) {
+        Say ('  막히면 이 두 파일을 보내 주십시오: ' + (Redact $ReportFile) + ' · ' + (Redact $LogFile))
+        Say ('  여는 법: 탐색기 주소창에 ' + (Redact $JarvisHome) + ' 를 붙여넣으십시오')
+    } else {
+        Say '  기록 파일은 아직 만들어지지 않았습니다 — 이 화면을 사진으로 남겨 주십시오.'
+    }
 }
 
 # 백신이 파일을 붙들었을 때 하는 말은 한 자리에서만 만든다 — 두 곳(설치 대기·받은 파일 사라짐)에서
@@ -473,6 +599,8 @@ function Write-Report {
     [void]$lines.Add("- 언제: $(Get-Date -Format 'yyyy-MM-ddTHH:mm:sszzz')")
     [void]$lines.Add("- 부트스트랩 판본: $BootstrapVersion · 모드: $Mode")
     [void]$lines.Add("- 종합 판정: **$verdict** (ok $ok · blocked $blocked · failed $failed · unknown $unknown / 전 $total 행)")
+    # 화면·기록 파일과 **같은 문자열**을 여기에도 남긴다 — 셋을 맞춰 보는 일이 사람 몫이 되면 안 된다.
+    if ($script:JCode) { [void]$lines.Add("- 진단 코드: **$($script:JCode)** ($HelpCodeUrl$($script:JCode))") }
     [void]$lines.Add('  - `unknown` 은 「완료됨」으로 세지 않습니다.')
     #   실제로는 4번이었다(로그인 · 폴더 신뢰 · bypass 동의 · 렌더러). 이 축은 언제나 「목표 달성」 쪽으로 틀린다.
     #   ⇒ 선언값과 관측값을 두 줄로 갈라 적고, 관측값은 사람이 채우는 빈칸으로 둔다.
@@ -598,7 +726,9 @@ function Step-InstallClaude {
     if (-not $p.HasExited) {
         # 조용히 다음 단계로 가지 않는다. 여기서 멈춰야 사람이 무엇을 누를지 알게 된다.
         Say ("[2/11] 설치가 " + [int]($ClaudeInstallWaitMs / 60000) + "분 안에 끝나지 않았습니다.")
+        Write-JCode 'J-AV-01' '백신 창이 설치 파일을 붙들고 있는 것으로 보입니다'
         Say-AntivirusHold '클로드 설치 파일 (이름이 claude 로 시작하는 파일)'
+        $script:NextStep = '작업 표시줄에서 백신 창을 찾아 [파일 전송] 또는 [실행] 을 누르신 뒤, 같은 한 줄을 다시 돌려 주십시오.'
         return 4
     }
     # PowerShell 5.1 은 갓 끝난 프로세스의 ExitCode 를 늦게 채우는 일이 있다(agy R1 [2] 지적 채택).
@@ -636,12 +766,16 @@ function Step-InstallClaude {
         if ($u) { foreach ($p in ($u -split ';')) { if ($p -and ([Environment]::ExpandEnvironmentVariables($p).TrimEnd('\') -ieq $bin)) { $inUser = '예'; break } } }
         $hasExe = if (Test-Path $exe) { '예' } else { '아니오' }
         Say '[2/11] 설치기는 끝났는데 claude 명령이 아직 안 잡힙니다.'
+        Write-JCode 'J-PATH-01' '깔렸는데 이 창에서 명령을 찾지 못합니다'
+        $script:NextStep = '창을 새로 열고 같은 한 줄을 다시 돌려 주십시오.'
         Say "     파일 있음: $hasExe ($(Redact $exe)) · 사용자 PATH 등록: $inUser · 설치기 종료 코드: $rcShown"
         Say '     이 화면을 사진으로 남겨 주십시오. 창을 새로 열고 같은 한 줄을 다시 돌리면 여기서부터 이어서 갑니다.'
         return 4
     }
     if (-not (Test-ClaudeAuthCmd)) {
-        Say '[2/11] 설치는 끝났는데 아직 낡은 판본이 잡힙니다. 창을 새로 열고 다시 돌려 주십시오.'
+        Say '[2/11] 설치는 끝났는데 아직 낡은 판본이 잡힙니다.'
+        Write-JCode 'J-VER-01' '낡은 판본이 먼저 잡혀 로그인 명령을 모릅니다'
+        $script:NextStep = '창을 새로 열고 같은 한 줄을 다시 돌려 주십시오. 판올림부터 이어서 갑니다.'
         return 4
     }
     $script:ClaudeOk = $true
@@ -685,7 +819,9 @@ function Step-Login {
         Start-Sleep -Seconds $LoginPollInterval
         $waited += $LoginPollInterval
     }
-    Say "[3/11] $([int]($LoginPollTimeout / 60))분 동안 로그인이 확인되지 않았습니다. 같은 한 줄을 다시 돌리면 여기서부터 이어서 갑니다."
+    Say "[3/11] $([int]($LoginPollTimeout / 60))분 동안 로그인이 확인되지 않았습니다."
+    Write-JCode 'J-LOGIN-01' '로그인 승인이 시간 안에 끝나지 않았습니다'
+    $script:NextStep = '브라우저에서 승인을 누르신 뒤 같은 한 줄을 다시 돌려 주십시오.'
     return 5
 }
 
@@ -918,15 +1054,42 @@ function Step-DownloadCys {
         return 0
     }
     if ($Mode -eq 'dry') { Say "[5/11] (dry-run) 받지 않았습니다. 받을 곳 = $CysDownloadUrl"; return 0 }
+    # 132MB 를 받기 전에 자리가 있는지 본다. 받다 중간에 꽉 차면 「받다 끊긴 파일」로만 보여
+    # 사람은 망 문제로 오해한다 — 미리 갈라 말한다.
+    try {
+        $drive = (Get-Item $DlDir -ErrorAction Stop).PSDrive
+        if ($drive -and $drive.Free -and ($drive.Free / 1MB) -lt 3072) {
+            Say ("[5/11] 저장 공간이 부족합니다 (남은 자리 약 " + [int]($drive.Free / 1MB) + "MB · 3GB 이상을 권합니다).")
+            Write-JCode 'J-DISK-01' '저장 공간이 부족합니다'
+            $script:NextStep = '공간을 3GB 이상 비우신 뒤 같은 한 줄을 다시 돌려 주십시오.'
+            return 5
+        }
+    } catch { }
     for ($try = 1; $try -le 2; $try++) {
         if (Test-Path $dst) { Remove-Item $dst -Force -ErrorAction SilentlyContinue }
         Say "[5/11] cys 설치 파일을 받습니다 (약 132MB · 잠시 걸립니다)."
         $pref = $ProgressPreference
         try {
             $ProgressPreference = 'SilentlyContinue'
-            Invoke-WebRequest -Uri $CysDownloadUrl -OutFile $dst -UseBasicParsing -ErrorAction Stop
+            Invoke-WebRequest -Uri $CysDownloadUrl -OutFile $dst -UseBasicParsing -TimeoutSec 900 -ErrorAction Stop
         } catch {
             Say "[5/11] 받지 못했습니다: $($_.Exception.Message)"
+            $ProgressPreference = $pref
+            # 두 번 해 보고 포기하지 않는다. 연결이 돌아오면 이어간다(같은 자리·같은 문장).
+            # ⚠다시 해 보는 명령에도 상한이 있어야 한다 — Invoke-WebRequest 의 기본 상한은 **무한**이라
+            #   응답 없는 연결에 매달리면 30분 상한이 있는 바깥 고리로 돌아오지 못한다
+            #   (agy R1 [1] 지적 채택 2026-09-09).
+            $again = Wait-ForConnection '[5/11]' {
+                try {
+                    $ProgressPreference = 'SilentlyContinue'
+                    Invoke-WebRequest -Uri $CysDownloadUrl -OutFile $dst -UseBasicParsing -TimeoutSec 900 -ErrorAction Stop
+                    return $true
+                } catch { return $false }
+            }
+            if (-not $again) {
+                $script:NextStep = '연결이 된 뒤 같은 한 줄을 다시 돌려 주십시오. 받은 데까지는 건너뛰고 이어서 갑니다.'
+                return 5
+            }
             continue
         } finally {
             # 실패해서 빠져나가도 이 창의 설정을 원래대로 돌려놓는다.
@@ -936,6 +1099,7 @@ function Step-DownloadCys {
         # 이것을 크기 불일치로 적으면 망 문제로 오해된다.
         if (-not (Test-Path $dst)) {
             Say '[5/11] 받은 파일이 사라졌습니다 — 백신이 격리했을 수 있습니다.'
+            Write-JCode 'J-AV-02' '받은 설치 파일이 사라졌습니다'
             Say-AntivirusHold (Redact $dst)
             Say '     백신 알림이 떴다면 그 화면의 이름, 대상 파일, 조치(차단·격리·삭제) 세 가지를 알려 주십시오.'
             continue
@@ -978,7 +1142,8 @@ function Step-InstallCys {
             # 되돌릴 파일이 실제로 만들어졌을 때에만 지운다. 백업이 없으면 손대지 않는다.
             if (Test-Path $bkFile) {
                 Remove-Item $key -Recurse -Force -ErrorAction SilentlyContinue
-                Say '[6/11] 지난 설치의 목록 항목만 정리했습니다 (프로그램 실체가 없어 설치가 멈추는 것을 막기 위해서입니다).'
+                Write-JCode 'J-RM-01' '지난 설치의 자국이 남아 있어 정리했습니다'
+            Say '[6/11] 지난 설치의 목록 항목만 정리했습니다 (프로그램 실체가 없어 설치가 멈추는 것을 막기 위해서입니다).'
                 Say "     되돌리려면 이 파일을 두 번 누르십시오: $(Redact $bkFile)"
                 Write-Log "removed stale uninstall entry · backup=$(Redact $bkFile)"
             } else {
@@ -1679,44 +1844,73 @@ function Step-Agora {
     return
 }
 
+# 시험이 이 파일을 「함수 묶음」으로만 읽는 문(맥판 JARVIS_LIB_ONLY 과 같은 자리·같은 까닭).
+#   연결 원인 판별처럼 **부르지 않으면 잴 수 없는 것**을 러너에서 재려면 이 문이 필요하다.
+#   ⚠사람이 쓰는 길이 아니다 — 설치기는 이 변수 없이 돈다(없으면 이 줄은 아무 일도 하지 않는다).
+if ($env:JARVIS_LIB_ONLY -eq '1') { return }
+
 # ── 본문 ──────────────────────────────────────────────────────────
-Say "=== 자비스 설치 도우미 $BootstrapVersion (모드: $Mode) ==="
-Show-PrevRunNote
-Say '[1/11] 이 컴퓨터를 살펴봅니다.'
-Invoke-DetectStage1
-Invoke-DetectStage2
-Write-Report
+try {
+    # 🔴자리 만들기를 **끝맺음 보증 안쪽**으로 옮겼다(agy R1 [3] 지적 채택 2026-09-09).
+    #   앞 판은 이 실패가 try 밖이라, 가장 도움이 필요한 순간에 「다음에 할 일」이 한 줄도 없이 창이 닫혔다.
+    #   ⚠까닭을 「권한」 하나로 단정하지 않는다 — 공간이 꽉 찼거나 백신이 막아도 여기서 실패한다.
+    try {
+        New-Item -ItemType Directory -Force -Path $JarvisHome -ErrorAction Stop | Out-Null
+    } catch {
+        Write-Host ("자리를 만들지 못했습니다: " + $JarvisHome)
+        Write-Host '     진단 코드: J-PERM-01 — 파일이나 폴더를 쓸 권한이 없습니다(공간 부족·백신 차단도 같은 모양입니다)'
+        $script:JCode = 'J-PERM-01'
+        $script:NextStep = '회사·학교에서 관리하는 컴퓨터면 담당자에게 문의해 주십시오. 개인 컴퓨터면 저장 공간과 백신 알림을 확인해 주십시오.'
+        exit 3
+    }
 
-if ($Mode -eq 'detect') { Say '감지만 하고 끝냅니다.'; exit 0 }
+    Say "=== 자비스 설치 도우미 $BootstrapVersion (모드: $Mode) ==="
+    Show-PrevRunNote
+    Say '[1/11] 이 컴퓨터를 살펴봅니다.'
+    Invoke-DetectStage1
+    Invoke-DetectStage2
+    Write-Report
 
-$rc = Step-InstallClaude; if ($rc -ne 0) { exit $rc }
-$rc = Step-Login;         if ($rc -ne 0) { exit $rc }
+    if ($Mode -eq 'detect') {
+        Say '감지만 하고 끝냅니다.'
+        # 끝맺음 한 줄은 그 끝에 맞아야 한다 — 「살펴보기만 한 끝」에 「이어서 갑니다」는 맞지 않는다.
+        $script:NextStep = '실제로 설치하시려면 -DetectOnly 없이 같은 한 줄을 돌려 주십시오.'
+        exit 0
+    }
 
-$Rows.Clear()
-Invoke-DetectStage1
-Invoke-DetectStage2
-Write-Report        # 기동 직전 값으로 보고를 갱신한다
+    $rc = Step-InstallClaude; if ($rc -ne 0) { exit $rc }
+    $rc = Step-Login;         if ($rc -ne 0) { exit $rc }
 
-$rc = Step-Prepare; if ($rc -ne 0) { exit $rc }
+    $Rows.Clear()
+    Invoke-DetectStage1
+    Invoke-DetectStage2
+    Write-Report        # 기동 직전 값으로 보고를 갱신한다
 
-# 여기서부터는 한 단이 막혀도 멈추지 않는다.
-# 앞 단계(클로드 설치·로그인·자비스 준비)는 이미 성립했고, 막힌 자리를 사람에게 설명해 주는 것이
-# 그 다음으로 할 수 있는 가장 쓸모 있는 일이기 때문이다. 막힌 단을 적어 두고 자비스를 깨운다.
-foreach ($st in @(
-    @{ Name = 'cys 설치 파일 받기'; Fn = { Step-DownloadCys } },
-    @{ Name = 'cys 설치';           Fn = { Step-InstallCys } },
-    @{ Name = 'cys 확인';           Fn = { Step-VerifyCys } },
-    @{ Name = '계정 준비';          Fn = { Step-PrepareAccount } })) {
-    # 함수가 화면 말고 출력 스트림에 무언가를 흘리면 반환값이 배열이 된다(이 파일 위쪽의 같은 함정).
-    # 그러면 성공한 단계도 막힌 것으로 읽힌다 ⇒ 마지막 값 하나만 종료 코드로 본다.
-    $rc = @(& $st.Fn)[-1]
-    if ($rc -ne 0) { $script:BlockedStep = $st.Name; break }
+    $rc = Step-Prepare; if ($rc -ne 0) { exit $rc }
+
+    # 여기서부터는 한 단이 막혀도 멈추지 않는다.
+    # 앞 단계(클로드 설치·로그인·자비스 준비)는 이미 성립했고, 막힌 자리를 사람에게 설명해 주는 것이
+    # 그 다음으로 할 수 있는 가장 쓸모 있는 일이기 때문이다. 막힌 단을 적어 두고 자비스를 깨운다.
+    foreach ($st in @(
+        @{ Name = 'cys 설치 파일 받기'; Fn = { Step-DownloadCys } },
+        @{ Name = 'cys 설치';           Fn = { Step-InstallCys } },
+        @{ Name = 'cys 확인';           Fn = { Step-VerifyCys } },
+        @{ Name = '계정 준비';          Fn = { Step-PrepareAccount } })) {
+        # 함수가 화면 말고 출력 스트림에 무언가를 흘리면 반환값이 배열이 된다(이 파일 위쪽의 같은 함정).
+        # 그러면 성공한 단계도 막힌 것으로 읽힌다 ⇒ 마지막 값 하나만 종료 코드로 본다.
+        $rc = @(& $st.Fn)[-1]
+        if ($rc -ne 0) { $script:BlockedStep = $st.Name; break }
+    }
+
+    $Rows.Clear()
+    Invoke-DetectStage1
+    Invoke-DetectStage2
+    Write-Report
+
+    # 여기는 마지막 문장이라 반환값이 호출부로 갈 곳도 없다 — 그대로 호스트로 흘려보낸다.
+    Step-Wake
+
+} finally {
+    # 어느 경로로 끝나도 이 블록을 지난다 — 맥판의 EXIT 트랩과 같은 보증이다.
+    Write-ClosingNote
 }
-
-$Rows.Clear()
-Invoke-DetectStage1
-Invoke-DetectStage2
-Write-Report
-
-# 여기는 마지막 문장이라 반환값이 호출부로 갈 곳도 없다 — 그대로 호스트로 흘려보낸다.
-Step-Wake
