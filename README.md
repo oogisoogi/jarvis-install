@@ -82,3 +82,7 @@ curl -fsSL https://jarvis.godmeyou.kr/install/reinstall.sh -o "$HOME/reinstall-j
 ## 라이선스
 
 MIT
+
+## 원작자 표기
+
+이 설치 도우미가 설치하는 cys 터미널의 원작자는 CYSJavis(GitHub: idoforgod)입니다. 설치 도우미가 내려받는 cys 배포본은 원작자의 허락을 받아 oogisoogi가 원작(MIT)을 바탕으로 빌드·서명·배포하는 파생판입니다. 원작 저장소: https://github.com/idoforgod/cys-terminal

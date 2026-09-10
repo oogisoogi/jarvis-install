@@ -32,7 +32,8 @@
 #   종료시키는 일이 실제로 있었다(2026-09-05 · V3 · 진단명 Execution/MDP.Powershell.M1201).
 #   그때 스크립트는 아무 말도 남기지 못하고 사라지며 아무것도 지워지지 않는다.
 #   설정 앱은 사람이 원래 쓰는 길이고, 같은 일을 막히지 않고 한다. (-UseUninstaller 로 옛 방식 선택)
-# 창이 갑자기 닫히면 백신이 PowerShell 을 종료한 것일 수 있다. 다시 돌리면 이어서 진행된다.
+# 창이 갑자기 닫히면 백신이 PowerShell 을 종료한 것일 수 있다. 그때는 Show-RerunHow 가 인쇄한
+#   명령 전체를 다시 붙여넣으면 이어서 진행된다(사람에게 「같은 줄」이라고 말하지 않는다 - 아래 참조).
 
 param([switch]$WhatIf, [switch]$List, [switch]$Yes, [switch]$PurgeLogin, [switch]$UseUninstaller)
 
@@ -44,7 +45,11 @@ $CysDir     = Join-Path $env:LOCALAPPDATA 'cys'
 $CysDirOld  = Join-Path $env:LOCALAPPDATA 'Programs\cys'
 $UninstExe  = Join-Path $CysDir 'uninstall.exe'
 $RegKey     = 'HKCU:\Software\Microsoft\Windows\CurrentVersion\Uninstall\cys'
-$JarvisDir  = Join-Path $env:USERPROFILE 'install-jarvis'
+# 🔴설치기가 `JARVIS_HOME` 을 존중하므로 제거기도 존중해야 한다(1R REVISE ⑦ 봉인 2026-09-10).
+#   앞 판은 고정 `%USERPROFILE%\install-jarvis` 만 지웠다 ⇒ 사용자 지정 폴더로 깐 기계에서는
+#   ⑴진짜 작업 폴더와 그 신뢰 자국이 **그대로 남고** ⑵기본 자리에 같은 이름의 남의 폴더가 있으면
+#   **엉뚱한 폴더를 지운다.** 맥 제거기는 원래 환경변수를 따랐다 — 두 OS 가 갈려 있던 자리다.
+$JarvisDir  = if ($env:JARVIS_HOME) { $env:JARVIS_HOME } else { Join-Path $env:USERPROFILE 'install-jarvis' }
 $CysHome    = Join-Path $env:USERPROFILE '.cys'
 $ClaudeDir  = Join-Path $env:USERPROFILE '.claude'
 $ClaudeJson = Join-Path $env:USERPROFILE '.claude.json'
@@ -85,6 +90,39 @@ $script:Preserved = 0
 $script:SkipCysDir = $false
 
 function Short($p) { return ([string]$p).Replace($env:USERPROFILE, '~') }
+
+# ── 다시 하시는 법 - 「같은 줄을 다시 돌려 주십시오」는 쓰지 않는다 ───────────
+# 🔴2026-09-10 실기에서 **사용자 막힘으로 확정**된 문구다(쓰신 분의 말: 「같은 줄을 한 번 더 돌려
+#   주십시오 - 이게 뭔지 모르겠다」). 「줄」이 무엇인지, 「돌린다」가 무슨 뜻인지 모르고,
+#   무엇보다 **그 명령이 화면 어디에도 없었다.** 창이 닫힌 뒤 사이트를 다시 찾는 것 자체가 손
+#   하나이고, 사이트에는 명령이 둘(지우기·재설치)이라 어느 쪽인지 사람이 고를 수도 없다.
+#   ⇒ 막힌 자리에서는 ①창 여는 법 ②복사 ③붙여넣기+Enter 를 적고 **명령 전체를 인쇄한다.**
+# ★어느 명령을 인쇄할지는 **들어온 길**이 정한다. 재설치가 이 스크립트를 안에서 부를 때
+#   JARVIS_ENTRY=reinstall 을 넘겨 준다 - 그 길에서 지우기 한 줄을 인쇄하면 사람은 지우기만
+#   되풀이하고 재설치에는 영영 못 닿는다.
+# ⚠아래 두 줄은 사이트가 게시하는 명령과 **글자까지 같아야 한다**(머리글의 한 줄 · 대문 · 절차서).
+#   갈리면 사람이 화면에서 복사한 명령이 사이트의 것과 달라진다 - checks.sh 가 그 동일성을 잰다.
+$JarvisRerunReset = @'
+powershell -NoProfile -ExecutionPolicy Bypass -Command "irm https://jarvis.godmeyou.kr/install/reset-clean.ps1 -OutFile ([Environment]::GetFolderPath('UserProfile')+'\reset-clean.ps1'); powershell -ExecutionPolicy Bypass -File ([Environment]::GetFolderPath('UserProfile')+'\reset-clean.ps1')"
+'@
+$JarvisRerunReinstall = @'
+powershell -NoProfile -ExecutionPolicy Bypass -Command "irm https://jarvis.godmeyou.kr/install/reinstall.ps1 -OutFile ([Environment]::GetFolderPath('UserProfile')+'\reinstall-jarvis.ps1'); powershell -ExecutionPolicy Bypass -File ([Environment]::GetFolderPath('UserProfile')+'\reinstall-jarvis.ps1')"
+'@
+function Get-RerunCmd {
+    if ($env:JARVIS_ENTRY -eq 'reinstall') { return $JarvisRerunReinstall }
+    return $JarvisRerunReset
+}
+function Show-RerunHow {
+    Write-Host ''
+    Write-Host '  == 다시 하시는 법 (이대로 따라 하시면 됩니다) =='
+    Write-Host '   1) 시작 단추를 누르고 powershell 이라고 치신 뒤 [Windows PowerShell] 을 여십시오.'
+    Write-Host '   2) 아래 명령을 처음부터 끝까지 마우스로 끌어 선택한 뒤 Ctrl+C 를 누르십시오.'
+    Write-Host '   3) 그 창을 한 번 누르고 마우스 오른쪽 단추를 눌러 붙여넣은 뒤 Enter 를 누르십시오.'
+    Write-Host ''
+    Write-Host (Get-RerunCmd)
+    Write-Host ''
+    Write-Host '  이미 지워진 것은 다시 지우지 않습니다 - 남은 자리부터 이어서 갑니다.'
+}
 function Row($label, $path) {
     $exists = Test-Path $path
     if ($exists) { $script:Found++ }
@@ -350,23 +388,41 @@ function Remove-OneItem($it) {
     [System.IO.File]::Delete($p)   # 없는 파일에는 아무 일도 일어나지 않는다
 }
 # 한 자리를 통째로 지운다 — 링크는 뚫지 않는다. 못 지운 수를 돌려준다.
+# 🔴2026-09-10 실기에서 고친 것(R2) — 앞 판은 항목별 예외를 `catch { }` 로 **전부 삼키고** 개수만 셌다.
+#   그래서 화면에 남는 것이 「1가지를 지우지 못했습니다」 한 줄뿐이었고, **사용자는 무엇이 남았는지
+#   알 길이 없었다.** 그 한 줄로는 우리도 원인을 못 찾는다(실제로 못 찾아 실기 중에 손으로 뒤졌다).
+#   ⇒ 실패한 자리와 까닭을 **최대 5개** 담아 두고, 부르는 쪽(Drop)이 인쇄한다.
+#   ⚠세는 값(fails)의 뜻은 바꾸지 않는다 - 검산은 여전히 「뿌리가 비었는가」다. 담는 것만 늘린다.
+$script:TreeFailWhy = @()
+function Add-TreeFailWhy($path, $why) {
+    if ($script:TreeFailWhy.Count -ge 5) { return }
+    $script:TreeFailWhy += ((Short $path) + '  ← ' + $why)
+}
 function Remove-TreeSafe($path) {
+    $script:TreeFailWhy = @()
     $it = $null
-    try { $it = Get-Item -LiteralPath $path -Force -ErrorAction Stop } catch { return 1 }
+    try { $it = Get-Item -LiteralPath $path -Force -ErrorAction Stop } catch { Add-TreeFailWhy $path $_.Exception.Message; return 1 }
     if ((-not $it.PSIsContainer) -or (Test-IsReparse $it)) {
-        try { Remove-OneItem $it; return 0 } catch { return 1 }
+        try { Remove-OneItem $it; return 0 } catch { Add-TreeFailWhy $path $_.Exception.Message; return 1 }
     }
     $fails = 0
     $items = @(Get-TreeItems $it.FullName)
-    if ($script:EnumFail -gt 0) { $fails++ }
+    if ($script:EnumFail -gt 0) { $fails++; Add-TreeFailWhy $it.FullName ('안을 끝까지 읽지 못했습니다(못 연 자리 ' + $script:EnumFail + '곳)') }
     foreach ($x in $items) {
-        try { Remove-OneItem $x } catch { }
+        try { Remove-OneItem $x } catch { Add-TreeFailWhy $x.FullName $_.Exception.Message }
     }
     # 검산 — 뿌리는 비어 있을 때만 지워진다. 안 지워지면 무엇인가 남은 것이다.
-    try { [System.IO.Directory]::Delete($it.FullName, $false) } catch { $fails++ }
+    try { [System.IO.Directory]::Delete($it.FullName, $false) } catch { $fails++; Add-TreeFailWhy $it.FullName $_.Exception.Message }
     return $fails
 }
+# 담아 둔 실패 사유를 인쇄한다. 없으면 아무 말도 하지 않는다(빈 제목만 찍지 않는다).
+function Write-TreeFailWhy {
+    if ($script:TreeFailWhy.Count -eq 0) { return }
+    Write-Host '         지우지 못한 자리:'
+    foreach ($w in $script:TreeFailWhy) { Write-Host ('           ' + $w) }
+}
 function Remove-ExceptPreserved($rootLiteral, $rootCanon, $keeps) {
+    $script:TreeFailWhy = @()
     $enumFail = 0
     $items = @(Get-TreeItems $rootLiteral)
     if ($script:EnumFail -gt 0) {
@@ -378,12 +434,14 @@ function Remove-ExceptPreserved($rootLiteral, $rootCanon, $keeps) {
         try { Remove-OneItem $it } catch { }
     }
     # 검산 - 남은 것을 **다시 열거해서** 센다. 지우기 실패든 열거 실패든 결과 한 칸으로 모인다.
+    #   ★남은 자리도 **적어 둔다**(R2) - 개수만으로는 사용자도 우리도 다음 손을 못 정한다.
     $left = 0
     $rest = @(Get-TreeItems $rootLiteral)
     if ($script:EnumFail -gt 0) { $enumFail = 1 }
     foreach ($it in $rest) {
         if (Test-KeepHit (Get-ItemCanon $it $rootLiteral $rootCanon) $keeps) { continue }
         $left++
+        Add-TreeFailWhy $it.FullName '아직 남아 있습니다(다른 프로그램이 붙들고 있을 수 있습니다)'
     }
     return ($left + $enumFail)
 }
@@ -515,6 +573,7 @@ function Drop($label, $path) {
         if ($fails -gt 0) {
             $script:KeptFail++
             Write-Host ("  [일부 남음] " + (Short $path) + " - {0}가지를 지우지 못했습니다(참가 자리는 그대로입니다)." -f $fails)
+            Write-TreeFailWhy
             return
         }
         $script:Removed++
@@ -523,9 +582,55 @@ function Drop($label, $path) {
     }
     $fails = Remove-TreeSafe $path
     if ($fails -eq 0) { $script:Removed++; Write-Host ("  지움: " + (Short $path)) }
-    else { $script:KeptFail++; Write-Host ("  [남음] " + (Short $path) + " - " + $fails + "가지를 지우지 못했습니다.") }
+    else { $script:KeptFail++; Write-Host ("  [남음] " + (Short $path) + " - " + $fails + "가지를 지우지 못했습니다."); Write-TreeFailWhy }
 }
 
+# ── 자리 기준으로 끈다 - 이름으로 끄면 우리가 아는 이름만 꺼진다 (R1 · 2026-09-10) ─────
+# 🔴실기에서 `%LOCALAPPDATA%\cys` 삭제가 실패했다. 붙들고 있던 것은 cys-app·cysd·cys 가 아니라
+#   cysd 가 띄운 **python3.exe**(office-bridge)였고, **cysd 가 사라진 뒤에도 고아로 살아남아**
+#   런타임 dll 을 붙들었다. 앞 판은 이름 셋만 Stop-Process 했으니 이 프로세스를 볼 수 없었다.
+#   ★자국은 이름이 아니라 **자리**다 - 그 폴더 안의 실행 파일로 도는 것은 전부 우리가 놓은 것이다.
+#   ⇒ 이름 축은 그대로 두고(권한 때문에 Path 를 못 읽는 우리 프로세스가 있다) **자리 축을 더한다.**
+#     두 축은 서로를 대체하지 않는다.
+function Get-ProcsUnder($dirs) {
+    $out = @()
+    foreach ($pr in @(Get-Process -ErrorAction SilentlyContinue)) {
+        if ($pr.Id -eq $PID) { continue }   # 우리 자신은 세지 않는다
+        $path = $null
+        try { $path = $pr.Path } catch { $path = $null }   # 남의(또는 상승된) 프로세스는 못 읽는다
+        if (-not $path) { continue }
+        foreach ($d in $dirs) {
+            if (-not $d) { continue }
+            $pre = ([string]$d).TrimEnd('\') + '\'
+            if ($path.StartsWith($pre, [System.StringComparison]::OrdinalIgnoreCase)) { $out += $pr; break }
+        }
+    }
+    return $out
+}
+# 끄고 2초 기다린 뒤 **다시 세어** 남은 것을 돌려준다. 「Stop-Process 를 불렀다」는 꺼졌다는 뜻이 아니다.
+function Stop-CysProcesses {
+    foreach ($n in @('cys-app', 'cysd', 'cys')) {
+        Get-Process -Name $n -ErrorAction SilentlyContinue | Stop-Process -Force -ErrorAction SilentlyContinue
+    }
+    foreach ($pr in @(Get-ProcsUnder @($CysDir, $CysDirOld))) {
+        try { Stop-Process -Id $pr.Id -Force -ErrorAction Stop } catch { }
+    }
+    Start-Sleep -Seconds 2
+    return @(Get-ProcsUnder @($CysDir, $CysDirOld))
+}
+# 남은 프로세스를 **사람이 작업 관리자에서 찾을 수 있는 만큼** 적는다.
+#   앞 판은 「아직 실행 중입니다」로 끝냈다 - 무엇을 끝내야 하는지 알 길이 없었다(실기 실측).
+function Write-AliveProcs($alive) {
+    $n = 0
+    foreach ($pr in @($alive)) {
+        $n++
+        if ($n -gt 5) { Write-Host ('         (그 밖에 ' + ($alive.Count - 5) + '개 더 있습니다.)'); break }
+        $path = ''
+        try { $path = [string]$pr.Path } catch { $path = '' }
+        Write-Host ('         돌고 있는 것: ' + $pr.ProcessName + '  (번호 ' + $pr.Id + ')  ' + (Short $path))
+    }
+    Write-Host '         작업 관리자(Ctrl+Shift+Esc)에서 위 번호의 항목을 끝내시거나, 컴퓨터를 다시 켜 주십시오.'
+}
 function Get-ClaudeCmd {
     if (Test-Path $ClaudeExe) { return $ClaudeExe }
     $c = Get-Command claude -ErrorAction SilentlyContinue
@@ -755,6 +860,190 @@ function Remove-JsonKey($file, $key) {
         $script:KeptFail++; Write-Host ("  [남음] " + (Short $file) + " 의 " + $key + " 칸 — " + $_.Exception.Message)
     }
 }
+# 🔴`projects` 아래의 우리 자국을 뺀다 — **자리에 따라 뺄 범위가 다르다**(2026-09-10) ─────────
+#   ⑴**우리 폴더**(자비스 작업 폴더) = 그 칸은 처음부터 끝까지 우리가 만든 것이다 ⇒ **칸째** 뺀다.
+#   ⑵**사용자 홈** = 참가자가 이미 쓰던 자리일 수 있다 ⇒ 우리가 넣은 신뢰 칸 **하나만** 뺀다.
+#   ★맥판이 ⑴을 이미 칸째 빼고 있었고 윈도우판은 아무것도 안 뺐다 — 두 OS 가 갈려 있었다.
+#     기대까지 갈라 적어 두었길래(시험 표) 갈림이 굳어 있었다. 이 판에서 ⑴을 맞춘다.
+function Remove-ProjectEntry($file, $dirs) {
+    if (-not (Test-Path $file)) { return }
+    $raw = Read-TextUtf8 $file
+    if ($null -eq $raw) {
+        $script:KeptFail++
+        Write-Host ("  [남음] " + (Short $file) + " 의 자비스 폴더 칸 — 이 파일을 UTF-8 로 읽지 못했습니다. 손대지 않았습니다.")
+        return
+    }
+    try {
+        $o = $raw | ConvertFrom-Json -ErrorAction Stop
+        $prj = $o.PSObject.Properties['projects']
+        if ($null -eq $prj -or $null -eq $prj.Value) { return }
+        $hit = 0
+        foreach ($k in @($dirs)) {
+            if ($null -ne $prj.Value.PSObject.Properties[$k]) { $prj.Value.PSObject.Properties.Remove($k); $hit++ }
+        }
+        if ($hit -eq 0) { return }
+        $why = Write-JsonChecked $file $o
+        if ($why) {
+            $script:KeptFail++
+            Write-Host ("  [남음] " + (Short $file) + " 의 자비스 폴더 칸 — " + $why + " 원본은 그대로 두었습니다.")
+            return
+        }
+        $script:Removed++
+        Write-Host ("  지움: " + (Short $file) + " 의 자비스 폴더 칸 " + $hit + "곳 (파일과 남의 칸은 그대로)")
+    } catch {
+        $script:KeptFail++; Write-Host ("  [남음] " + (Short $file) + " 의 자비스 폴더 칸 — " + $_.Exception.Message)
+    }
+}
+# ── 🔴🔴작업 폴더를 **재귀로 지우기 전에** 그 자리가 안전한지 본다 (3R N3 = 표면 축소 · master 결정) ──
+#   `JARVIS_HOME` 은 환경변수라 **무엇이든 들어올 수 있다.** 검사 없이 넘기면 그 값이 사용자 홈이거나
+#   드라이브 루트일 때 **사진·문서·남의 프로젝트를 통째로** 지운다. 되돌릴 수 없는 손실이다.
+# 🔴🔴**앞 판은 「나쁜 값 목록」으로 막으려 했고, 그 목록은 세 라운드 내내 새 구멍을 냈다**
+#   (홈·드라이브 루트·시스템 자리 → `D:\custom` → UNC 공유 하위 → **조상 junction** → **8.3 짧은 이름**…).
+#   ★목록으로 막는 싸움은 **막는 쪽이 항상 뒤늦다.** 값의 모양이 무한하기 때문이다.
+#   ⇒ **표면을 줄인다**(master 결정 2026-09-10): 지워도 되는 자리의 이름을 **하나로 못 박는다.**
+#     ⑴실제 경로의 **마지막 칸이 정확히 `install-jarvis`** 다. 그 외의 값은 **거부하고 안내한다.**
+#       · 참가자는 기본값을 쓰므로 아무 영향이 없고, 러너의 `…\lp-home\install-jarvis` 도 통과한다.
+#       · 이 한 줄로 홈·드라이브 루트·시스템 자리·UNC 공유·남의 프로젝트가 **한꺼번에** 닫힌다 —
+#         그것들의 마지막 칸은 `install-jarvis` 가 아니기 때문이다.
+#     ⑵조상 어디에도 **링크(junction·symlink)가 없다.** 중간 한 칸이 링크면 글자로 보는 검사는
+#       모두 빗나가고, 그 안을 열거하는 순간 **남의 자리**를 훑는다(3R REVISE).
+#     ⑶**우리가 만든 표식**이 그 안에 있다 — 설치기는 **자기가 새로 만든 폴더에만** 표식을 놓는다.
+#       (앞 판은 이미 있던 남의 폴더에도 표식을 써 줘서 이 관문을 스스로 무효화했다 — 3R BLOCK.)
+#   ⚠`GetFullPath` 는 `..` 과 상대 경로만 편다 — **8.3 짧은 이름**(`PROGRA~1`)은 그대로 남는다.
+#     실물이 있으면 `Get-Item` 의 `FullName` 이 긴 이름으로 다시 써 준다 ⇒ 그 값으로 이름을 견준다.
+$JarvisOwnerMark = 'jarvis-installer-owned v1'
+$JarvisHomeBaseName = 'install-jarvis'
+$script:SafeWhy = ''
+$script:TrustCleanupFail = 0
+function Resolve-RealPath($p) {
+    $full = [System.IO.Path]::GetFullPath($p)
+    try {
+        $it = Get-Item -LiteralPath $full -Force -ErrorAction Stop
+        if ($it.FullName) { $full = [string]$it.FullName }
+    } catch { }
+    return $full.TrimEnd('\')
+}
+function Get-ReparseAncestor($p) {   # 자기 자신부터 위로 훑어 **처음 만나는 링크**를 돌려준다(없으면 '')
+    $cur = $p
+    while ($cur) {
+        try {
+            $it = Get-Item -LiteralPath $cur -Force -ErrorAction Stop
+            if (($it.Attributes -band [System.IO.FileAttributes]::ReparsePoint) -eq [System.IO.FileAttributes]::ReparsePoint) {
+                return [string]$cur
+            }
+        } catch { }
+        $parent = Split-Path $cur -Parent
+        if ((-not $parent) -or ($parent -eq $cur)) { break }
+        $cur = $parent
+    }
+    return ''
+}
+function Test-SafeJarvisDir($p) {
+    $script:SafeWhy = ''
+    if (-not $p) { $script:SafeWhy = '빈 경로입니다'; return $false }
+    $full = $null
+    try { $full = Resolve-RealPath $p } catch { $script:SafeWhy = '실제 경로를 확인하지 못했습니다'; return $false }
+    if (-not $full) { $script:SafeWhy = '빈 경로입니다'; return $false }
+    if (-not [System.IO.Path]::IsPathRooted($full)) { $script:SafeWhy = '절대 경로가 아닙니다'; return $false }
+    # ⑴이름 관문 — 실제 경로의 마지막 칸이 정확히 그 이름일 때만.
+    $leaf = ''
+    try { $leaf = [string](Split-Path $full -Leaf) } catch { $leaf = '' }
+    if ($leaf -ne $JarvisHomeBaseName) {
+        $script:SafeWhy = ('이 도구가 지우는 폴더의 이름은 「' + $JarvisHomeBaseName + '」 하나입니다(실제 경로: ' + $full + ')')
+        return $false
+    }
+    # ⑵링크 관문 — 자기 자신을 포함해 조상 어디에도 링크가 없어야 한다.
+    $rp = Get-ReparseAncestor $full
+    if ($rp) {
+        $script:SafeWhy = ('그 자리로 가는 길에 바로가기(junction·symlink)가 있습니다: ' + $rp)
+        return $false
+    }
+    # ⑶표식 관문 — 설치기가 **새로 만든 폴더에만** 놓는다.
+    $mark = Join-Path $full '.jarvis-owned'
+    if (-not (Test-Path -LiteralPath $mark)) {
+        $script:SafeWhy = '설치 도우미가 놓은 표식이 없습니다(우리가 만든 폴더가 아닙니다)'; return $false
+    }
+    # ★이 파일이 이미 가진 UTF-8 읽기 도우미를 쓴다 — `Get-Content -Raw` 는 5.1 에서 ANSI 로 읽는다.
+    $body = Read-TextUtf8 $mark
+    if ($null -eq $body -or $body -notmatch [regex]::Escape($JarvisOwnerMark)) {
+        $script:SafeWhy = '표식의 내용이 우리 것이 아닙니다'; return $false
+    }
+    return $true
+}
+
+# 우리가 홈에 **새로 넣은** 신뢰 키의 목록을 읽는다 — 설치기가 적어 둔 TSV(설정파일<탭>키).
+#   ⚠파일이 없으면 빈 목록이다 ⇒ 홈 신뢰 칸에는 **손대지 않는다.** 모르는 것을 지우지 않는다.
+#     (설치기가 그 키를 넣었다면 기록도 함께 남는다 — 기록이 없다는 것은 안 넣었다는 뜻이다.)
+function Read-TrustSeedRecord {
+    $f = Join-Path $JarvisDir 'trust-seed.tsv'
+    if (-not (Test-Path $f)) { return @() }
+    $rows = @()
+    try {
+        $raw = Read-TextUtf8 $f
+        if ($null -eq $raw) { throw 'UTF-8 로 읽지 못했습니다' }
+        foreach ($ln in ($raw -split "`r?`n")) {
+            if (-not $ln) { continue }
+            $parts = $ln -split "`t"
+            if ($parts.Count -ge 2 -and $parts[0] -and $parts[1]) {
+                $rows += ,@($parts[0], $parts[1])
+            }
+        }
+    } catch {
+        # ★기록을 못 읽은 것도 **정리 실패**다 — 그 기록이 든 폴더를 지우면 다시 해 볼 길이 사라진다.
+        $script:TrustCleanupFail++
+        Write-Host ('  [남음] 폴더 신뢰 기록을 읽지 못했습니다 — 홈 신뢰 칸은 손대지 않습니다: ' + $_.Exception.Message)
+        return @()
+    }
+    return $rows
+}
+# 홈 쪽 — 우리가 넣은 신뢰 칸 하나만 뺀다 ─────────
+#   ⛔`projects.<홈>` 칸을 **통째로 지우지 않는다** — 그 칸에는 참가자가 쌓은 값(allowedTools 등)이
+#     함께 들어 있을 수 있다. 우리가 넣은 것은 `hasTrustDialogAccepted` 하나이므로 그 하나만 뺀다.
+#   ★그 칸이 비면(우리가 만든 칸이었다는 뜻) 칸째 지운다 — 빈 칸을 남기면 다음 진단이 자국으로 센다.
+function Remove-TrustSeed($file, $dirs) {
+    if (-not (Test-Path $file)) { return }
+    $raw = Read-TextUtf8 $file
+    if ($null -eq $raw) {
+        $script:KeptFail++; $script:TrustCleanupFail++
+        Write-Host ("  [남음] " + (Short $file) + " 의 폴더 신뢰 칸 — 이 파일을 UTF-8 로 읽지 못했습니다. 손대지 않았습니다.")
+        return
+    }
+    try {
+        $o = $raw | ConvertFrom-Json -ErrorAction Stop
+        $prj = $o.PSObject.Properties['projects']
+        if ($null -eq $prj -or $null -eq $prj.Value) { return }
+        $hit = 0
+        foreach ($k in @($dirs)) {
+            $ex = $prj.Value.PSObject.Properties[$k]
+            if ($null -eq $ex -or $null -eq $ex.Value) { continue }
+            $cur = $ex.Value.PSObject.Properties['hasTrustDialogAccepted']
+            if ($null -eq $cur) { continue }
+            # 🔴🔴**우리가 넣은 값과 같을 때만 지운다**(3R N4 봉인 2026-09-10 · 맥판은 이미 이렇게 한다).
+            #   앞 판은 **칸이 있기만 하면** 지웠다. 기록한 뒤 사람이 그 값을 손수 `false` 로 바꾸셨다면
+            #   그것은 이제 **그분의 선택**이다 — 기록이 있다고 남의 결정을 되돌리지 않는다.
+            if ($cur.Value -ne $true) {
+                Write-Host ("  남김: " + (Short $file) + " 의 " + (Short $k) + " 폴더 신뢰 칸 (우리가 넣은 값과 달라 손대지 않습니다: " + $cur.Value + ")")
+                continue
+            }
+            $ex.Value.PSObject.Properties.Remove('hasTrustDialogAccepted')
+            $hit++
+            # 우리 칸 하나만 있던 자리면 이제 비었다 — 빈 칸은 남기지 않는다.
+            if (@($ex.Value.PSObject.Properties).Count -eq 0) { $prj.Value.PSObject.Properties.Remove($k) }
+        }
+        if ($hit -eq 0) { return }
+        $why = Write-JsonChecked $file $o
+        if ($why) {
+            $script:KeptFail++; $script:TrustCleanupFail++
+            Write-Host ("  [남음] " + (Short $file) + " 의 폴더 신뢰 칸 — " + $why + " 원본은 그대로 두었습니다.")
+            return
+        }
+        $script:Removed++
+        Write-Host ("  지움: " + (Short $file) + " 의 폴더 신뢰 칸 " + $hit + "곳 (파일과 나머지 칸은 그대로)")
+    } catch {
+        $script:KeptFail++; $script:TrustCleanupFail++
+        Write-Host ("  [남음] " + (Short $file) + " 의 폴더 신뢰 칸 — " + $_.Exception.Message)
+    }
+}
 function Remove-OurHooks($file) {
     if (-not (Test-Hooks $file)) { return }
     $raw = Read-TextUtf8 $file
@@ -805,6 +1094,17 @@ function Remove-UserPathSeed {
 # ★공식 명령을 먼저 쓴다 — 그 명령은 두 운영체제에서 같은 뜻이라 대칭이 저절로 맞는다.
 #   자리를 직접 치우는 것은 클로드가 이미 없을 때의 폴백이다.
 #   ⚠순서 제약: 로그아웃 명령이 클로드 안에 들어 있다. 클로드를 지우기 전에 부른다.
+# 🔴**이 함수는 한 실행에 한 번만 돈다**(1R BLOCK ① 봉인 2026-09-10 · 맥과 같은 불변식).
+#   맥에서는 재시도 루프가 이 자리를 되부르며 열쇠고리 항목을 하나씩 **최대 네 개** 지웠다.
+#   윈도우는 파일 하나라 되불러도 결과가 같지만, ★불변식을 한쪽 OS 에만 두면 다음 사람이
+#   「윈도우는 되불러도 되는 자리」로 읽고 그 위에 무언가를 얹는다. 두 판을 같게 둔다.
+# 🔴🔴**함수 전체를 막은 것은 너무 넓었다**(2R N1 봉인 2026-09-10). 잠긴 로그인 파일 삭제가 처음
+#   실패했을 때 사람이 잠금을 풀고 Enter 를 눌러도 이 함수가 통째로 건너뛰어졌고, 나머지가 성공하면
+#   **파일이 남은 채 전체 성공**으로 끝났다 — 거짓 성공이다.
+#   ⇒ 되돌릴 수 없는 것만 한 번으로 막는다(맥은 열쇠고리 직접 삭제가 그것이다). 윈도우에는 아직
+#     그런 명령이 없지만 **이름과 자리를 맥과 같게 둔다** — 생기는 날 여기가 그 자리다.
+#   여러 번 해도 결과가 같은 것(공식 logout · 파일 삭제)은 **재시도할 수 있게** 둔다.
+$script:LoginKeychainDone = $false
 function Invoke-PurgeLoginFirst {
     if (-not $PurgeLogin) { Write-Host '  남김: 로그인 (다음에 다시 하지 않으셔도 됩니다)'; return }
     $claude = Get-ClaudeCmd
@@ -825,6 +1125,11 @@ function Invoke-Purge {
     Write-Host ''
     Write-Host '=== 지웁니다 ==='
 
+    # 🔴**자비스 폴더를 지우기 전에** 신뢰 씨앗 기록을 읽어 둔다(1R REVISE ④ 봉인 2026-09-10).
+    #   그 기록 파일은 자비스 작업 폴더 안에 있고, 아래에서 그 폴더를 지운다 — 순서를 뒤집으면
+    #   기록이 먼저 사라져 「우리가 넣은 것」과 「참가자의 것」을 영영 구별할 수 없다.
+    $script:TrustSeedRows = @(Read-TrustSeedRecord)
+
     # ★남겨야 할 자리의 실경로를 **먼저 한 번에** 푼다. 하나라도 못 풀면 이 실행은 파일을 지우지 않는다.
     Initialize-PreserveCanon
     if ($script:PreserveCanonFail.Count -gt 0) {
@@ -834,7 +1139,7 @@ function Invoke-Purge {
             Write-Host ('           까닭: ' + $bad.why)
         }
         Write-Host '         무엇을 남겨야 하는지 모르는 채로 지우면 참가 열쇠를 잃을 수 있습니다.'
-        Write-Host '         그 자리를 살펴보신 뒤(링크가 끊겼거나 권한이 없을 수 있습니다) 같은 줄을 다시 돌려 주십시오.'
+        Write-Host '         그 자리를 살펴보신 뒤(링크가 끊겼거나 권한이 없을 수 있습니다) 아래 「다시 하시는 법」대로 다시 실행해 주십시오.'
     }
 
     # ★순서가 중요하다 — 등록을 떼는 명령과 로그아웃 명령이 지울 대상 **안에** 들어 있다.
@@ -906,7 +1211,7 @@ function Invoke-Purge {
             $script:KeptFail++
             Write-Host '  [남음] cys 프로그램 — 설정 앱에서 아직 지워지지 않았습니다.'
             Write-Host '         우리가 폴더만 억지로 지우면 시작 메뉴 바로가기 같은 것이 남습니다.'
-            Write-Host '         설정 앱에서 제거를 마치신 뒤 같은 줄을 한 번 더 돌려 주십시오.'
+            Write-Host '         설정 앱에서 제거를 마치신 뒤 아래 「다시 하시는 법」대로 다시 실행해 주십시오.'
             $script:SkipCysDir = $true
         }
     } elseif ((Test-Path $CysDir) -or (Test-Path $CysDirOld)) {
@@ -926,16 +1231,13 @@ function Invoke-Purge {
             Write-Host '  cys 폴더는 있는데 설치 목록에는 항목이 없습니다 (지난 설치가 끝까지 못 간 자리입니다).'
             Write-Host '    설정 앱에는 cys 가 보이지 않습니다 — 그래서 이번에는 이 스크립트가 직접 지웁니다.'
         }
-        foreach ($n in @('cys-app', 'cysd', 'cys')) {
-            Get-Process -Name $n -ErrorAction SilentlyContinue | Stop-Process -Force -ErrorAction SilentlyContinue
-        }
-        Start-Sleep -Seconds 2
-        $alive = @(foreach ($n in @('cys-app', 'cysd', 'cys')) { Get-Process -Name $n -ErrorAction SilentlyContinue })
+        $alive = @(Stop-CysProcesses)
         if ($alive.Count -gt 0) {
             $script:KeptFail++
             $script:SkipCysDir = $true
             Write-Host '  [남음] cys 프로그램 — 아직 실행 중이라 폴더를 지울 수 없습니다.'
-            Write-Host '         작업 관리자에서 cys 를 끝내신 뒤 같은 줄을 한 번 더 돌려 주십시오.'
+            Write-AliveProcs $alive
+            Write-Host '         그 뒤 아래 「다시 하시는 법」대로 다시 실행해 주십시오.'
         } elseif (-not $Yes) {
             $a = Read-Host '  이 폴더를 지웁니다. 계속하시려면 Enter 를 눌러 주십시오 (그만두려면 q)'
             if ($a -eq 'q') {
@@ -947,10 +1249,12 @@ function Invoke-Purge {
     }
 
     # cys 가 돌고 있으면 폴더가 지워지지 않는다 — 먼저 멈춘다.
-    foreach ($n in @('cys-app', 'cysd', 'cys')) {
-        Get-Process -Name $n -ErrorAction SilentlyContinue | Stop-Process -Force -ErrorAction SilentlyContinue
+    #   ★이름이 아니라 **자리**로 끈다(R1). 고아가 된 python3.exe 가 정확히 이 자리에서 걸렸다.
+    $stillAlive = @(Stop-CysProcesses)
+    if ($stillAlive.Count -gt 0 -and -not $script:SkipCysDir) {
+        Write-Host ('  [주의] cys 자리에서 아직 ' + $stillAlive.Count + '개가 돌고 있습니다 — 폴더가 안 지워질 수 있습니다.')
+        Write-AliveProcs $stillAlive
     }
-    Start-Sleep -Seconds 2
 
     if (-not $script:SkipCysDir) {
         Drop 'cys 프로그램' $CysDir
@@ -1002,7 +1306,7 @@ function Invoke-Purge {
             Write-Host ('         ' + (Short $CysHome) + ' 를 지우지 않았습니다. 지웠다면 안 옮겨진 쪽이 사라졌을 것입니다.')
             Write-Host ('         까닭: ' + $script:TreeSameWhy)
             Write-Host '         지난번에 옮기다 만 것일 수도, 손수 고쳐 두신 것일 수도 있어 저희가 고르지 않습니다.'
-            Write-Host ('         ' + (Short $AgoraSkill) + ' 를 손으로 정리하신 뒤 같은 줄을 다시 돌려 주십시오.')
+            Write-Host ('         ' + (Short $AgoraSkill) + ' 를 손으로 정리하신 뒤 아래 「다시 하시는 법」대로 다시 실행해 주십시오.')
             Write-Host '         참가 열쇠·이름은 어느 경우에도 그대로 있습니다.'
         }
     } elseif ((Test-Path -LiteralPath $AgoraSkillInCys) -and -not (Test-Path -LiteralPath $AgoraSkill)) {
@@ -1033,7 +1337,7 @@ function Invoke-Purge {
             Write-Host ("  [남음] 토론장 안내를 밖으로 옮기지 못했습니다 - 그래서 " + (Short $CysHome) + " 를 지우지 않았습니다.")
             if ($why) { Write-Host ("         까닭: " + $why) }
             Write-Host '         지웠다면 그 안내가 영영 사라졌을 것입니다. 참가 열쇠·이름은 그대로 있습니다.'
-            Write-Host ("         " + (Short $AgoraSkillInCys) + " 를 손으로 " + (Short $AgoraSkill) + " 에 옮기신 뒤 같은 줄을 다시 돌려 주십시오.")
+            Write-Host ("         " + (Short $AgoraSkillInCys) + " 를 손으로 " + (Short $AgoraSkill) + " 에 옮기신 뒤 아래 「다시 하시는 법」대로 다시 실행해 주십시오.")
             # 반쪽만 생긴 대상은 치운다 - 치우기가 실패해도 이제는 안전하다(다음 실행이 위 「다르다」 갈래로
             #   들어가 원본을 남긴다). 앞 판은 이 치우기가 실패하면 다음 실행이 원본을 지웠다.
             if ((Test-Path -LiteralPath $AgoraSkill) -and -not (Test-TreeSame $AgoraSkillInCys $AgoraSkill)) {
@@ -1049,8 +1353,41 @@ function Invoke-Purge {
     if ($agoraMigrateOk) { Drop 'cys 계정 자리' $CysHome }
     # footprint: W-CLAUDEBIN
     Drop '클로드 실행 파일' $ClaudeExe
+    # 🔴**신뢰 키 정리를 작업 폴더 삭제보다 앞에 둔다**(2R N4 봉인 2026-09-10).
+    #   기록 파일은 그 폴더 안에 있다. 폴더를 먼저 지우면, 키 정리가 실패했을 때 **다시 해 볼 근거가
+    #   사라진다** — 재시도는 「기록 없음」으로 읽고 그 키를 영영 건너뛴다.
+    #   ★순서가 곧 안전장치다: 근거를 없애는 일은 그 근거를 다 쓴 뒤에 한다.
+    #   ⑵사용자 홈 = **기록에 적힌 것만** 뺀다. 우리가 넣은 키만 기록돼 있다(1R REVISE ④).
+    #   ⛔경로를 추측해서 지우지 않는다 — 그 추측이 참가자의 값을 지우던 자리였다.
+    if ($script:TrustSeedRows.Count -eq 0) {
+        Write-Host '  남김: 홈 폴더 신뢰 칸 (우리가 넣은 기록이 없어 손대지 않습니다)'
+    } else {
+        $byCfg = @{}
+        foreach ($row in $script:TrustSeedRows) {
+            if (-not $byCfg.ContainsKey($row[0])) { $byCfg[$row[0]] = @() }
+            $byCfg[$row[0]] += $row[1]
+        }
+        foreach ($cfgPath in @($byCfg.Keys)) { Remove-TrustSeed $cfgPath $byCfg[$cfgPath] }
+    }
+
     # footprint: W-JARVISHOME
-    Drop '자비스 작업 폴더' $JarvisDir
+    # 🔴🔴**신뢰 칸 정리에 실패했으면 이 폴더를 남긴다**(3R N4 봉인 2026-09-10). 기록 파일이 이 안에
+    #   있다 — 지우면 **다시 해 볼 근거가 사라지고**, 다음 실행은 「기록 없음」으로 읽어 그 칸을
+    #   영영 건너뛴다(참가자 컴퓨터에 우리 자국이 남는다).
+    #   ★순서를 앞당긴 것만으로는 부족했다: 실패해도 그냥 이어서 지우고 있었다.
+    if ($script:TrustCleanupFail -gt 0) {
+        $script:KeptFail++
+        Write-Host ('  [남음] ' + (Short $JarvisDir) + ' - 폴더 신뢰 칸을 다 되돌리지 못해 일부러 남겼습니다.')
+        Write-Host '         이 폴더 안의 기록(trust-seed.tsv)이 있어야 다시 해 볼 수 있습니다.'
+        Write-Host '         그 칸을 쓰고 있는 프로그램(클로드 창 등)을 닫으신 뒤 아래 「다시 하시는 법」대로 다시 실행해 주십시오.'
+    } elseif (Test-SafeJarvisDir $JarvisDir) {
+        Drop '자비스 작업 폴더' $JarvisDir
+    } elseif (Test-Path $JarvisDir) {
+        $script:KeptFail++
+        Write-Host ('  [남음] ' + (Short $JarvisDir) + ' - 안전 확인을 통과하지 못해 지우지 않았습니다.')
+        Write-Host ('         까닭: ' + $script:SafeWhy)
+        Write-Host '         그 자리는 손으로 확인해 주십시오. 확실하지 않은 자리를 재귀로 지우지 않습니다.'
+    }
     # footprint: W-SCRIPTCOPY
     Drop '받아 둔 설치 스크립트' $HomePs1
     Drop '받아 둔 설치 스크립트(옛 자리)' $TempPs1
@@ -1059,10 +1396,24 @@ function Invoke-Purge {
     Remove-UserPathSeed
     # footprint: W-CLAUDEJSON
     Remove-JsonKey $ClaudeJson 'hasCompletedOnboarding'
+    # 큰 화면 권유 질문을 미리 넘기려고 설치기가 99 로 적어 둔 칸이다. 우리 자국이니 우리가 뺀다.
+    #   ⚠이 칸은 오래 전부터 심고 있었는데 표에 없어서 아무도 안 지웠다(2026-09-10 자국 표를 채우다 드러났다).
+    Remove-JsonKey $ClaudeJson 'fullscreenUpsellSeenCount'
+    # 폴더 신뢰 씨앗 — 설치기가 심은 자리를 되돌린다. **범위가 자리마다 다르다**(위 함수 머리글 참조).
+    #   ⑴자비스 작업 폴더(백슬래시·슬래시 2형) = 우리가 만든 칸이므로 칸째 뺀다(맥판과 같아진다).
+    Remove-ProjectEntry $ClaudeJson @($JarvisDir, ($JarvisDir -replace '\\','/'))
     # footprint: W-CLAUDESETTINGS
     Remove-JsonKey $SettingsJs 'theme'
     Remove-JsonKey $SettingsJs 'skipDangerousModePermissionPrompt'
     Remove-JsonKey $SettingsJs 'remoteControlAtStartup'
+    # 🔴**요청한 로그인 자국이 정말 사라졌는지 끝에서 다시 본다**(2R N1 봉인). 앞 판은 「지웠다」를
+    #   그 순간의 종료값으로만 말했다 ⇒ 파일이 잠겨 남았는데 전체는 성공으로 끝났다.
+    #   ★「지웠다」는 **다시 봐서 없을 때만** 참이다.
+    if ($PurgeLogin -and (Test-Path $CredFile)) {
+        $script:KeptFail++
+        Write-Host ('  [남음] ' + (Short $CredFile) + ' - 로그인 파일이 아직 남아 있습니다.')
+        Write-Host '         그 파일을 쓰고 있는 프로그램(클로드 창 등)을 닫으신 뒤 다시 해 주십시오.'
+    }
     # footprint: W-CLAUDEUSER — 손대지 않는다
     Write-Host '  남김: 클로드 대화·기록'
 
@@ -1079,7 +1430,7 @@ function Invoke-Purge {
     Write-Host ("=== 끝났습니다 — {0} 가지를 지웠고, {1} 가지를 못 지웠습니다. ===" -f $script:Removed, $script:KeptFail)
     Write-Host '    위에 [남음] 으로 표시된 자리가 있습니다. 그대로 두고 다시 설치하면 뒤엉킵니다.'
     Write-Host '    까닭은 보통 셋 중 하나입니다: 프로그램이 아직 돌고 있다 · 백신이 그 파일을 붙들고 있다 · cys 제거를 아직 안 하셨다'
-    Write-Host '    같은 줄을 한 번 더 돌려 보시고, 그래도 남으면 그 줄을 알려 주십시오.'
+    Write-Host '    아래 「다시 하시는 법」대로 한 번 더 해 보시고, 그래도 남으면 이 화면을 사진으로 남겨 알려 주십시오.'
     return 7
 }
 
@@ -1096,5 +1447,26 @@ if (-not $Yes) {
     if ($answer -ne '지웁니다') { Write-Host '그만둡니다 — 아무것도 지우지 않았습니다.'; exit 1 }
 }
 
+# ★그 자리에서 다시 해 본다 - 창을 닫고 명령을 다시 찾는 것보다 Enter 한 번이 싸다(2026-09-10).
+#   막힌 까닭 대부분은 **사람이 지금 이 창 앞에서 없앨 수 있는 것**이다(설정 앱 제거를 마친다 ·
+#   작업 관리자에서 붙들고 있는 것을 끝낸다). 그때마다 사이트를 다시 찾게 하지 않는다.
+#   ⚠상한 3회 - 무한 고리는 「막혔다」를 영영 말하지 않는 것과 같다. 3회 뒤에는 사실대로 끝내고
+#     **명령 전체를 인쇄**한다(재부팅이 필요한 자리는 재실행으로 안 풀린다).
+function Reset-PurgeCounters {
+    $script:Removed = 0
+    $script:KeptFail = 0
+    $script:Preserved = 0
+    $script:SkipCysDir = $false
+}
 $rc = Invoke-Purge
+$tries = 0
+while (($rc -ne 0) -and (-not $Yes) -and ($tries -lt 3)) {
+    $tries++
+    Write-Host ''
+    $a = Read-Host ('  남은 자리를 여기서 바로 다시 지워 볼 수 있습니다. Enter 를 누르면 다시 해 봅니다 (' + $tries + '/3 · 그만두려면 q)')
+    if ($a -eq 'q') { break }
+    Reset-PurgeCounters
+    $rc = Invoke-Purge
+}
+if ($rc -ne 0) { Show-RerunHow }
 exit $rc

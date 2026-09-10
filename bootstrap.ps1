@@ -5,14 +5,16 @@
 #   2) 클로드 코드가 없거나 낡았으면 공식 설치기로 설치한다
 #   3) 로그인 화면을 열고 승인이 끝날 때까지 기다린다
 #   4) 자비스를 깨워 환경 보고를 사람 말로 옮겨 준다
-# 같은 줄을 다시 돌리면 끝난 단계는 건너뛰고 이어서 간다.
+# 다시 실행하면 끝난 단계는 건너뛰고 이어서 간다.
+#   ⛔사람에게 「같은 줄을 다시 돌려 주십시오」라고 말하지 않는다 — 2026-09-10 실기에서
+#     **사용자 막힘으로 확정**된 문구다. 대신 Show-RerunHow 가 창 여는 법과 **명령 전체**를 인쇄한다.
 #
 # 쓰는 법
 #   powershell -File bootstrap.ps1                 전 단계
 #   powershell -File bootstrap.ps1 -DetectOnly     살펴보기만 하고 환경 보고 1장을 쓴 뒤 끝낸다
 #   powershell -File bootstrap.ps1 -DryRun         판정은 다 하되 바깥을 바꾸는 행위는 하지 않는다
 #
-# 배포 한 줄 (사람이 붙여넣는 것 — cmd 창과 PowerShell 창 어느 쪽에서도 같은 줄이 돈다)
+# 배포 한 줄 (사람이 붙여넣는 것 — cmd 창과 PowerShell 창 어느 쪽에서도 이 명령이 그대로 돈다)
 #   powershell -NoProfile -ExecutionPolicy Bypass -Command "irm https://jarvis.godmeyou.kr/install/bootstrap.ps1 -OutFile ([Environment]::GetFolderPath('UserProfile')+'\install-jarvis.ps1'); powershell -ExecutionPolicy Bypass -File ([Environment]::GetFolderPath('UserProfile')+'\install-jarvis.ps1')"
 #   -ExecutionPolicy Bypass 가 없으면 윈도우 기본값(Restricted)에서 스크립트가 로드되지 않는다.
 #   왜 이 모양인가 (구판은 cmd 창에 붙여넣으면 안 돌았다)
@@ -143,6 +145,129 @@ function Invoke-Logged($what, $cmd, $cmdArgs) {
     return $code
 }
 
+# ── 자동 시작 등록을 「말」이 아니라 「자리」로 잰다 (R6 · 2026-09-10) ────────────
+# 🔴실기에서 화면이 스스로 모순됐다: 팩이 「작업 스케줄러 등록 완료(ONLOGON + RestartOnFailure)」를
+#   찍은 **바로 다음 줄에** 설치기가 「자동으로 켜지도록 등록하지는 못했습니다」를 찍었다.
+#   그리고 재부팅 실측 = cys 는 저절로 켜지지 않았다(쓰시는 분이 손으로 여셨다).
+#   ⇒ 두 줄 다 **추정**이었다. 팩은 자기가 부른 명령의 종료값을 말했고, 설치기는 「데몬이 안 답한다」를
+#     「등록 실패」로 옮겨 적었다. ★둘 다 등록된 자리를 직접 본 적이 없다.
+#   ⇒ 여기서 **작업 그 자체를 묻는다.** 이 함수의 답만이 등록 여부의 사실이다.
+#   ⚠「등록됨」과 「다음 로그온에 실제로 뜬다」는 다른 명제다 — 우리는 앞의 것만 말한다(뒤는 실기 몫).
+function Get-CysAutoStartState {
+    param([string]$CysCli = '')
+    # 🔴🔴돌려주는 값은 **다섯**이다 — 'yes' · 'off' · 'other' · 'no' · 'unknown'.
+    #   ⑴앞 판(1R)은 $true/$false 둘뿐이라 **「모른다」를 「없다」로 바꿔** 말했다.
+    #   ⑵그 다음 판(2R 지적)은 XML 을 **글자로** 봤다 — `<Command>` 안에 `cysd` 라는 조각만 있으면
+    #     'yes' 였다. 달력 trigger 로 `C:\Other\cysd.exe` 를 도는 남의 작업도 「다음 로그온부터
+    #     저절로 켜집니다」가 됐다. ⇒ 재부팅해도 안 켜지는데 등록 완료라고 안내한다.
+    #   ⇒ **구조로 읽는다.** 'yes' 는 세 가지가 **모두** 참일 때만이다:
+    #     ①실행 파일이 **우리가 깐 그 자리의 cysd.exe** 다(경로 비교 · 이름 조각이 아니다)
+    #     ②**지금 이 사용자**의 **로그온 trigger** 가 있고 그것이 켜져 있다
+    #     ③작업 자체가 켜져 있다
+    #   ⚠XML 을 못 읽거나 어느 하나를 확인할 수 없으면 **'unknown'** 이다 — 모르는 것은 모른다고 한다.
+    $xml = ''
+    $rc = 1
+    try {
+        $xml = (& schtasks /Query /TN cysd /XML 2>&1) -join "`n"
+        $rc = $LASTEXITCODE
+    } catch {
+        return 'unknown'
+    }
+    if ($rc -ne 0) {
+        # 「그런 작업이 없다」와 「물어보지 못했다」는 다른 답이다. 섞으면 위 사고가 되풀이된다.
+        if ($xml -match '찾을 수 없|cannot find|does not exist|ERROR: The system cannot find') { return 'no' }
+        return 'unknown'
+    }
+    $doc = $null
+    try {
+        $body = $xml.Substring($xml.IndexOf('<'))   # schtasks 는 앞에 BOM·빈 줄을 붙이기도 한다
+        $doc = [xml]$body
+    } catch { return 'unknown' }
+    if ($null -eq $doc -or $null -eq $doc.Task) { return 'unknown' }
+
+    # ① 실행 파일 — 우리가 깐 자리의 cysd.exe 여야 한다.
+    $wantList = @()
+    foreach ($d in @($env:LOCALAPPDATA)) {
+        if ($d) {
+            $wantList += (Join-Path $d 'cys\cysd.exe')
+            $wantList += (Join-Path $d 'Programs\cys\cysd.exe')
+        }
+    }
+    if ($CysCli) {
+        try { $wantList += (Join-Path (Split-Path $CysCli -Parent) 'cysd.exe') } catch { }
+    }
+    $cmds = @()
+    try { foreach ($a in @($doc.Task.Actions.Exec)) { if ($a -and $a.Command) { $cmds += [string]$a.Command } } } catch { return 'unknown' }
+    if ($cmds.Count -eq 0) { return 'other' }
+    $mine = $false
+    foreach ($c in $cmds) {
+        $c2 = $c.Trim().Trim('"')
+        try { $c2 = [System.IO.Path]::GetFullPath($c2) } catch { }
+        foreach ($w in $wantList) {
+            $w2 = $w
+            try { $w2 = [System.IO.Path]::GetFullPath($w) } catch { }
+            if ($c2 -and $w2 -and ($c2 -eq $w2)) { $mine = $true }
+        }
+    }
+    if (-not $mine) { return 'other' }
+
+    # ③ 작업 자체가 켜져 있는가
+    try {
+        if ($doc.Task.Settings -and ($doc.Task.Settings.Enabled -eq 'false')) { return 'off' }
+    } catch { return 'unknown' }
+
+    # ② 지금 이 사용자의 로그온 trigger 가 있고 켜져 있는가
+    $logon = $null
+    try { $logon = @($doc.Task.Triggers.LogonTrigger) } catch { return 'unknown' }
+    if ($null -eq $logon -or $logon.Count -eq 0 -or $null -eq $logon[0]) { return 'off' }
+    # 🔴🔴**사람을 이름으로 견주지 않는다 — SID 로 견준다**(3R ⑤ 봉인 2026-09-10).
+    #   앞 판은 세 가지를 이름으로 비교했고 **양쪽으로 틀렸다**:
+    #     ⑴`\<이름>` 접미사만 같아도 통과 ⇒ 지금 계정이 `ACME\alice` 인데 trigger 가 `OTHER\alice`
+    #       여도 「다음 로그온부터 저절로 켜집니다」였다. **도메인이 다르면 다른 사람이다.**
+    #     ⑵작업 스케줄러의 `UserId` 는 **사용자명일 수도 SID 일 수도 있다**(Microsoft 문서 명시).
+    #       SID 로 적힌 정상적인 내 작업이 이름 비교에서 안 맞아 `off` 로 오판됐다.
+    #   ⇒ **두 형태를 한 축(SID)으로 모아** 견준다: `S-1-…` 이면 그대로, 이름이면 `NTAccount→SID` 변환.
+    #   ⚠변환을 못 하면(도메인에 못 닿는 등) **모른다고 한다** — 「아니다」로 단정하지 않는다.
+    $mySid = ''
+    try { $mySid = [string][System.Security.Principal.WindowsIdentity]::GetCurrent().User.Value } catch { $mySid = '' }
+    if (-not $mySid) { return 'unknown' }
+    $ok = $false
+    $unresolved = $false
+    foreach ($t in $logon) {
+        if ($null -eq $t) { continue }
+        if ($t.Enabled -eq 'false') { continue }
+        $uid = ''
+        try { $uid = ([string]$t.UserId).Trim() } catch { $uid = '' }
+        # UserId 가 없으면 「누가 로그온하든」이라는 뜻이다 — 우리도 거기 포함된다.
+        if (-not $uid) { $ok = $true; continue }
+        $sid = ''
+        if ($uid -match '^S-1-') {
+            $sid = $uid
+        } else {
+            try {
+                $sid = [string](New-Object System.Security.Principal.NTAccount($uid)).Translate([System.Security.Principal.SecurityIdentifier]).Value
+            } catch { $sid = ''; $unresolved = $true }
+        }
+        if ($sid -and ($sid -eq $mySid)) { $ok = $true }
+    }
+    if (-not $ok) {
+        # 「내 것이 아니다」와 「누구 것인지 못 알아봤다」는 다른 답이다. 섞으면 또 거짓 단정이 된다.
+        if ($unresolved) { return 'unknown' }
+        return 'off'
+    }
+    return 'yes'
+}
+# 사람에게 할 말은 한 자리에서만 만든다 — 상태가 다섯인데 문장이 자리마다 갈리면 또 모순이 난다.
+function Get-AutoStartWords($state) {
+    switch ($state) {
+        'yes'   { return '자동 시작 등록됨 (작업 이름 cysd · 다음 로그온부터 저절로 켜집니다).' }
+        'off'   { return '자동 시작 작업은 있는데 꺼져 있습니다 — 컴퓨터를 켜실 때 cys 를 한 번 열어 주십시오.' }
+        'other' { return 'cysd 라는 이름의 작업이 있지만 우리 것이 아닙니다 — 자동 시작은 등록되지 않았습니다.' }
+        'no'    { return '자동으로 켜지도록 등록되지 않았습니다(까닭은 이 화면만으로는 갈리지 않습니다).' }
+        default { return '자동 시작 등록 여부를 확인하지 못했습니다(이 컴퓨터의 정책이 조회를 막았을 수 있습니다).' }
+    }
+}
+
 function Invoke-CysProbe {
     param([string]$Cli, [string[]]$CysArgs)
     $prev = $env:CYS_NO_AUTOSTART
@@ -162,7 +287,11 @@ function Write-TextNoBom($path, $text) {
 $script:HumanHands = 0
 function Human($who, $what) {
     $script:HumanHands++
-    Say "[사람 손 #$($script:HumanHands) · 강제: $who] $what"
+    # 🔴「강제」를 뺀다(1R BLOCK ③ 봉인 2026-09-10). 이 칸의 뜻은 「누가 이 손을 시키는가」이지
+    #   「우리가 사람을 강제한다」가 아니다. 앞 판은 자리마다 문구를 순화해 놓고 **이 공통 래퍼가
+    #   여전히 「강제: 자비스」를 인쇄**해서, 화면에는 순화가 하나도 나타나지 않았다.
+    #   ★자리마다 고치고 공통 자리를 안 고치면 아무것도 안 고친 것이다.
+    Say "[사람 손 #$($script:HumanHands) · 시킨 쪽: $who] $what"
 }
 
 # 지난 실행이 끝을 알리지 않고 사라졌으면 그 사실과 마지막 줄을 사람에게 보여 준다.
@@ -285,7 +414,13 @@ $script:ClosingDone = $false
 function Write-ClosingNote {
     if ($script:ClosingDone) { return }
     $script:ClosingDone = $true
-    $next = if ($script:NextStep) { $script:NextStep } else { '같은 한 줄을 다시 돌리시면 끝난 단계는 건너뛰고 이어서 갑니다.' }
+    # 「다음에 할 일」을 아무도 안 적은 끝 = 우리가 예상 못 한 자리다. 그때가 안내가 가장 필요한 때이므로
+    #   기본값을 「다시 실행」으로 두고 **깃발도 함께 세운다**(문구만 두면 방법이 안 나온다).
+    if (-not $script:NextStep) {
+        $script:NextStep = '아래 「다시 하시는 법」대로 다시 실행해 주십시오.'
+        $script:ShowRerun = $true
+    }
+    $next = $script:NextStep
     Say ''
     Say ('다음에 할 일: ' + $next)
     if ($script:JCode) {
@@ -307,6 +442,46 @@ function Write-ClosingNote {
     } else {
         Say '  기록 파일은 아직 만들어지지 않았습니다 — 이 화면을 사진으로 남겨 주십시오.'
     }
+    # ★안내는 **맨 마지막**에 둔다 — 사람이 마지막으로 보는 화면에 명령이 있어야 복사할 수 있다.
+    if ($script:ShowRerun) { Show-RerunHow }
+}
+
+# ── 다시 하시는 법 — 「같은 줄」이라고 말하지 않는다 (2026-09-10 실기에서 고친 것) ─────
+# 🔴막힌 자리마다 「같은 한 줄을 다시 돌려 주십시오」라고 적어 왔다. 실기에서 그것이 **사용자
+#   막힘으로 확정**됐다 — 「줄」이 무엇인지, 「돌린다」가 무슨 뜻인지 모르고, 무엇보다 그 명령이
+#   화면 어디에도 없었다. 창이 닫힌 뒤 사이트를 다시 찾는 것 자체가 손 하나이고, 사이트에는
+#   명령이 둘(지우기·재설치)이라 어느 쪽인지 사람이 고를 수도 없다.
+#   ⇒ 끝맺음에서 ①창 여는 법 ②복사 ③붙여넣기+Enter 를 적고 **명령 전체를 인쇄한다.**
+# ★어느 명령을 인쇄할지는 **들어온 길**이 정한다(재설치가 JARVIS_ENTRY=reinstall 로 알려 준다).
+# ⚠아래 두 줄은 사이트가 게시하는 명령과 **글자까지 같아야 한다** — checks.ps1 이 아니라
+#   checks.sh 가 머리글의 한 줄과 이 상수의 동일성을 잰다(둘이 갈리면 사람이 복사한 것이 달라진다).
+$JarvisRerunBootstrap = @'
+powershell -NoProfile -ExecutionPolicy Bypass -Command "irm https://jarvis.godmeyou.kr/install/bootstrap.ps1 -OutFile ([Environment]::GetFolderPath('UserProfile')+'\install-jarvis.ps1'); powershell -ExecutionPolicy Bypass -File ([Environment]::GetFolderPath('UserProfile')+'\install-jarvis.ps1')"
+'@
+$JarvisRerunReinstall = @'
+powershell -NoProfile -ExecutionPolicy Bypass -Command "irm https://jarvis.godmeyou.kr/install/reinstall.ps1 -OutFile ([Environment]::GetFolderPath('UserProfile')+'\reinstall-jarvis.ps1'); powershell -ExecutionPolicy Bypass -File ([Environment]::GetFolderPath('UserProfile')+'\reinstall-jarvis.ps1')"
+'@
+$script:ShowRerun = $false
+function Get-RerunCmd {
+    if ($env:JARVIS_ENTRY -eq 'reinstall') { return $JarvisRerunReinstall }
+    return $JarvisRerunBootstrap
+}
+# 「다시 실행하면 풀린다」고 말하는 자리는 **전부 이 함수로** 적는다 — 문구와 깃발이 갈리면
+#   화면은 다시 하라는데 그 방법은 안 나오는 끝이 생긴다(그것이 실기에서 난 일이다).
+function Set-NextStepRerun($text) {
+    $script:NextStep = $text
+    $script:ShowRerun = $true
+}
+function Show-RerunHow {
+    Say ''
+    Say '  == 다시 하시는 법 (이대로 따라 하시면 됩니다) =='
+    Say '   1) 시작 단추를 누르고 powershell 이라고 치신 뒤 [Windows PowerShell] 을 여십시오.'
+    Say '   2) 아래 명령을 처음부터 끝까지 마우스로 끌어 선택한 뒤 Ctrl+C 를 누르십시오.'
+    Say '   3) 그 창을 한 번 누르고 마우스 오른쪽 단추를 눌러 붙여넣은 뒤 Enter 를 누르십시오.'
+    Say ''
+    Say (Get-RerunCmd)
+    Say ''
+    Say '  끝난 단계는 건너뛰고 막힌 자리부터 이어서 갑니다.'
 }
 
 # 백신이 파일을 붙들었을 때 하는 말은 한 자리에서만 만든다 — 두 곳(설치 대기·받은 파일 사라짐)에서
@@ -318,7 +493,8 @@ function Say-AntivirusHold($what) {
     Say ("     대상 = " + $what)
     Say '     작업 표시줄과 화면 오른쪽 아래에 백신 창이 떠 있는지 확인해 주십시오.'
     Say '     「클라우드 자동 분석 요청」 창이면 [파일 전송] 을, 실행 알림이면 [실행] 을 누르시고 창을 닫지 마십시오.'
-    Say '     그 뒤 같은 한 줄을 다시 돌리시면 여기서부터 이어서 갑니다.'
+    Say '     그 뒤 아래 「다시 하시는 법」대로 다시 실행하시면 여기서부터 이어서 갑니다.'
+    $script:ShowRerun = $true
 }
 
 function Redact($s) {
@@ -343,7 +519,8 @@ function Test-ClaudeAuthCmd {
 #   cys 쪽 능력도 같은 까닭으로 `--help` 로 묻는다(판본 숫자를 게이트로 쓰지 않는다).
 #   묻는 것 = 자리를 열 때 「이 자리에서 무엇을 띄우는지」를 적어 두는 칸이 있는가.
 #   그 칸이 있어야 컴퓨터를 껐다 켠 뒤 복원이 자비스 자리를 「무엇을 띄울지 모름」으로 건너뛰지 않는다.
-#   ⚠지금 배포된 판본(0.14.29)에는 그 칸이 없다 — 없는 판본에 붙이면 자리가 아예 안 열린다.
+#   ⚠판본에 따라 그 칸이 없다 — 없는 판본에 붙이면 자리가 아예 안 열린다(2026-09-04 실측: 0.14.29 에 없었다).
+#     ★그래서 이 주석에 「지금 배포된 판본은 X」라고 적지 않는다 — 핀이 올라가는 날 그 문장만 낡는다.
 #   그래서 붙이기 전에 물어본다. 한 번만 묻고 그 답을 기록 파일에 한 줄 남긴다.
 #   ⚠답을 기억해 두지 않는다. 이 스크립트가 도는 동안 cys 는 **없다가 생기고 낡았다가 새로워진다** —
 #   설치 전에 물어 둔 답을 설치 뒤에 그대로 쓰면 옛 판본에 대고 판정하는 셈이 된다.
@@ -423,6 +600,21 @@ $script:IsAdmin     = $false
 $script:CysBodyMissing = $false
 $script:BlockedStep = ''
 $script:DaemonTemporary = $false
+# 자동 시작 등록 실측값(Get-CysAutoStartState 가 채운다). 재기 전에는 **'unknown'** 이다 —
+#   ⛔안 재고 'no' 로 두면 그것이 곧 「모른다를 없다로 바꿔 말하는」 그 사고다.
+$script:AutoStartState = 'unknown'
+# 🔴우리가 **홈 폴더에 새로 넣은** 신뢰 키의 목록(설정파일, 키). 제거기가 이 목록만 되돌린다 —
+#   목록에 없는 키는 참가자의 것이므로 손대지 않는다(1R REVISE ④). 형식은 TSV 다: 두 OS 가 같은
+#   파일을 읽고 쓰는데 한쪽에는 JSON 도구가 없을 수 있기 때문이다(맥 깨끗한 기계에 jq 가 없다).
+$script:TrustSeeded = @()
+$script:TrustJournalFailed = $false
+$TrustSeedFile = Join-Path $JarvisHome 'trust-seed.tsv'
+# 🔴**우리가 만든 폴더라는 표식**(2R N3 봉인 2026-09-10). 제거기는 이 표식이 있을 때만 작업 폴더를
+#   재귀로 지운다 — JARVIS_HOME 은 환경변수라 무엇이든 들어올 수 있고, 검사 없이 지우면
+#   사용자 홈이나 드라이브 루트가 통째로 사라진다(되돌릴 수 없다).
+$JarvisOwnerFile = Join-Path $JarvisHome '.jarvis-owned'
+$JarvisOwnerMark = 'jarvis-installer-owned v1'
+$JarvisHomeBaseName = 'install-jarvis'
 
 function Invoke-DetectStage1 {
     #   상태 변수들이 켜지기만 하고 꺼지지 않으면 앞 호출의 `$true` 잔재가 남아 틀린 ok 를 낸다.
@@ -639,19 +831,30 @@ function Write-Report {
     [void]$lines.Add('')
     [void]$lines.Add('## 지금 상태 → 다음 행동')
     if ($script:DaemonTemporary) {
-        [void]$lines.Add('- ⓘ **cys 를 직접 열어 켰습니다.** 자동으로 켜지도록 등록하는 것은 이 계정에서 막혀 있습니다(윈도우 설정).')
+        # ⚠한 줄에 인라인 if 를 넣다가 닫는 중괄호를 빠뜨려 **5.1 이 파일 전체를 파싱하지 못했다**
+        #   (러너 실측 2026-09-10 · MissingEndCurlyBrace ⇒ 설치기가 한마디도 못 하고 죽는다).
+        #   ⇒ 값을 먼저 변수에 담는다. 긴 인라인 식은 이 파일에서 위험 대비 이득이 없다.
+        [void]$lines.Add('- ⓘ **cys 를 직접 열어 켰습니다.** ' + (Get-AutoStartWords $script:AutoStartState))
         [void]$lines.Add('  다음에 컴퓨터를 켜시면 **cys 를 한 번 열어 주시면** 됩니다 — 그러면 그때부터 다시 돕니다. 따로 하실 일은 없습니다.')
     }
     if ($Mode -eq 'dry') {
         # 🔴맥에서 먼저 잡힌 것을 윈도우에도 같게 고친다(두 OS 동등). dry 모드에서는 아래
         #   「앞 단계는 이미 끝났습니다」가 거짓이다 — 아무것도 안 했기 때문이다.
         [void]$lines.Add('- (미리보기) 아무것도 하지 않았습니다 — 이 보고는 **지금 이 컴퓨터의 상태**일 뿐입니다.')
-        [void]$lines.Add('- 실제로 설치하시려면 미리보기 없이 같은 한 줄을 돌리십시오.')
+        [void]$lines.Add('- 실제로 설치하시려면 미리보기(-DryRun) 없이 아래 명령을 다시 실행하십시오.')
+        [void]$lines.Add('')
+        [void]$lines.Add('```')
+        [void]$lines.Add((Get-RerunCmd))
+        [void]$lines.Add('```')
     } elseif ($script:BlockedStep) {
         [void]$lines.Add("- **막힌 단계: $($script:BlockedStep)**")
         [void]$lines.Add('- 앞 단계(클로드 설치·로그인·자비스 준비)는 **이미 끝났습니다.** 여기부터 다시 이어서 갑니다.')
         [void]$lines.Add('- 그 **다음 단계들은 아직 하지 않았습니다** — 실패한 것이 아니라 순서가 안 온 것입니다.')
-        [void]$lines.Add('- 같은 한 줄을 다시 돌리면 **끝난 단계는 건너뛰고 막힌 자리부터** 갑니다.')
+        [void]$lines.Add('- 아래 명령을 다시 실행하면 **끝난 단계는 건너뛰고 막힌 자리부터** 갑니다.')
+        [void]$lines.Add('')
+        [void]$lines.Add('```')
+        [void]$lines.Add((Get-RerunCmd))
+        [void]$lines.Add('```')
     } else {
         [void]$lines.Add('- 막힌 단계 없음.')
     }
@@ -733,7 +936,8 @@ function Step-InstallClaude {
         $p = Start-Process -FilePath $psExe -NoNewWindow -PassThru -ErrorAction Stop `
                            -ArgumentList @('-NoProfile', '-Command', "irm '$ClaudeInstallUrl' | iex")
     } catch {
-        Say "[2/10] 실패: $($_.Exception.Message). 인터넷 연결을 확인해 주십시오. 같은 한 줄을 다시 돌리면 여기서부터 이어서 갑니다."
+        Say "[2/10] 실패: $($_.Exception.Message). 인터넷 연결을 확인해 주십시오. 아래 「다시 하시는 법」대로 다시 실행하시면 여기서부터 이어서 갑니다."
+        $script:ShowRerun = $true
         return 4
     }
     $waitedMs = 0
@@ -753,7 +957,7 @@ function Step-InstallClaude {
         Say ("[2/10] 설치가 " + [int]($ClaudeInstallWaitMs / 60000) + "분 안에 끝나지 않았습니다.")
         Write-JCode 'J-AV-01' '백신 창이 설치 파일을 붙들고 있는 것으로 보입니다'
         Say-AntivirusHold '클로드 설치 파일 (이름이 claude 로 시작하는 파일)'
-        $script:NextStep = '작업 표시줄에서 백신 창을 찾아 [파일 전송] 또는 [실행] 을 누르신 뒤, 같은 한 줄을 다시 돌려 주십시오.'
+        Set-NextStepRerun '작업 표시줄에서 백신 창을 찾아 [파일 전송] 또는 [실행] 을 누르신 뒤, 아래 「다시 하시는 법」대로 다시 실행해 주십시오.'
         return 4
     }
     # PowerShell 5.1 은 갓 끝난 프로세스의 ExitCode 를 늦게 채우는 일이 있다(검토 지적 채택).
@@ -769,7 +973,8 @@ function Step-InstallClaude {
     if ($null -eq $installRc) {
         Say '[2/10] 설치기가 끝났는데 종료 코드를 읽지 못했습니다 — 숫자 대신 클로드 명령이 답하는지로 판정합니다.'
     } elseif ($installRc -ne 0) {
-        Say "[2/10] 실패 (종료 코드 $installRc). 같은 한 줄을 다시 돌리면 여기서부터 이어서 갑니다."
+        Say "[2/10] 실패 (종료 코드 $installRc). 아래 「다시 하시는 법」대로 다시 실행하시면 여기서부터 이어서 갑니다."
+        $script:ShowRerun = $true
         return 4
     }
     #   ⇒ 이 프로세스의 `$env:Path` 를 사용자·시스템 환경변수에서 다시 읽어 붙인다.
@@ -792,15 +997,16 @@ function Step-InstallClaude {
         $hasExe = if (Test-Path $exe) { '예' } else { '아니오' }
         Say '[2/10] 설치기는 끝났는데 claude 명령이 아직 안 잡힙니다.'
         Write-JCode 'J-PATH-01' '깔렸는데 이 창에서 명령을 찾지 못합니다'
-        $script:NextStep = '창을 새로 열고 같은 한 줄을 다시 돌려 주십시오.'
+        Set-NextStepRerun 'PowerShell 창을 새로 열고 아래 「다시 하시는 법」대로 다시 실행해 주십시오.'
         Say "     파일 있음: $hasExe ($(Redact $exe)) · 사용자 PATH 등록: $inUser · 설치기 종료 코드: $rcShown"
-        Say '     이 화면을 사진으로 남겨 주십시오. 창을 새로 열고 같은 한 줄을 다시 돌리면 여기서부터 이어서 갑니다.'
+        Say '     이 화면을 사진으로 남겨 주십시오. PowerShell 창을 새로 열고 아래 「다시 하시는 법」대로 다시 실행하시면 여기서부터 이어서 갑니다.'
+        $script:ShowRerun = $true
         return 4
     }
     if (-not (Test-ClaudeAuthCmd)) {
         Say '[2/10] 설치는 끝났는데 아직 낡은 판본이 잡힙니다.'
         Write-JCode 'J-VER-01' '낡은 판본이 먼저 잡혀 로그인 명령을 모릅니다'
-        $script:NextStep = '창을 새로 열고 같은 한 줄을 다시 돌려 주십시오. 판올림부터 이어서 갑니다.'
+        Set-NextStepRerun 'PowerShell 창을 새로 열고 아래 「다시 하시는 법」대로 다시 실행해 주십시오. 판올림부터 이어서 갑니다.'
         return 4
     }
     $script:ClaudeOk = $true
@@ -826,7 +1032,8 @@ function Step-Login {
 
     if (-not (Test-ClaudeAuthCmd)) {
         Say '[3/10] 이 판본의 클로드는 로그인 확인 명령을 모릅니다. 판올림이 먼저 필요합니다.'
-        Say '     같은 한 줄을 다시 돌리면 판올림부터 이어서 갑니다.'
+        Say '     아래 「다시 하시는 법」대로 다시 실행하시면 판올림부터 이어서 갑니다.'
+        $script:ShowRerun = $true
         return 6
     }
     Human '벤더' '로그인 승인 클릭 — 클로드 회사 화면에서만 할 수 있다(우리가 대신 못 누른다)'
@@ -846,7 +1053,7 @@ function Step-Login {
     }
     Say "[3/10] $([int]($LoginPollTimeout / 60))분 동안 로그인이 확인되지 않았습니다."
     Write-JCode 'J-LOGIN-01' '로그인 승인이 시간 안에 끝나지 않았습니다'
-    $script:NextStep = '브라우저에서 승인을 누르신 뒤 같은 한 줄을 다시 돌려 주십시오.'
+    Set-NextStepRerun '브라우저에서 승인을 누르신 뒤 아래 「다시 하시는 법」대로 다시 실행해 주십시오.'
     return 5
 }
 
@@ -969,8 +1176,51 @@ function Set-ClaudePrefs {
         #   우리가 쓴 키는 `C:\Users\oogis\install-jarvis`(백슬래시) 였다 ⇒ 한 폴더에 키가 두 개 생겼고
         #   클로드는 자기 형태만 봤다. BOM 이 없었어도 신뢰 프롬프트는 떴다 — 원인이 둘이었다.
         $trust = [pscustomobject]@{ hasTrustDialogAccepted = $true }
+        # 🔴2026-09-10 실기에서 고친 것(R4) — 앞 판은 **자비스 작업 폴더에만** 신뢰를 심었다. 그런데 동료
+        #   좌석(cso·worker·리뷰어)은 팩 편성이 정하는 cwd 로 뜨고, 그 cwd 가 **사용자 폴더(홈)** 였다.
+        #   ⇒ 좌석 4기가 「Quick safety check … Yes, I trust this folder」에서 전부 섰고,
+        #   ★그 화면의 기본 선택이 「No, exit」라 Enter 만 누르면 **클로드가 종료돼 좌석이 PS 로 낙하**했다
+        #   (같은 사고 2회). 한 좌석에서 「Yes」를 1회 누르니 그 뒤 스폰 전건이 무질문이었다
+        #   = 프로필에 홈 신뢰가 기록되면 끝나는 문제였다.
+        #   ⇒ 홈도 함께 심는다. 편성이 자식 cwd 를 고치는 것(팩 몫)과 **무관하게** 안전한 벨트다.
+        #   ⚠되돌리기 = 이 파일의 projects 아래 그 두 키를 지우면 된다(사본도 .bak-jarvis 로 남긴다).
+        # ⑴자비스 작업 폴더 — 우리가 만든 자리다. 없으면 만들고 있으면 우리 칸을 세운다.
         foreach ($k in @($JarvisHome, ($JarvisHome -replace '\\','/'))) {
-            $o.projects | Add-Member -NotePropertyName $k -NotePropertyValue $trust -Force
+            $ex = $o.projects.PSObject.Properties[$k]
+            if ($null -eq $ex -or $null -eq $ex.Value) {
+                $o.projects | Add-Member -NotePropertyName $k -NotePropertyValue ([pscustomobject]@{ hasTrustDialogAccepted = $true }) -Force
+            } else {
+                $ex.Value | Add-Member -NotePropertyName hasTrustDialogAccepted -NotePropertyValue $true -Force
+            }
+        }
+        # ⑵사용자 홈 — **참가자의 자리다.** 여기서는 규칙이 다르다(1R REVISE ④ 봉인 2026-09-10).
+        # 🔴🔴**이미 값이 있으면 손대지 않는다.** 앞 판은 있든 없든 true 로 세웠다. 그러면
+        #   ①원래 true 였던 분의 값을 「우리 것」과 구별할 수 없게 되고(제거기가 남의 값을 지운다)
+        #   ②원래 **false**(신뢰하지 않겠다고 **명시적으로 고르신 것**)를 조용히 true 로 뒤집는다.
+        #   ★②는 안전 설정을 우리가 몰래 되돌리는 것이다 — 편의를 위해 할 일이 아니다.
+        #   ⇒ **없을 때만 넣는다.** 그러면 「우리가 넣었다」와 「원래 있었다」가 저절로 갈린다 —
+        #     기록해야 할 것은 **우리가 넣은 키의 목록**뿐이고, 되돌리기는 그것만 지우면 끝난다.
+        #   ⚠값이 false 라 좌석이 신뢰 질문을 만나면, 그때는 사람이 한 번 [Yes] 를 누르시면 된다.
+        #     남의 선택을 뒤집는 것보다 손 한 번이 싸다.
+        # 🔴🔴**소유 목록에는 「쓰고 나서」 적는다**(3R N4 봉인 2026-09-10).
+        #   앞 판은 파일에 **쓰기 전에** `$script:TrustSeeded` 에 넣었다. 그 뒤 쓰기·되읽기가 실패해
+        #   사본으로 되돌리면, 파일에는 없는 키가 목록에는 남는다 ⇒ 기록이 사실과 어긋난다.
+        #   ★기록은 **일어난 일**을 적는 것이지 하려던 일을 적는 것이 아니다.
+        $pending = @()
+        $homeDir = ([string]$env:USERPROFILE).TrimEnd('\')
+        if ($homeDir) {
+            foreach ($k in @($homeDir, ($homeDir -replace '\\','/'))) {
+                $ex = $o.projects.PSObject.Properties[$k]
+                if ($null -eq $ex -or $null -eq $ex.Value) {
+                    $o.projects | Add-Member -NotePropertyName $k -NotePropertyValue ([pscustomobject]@{ hasTrustDialogAccepted = $true }) -Force
+                    $pending += ,@($cfg, $k)
+                } elseif ($null -eq $ex.Value.PSObject.Properties['hasTrustDialogAccepted']) {
+                    $ex.Value | Add-Member -NotePropertyName hasTrustDialogAccepted -NotePropertyValue $true -Force
+                    $pending += ,@($cfg, $k)
+                } else {
+                    Say '     (이 컴퓨터에는 홈 폴더 신뢰 설정이 이미 있어 그대로 두었습니다 — 우리가 바꾸지 않습니다.)'
+                }
+            }
         }
         Write-TextNoBom $cfg ($o | ConvertTo-Json -Depth 20)
         # 쓴 뒤에 되읽어서 확인한다 — 못 읽으면 사본으로 되돌린다(우리가 남의 설정을 깨고 끝내지 않는다).
@@ -985,8 +1235,10 @@ function Set-ClaudePrefs {
             }
             return $false
         }
+        # 쓰기와 되읽기가 모두 성공한 지금에야 「우리가 넣었다」가 사실이 된다.
+        foreach ($e in $pending) { $script:TrustSeeded += ,$e }
         Say '     첫 실행 질문(테마·폴더 신뢰·큰 화면 권유)을 미리 넘겨 두었습니다.'
-        Write-Log "seed: hasCompletedOnboarding=true · projects.$JarvisHome.hasTrustDialogAccepted=true (되돌리기 = $(Redact $cfg) 삭제)"
+        Write-Log "seed: hasCompletedOnboarding=true · 작업 폴더 신뢰 2형($(Redact $JarvisHome)) · 홈 신뢰는 없을 때만($(Redact $homeDir)) · 우리가 넣은 홈 키 누계 $($script:TrustSeeded.Count) (되돌리기 = $(Redact $cfg).bak-jarvis 를 되돌려 복사)"
         return $true
     } catch {
         Say '     (사전 설정을 걸지 못했습니다. 클로드가 처음 몇 가지를 물을 수 있습니다.)'
@@ -1046,6 +1298,42 @@ function Copy-LoginToIsolated {
     }
 }
 
+# 우리가 넣은 홈 신뢰 칸 하나를 도로 뺀다 — 기록에 실패했을 때 쓴다.
+#   ⚠제거기의 되돌리기와 같은 범위다: `hasTrustDialogAccepted` 한 칸만, 그 칸만 있던 자리면 칸째.
+function Undo-TrustSeed($cfg, $key) {
+    try {
+        if (-not (Test-Path $cfg)) { return }
+        $o = Get-Content $cfg -Raw -Encoding UTF8 | ConvertFrom-Json
+        $prj = $o.PSObject.Properties['projects']
+        if ($null -eq $prj -or $null -eq $prj.Value) { return }
+        $ex = $prj.Value.PSObject.Properties[$key]
+        if ($null -eq $ex -or $null -eq $ex.Value) { return }
+        if ($null -ne $ex.Value.PSObject.Properties['hasTrustDialogAccepted']) {
+            $ex.Value.PSObject.Properties.Remove('hasTrustDialogAccepted')
+        }
+        if (@($ex.Value.PSObject.Properties).Count -eq 0) { $prj.Value.PSObject.Properties.Remove($key) }
+        Write-TextNoBom $cfg ($o | ConvertTo-Json -Depth 20)
+        # 🔴🔴**되돌렸다고 말하기 전에 되돌아갔는지 본다**(4R BLOCK N4 봉인 2026-09-10 · 맥판과 같다).
+        #   앞 판은 쓰기만 하고 `$true` 도 안 돌려줬다 — 부르는 쪽은 결과와 무관하게 추적 목록을 비우고
+        #   「도로 뺐습니다」라고 말했다. 디스크가 꽉 차면 기록 쓰기와 되쓰기가 **함께** 실패한다 ⇒
+        #   키는 남고 기록은 없는데 화면은 되돌렸다고 말한다(다음 실행이 그 키를 남의 것으로 읽는다).
+        #   ★「했다」는 **다시 읽어 없을 때만** 참이다.
+        $back = Get-Content $cfg -Raw -Encoding UTF8 -ErrorAction Stop | ConvertFrom-Json
+        $bp = $back.PSObject.Properties['projects']
+        if ($null -ne $bp -and $null -ne $bp.Value) {
+            $be = $bp.Value.PSObject.Properties[$key]
+            if ($null -ne $be -and $null -ne $be.Value -and $null -ne $be.Value.PSObject.Properties['hasTrustDialogAccepted']) {
+                Write-Log ("trust seed rollback NOT verified (키가 아직 있다): " + (Redact $cfg) + " + " + (Redact $key))
+                return $false
+            }
+        }
+        Write-Log ("trust seed rollback: " + (Redact $cfg) + " + " + (Redact $key))
+        return $true
+    } catch {
+        Write-Log ("trust seed rollback FAILED: " + $_.Exception.Message)
+        return $false
+    }
+}
 function Set-AllProfiles {
     $seeded = @()
     foreach ($t in (Get-ProfileTargets)) {
@@ -1054,6 +1342,58 @@ function Set-AllProfiles {
         $seeded += $t.Name
     }
     Write-Log ("seed profiles: " + ($seeded -join ', '))
+    # ★우리가 넣은 홈 키를 적어 둔다 — 제거기는 **이 파일에 적힌 것만** 되돌린다.
+    #   ⚠파일이 없으면 제거기는 홈 신뢰 칸에 손대지 않는다(모르는 것을 지우지 않는다).
+    # 🔴🔴**기록에 실패하면 설정 변경을 되돌린다**(3R N4 봉인 2026-09-10).
+    #   앞 판은 기록 실패를 `Write-Log` 한 줄로 남기고 **성공을 돌려줬다.** 그런데 신뢰 칸은 이미
+    #   들어가 있었다 ⇒ 제거기는 그것을 「참가자의 것」으로 읽어 **영영 남긴다.**
+    #   ★기록과 설정은 **함께 서거나 함께 물러난다** — 반쪽만 남으면 그것이 곧 되돌릴 수 없는 자국이다.
+    $script:TrustJournalFailed = $false
+    try {
+        $lines = @()
+        foreach ($e in $script:TrustSeeded) { $lines += ($e[0] + "`t" + $e[1]) }
+        if ($lines.Count -gt 0) {
+            Write-TextNoBom $TrustSeedFile (($lines -join "`r`n") + "`r`n")
+            # 쓴 것을 되읽어 확인한다 — 「썼다」는 다시 읽어 있을 때만 참이다.
+            $back = Get-Content $TrustSeedFile -Raw -Encoding UTF8 -ErrorAction Stop
+            if (($null -eq $back) -or ($back.Split("`n").Where({ $_.Trim() }).Count -lt $lines.Count)) { throw '되읽기 확인 실패' }
+            Write-Log ("trust seed record: " + $lines.Count + " 줄 -> " + (Redact $TrustSeedFile))
+        }
+    } catch {
+        Write-Log ("trust seed record failed -> rollback: " + $_.Exception.Message)
+        $script:TrustJournalFailed = $true
+        # 되돌아가지 **않은** 것만 남긴다 — 추적 목록을 무조건 비우면 「키는 남고 기록은 없는」 상태가 된다.
+        $stuck = @()
+        foreach ($e in $script:TrustSeeded) {
+            if (-not (Undo-TrustSeed $e[0] $e[1])) { $stuck += ,$e }
+        }
+        $script:TrustSeeded = @($stuck)
+        if ($stuck.Count -eq 0) {
+            Say '     (홈 폴더 신뢰 기록을 남기지 못해 그 설정을 도로 뺐습니다 — 좌석이 폴더 신뢰를 한 번 물을 수 있습니다.)'
+        } else {
+            # 되돌리기도 실패했다. **키는 남고 기록은 없는** 상태만은 만들지 않는다 —
+            #   기록을 한 번 더 시도해 둘을 맞춘다(그러면 지울 때 되돌릴 수 있다).
+            $lines2 = @()
+            foreach ($e in $stuck) { $lines2 += ($e[0] + "`t" + $e[1]) }
+            $ok2 = $false
+            try {
+                Write-TextNoBom $TrustSeedFile (($lines2 -join "`r`n") + "`r`n")
+                $chk = Get-Content $TrustSeedFile -Raw -Encoding UTF8 -ErrorAction Stop
+                if ($null -ne $chk -and $chk.Trim()) { $ok2 = $true }
+            } catch { $ok2 = $false }
+            if ($ok2) {
+                Say '     (설정을 도로 빼지 못해 기록을 남겨 두었습니다 — 지울 때 이 칸도 함께 되돌립니다.)'
+                Write-Log ('trust seed rollback FAILED -> journal re-recorded: ' + $stuck.Count + ' 줄')
+            } else {
+                Say '     홈 폴더 신뢰 설정을 넣었는데 그 기록도, 되돌리기도 하지 못했습니다.'
+                Say '        지울 때 이 칸은 자동으로 되돌아가지 않습니다. 손으로 빼시려면:'
+                foreach ($e in $stuck) {
+                    Say ('        파일 ' + (Redact $e[0]) + ' 의 projects → ' + (Redact $e[1]) + ' → hasTrustDialogAccepted 줄')
+                }
+                Write-Log ('trust seed rollback FAILED and journal FAILED: ' + $stuck.Count + ' 줄')
+            }
+        }
+    }
     return $seeded
 }
 
@@ -1064,6 +1404,16 @@ function Step-Prepare {
         return 0
     }
     Set-AllProfiles | Out-Null
+    # ⚠기록 실패만 단계 실패로 올린다 — 그때는 설정을 도로 뺐고, 그것을 삼키면 화면이 거짓을 말한다.
+    #   (사전 설정 자체를 못 건 것은 예전처럼 「사람 손 한 번」이면 끝나므로 계속 간다.)
+    if ($script:TrustJournalFailed) {
+        Say '[4/10] 홈 폴더 신뢰 기록을 남기지 못했습니다 — 그 설정은 도로 뺐고, 여기서 멈춥니다.'
+        Say '     기록 없이 그 칸만 넣으면 지울 때 되돌릴 길이 없습니다(남의 컴퓨터에 자국이 남습니다).'
+        $script:JCode = 'J-PERM-01'
+        $script:NextStep = '저장 공간과 백신 알림을 확인하신 뒤 다시 실행해 주십시오.'
+        $script:ShowRerun = $true
+        return 4
+    }
     Say '[4/10] 자비스가 쓸 것을 갖춰 두었습니다.'
     return 0
 }
@@ -1092,7 +1442,7 @@ function Step-DownloadCys {
         if ($drive -and $drive.Free -and ($drive.Free / 1MB) -lt 3072) {
             Say ("[5/10] 저장 공간이 부족합니다 (남은 자리 약 " + [int]($drive.Free / 1MB) + "MB · 3GB 이상을 권합니다).")
             Write-JCode 'J-DISK-01' '저장 공간이 부족합니다'
-            $script:NextStep = '공간을 3GB 이상 비우신 뒤 같은 한 줄을 다시 돌려 주십시오.'
+            Set-NextStepRerun '공간을 3GB 이상 비우신 뒤 아래 「다시 하시는 법」대로 다시 실행해 주십시오.'
             return 5
         }
     } catch { }
@@ -1118,7 +1468,7 @@ function Step-DownloadCys {
                 } catch { return $false }
             }
             if (-not $again) {
-                $script:NextStep = '연결이 된 뒤 같은 한 줄을 다시 돌려 주십시오. 받은 데까지는 건너뛰고 이어서 갑니다.'
+                Set-NextStepRerun '연결이 된 뒤 아래 「다시 하시는 법」대로 다시 실행해 주십시오. 받은 데까지는 건너뛰고 이어서 갑니다.'
                 return 5
             }
             # 회복 뒤 받은 파일은 아래 검증으로 **그대로 넘긴다** — 여기서 continue 하면 다음 회차가 그 파일을 지운다(검토 지적 2026-09-09).
@@ -1207,7 +1557,7 @@ function Step-InstallCys {
     # 안내는 설치기를 띄우기 「전에」 해야 한다 — 백신이 이 창을 종료시키면 뒤에 적은 말은 나오지 못한다.
     Say '     백신이 막았다고 하면 그 화면을 사진으로 남겨 주십시오 — 이름, 대상 파일, 조치(차단·격리·종료) 세 가지가 보이게.'
     Say '     허용을 누를지는 쓰시는 분의 판단입니다. 저희가 대신 예외로 등록하지 않습니다.'
-    Say '     이 창이 갑자기 닫히더라도 같은 한 줄을 다시 돌리시면 이어서 진행됩니다.'
+    Say '     이 창이 갑자기 닫히더라도, 끝에 인쇄되는 「다시 하시는 법」의 명령을 다시 붙여넣으시면 이어서 진행됩니다.'
     # ⛔우회하지 않는다 — 이 아래 어디에도 백신을 피하는 장치를 넣지 마라.
     #   금지 3종 = 검사 우회(AMSI) · 명령 숨기기(난독화·인코딩된 명령) · 우리가 대신 백신 예외 등록.
     #   그것들이 바로 백신이 찾는 행위이고, 그렇게 만든 설치기는 남의 컴퓨터에 둘 수 없다.
@@ -1241,7 +1591,8 @@ function Step-InstallCys {
         # 새 오류가 하나 더 늘어난 것으로만 보인다.
         if ($p -and -not $p.HasExited) {
             Say '     설치 프로그램이 아직 화면에 떠 있는 것 같습니다. 그 창을 먼저 봐 주십시오.'
-            Say '     창을 닫으셨거나 끝났는데도 이 줄이 나오면, 같은 한 줄을 다시 돌려 주십시오.'
+            Say '     창을 닫으셨거나 끝났는데도 이 줄이 나오면, 아래 「다시 하시는 법」대로 다시 실행해 주십시오.'
+            $script:ShowRerun = $true
             break
         }
         # 설치기는 실패를 종류별로 알려 준다. 종료 코드 4 는 「원래 있던 판은 그대로이고 새 판이 안 들어갔다」는 뜻이다.
@@ -1298,7 +1649,8 @@ function Step-VerifyCys {
         if ($ver) { $script:CysCli = $b.Cli; Say '     (명령이 아직 답하지 않아 파일에 적힌 판본을 읽었습니다.)' }
     }
     if ($ver) { Say "[7/10] cys 가 답합니다: $ver"; Say "     부르는 길: $(Redact $script:CysCli)"; return 0 }
-    Say '[7/10] 프로그램은 있는데 아직 명령으로 부를 수 없습니다. 창을 새로 열고 같은 줄을 다시 돌려 주십시오.'
+    Say '[7/10] 프로그램은 있는데 아직 명령으로 부를 수 없습니다. PowerShell 창을 새로 열고 아래 「다시 하시는 법」대로 다시 실행해 주십시오.'
+    $script:ShowRerun = $true
     return 7
 }
 
@@ -1309,7 +1661,11 @@ function Step-PrepareAccount {
     $cli = if ($script:CysCli) { $script:CysCli } else { 'cys' }
     Say '[8/10] 이 계정에 자리를 잡습니다.'
     Invoke-Logged 'init-pack' $cli @('init-pack') | Out-Null
-    Invoke-Logged 'daemon install' $cli @('daemon', 'install') | Out-Null
+    $daemonRc = Invoke-Logged 'daemon install' $cli @('daemon', 'install')
+    # ★등록됐는지는 **작업을 직접 보고** 정한다(위 Test-CysAutoStart 의 까닭). 팩이 찍은 줄도,
+    #   우리 추정도 아니다. 이 값 하나로 아래 문구가 갈린다 — 그래야 두 줄이 서로 모순되지 않는다.
+    $script:AutoStartState = Get-CysAutoStartState $cli
+    Write-Log ("daemon install rc=$daemonRc · scheduled task cysd = " + $script:AutoStartState)
     # 한 번 응답을 받았으면 그것으로 판정한다. 다시 물으면 그 순간의 흔들림으로 성공이 실패가 된다.
     $alive = $false
     for ($i = 0; $i -lt 10; $i++) {
@@ -1325,7 +1681,13 @@ function Step-PrepareAccount {
         $sideCar = Join-Path $cysHome 'cys-app.exe'
         if (-not (Test-Path $sideCar)) { $sideCar = Join-Path $cysHome 'cysd.exe' }
         if (Test-Path $sideCar) {
-            Say '[8/10] 자동으로 켜지도록 등록하지는 못했습니다. 이번에는 프로그램을 직접 열어 보겠습니다.'
+            # ⚠「등록이 안 됐다」와 「등록은 됐는데 지금 안 답한다」는 다른 일이다. 갈라 말한다(R6).
+            if ($script:AutoStartState -eq 'yes') {
+                Say '[8/10] 자동 시작은 등록됐는데(작업 이름 cysd) 아직 답이 없습니다. 이번에는 프로그램을 직접 열어 보겠습니다.'
+            } else {
+                Say '[8/10] 이번에는 프로그램을 직접 열어 보겠습니다.'
+                Say ('     ' + (Get-AutoStartWords $script:AutoStartState))
+            }
             try { Start-Process -FilePath $sideCar | Out-Null } catch { Say "       직접 열지 못했습니다: $($_.Exception.Message)" }
             for ($i = 0; $i -lt 10; $i++) {
                 $pong = (& $cli ping 2>&1) -join ' '
@@ -1335,11 +1697,19 @@ function Step-PrepareAccount {
             if ($alive) {
                 $script:DaemonTemporary = $true
                 Say '[8/10] 켜졌습니다.'
-                Say '     자동으로 켜지도록 등록하는 것은 이 계정에서 막혀 있습니다(윈도우 설정).'
-                Say '     다음에 컴퓨터를 켜시면 cys 를 한 번 열어 주시면 됩니다. 그러면 그때부터 다시 돕니다.'
-                Write-Log 'daemon started by launching the app (auto-start registration blocked by policy)'
+                # ⛔까닭을 「윈도우 설정이 막았다」로 **단정하지 않는다** — 우리는 그것을 잰 적이 없다.
+                #   앞 판은 단정했고, 같은 날 팩은 「등록 완료」를 찍고 있었다(2026-09-10 실기).
+                Say ('     ' + (Get-AutoStartWords $script:AutoStartState))
+                if ($script:AutoStartState -ne 'yes') {
+                    Say '     다음에 컴퓨터를 켜시면 cys 를 한 번 열어 주시면 됩니다. 그러면 그때부터 다시 돕니다.'
+                }
+                Write-Log ('daemon started by launching the app (scheduled task cysd = ' + $script:AutoStartState + ')')
             }
         }
+    }
+    # ★답이 왔든 안 왔든 **등록 여부는 따로 말한다** — 이 둘을 한 줄에 뭉치면 다시 모순이 생긴다(R6).
+    if ($alive -and -not $script:DaemonTemporary) {
+        Say ('     ' + (Get-AutoStartWords $script:AutoStartState))
     }
     if (-not $alive) {
         Say '[8/10] 준비는 됐는데 아직 응답이 없습니다.'
@@ -1349,7 +1719,8 @@ function Step-PrepareAccount {
         # 함께 있어야 할 짝 파일이 실제로 있는지도 본다(다른 운영체제에서 이것이 없어 실패한 전례가 있다).
         $sideCar = Join-Path (Split-Path $cli -Parent) 'cysd.exe'
         Say "       짝 파일 있음 = $(Test-Path $sideCar) ($(Redact $sideCar))"
-        Say '     잠시 뒤 같은 줄을 다시 돌려 주십시오. 그래도 같으면 위 세 줄을 알려 주십시오.'
+        Say '     잠시 뒤 아래 「다시 하시는 법」대로 다시 실행해 주십시오. 그래도 같으면 위 세 줄을 알려 주십시오.'
+        $script:ShowRerun = $true
         return 8
     }
     $doc = (Invoke-CysProbe $cli @('doctor')) -join "`n"
@@ -1368,16 +1739,27 @@ function Step-PrepareAccount {
     }
     # 통과 기준은 실패 0 이다. 주의는 성한 컴퓨터에도 나온다.
     # 판정 못 한 항목은 「됐다」로 세지 않는다 — 몇 개인지 그대로 알린다.
+    # 자리를 잡으면서 **자비스 전용 설정 자리**가 새로 생긴다. 자비스가 부를 동료들은 그 자리로 뜨므로
+    # 사전 설정을 여기서 한 번 더 심는다 — 안 그러면 동료들이 첫 실행 질문 앞에서 멈춰 선다(실측).
+    # 🔴2026-09-10 개정 — 앞 판은 이 두 줄이 **자가진단 실패 갈래보다 뒤**에 있었다. 그래서 자가진단이
+    #   한 가지라도 못 통과하면 전용 자리에 사전 설정이 **영영 안 심겼고**, 그 뒤 자비스가 부른 동료
+    #   좌석들이 전부 첫 실행 질문(폴더 신뢰) 앞에 섰다. ★자가진단 결과와 시드는 아무 관계가 없다 —
+    #   자리는 이미 생겼고, 심는 것은 실패해도 잃을 것이 없다. ⇒ 갈림길 **앞**으로 옮긴다.
+    Set-AllProfiles | Out-Null
+    if ($script:TrustJournalFailed) {
+        Say '[8/10] 홈 폴더 신뢰 기록을 남기지 못했습니다 — 그 설정은 도로 뺐고, 여기서 멈춥니다.'
+        $script:JCode = 'J-PERM-01'
+        $script:NextStep = '저장 공간과 백신 알림을 확인하신 뒤 다시 실행해 주십시오.'
+        $script:ShowRerun = $true
+        return 8
+    }
+    Copy-LoginToIsolated | Out-Null
     if ($bad -gt 0) {
         Say "[8/10] 자가진단에서 $bad 가지가 통과하지 못했습니다."
         Say '     아래 자비스가 무엇이 걸렸는지 사람 말로 알려 드립니다.'
         return 8
     }
     if ([int]$nSkip -gt 0) { Say "     ($nSkip 가지는 이 컴퓨터에서 판정할 수 없는 항목입니다 — 고장이 아닙니다.)" }
-    # 자리를 잡으면서 **자비스 전용 설정 자리**가 새로 생긴다. 자비스가 부를 동료들은 그 자리로 뜨므로
-    # 사전 설정을 여기서 한 번 더 심는다 — 안 그러면 동료들이 첫 실행 질문 앞에서 멈춰 선다(실측).
-    Set-AllProfiles | Out-Null
-    Copy-LoginToIsolated | Out-Null
     Say '[8/10] 자리를 잡았습니다 (실패 0).'
     return 0
 }
@@ -1406,6 +1788,9 @@ function Step-Wake {
     #   1차 = 우리말이 깨져 「알 수 없는 인자」 · 2차 = 명령 안의 따옴표가 벗겨져 문장이 조각나
     #   그 조각 하나가 「알 수 없는 인자」로 갔다. 두 번 다 원인은 「문장을 인자로 넘긴 것」이다.
     # ⇒ 문장은 파일에 넣고, 여는 명령은 그 파일 하나만 가리킨다.
+    # ★자리를 열기 **전에** 기준선을 찍는다(2R N2). 이 줄이 자리 여는 줄보다 뒤에 오면
+    #   우리가 만든 master 자리까지 기준선에 들어가 영영 안 세어진다.
+    Set-FleetBaseline $cli
     $wakeFile = Join-Path $JarvisHome 'wake.ps1'
     # 앞 단계에서 자리 잡기가 끝나지 않았으면 cys 안에 창을 열 수 없다.
     # 시도해 봐야 실패 줄만 하나 더 보이므로, 사유를 말하고 바로 이 창에서 띄운다.
@@ -1474,14 +1859,16 @@ function Step-Wake {
     Set-Location -Path $JarvisHome -ErrorAction SilentlyContinue
     if (-not (Get-Command claude -ErrorAction SilentlyContinue)) {
         Say '[9/10] 자비스를 띄우지 못했습니다 — 클로드 명령을 찾지 못했습니다.'
-        Say '     창을 새로 열고 같은 한 줄을 다시 돌려 주십시오.'
+        Say '     PowerShell 창을 새로 열고 아래 「다시 하시는 법」대로 다시 실행해 주십시오.'
+        $script:ShowRerun = $true
         return
     }
     try {
         & claude --dangerously-skip-permissions $firstPrompt
     } catch {
         Say "[9/10] 자비스를 띄우지 못했습니다: $($_.Exception.Message)"
-        Say '     창을 새로 열고 같은 한 줄을 다시 돌려 주십시오.'
+        Say '     PowerShell 창을 새로 열고 아래 「다시 하시는 법」대로 다시 실행해 주십시오.'
+        $script:ShowRerun = $true
         return
     }
     # 이 함수의 값은 아무도 쓰지 않는다. 값을 돌려주면 화면에 숫자 한 줄로 새어 나온다(실측 09:3x).
@@ -1498,15 +1885,74 @@ $FleetTrigger = '너는 마스터다'
 #   그래서 우리는 **부탁만 하고 기다린다.** 사람 손 한 번이 늘지만 그 한 번이 이 장치의 값이다.
 $FleetRoles   = @('master', 'cso', 'worker')   # 이 기계에서 세울 수 있는 역할(리뷰어 둘은 고르기 나름)
 $FleetWaitTries = 72   # 5초 × 72 = 6분. 사람이 창을 찾아 한 문장 치기에 넉넉한 시간.
+# 🔴🔴**이전 설치의 좌석을 이번 선언으로 세지 않는다**(2R N2 봉인 2026-09-10).
+#   앞 판은 전역 목록에서 **역할 이름만** 셌다. 그러면 지난 설치의 master·cso·worker 가 아직 살아
+#   있는 기계에서는 사람이 **아무 선언도 하지 않았는데** 첫 폴링에 세 역할이 다 차서
+#   「함대가 섰습니다」로 끝난다 — 새로 연 자비스는 깨어 있지도 않다.
+#   ⇒ 자리를 열기 **전에** 목록을 찍어 두고(기준선), 그 뒤 **새로 생긴 자리만** 센다.
+# 🔴🔴**기준선을 못 찍었으면 세는 것 자체를 하지 않는다**(3R N2 봉인 2026-09-10 · master 결정).
+#   기준선은 「이번 설치의 자리」와 「지난 설치의 자리」를 가르는 **유일한 근거**다. 그 조회가 실패해
+#   빈 집합이 되면, 다음 조회에 보이는 **옛 좌석 전부가 새 좌석으로** 읽힌다 ⇒ 사람이 아무 말도
+#   하지 않았는데 첫 폴링에 「함대가 섰습니다」로 끝난다.
+#   ★빈 집합은 「아무것도 없었다」가 아니라 **「못 물어봤다」**일 수 있다. 그 둘을 한 칸에 담으면
+#     실패가 곧 거짓 성공이 된다.
+#   ⇒ 실패면 **계산하지 않고 모른다고 말한다**(unknown 게이트).
+$script:BaselineSurfaces = @()
+$script:BaselineOk = $false
+function Get-SurfaceIds {
+    param([string]$Cli)
+    $out = (Invoke-CysProbe $Cli @('list')) -join "`n"
+    $ids = @()
+    foreach ($m in [regex]::Matches($out, 'surface:\d+')) { $ids += $m.Value }
+    return ($ids | Sort-Object -Unique)
+}
+function Set-FleetBaseline {
+    param([string]$Cli)
+    $script:BaselineOk = $false
+    $script:BaselineSurfaces = @()
+    try {
+        $global:LASTEXITCODE = 0
+        $out = (Invoke-CysProbe $Cli @('list')) -join "`n"
+        if ($LASTEXITCODE -ne 0) { throw ('cys list 가 ' + $LASTEXITCODE + ' 로 끝났습니다') }
+        $ids = @()
+        foreach ($m in [regex]::Matches($out, 'surface:\d+')) { $ids += $m.Value }
+        $script:BaselineSurfaces = @($ids | Sort-Object -Unique)
+        $script:BaselineOk = $true
+        Write-Log ('fleet baseline surfaces: ' + ($script:BaselineSurfaces -join ' '))
+    } catch {
+        Write-Log ('fleet baseline FAILED: ' + $_.Exception.Message + ' -> 좌석 판정 안 함')
+    }
+}
 function Get-LiveRoles {
     param([string]$Cli)
     $out = (Invoke-CysProbe $Cli @('list')) -join "`n"
     $live = @()
-    foreach ($r in $FleetRoles) {
-        # 목록의 role 칸은 role=master · role=worker-2 처럼 나온다. 앞부분이 맞으면 그 역할로 센다.
-        if ($out -match ("role=" + [regex]::Escape($r) + "(\s|-|$)")) { $live += $r }
+    foreach ($ln in ($out -split "`n")) {
+        if (-not $ln) { continue }
+        $mid = [regex]::Match($ln, 'surface:\d+')
+        # 기준선에 있던 자리는 **이번 설치의 것이 아니다** — 세지 않는다.
+        if ($mid.Success -and ($script:BaselineSurfaces -contains $mid.Value)) { continue }
+        foreach ($r in $FleetRoles) {
+            if ($live -contains $r) { continue }
+            # 목록의 role 칸은 role=master · role=worker-2 처럼 나온다. 앞부분이 맞으면 그 역할로 센다.
+            if ($ln -match ("role=" + [regex]::Escape($r) + "(\s|-|$)")) { $live += $r }
+        }
     }
     return $live
+}
+# 🔴🔴**「선언됐다」의 근거를 바꾼다**(1R BLOCK ③ 봉인 2026-09-10).
+#   앞 판은 「목록에 role=master 가 있으면 사람이 선언한 것」으로 봤다. **그 축은 처음부터 거짓이었다** —
+#   ★master 좌석을 만든 것은 사람이 아니라 **우리 자신**이다(바로 위에서 role=master 자리를 연다).
+#   그래서 사람이 아무것도 치지 않아도 화면은 「부르는 중 · 사람이 하실 일 없습니다」라고 말하고,
+#   끝에는 「그 한마디는 들어갔습니다」라고 단정했다 ⇒ **선언이 영영 안 일어나고 6분을 버린다.**
+#   앞 판이 고치려던 사고(이미 친 사람에게 또 치라고 함)를 **정반대 방향으로 되풀이**한 셈이다.
+#   ⇒ 근거 = **자식 좌석의 출현**. cso·worker 는 자비스가 선언을 듣고 나서야 부른다 —
+#     우리는 그것들을 만들지 않는다. 하나라도 서면 그 한마디는 확실히 들어간 것이다.
+#   ⚠뒤집어 말하면: 자식이 하나도 없으면 **선언 여부를 우리는 모른다.** 모를 때는 단정하지 않고
+#     「아직 치지 않으셨다면」이라는 조건문으로 말한다(그것이 원래 문구가 맞았던 이유다).
+function Test-DeclarationSeen($live) {
+    foreach ($r in @($live)) { if ($r -ne 'master') { return $true } }
+    return $false
 }
 function Step-Fleet {
     param([string]$SurfaceRef)
@@ -1517,7 +1963,17 @@ function Step-Fleet {
         Say "     cys 창에서 자비스에게 이렇게 말해 주십시오: $FleetTrigger"
         return 10
     }
-    Human '자비스' '동료들을 부르는 한마디 — cys 창에서 직접 쳐 주셔야 합니다'
+    # 🔴2026-09-10 실기에서 고친 것(R5) — 이 자리의 옛 문구는 「강제」였다. 그런데 같은 4분 동안 자비스는
+    #   화면에 「사람이 할 일 없음」이라고 적고 있었다 ⇒ 사용자에게 두 화면이 **정면으로 모순**이다.
+    #   ★안전장치 설명은 남기고 「강제」의 어감만 뺀다 — 사람이 치는 것은 이 한마디 하나다.
+    # ★기준선을 못 찍었으면 **여기서 멈춘다** — 세어 봐야 그 수가 무엇을 뜻하는지 모른다.
+    if (-not $script:BaselineOk) {
+        Say '[10/10] 지금 열려 있는 자리 목록을 읽지 못해, 동료들이 섰는지 판정하지 않습니다.'
+        Say "     cys 창에서 자비스에게 이렇게 말해 주십시오: $FleetTrigger"
+        Say '     그 뒤 자비스에게 「동료들 다 섰어?」라고 물어보시면 자비스가 직접 확인해 알려 드립니다.'
+        return 10
+    }
+    Human '자비스' '이 한마디만 사람이 칩니다 — cys 창에서 직접 쳐 주십시오(안전장치)'
     Say ''
     Say '   ┌─────────────────────────────────────────────┐'
     Say ("   │   cys 창(제목 jarvis)에 이렇게 쳐 주십시오:  │")
@@ -1537,8 +1993,20 @@ function Step-Fleet {
         $live = @(Get-LiveRoles $cli)
         if ($live.Count -ge $FleetRoles.Count) { break }
         # 오래 걸리면 얼마나 더 기다리는지 알려 준다 — 말없이 멈춰 있는 것처럼 보이지 않게.
+        # 🔴2026-09-10 실기에서 고친 것(R5) — 앞 판은 **판정 없이** 「아직 치지 않으셨다면 지금 쳐 주십시오」를
+        #   되풀이했다. 쓰시는 분은 이미 치셨고 자비스는 그 4분 동안 환경 보고를 쓰고 동료를 부르고 있었다.
+        #   ⇒ 사용자에게는 「다 됐다」와 「아직 안 쳤다」가 동시에 떠 있었다.
+        #   ★판정 축은 이미 손에 있었다 — master 자리가 목록에 서 있으면 **그 한마디는 이미 들어간 것**이다
+        #     (선언이 role 등록을 낳는다). 그 뒤로는 사람에게 시킬 일이 없다.
+        #   ⚠새 프로브를 만들지 않는다 — 이미 5초마다 부르는 `cys list` 의 답을 그대로 읽는다.
         if (($i -gt 0) -and (($i % 12) -eq 0)) {
-            Say ("   기다리는 중입니다 ($([int]($waited / 60))분 지남 · 최대 $([int](($FleetWaitTries * 5) / 60))분). 아직 치지 않으셨다면 지금 쳐 주십시오.")
+            $mins = "$([int]($waited / 60))분 지남 · 최대 $([int](($FleetWaitTries * 5) / 60))분"
+            if (Test-DeclarationSeen $live) {
+                Say ("   자비스가 동료들을 부르는 중입니다. 그대로 기다려 주십시오 ($mins).")
+                Say ("     선 자리 = " + ($live -join ' · ') + '  (사람이 하실 일은 없습니다)')
+            } else {
+                Say ("   기다리는 중입니다 ($mins). 아직 치지 않으셨다면 지금 쳐 주십시오.")
+            }
         }
     }
     $missing = @($FleetRoles | Where-Object { $live -notcontains $_ })
@@ -1549,8 +2017,14 @@ function Step-Fleet {
     # 성공보다 이 문구가 중요하다 — 무엇이 없어서 못 섰는지를 그대로 말한다.
     Say ("[10/10] 아직 서지 않은 자리가 있습니다: " + ($missing -join ' · '))
     Say ("     선 자리 = " + $(if ($live.Count) { $live -join ' · ' } else { '없음' }))
-    Say '     아직 그 한마디를 치지 않으셨다면, cys 창에서 지금 쳐 주시면 됩니다.'
-    Say '     치셨는데도 서지 않았다면 cys 창의 자비스에게 물어보십시오 — 무엇이 걸렸는지 사람 말로 알려 줍니다.'
+    # ★여기서도 「아직 안 쳤다」를 단정하지 않는다 — 다만 근거는 **자식 좌석**이다(아래 함수).
+    if (Test-DeclarationSeen $live) {
+        Say '     자비스는 이미 깨어 있습니다(master 자리가 섰습니다) — 그 한마디는 들어갔습니다.'
+        Say '     남은 자리는 자비스가 이어서 세웁니다. cys 창의 자비스에게 무엇이 걸렸는지 물어보십시오.'
+    } else {
+        Say '     아직 그 한마디를 치지 않으셨다면, cys 창에서 지금 쳐 주시면 됩니다.'
+        Say '     치셨는데도 서지 않았다면 cys 창의 자비스에게 물어보십시오 — 무엇이 걸렸는지 사람 말로 알려 줍니다.'
+    }
     Write-Log ("fleet missing: " + ($missing -join ','))
     return 10
 }
@@ -1565,14 +2039,74 @@ try {
     # 🔴자리 만들기를 **끝맺음 보증 안쪽**으로 옮겼다(검토 지적 채택 2026-09-09).
     #   앞 판은 이 실패가 try 밖이라, 가장 도움이 필요한 순간에 「다음에 할 일」이 한 줄도 없이 창이 닫혔다.
     #   ⚠까닭을 「권한」 하나로 단정하지 않는다 — 공간이 꽉 찼거나 백신이 막아도 여기서 실패한다.
-    try {
-        New-Item -ItemType Directory -Force -Path $JarvisHome -ErrorAction Stop | Out-Null
-    } catch {
-        Write-Host ("자리를 만들지 못했습니다: " + $JarvisHome)
-        Write-Host '     진단 코드: J-PERM-01 — 파일이나 폴더를 쓸 권한이 없습니다(공간 부족·백신 차단도 같은 모양입니다)'
-        $script:JCode = 'J-PERM-01'
-        $script:NextStep = '회사·학교에서 관리하는 컴퓨터면 담당자에게 문의해 주십시오. 개인 컴퓨터면 저장 공간과 백신 알림을 확인해 주십시오.'
+    # ── 🔴🔴작업 폴더는 **이름을 못 박고, 우리가 만든 자리에만 표식을 놓는다** (3R N3 · master 결정) ──
+    #   앞 판은 `$env:JARVIS_HOME` 값이 무엇이든 `-Force` 로 만들고 **이미 있던 남의 폴더에도 표식을 써 줬다.**
+    #   ⇒ 제거기의 「우리 폴더인가」 관문이 그 표식을 소유 증거로 받아 **남의 폴더를 통째로 지웠다**
+    #     (`D:\valuable\project` 로 한 번 설치하면 그 다음 지우기가 그 폴더를 재귀 삭제한다).
+    #   ★설치기가 표식을 헤프게 놓으면 제거기의 관문은 **관문이 아니다.**
+    #   ⇒ 두 관문을 **만들기보다 먼저** 통과해야 한다: ⑴이름이 정확히 install-jarvis ⑵이미 있으면
+    #     우리 표식이 있거나 비어 있을 때만 채택. 표식을 못 쓰면 **거기서 멈춘다**(맥판과 같다).
+    if ((Split-Path $JarvisHome -Leaf) -ne $JarvisHomeBaseName) {
+        Write-Host ("작업 폴더로 쓸 수 없는 자리입니다: " + $JarvisHome)
+        Write-Host ("     까닭: 폴더 이름이 「" + $JarvisHomeBaseName + "」 이 아닙니다")
+        Write-Host ("     진단 코드: J-HOME-01 — 이 도구가 만들고 지우는 폴더의 이름은 「" + $JarvisHomeBaseName + "」 하나입니다")
+        $script:JCode = 'J-HOME-01'
+        $script:NextStep = ("JARVIS_HOME 을 지정하지 않으신 채로 다시 실행하시면 기본 자리(" + (Join-Path $env:USERPROFILE $JarvisHomeBaseName) + ")를 씁니다. 그 자리를 꼭 쓰시려면 이름이 " + $JarvisHomeBaseName + " 인 빈 폴더를 지정해 주십시오.")
+        $script:ShowRerun = $true
         exit 3
+    }
+    $jarvisHomeCreated = $false
+    $ownerMarkOk = $false
+    if (Test-Path -LiteralPath $JarvisOwnerFile) {
+        $mk = $null
+        try { $mk = Get-Content -LiteralPath $JarvisOwnerFile -Raw -Encoding UTF8 -ErrorAction Stop } catch { $mk = $null }
+        if ($null -ne $mk -and $mk.Contains($JarvisOwnerMark)) { $ownerMarkOk = $true }
+    }
+    if (Test-Path -LiteralPath $JarvisHome) {
+        if (-not (Test-Path -LiteralPath $JarvisHome -PathType Container)) {
+            Write-Host ("작업 폴더로 쓸 수 없는 자리입니다: " + $JarvisHome)
+            Write-Host '     까닭: 그 자리에 폴더가 아닌 것이 이미 있습니다'
+            Write-Host ("     진단 코드: J-HOME-01 — 이 도구가 만들고 지우는 폴더의 이름은 「" + $JarvisHomeBaseName + "」 하나입니다")
+            $script:JCode = 'J-HOME-01'
+            $script:NextStep = '그 자리의 파일을 옮기시거나, JARVIS_HOME 을 지정하지 않으신 채로 다시 실행해 주십시오.'
+            $script:ShowRerun = $true
+            exit 3
+        }
+        # 🔴🔴**「비어 있으면 채택」을 걷어냈다**(4R BLOCK N3 봉인 2026-09-10 · 맥판과 같다).
+        #   ⑴결정은 「자기가 만든 폴더에만 표식」이었는데 **남이 만들어 둔 빈 폴더**도 채택해 표식을 써 줬다.
+        #   ⑵`Get-ChildItem` 이 **권한 오류**를 내면 빈 목록으로 읽었다 — 「목록은 못 읽지만 파일은 만들 수
+        #     있는」 폴더(남의 파일이 가득한 자리)에 표식을 써 준다.
+        #   ⇒ **세지 않는다.** 표식이 없는 기존 폴더는 내용과 무관하게 거부한다(셀 필요가 없으면 틀릴 자리도 없다).
+        if (-not $ownerMarkOk) {
+            Write-Host ("작업 폴더로 쓸 수 없는 자리입니다: " + $JarvisHome)
+            Write-Host '     까닭: 그 폴더는 이미 있는데 우리 표식이 없습니다(우리가 만든 자리가 아닙니다 — 지울 때 통째로 지우는 자리이므로 채택하지 않습니다)'
+            Write-Host ("     진단 코드: J-HOME-01 — 이 도구가 만들고 지우는 폴더의 이름은 「" + $JarvisHomeBaseName + "」 하나입니다")
+            $script:JCode = 'J-HOME-01'
+            $script:NextStep = ('그 폴더를 지우거나 옮기신 뒤 다시 해 주십시오 — 설치 도우미는 자기가 새로 만든 폴더만 씁니다. JARVIS_HOME 을 지정하지 않으신 채로 다시 실행하시면 기본 자리(' + (Join-Path $env:USERPROFILE $JarvisHomeBaseName) + ')를 씁니다.')
+            $script:ShowRerun = $true
+            exit 3
+        }
+    } else {
+        try {
+            New-Item -ItemType Directory -Path $JarvisHome -ErrorAction Stop | Out-Null
+            $jarvisHomeCreated = $true
+        } catch {
+            Write-Host ("자리를 만들지 못했습니다: " + $JarvisHome)
+            Write-Host '     진단 코드: J-PERM-01 — 파일이나 폴더를 쓸 권한이 없습니다(공간 부족·백신 차단도 같은 모양입니다)'
+            $script:JCode = 'J-PERM-01'
+            $script:NextStep = '회사·학교에서 관리하는 컴퓨터면 담당자에게 문의해 주십시오. 개인 컴퓨터면 저장 공간과 백신 알림을 확인해 주십시오.'
+            exit 3
+        }
+    }
+    if (-not $ownerMarkOk) {
+        try { Write-TextNoBom $JarvisOwnerFile ($JarvisOwnerMark + "`r`n") } catch {
+            Write-Host ("작업 폴더 표식을 쓰지 못했습니다: " + (Redact $JarvisOwnerFile))
+            Write-Host '     진단 코드: J-PERM-01 — 파일이나 폴더를 쓸 권한이 없습니다(공간 부족·백신 차단도 같은 모양입니다)'
+            $script:JCode = 'J-PERM-01'
+            $script:NextStep = '저장 공간과 백신 알림을 확인하신 뒤 다시 실행해 주십시오. (표식 없이 계속하면 다음 실행이 이 폴더를 「남의 것」으로 읽습니다.)'
+            if ($jarvisHomeCreated) { Remove-Item -LiteralPath $JarvisHome -Force -ErrorAction SilentlyContinue }
+            exit 3
+        }
     }
 
     Say "=== 자비스 설치 도우미 $BootstrapVersion (모드: $Mode) ==="
@@ -1585,7 +2119,7 @@ try {
     if ($Mode -eq 'detect') {
         Say '감지만 하고 끝냅니다.'
         # 끝맺음 한 줄은 그 끝에 맞아야 한다 — 「살펴보기만 한 끝」에 「이어서 갑니다」는 맞지 않는다.
-        $script:NextStep = '실제로 설치하시려면 -DetectOnly 없이 같은 한 줄을 돌려 주십시오.'
+        Set-NextStepRerun '실제로 설치하시려면 -DetectOnly 없이 아래 「다시 하시는 법」대로 다시 실행해 주십시오.'
         exit 0
     }
 

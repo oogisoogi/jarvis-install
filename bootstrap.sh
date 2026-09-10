@@ -6,7 +6,9 @@
 #   2) 클로드 코드가 없거나 낡았으면 공식 설치기로 설치한다
 #   3) 로그인 화면을 열고 승인이 끝날 때까지 기다린다
 #   4) 자비스를 깨워 환경 보고를 사람 말로 옮겨 준다
-# 같은 줄을 다시 돌리면 끝난 단계는 건너뛰고 이어서 간다.
+# 다시 실행하면 끝난 단계는 건너뛰고 이어서 간다.
+#   ⛔사람에게 「같은 줄을 다시 돌려 주십시오」라고 말하지 않는다 — 2026-09-10 실기에서
+#     **사용자 막힘으로 확정**된 문구다. 대신 show_rerun_how 가 창 여는 법과 **명령 전체**를 인쇄한다.
 #
 # 쓰는 법
 #   bash bootstrap.sh                 전 단계
@@ -45,14 +47,26 @@ LOG_FILE="$JARVIS_HOME/bootstrap.log"
 REPORT_FILE="$JARVIS_HOME/env-report.md"
 DIRECTIVE_FILE="$JARVIS_HOME/install-directive.md"
 DL_DIR="$JARVIS_HOME/dl"
+# 🔴우리가 **홈 폴더에 새로 넣은** 신뢰 키의 기록(설정파일<탭>키). 제거기는 이 파일에 적힌 것만
+#   되돌린다 — 적히지 않은 키는 참가자의 것이므로 손대지 않는다(1R REVISE ④).
+#   ⚠TSV 다: 두 OS 가 같은 파일을 읽고 쓰는데 깨끗한 맥에는 JSON 도구(jq)가 없다.
+TRUST_SEED_FILE="$JARVIS_HOME/trust-seed.tsv"
+# 🔴**우리가 만든 폴더라는 표식**(2R N3). 제거기는 이 표식이 있을 때만 작업 폴더를 재귀로 지운다 —
+#   `JARVIS_HOME` 은 환경변수라 무엇이든 들어올 수 있고, 검사 없이 지우면 남의 폴더가 사라진다.
+JARVIS_OWNER_FILE="$JARVIS_HOME/.jarvis-owned"
+JARVIS_OWNER_MARK="jarvis-installer-owned v1"
 BLOCKED_STEP=""
 
 # cys 설치 파일 — 판본이 파일 이름에 박혀 배포되므로 여기에 핀한다.
-CYS_VERSION="0.14.29"
+# ★2026-09-10 판올림 — 벤더 마지막 판본으로 올린다. 바이트는 **받을 자리에 직접 물어** 적었다
+#   (`curl -sSI -L` 의 content-length · 2026-09-10 12:0x 실측: aarch64 270596222 · x64 280008429).
+#   ⚠윈도우(bootstrap.ps1)는 2026-09-09부터 **우리 릴리스**를 받는다(우리 빌드가 서명돼 있다).
+#     맥은 우리 빌드가 무서명이라 아직 벤더 dmg 그대로다 — 두 OS 가 갈리는 것이 지금은 의도다.
+CYS_VERSION="0.14.30"
 CYS_DOWNLOAD_DIR="https://www.cysinsight.com/downloads/"
 case "$(uname -m)" in
-  arm64) CYS_MAC_FILE="cys_${CYS_VERSION}_aarch64.dmg"; CYS_MAC_BYTES=270338728 ;;
-  *)     CYS_MAC_FILE="cys_${CYS_VERSION}_x64.dmg";     CYS_MAC_BYTES=284549706 ;;
+  arm64) CYS_MAC_FILE="cys_${CYS_VERSION}_aarch64.dmg"; CYS_MAC_BYTES=270596222 ;;
+  *)     CYS_MAC_FILE="cys_${CYS_VERSION}_x64.dmg";     CYS_MAC_BYTES=280008429 ;;
 esac
 CYS_DOWNLOAD_URL="${CYS_DOWNLOAD_DIR}${CYS_MAC_FILE}"
 
@@ -79,13 +93,46 @@ done
 log() { printf '%s %s\n' "$(date '+%Y-%m-%dT%H:%M:%S%z')" "$*" >> "$LOG_FILE"; }
 
 #   「내가 중간에 5번 이상 작업을 해야 했다」 · 몇 번이었는지 아무도 정확히 몰랐다).
-#   $1 = 누가 강제하는가(OS·벤더·우리) — 「우리」가 하나라도 남으면 그것이 우리가 고칠 몫이다.
+#   $1 = 누가 이 손을 시키는가(OS·벤더·우리) — 「우리」가 하나라도 남으면 그것이 우리가 고칠 몫이다.
+# 🔴화면 문구에서 「강제」를 뺀다(1R 봉인 2026-09-10 · 윈도우판과 같다). 이 칸의 뜻은 「누가
+#   시키는가」이지 「우리가 사람을 강제한다」가 아니다. 앞 판은 자리마다 문구를 순화해 놓고
+#   **이 공통 래퍼가 여전히 「강제: 자비스」를 인쇄**해 화면에는 순화가 하나도 안 나타났다.
+#   ★자리마다 고치고 공통 자리를 안 고치면 아무것도 안 고친 것이다.
 HUMAN_HANDS=0
 human() {
   HUMAN_HANDS=$((HUMAN_HANDS + 1))
-  say "[사람 손 #${HUMAN_HANDS} · 강제: $1] $2"
+  say "[사람 손 #${HUMAN_HANDS} · 시킨 쪽: $1] $2"
 }
 say() { printf '%s\n' "$*"; log "$*"; }
+
+# ── 다시 하시는 법 — 「같은 줄」이라고 말하지 않는다 (2026-09-10 실기에서 고친 것) ─────
+# 🔴막힌 자리마다 「같은 한 줄을 다시 돌려 주십시오」라고 적어 왔다. 실기에서 그것이 **사용자
+#   막힘으로 확정**됐다 — 「줄」이 무엇인지, 「돌린다」가 무슨 뜻인지 모르고, 무엇보다 그 명령이
+#   화면 어디에도 없었다. 창이 닫힌 뒤 사이트를 다시 찾는 것 자체가 손 하나다.
+#   ⇒ 끝맺음에서 ①창 여는 법 ②복사 ③붙여넣기+Enter 를 적고 **명령 전체를 인쇄한다.**
+# ★어느 명령을 인쇄할지는 **들어온 길**이 정한다(재설치가 JARVIS_ENTRY=reinstall 로 알려 준다).
+# ⚠아래 두 줄은 사이트가 게시하는 명령과 **글자까지 같아야 한다** — checks.sh 가 그 동일성을 잰다.
+JARVIS_RERUN_BOOTSTRAP='curl -fsSL https://jarvis.godmeyou.kr/install/bootstrap.sh -o "$HOME/install-jarvis.sh" && bash "$HOME/install-jarvis.sh"'
+JARVIS_RERUN_REINSTALL='curl -fsSL https://jarvis.godmeyou.kr/install/reinstall.sh -o "$HOME/reinstall-jarvis.sh" && bash "$HOME/reinstall-jarvis.sh"'
+rerun_cmd() {
+  if [ "${JARVIS_ENTRY:-}" = "reinstall" ]; then printf '%s\n' "$JARVIS_RERUN_REINSTALL"
+  else printf '%s\n' "$JARVIS_RERUN_BOOTSTRAP"; fi
+}
+SHOW_RERUN=0
+# 「다시 실행하면 풀린다」고 말하는 자리는 **전부 이 함수로** 적는다 — 문구와 깃발이 갈리면
+#   화면은 다시 하라는데 그 방법은 안 나오는 끝이 생긴다(그것이 실기에서 난 일이다).
+next_rerun() { NEXT_STEP="$1"; SHOW_RERUN=1; }
+show_rerun_how() {
+  printf '%s\n' ""
+  printf '%s\n' "  == 다시 하시는 법 (이대로 따라 하시면 됩니다) =="
+  printf '%s\n' "   1) Command(⌘)+스페이스를 누르고 터미널 이라고 치신 뒤 [터미널] 을 여십시오."
+  printf '%s\n' "   2) 아래 명령을 처음부터 끝까지 끌어 선택한 뒤 Command(⌘)+C 를 누르십시오."
+  printf '%s\n' "   3) 터미널 창을 한 번 누르고 Command(⌘)+V 로 붙여넣은 뒤 Enter(리턴) 를 누르십시오."
+  printf '%s\n' ""
+  printf '%s\n' "$(rerun_cmd)"
+  printf '%s\n' ""
+  printf '%s\n' "  끝난 단계는 건너뛰고 막힌 자리부터 이어서 갑니다."
+}
 
 redact() { printf '%s' "$1" | sed "s|$HOME|~|g"; }
 
@@ -99,7 +146,8 @@ claude_has_auth_cmd() {
 #   cys 쪽 능력도 같은 이유로 `--help` 로 묻는다(판본 숫자를 게이트로 쓰지 않는다).
 #   묻는 것 = 좌석을 열 때 「이 자리에서 무엇을 띄우는지」를 적어 두는 칸이 있는가.
 #   그 칸이 있어야 컴퓨터를 껐다 켠 뒤 복원이 자비스 자리를 「무엇을 띄울지 모름」으로 건너뛰지 않는다.
-#   ⚠지금 배포된 판본(0.14.29)에는 그 칸이 없다 — 없는 판본에 붙이면 좌석이 아예 안 열린다.
+#   ⚠판본에 따라 그 칸이 없다 — 없는 판본에 붙이면 좌석이 아예 안 열린다(2026-09-04 실측: 0.14.29 에 없었다).
+#     ★그래서 이 주석에 「지금 배포된 판본은 X」라고 적지 않는다 — 핀이 올라가는 날 그 문장만 낡는다.
 #   그래서 붙이기 전에 물어본다. 한 번만 묻고 그 답을 기록 파일에 한 줄 남긴다.
 #   ⚠답을 기억해 두지 않는다. 이 스크립트가 도는 동안 cys 는 **없다가 생기고 낡았다가 새로워진다** —
 #   설치 전에 물어 둔 답을 설치 뒤에 그대로 쓰면, 방금 깐 판본이 아니라 옛 판본에 대고 판정하는 셈이 된다.
@@ -223,7 +271,10 @@ closing_note() {
   [ "$CLOSING_DONE" = "1" ] && return 0
   CLOSING_DONE=1
   printf '%s\n' ""
-  printf '%s\n' "다음에 할 일: ${NEXT_STEP:-같은 한 줄을 다시 돌리시면 끝난 단계는 건너뛰고 이어서 갑니다.}"
+  # 「다음에 할 일」을 아무도 안 적은 끝 = 우리가 예상 못 한 자리다. 그때가 안내가 가장 필요한 때이므로
+  #   기본값을 「다시 실행」으로 두고 **깃발도 함께 세운다**(문구만 두면 방법이 안 나온다).
+  if [ -z "$NEXT_STEP" ]; then NEXT_STEP="아래 「다시 하시는 법」대로 다시 실행해 주십시오."; SHOW_RERUN=1; fi
+  printf '%s\n' "다음에 할 일: $NEXT_STEP"
   if [ -n "$J_CODE" ]; then
     printf '%s\n' "  진단 코드: $J_CODE  (${HELP_CODE_URL}${J_CODE})"
     # 🔴화면과 보고서가 갈리지 않게 한다(검토 지적 채택 2026-09-09) — 단계가 코드를 남기고 그 자리에서
@@ -243,6 +294,9 @@ closing_note() {
   else
     printf '%s\n' "  기록 파일은 아직 만들어지지 않았습니다 — 이 화면을 사진으로 남겨 주십시오."
   fi
+  # ★안내는 **맨 마지막**에 둔다 — 사람이 마지막으로 보는 화면에 명령이 있어야 복사할 수 있다.
+  [ "$SHOW_RERUN" = "1" ] && show_rerun_how
+  return 0
 }
 NEXT_STEP=""    # 단계가 자기 자리에서 더 정확한 한 줄을 넣을 수 있다
 
@@ -255,11 +309,76 @@ trap 'closing_note; rm -f "$ROWS_FILE"' EXIT
 #   앞 판은 이 실패가 트랩 등록보다 먼저 나서, 가장 도움이 필요한 순간(권한·공간·백신으로 자리를 못 만든
 #   순간)에 「다음에 할 일」이 한 줄도 안 나오고 창이 차갑게 닫혔다.
 #   ⚠까닭을 「권한」 하나로 단정하지 않는다 — 공간이 꽉 찼거나 백신이 폴더 생성을 막아도 여기서 실패한다.
-if ! mkdir -p "$JARVIS_HOME" 2>/dev/null; then
-  echo "자리를 만들지 못했습니다: $JARVIS_HOME" >&2
+# ── 🔴🔴작업 폴더는 **이름을 못 박고, 우리가 만든 자리에만 표식을 놓는다** (3R N3 · master 결정) ──
+#   앞 판은 `JARVIS_HOME` 값이 무엇이든 `mkdir -p` 로 만들고 **이미 있던 남의 폴더에도 표식을 써 줬다.**
+#   ⇒ 제거기의 「우리 폴더인가」 관문이 그 표식을 소유 증거로 받아 **남의 폴더를 통째로 지웠다**
+#     (`JARVIS_HOME=~/valuable/project` 로 한 번 설치하면 그 다음 지우기가 그 폴더를 재귀 삭제한다).
+#   ★설치기가 표식을 헤프게 놓으면 제거기의 관문은 **관문이 아니다.** 관문의 값은 그것을 세우는
+#     쪽이 아끼는 만큼이다 — 검사를 늘리는 것으로는 이 구멍이 안 막힌다.
+#   ⇒ 두 관문을 **만들기보다 먼저** 통과해야 한다:
+#     ⑴이름이 정확히 `install-jarvis` 인 자리만 쓴다(그 외 값 = 거부·안내·중단).
+#     ⑵표식은 **우리가 새로 만든 자리**(또는 비어 있는 자리)에만 놓는다. 이미 있고 **비어 있지 않으면**
+#       채택하지 않는다 — 우리가 앞서 만든 자리는 우리 표식을 갖고 있으므로 다시 깔 때 그대로 이어 쓴다.
+#   ⚠표식을 못 쓰면 **거기서 멈춘다**(앞 판은 경고만 하고 계속 갔다). 표식 없는 폴더에 기록을 쌓아 두면
+#     다음 실행이 그 폴더를 「남의 것」으로 읽어 ⑵에서 막힌다 — 그때는 사람이 손으로 치울 수밖에 없다.
+JARVIS_HOME_BASENAME="install-jarvis"
+owner_mark_ok() {  # 이 자리에 우리 표식이 있는가
+  [ -f "$JARVIS_OWNER_FILE" ] && grep -qF "$JARVIS_OWNER_MARK" "$JARVIS_OWNER_FILE" 2>/dev/null
+}
+write_owner_mark() {
+  owner_mark_ok && return 0
+  printf '%s\n' "$JARVIS_OWNER_MARK" > "$JARVIS_OWNER_FILE" 2>/dev/null || return 1
+  return 0
+}
+refuse_jarvis_home() {  # refuse_jarvis_home <까닭 한 줄>
+  echo "작업 폴더로 쓸 수 없는 자리입니다: $JARVIS_HOME" >&2
+  echo "     까닭: $1" >&2
+  echo "     진단 코드: J-HOME-01 — 이 도구가 만들고 지우는 폴더의 이름은 「$JARVIS_HOME_BASENAME」 하나입니다" >&2
+  J_CODE="J-HOME-01"
+  NEXT_STEP="JARVIS_HOME 을 지정하지 않으신 채로 다시 실행하시면 기본 자리($HOME/$JARVIS_HOME_BASENAME)를 씁니다. 그 자리를 꼭 쓰시려면 그 폴더를 지우거나 옮기신 뒤 다시 실행해 주십시오 — 설치 도우미는 자기가 새로 만든 폴더만 씁니다."
+  SHOW_RERUN=1
+  exit 3
+}
+# ⑴이름 관문 — **만들기 전에** 본다.
+if [ "$(basename "${JARVIS_HOME%/}")" != "$JARVIS_HOME_BASENAME" ]; then
+  refuse_jarvis_home "폴더 이름이 「$JARVIS_HOME_BASENAME」 이 아닙니다"
+fi
+# ⑵채택 관문 — 이미 있는 자리는 **우리 표식이 있을 때만** 쓴다.
+# 🔴🔴**「비어 있으면 채택」을 걷어냈다**(4R BLOCK N3 봉인 2026-09-10). 두 가지가 틀렸다:
+#   ⑴결정은 「설치기가 **자기가 만든** 폴더에만 표식을 놓는다」였는데, 코드는 **남이 만들어 둔 빈 폴더**도
+#     채택해 표식을 써 줬다 ⇒ 그 자리는 그때부터 「우리 것」이 되어 다음 지우기가 통째로 지운다.
+#   ⑵더 나쁜 것은 **비었는지 세는 방법**이었다: `ls -A` 가 **권한 오류**를 내도 빈 목록으로 읽었다.
+#     「목록은 못 읽지만 파일은 만들 수 있는」 폴더 — 남의 파일이 가득한 그 자리에 표식을 써 준다.
+#   ★「비었다」와 「못 세었다」를 한 칸에 담은 자리가 또 있었다. 이 티켓에서만 세 번째다.
+#   ⇒ **세지 않는다.** 셀 필요가 없으면 틀릴 자리도 없다 — 표식이 없는 기존 폴더는 내용과 무관하게 거부한다.
+#   ⚠참가자 영향: 앞선 실행이 표식을 못 쓰고 죽어 **빈 폴더만 남은** 드문 경우에 한 번 막힌다.
+#     그때 화면이 「그 폴더를 지우고 다시 실행」이라고 정확히 말한다 — 손 한 번이 남의 폴더를 지키는 값이다.
+JARVIS_HOME_CREATED=0
+if [ -e "$JARVIS_HOME" ]; then
+  if [ ! -d "$JARVIS_HOME" ]; then
+    refuse_jarvis_home "그 자리에 폴더가 아닌 것이 이미 있습니다"
+  fi
+  if ! owner_mark_ok; then
+    refuse_jarvis_home "그 폴더는 이미 있는데 우리 표식이 없습니다(우리가 만든 자리가 아닙니다 — 지울 때 통째로 지우는 자리이므로 채택하지 않습니다)"
+  fi
+else
+  if ! mkdir -p "$JARVIS_HOME" 2>/dev/null; then
+    echo "자리를 만들지 못했습니다: $JARVIS_HOME" >&2
+    echo "     진단 코드: J-PERM-01 — 파일이나 폴더를 쓸 권한이 없습니다(공간 부족·백신 차단도 같은 모양입니다)" >&2
+    J_CODE="J-PERM-01"
+    NEXT_STEP="회사·학교에서 관리하는 컴퓨터면 담당자에게 문의해 주십시오. 개인 컴퓨터면 저장 공간과 백신 알림을 확인해 주십시오."
+    exit 3
+  fi
+  JARVIS_HOME_CREATED=1
+fi
+# ★표식을 놓는다 — 제거기는 이 표식이 있을 때만 그 폴더를 재귀로 지운다.
+if ! write_owner_mark; then
+  echo "작업 폴더 표식을 쓰지 못했습니다: $(redact "$JARVIS_OWNER_FILE")" >&2
   echo "     진단 코드: J-PERM-01 — 파일이나 폴더를 쓸 권한이 없습니다(공간 부족·백신 차단도 같은 모양입니다)" >&2
   J_CODE="J-PERM-01"
-  NEXT_STEP="회사·학교에서 관리하는 컴퓨터면 담당자에게 문의해 주십시오. 개인 컴퓨터면 저장 공간과 백신 알림을 확인해 주십시오."
+  NEXT_STEP="저장 공간과 백신 알림을 확인하신 뒤 다시 실행해 주십시오. (표식 없이 계속하면 다음 실행이 이 폴더를 「남의 것」으로 읽습니다.)"
+  # 우리가 방금 만든 빈 자리라면 되돌려 둔다 — 반쯤 만든 자리를 남기지 않는다.
+  [ "$JARVIS_HOME_CREATED" = "1" ] && rmdir "$JARVIS_HOME" 2>/dev/null
   exit 3
 fi
 
@@ -461,12 +580,14 @@ write_report() {
       #   깨끗한 기계 실측(2026-09-06 Tart)에서 그 줄이 실제로 찍혔다: 클로드도 로그인도 없는 기계가
       #   「클로드 설치·로그인이 이미 끝났다」는 보고서를 받았다. 모드가 다르면 문장도 달라야 한다.
       printf -- '- (미리보기) 아무것도 하지 않았습니다 — 이 보고는 **지금 이 컴퓨터의 상태**일 뿐입니다.\n'
-      printf -- '- 실제로 설치하시려면 `--dry-run` 없이 같은 한 줄을 돌리십시오.\n'
+      printf -- '- 실제로 설치하시려면 `--dry-run` 없이 아래 명령을 다시 실행하십시오.\n'
+      printf -- '\n```\n%s\n```\n' "$(rerun_cmd)"
     elif [ -n "$BLOCKED_STEP" ]; then
       printf -- '- **막힌 단계: %s**\n' "$BLOCKED_STEP"
       printf -- '- 앞 단계(클로드 설치·로그인·자비스 준비)는 **이미 끝났습니다.** 여기부터 다시 이어서 갑니다.\n'
       printf -- '- 그 **다음 단계들은 아직 하지 않았습니다** — 실패한 것이 아니라 순서가 안 온 것입니다.\n'
-    printf -- '- 같은 한 줄을 다시 돌리면 **끝난 단계는 건너뛰고 막힌 자리부터** 갑니다.\n'
+    printf -- '- 아래 명령을 다시 실행하면 **끝난 단계는 건너뛰고 막힌 자리부터** 갑니다.\n'
+      printf -- '\n```\n%s\n```\n' "$(rerun_cmd)"
     else
       printf -- '- 막힌 단계 없음.\n'
     fi
@@ -542,7 +663,7 @@ step_install_claude() {
     if wait_for_connection "[2/10]" '( set -o pipefail; curl -fsSL --max-time 600 "$CLAUDE_INSTALL_URL" | bash )'; then
       rc=0
     else
-      NEXT_STEP="연결이 된 뒤 같은 한 줄을 다시 돌려 주십시오. 끝난 단계는 건너뛰고 이어서 갑니다."
+      next_rerun "연결이 된 뒤 아래 「다시 하시는 법」대로 다시 실행해 주십시오. 끝난 단계는 건너뛰고 이어서 갑니다."
       return 4
     fi
   fi
@@ -557,7 +678,7 @@ step_install_claude() {
   if ! claude --version >/dev/null 2>&1; then
     say "[2/10] 설치기는 끝났는데 claude 명령이 아직 안 잡힙니다."
     jcode "J-PATH-01" "깔렸는데 이 창에서 명령을 찾지 못합니다"
-    NEXT_STEP="창을 새로 열고 같은 한 줄을 다시 돌려 주십시오."
+    next_rerun "터미널 창을 새로 열고 아래 「다시 하시는 법」대로 다시 실행해 주십시오."
     return 4
   fi
   #   새로 깐 것이 PATH 에서 이겨야 한다. 위에서 `$HOME/.local/bin` 을 앞에 붙였으므로 이기는 것이
@@ -565,13 +686,13 @@ step_install_claude() {
   nowpath="$(command -v claude 2>/dev/null)"
   case "$nowpath" in
     "$HOME"/.local/bin/*) : ;;
-    *) say "[2/10] ⚠새로 깐 클로드가 아니라 $(redact "$nowpath") 가 먼저 잡힙니다. 창을 새로 열고 다시 돌려 주십시오."
+    *) say "[2/10] ⚠새로 깐 클로드가 아니라 $(redact "$nowpath") 가 먼저 잡힙니다. 터미널 창을 새로 열고 아래 「다시 하시는 법」대로 다시 실행해 주십시오."; SHOW_RERUN=1
        return 4 ;;
   esac
   if ! claude_has_auth_cmd; then
     say "[2/10] 설치는 끝났는데 아직 낡은 판본이 잡힙니다."
     jcode "J-VER-01" "낡은 판본이 먼저 잡혀 로그인 명령을 모릅니다"
-    NEXT_STEP="창을 새로 열고 같은 한 줄을 다시 돌려 주십시오. 판올림부터 이어서 갑니다."
+    next_rerun "터미널 창을 새로 열고 아래 「다시 하시는 법」대로 다시 실행해 주십시오. 판올림부터 이어서 갑니다."
     return 4
   fi
   S1_CLAUDE_OK=1
@@ -603,7 +724,7 @@ step_login() {
   fi
   if ! claude_has_auth_cmd; then
     say "[3/10] 이 판본의 클로드는 로그인 확인 명령을 모릅니다. 판올림이 먼저 필요합니다."
-    say "     같은 한 줄을 다시 돌리면 판올림부터 이어서 갑니다."
+    say "     아래 「다시 하시는 법」대로 다시 실행하시면 판올림부터 이어서 갑니다."; SHOW_RERUN=1
     return 6
   fi
   human "벤더" "로그인 승인 클릭 — 클로드 회사 화면에서만 할 수 있다(우리가 대신 못 누른다)"
@@ -623,7 +744,7 @@ step_login() {
   done
   say "[3/10] $((LOGIN_POLL_TIMEOUT / 60))분 동안 로그인이 확인되지 않았습니다."
   jcode "J-LOGIN-01" "로그인 승인이 시간 안에 끝나지 않았습니다"
-  NEXT_STEP="브라우저에서 승인을 누르신 뒤 같은 한 줄을 다시 돌려 주십시오."
+  next_rerun "브라우저에서 승인을 누르신 뒤 아래 「다시 하시는 법」대로 다시 실행해 주십시오."
   return 5
 }
 
@@ -720,6 +841,15 @@ seed_claude_settings() {
 }
 
 # 이 함수는 두 번 불린다 — 자비스 전용 자리는 [8] 에서 자리를 잡은 뒤에야 생기기 때문이다.
+# 🔴🔴**실패를 「사람 손 한 번」으로 바꿔 적고 성공을 돌려주지 않는다**(3R N4 봉인 2026-09-10).
+#   앞 판은 `seed_claude_prefs` 가 rc 1 로 돌아와도 `human` 한 줄만 찍고 **항상 0** 을 돌려줬다.
+#   ⇒ 신뢰 기록이 실패한 판에서도 [4/10] 은 「갖춰 두었습니다」로 넘어갔다.
+#   ★`human` 은 **사람에게 할 일이 생겼다는 표시**지 실패의 처리 방법이 아니다. 둘을 섞으면
+#     단계는 늘 성공하고, 실패는 화면 한 줄로만 흘러간다.
+# ⚠**실패의 종류를 가른다.** 사전 설정을 못 건 것(도구 부재 등)은 예전처럼 「사람 손 한 번」이면
+#   끝나는 일이라 계속 간다. 그러나 **기록 실패는 다르다** — 그때는 설정을 도로 뺐고, 그 사실을
+#   단계가 삼키면 화면은 「갖춰 두었습니다」라고 말한다. 그 한 줄만 단계 실패로 올린다.
+TRUST_JOURNAL_FAILED=0
 seed_all_profiles() {
   local p
   for p in $(profile_configs); do
@@ -728,6 +858,7 @@ seed_all_profiles() {
   for p in $(profile_settings); do
     seed_claude_settings "$p" || human "벤더" "설정 파일($(redact "$p"))을 못 썼다"
   done
+  [ "$TRUST_JOURNAL_FAILED" = "1" ] && return 1
   return 0
 }
 
@@ -747,13 +878,82 @@ seed_claude_prefs() {
   if ! plutil -extract projects json -o - "$cfg" >/dev/null 2>&1; then
     plutil -replace projects -json '{}' "$cfg" >/dev/null 2>&1
   fi
-  plutil -insert "projects.$JARVIS_HOME" -json '{"hasTrustDialogAccepted":true}' "$cfg" >/dev/null 2>&1 \
-    || plutil -replace "projects.$JARVIS_HOME" -json '{"hasTrustDialogAccepted":true}' "$cfg" >/dev/null 2>&1
+  # 🔴2026-09-10 수리(R4) — 앞 판은 **자비스 작업 폴더에만** 신뢰를 심었다. 그런데 동료 좌석은
+  #   팩 편성이 정하는 cwd 로 뜨고 그 cwd 가 **홈**이었다 ⇒ 좌석들이 「Quick safety check …
+  #   Yes, I trust this folder」에서 서고, ★기본 선택이 「No, exit」라 Enter 만 누르면 클로드가
+  #   종료돼 좌석이 셸로 낙하한다. 홈도 심어 그 고리를 끊는다.
+  #   ⚠사용자 폴더 이름에 마침표가 있으면 plutil 이 그 칸을 가리킬 수 없다(이 저장소가 아는 함정) —
+  #     조용히 지나가지 않고 화면에 말한다. 못 넘긴 질문은 사람이 한 번 누르면 끝난다.
+  # ⑴자비스 작업 폴더 — 우리가 만든 자리다. 없으면 만들고, 있으면 우리 칸을 세운다.
+  case "$JARVIS_HOME" in
+    *.*) say "     (폴더 이름에 마침표가 있어 $(redact "$JARVIS_HOME") 의 폴더 신뢰 질문은 미리 넘기지 못했습니다 — 한 번 [Yes] 를 눌러 주십시오.)" ;;
+    *) plutil -insert "projects.$JARVIS_HOME" -json '{"hasTrustDialogAccepted":true}' "$cfg" >/dev/null 2>&1 \
+         || plutil -replace "projects.$JARVIS_HOME.hasTrustDialogAccepted" -bool true "$cfg" >/dev/null 2>&1 \
+         || plutil -insert "projects.$JARVIS_HOME.hasTrustDialogAccepted" -bool true "$cfg" >/dev/null 2>&1 ;;
+  esac
+  # ⑵사용자 홈 — **참가자의 자리다.** 규칙이 다르다(1R REVISE ④ 봉인 2026-09-10 · 윈도우판과 같다).
+  # 🔴🔴**이미 값이 있으면 손대지 않는다.** 앞 판은 있든 없든 true 로 세웠다. 그러면
+  #   ①원래 true 였던 분의 값을 「우리 것」과 구별할 수 없게 되고(제거기가 남의 값을 지운다)
+  #   ②원래 **false**(신뢰하지 않겠다고 명시적으로 고르신 것)를 조용히 true 로 뒤집는다.
+  #   ★②는 안전 설정을 우리가 몰래 되돌리는 것이다 — 편의를 위해 할 일이 아니다.
+  #   ⇒ **없을 때만 넣고, 넣은 것만 적어 둔다.** 제거기는 적힌 것만 되돌린다.
+  #   ⚠값이 false 라 좌석이 신뢰 질문을 만나면 사람이 한 번 [Yes] 를 누르시면 된다 —
+  #     남의 선택을 뒤집는 것보다 손 한 번이 싸다.
+  case "$HOME" in
+    *.*) say "     (폴더 이름에 마침표가 있어 $(redact "$HOME") 의 폴더 신뢰 질문은 미리 넘기지 못했습니다 — 한 번 [Yes] 를 눌러 주십시오.)" ;;
+    *) if plutil -extract "projects.$HOME.hasTrustDialogAccepted" raw -o - "$cfg" >/dev/null 2>&1; then
+         say "     (이 컴퓨터에는 홈 폴더 신뢰 설정이 이미 있어 그대로 두었습니다 — 우리가 바꾸지 않습니다.)"
+       else
+         # 되돌릴 때 **그만큼만** 되돌리려면, 무엇을 새로 만드는지 넣기 전에 갈라 둬야 한다.
+         _made_entry=0
+         plutil -extract "projects.$HOME" json -o - "$cfg" >/dev/null 2>&1 || _made_entry=1
+         if plutil -insert "projects.$HOME" -json '{"hasTrustDialogAccepted":true}' "$cfg" >/dev/null 2>&1 \
+            || plutil -insert "projects.$HOME.hasTrustDialogAccepted" -bool true "$cfg" >/dev/null 2>&1; then
+           # 🔴🔴**기록에 실패하면 설정 변경을 되돌린다**(3R N4 봉인 2026-09-10).
+           #   앞 판은 기록 실패를 「말하고 rc 1」로 끝냈다 — 그런데 **키는 이미 들어가 있었다.**
+           #   ⇒ 제거기는 그 키를 「참가자의 것」으로 읽어 **영영 남긴다.** 우리가 남의 컴퓨터에
+           #     되돌릴 길 없는 자국을 남기는 것이다.
+           #   ★기록과 설정은 **함께 서거나 함께 물러난다** — 반쪽만 남으면 그것이 곧 자국이다.
+           if ! printf '%s\t%s\n' "$cfg" "$HOME" >> "$TRUST_SEED_FILE" 2>/dev/null; then
+             TRUST_JOURNAL_FAILED=1
+             # 🔴🔴**되돌렸다고 말하기 전에 되돌아갔는지 본다**(4R BLOCK N4 봉인 2026-09-10).
+             #   앞 판은 `plutil -remove` 의 종료값을 **버리고** 곧바로 「도로 뺐습니다」라고 말했다.
+             #   디스크가 꽉 차면 기록 쓰기와 설정 되쓰기가 **함께** 실패한다 ⇒ 키는 남고 기록은 없는데
+             #   화면은 되돌렸다고 말한다. 다음 실행은 그 키를 **참가자의 것**으로 읽어 영영 건너뛴다.
+             #   ★「했다」는 **다시 봐서 없을 때만** 참이다 — 이 파일이 로그인 쪽에서 이미 배운 규칙이다.
+             if [ "$_made_entry" = "1" ]; then
+               plutil -remove "projects.$HOME" "$cfg" >/dev/null 2>&1 || true
+             else
+               plutil -remove "projects.$HOME.hasTrustDialogAccepted" "$cfg" >/dev/null 2>&1 || true
+             fi
+             if ! plutil -extract "projects.$HOME.hasTrustDialogAccepted" raw -o - "$cfg" >/dev/null 2>&1; then
+               say "     (홈 폴더 신뢰 기록을 남기지 못해 그 설정을 도로 뺐습니다 — 좌석이 폴더 신뢰를 한 번 물을 수 있습니다.)"
+               log "trust seed record FAILED -> rollback verified: $(redact "$cfg") + $(redact "$HOME")"
+               return 1
+             fi
+             # 되돌리기도 실패했다. **키는 남고 기록은 없는** 상태만은 만들지 않는다 —
+             #   기록을 한 번 더 시도해 둘을 맞춘다(그러면 지울 때 되돌릴 수 있다).
+             if printf '%s\t%s\n' "$cfg" "$HOME" >> "$TRUST_SEED_FILE" 2>/dev/null; then
+               say "     (설정을 도로 빼지 못해 기록을 남겨 두었습니다 — 지울 때 이 칸도 함께 되돌립니다.)"
+               log "trust seed rollback FAILED -> journal re-recorded: $(redact "$cfg") + $(redact "$HOME")"
+               return 1
+             fi
+             # 둘 다 실패했다. 조용히 지나가지 않는다 — 사람이 손으로 되돌릴 수 있게 **어디의 무엇**인지 적는다.
+             say "     홈 폴더 신뢰 설정을 넣었는데 그 기록도, 되돌리기도 하지 못했습니다."
+             say "        지울 때 이 칸은 자동으로 되돌아가지 않습니다. 손으로 빼시려면:"
+             say "        파일 $(redact "$cfg") 의 projects → $(redact "$HOME") → hasTrustDialogAccepted 줄"
+             log "trust seed rollback FAILED and journal FAILED: $(redact "$cfg") + $(redact "$HOME")"
+             return 1
+           fi
+           log "trust seed record: $(redact "$cfg") + $(redact "$HOME")"
+         fi
+       fi ;;
+  esac
   # 큰 화면 권유 질문은 「본 횟수」가 적을 때만 뜬다(실측: 그 값이 3인 기계에서는 안 떴다).
   plutil -replace fullscreenUpsellSeenCount -integer 99 "$cfg" >/dev/null 2>&1 \
     || plutil -insert fullscreenUpsellSeenCount -integer 99 "$cfg" >/dev/null 2>&1
   say "     첫 실행 질문(테마·폴더 신뢰·큰 화면 권유)을 미리 넘겨 두었습니다."
-  log "seed: hasCompletedOnboarding=true · projects.$JARVIS_HOME.hasTrustDialogAccepted=true (되돌리기 = $(redact "$cfg") 삭제)"
+  log "seed: hasCompletedOnboarding=true · 작업 폴더 신뢰($(redact "$JARVIS_HOME")) · 홈 신뢰는 없을 때만($(redact "$HOME")) (되돌리기 = 우리가 넣은 키만 · 기록 = $(redact "$TRUST_SEED_FILE"))"
   return 0
 }
 
@@ -763,7 +963,14 @@ step_prepare() {
     say "[4/10] (dry-run) 사전 설정을 쓰지 않았습니다(바깥 변경 0)."
     return 0
   fi
-  seed_all_profiles
+  if ! seed_all_profiles; then
+    say "[4/10] 홈 폴더 신뢰 기록을 남기지 못했습니다 — 그 설정은 도로 뺐고, 여기서 멈춥니다."
+    say "     기록 없이 그 칸만 넣으면 지울 때 되돌릴 길이 없습니다(남의 컴퓨터에 자국이 남습니다)."
+    J_CODE="J-PERM-01"
+    NEXT_STEP="저장 공간과 백신 알림을 확인하신 뒤 다시 실행해 주십시오."
+    SHOW_RERUN=1
+    return 4
+  fi
   say "[4/10] 자비스가 쓸 것을 갖춰 두었습니다."
   return 0
 }
@@ -790,7 +997,7 @@ step_download_cys() {
   if [ -n "$freemb" ] && [ "$freemb" -lt 3072 ] 2>/dev/null; then
     say "[5/10] 저장 공간이 부족합니다 (남은 자리 약 ${freemb}MB · 3GB 이상을 권합니다)."
     jcode "J-DISK-01" "저장 공간이 부족합니다"
-    NEXT_STEP="공간을 3GB 이상 비우신 뒤 같은 한 줄을 다시 돌려 주십시오."
+    next_rerun "공간을 3GB 이상 비우신 뒤 아래 「다시 하시는 법」대로 다시 실행해 주십시오."
     return 5
   fi
   for try in 1 2; do
@@ -802,7 +1009,7 @@ step_download_cys() {
       # ⚠다시 해 보는 명령에도 상한이 있어야 한다 — 없으면 curl 이 응답 없는 연결에 매달려
       #   30분 상한이 있는 바깥 고리로 **돌아오지 못한다**(검토 지적 채택 2026-09-09).
       if ! wait_for_connection "[5/10]" 'curl -fsSL --max-time 900 "$CYS_DOWNLOAD_URL" -o "$dst"'; then
-        NEXT_STEP="연결이 된 뒤 같은 한 줄을 다시 돌려 주십시오. 받은 데까지는 건너뛰고 이어서 갑니다."
+        next_rerun "연결이 된 뒤 아래 「다시 하시는 법」대로 다시 실행해 주십시오. 받은 데까지는 건너뛰고 이어서 갑니다."
         rm -f "$dst"
         return 5
       fi
@@ -928,9 +1135,9 @@ step_install_cys() {
          say "[6/10] 설치를 마쳤습니다."
          return 0
        fi
-       say "[6/10] 5분 동안 설치가 확인되지 않았습니다. 같은 한 줄을 다시 돌리면 여기서부터 이어서 갑니다."
+       say "[6/10] 5분 동안 설치가 확인되지 않았습니다. 아래 「다시 하시는 법」대로 다시 실행하시면 여기서부터 이어서 갑니다."; SHOW_RERUN=1
        return 6 ;;
-    2|3) say "[6/10] 설치 파일이 온전하지 않습니다. 같은 한 줄을 다시 돌리면 다시 받습니다."
+    2|3) say "[6/10] 설치 파일이 온전하지 않습니다. 아래 「다시 하시는 법」대로 다시 실행하시면 다시 받습니다."; SHOW_RERUN=1
          rm -f "$dst"
          return 6 ;;
     4) say "[6/10] 받은 설치 파일이 공식 서명 검사를 통과하지 못했습니다 — 설치를 멈춥니다."
@@ -987,7 +1194,7 @@ step_verify_cys() {
     say "     부르는 길: $(redact "$CYS_CLI")"
     return 0
   fi
-  say "[7/10] 프로그램은 있는데 아직 명령으로 부를 수 없습니다. 창을 새로 열고 같은 줄을 다시 돌려 주십시오."
+  say "[7/10] 프로그램은 있는데 아직 명령으로 부를 수 없습니다. 터미널 창을 새로 열고 아래 「다시 하시는 법」대로 다시 실행해 주십시오."; SHOW_RERUN=1
   return 7
 }
 
@@ -1013,7 +1220,7 @@ step_prepare_account() {
     sleep 2; i=$((i+1))
   done
   if [ "$alive" -ne 1 ]; then
-    say "[8/10] 준비는 됐는데 아직 응답이 없습니다. 잠시 뒤 같은 줄을 다시 돌려 주십시오."
+    say "[8/10] 준비는 됐는데 아직 응답이 없습니다. 잠시 뒤 아래 「다시 하시는 법」대로 다시 실행해 주십시오."; SHOW_RERUN=1
     return 8
   fi
   doc="$(CYS_NO_AUTOSTART=1 "$cli" doctor 2>&1)"
@@ -1041,7 +1248,13 @@ step_prepare_account() {
     say "     (${n_skip}가지는 이 컴퓨터에서 판정할 수 없는 항목입니다 — 고장이 아닙니다.)"
   fi
   # 자리를 잡으면서 자비스 전용 설정 자리가 새로 생긴다 — 동료들이 그 자리로 뜨므로 한 번 더 심는다.
-  seed_all_profiles
+  if ! seed_all_profiles; then
+    say "[8/10] 홈 폴더 신뢰 기록을 남기지 못했습니다 — 그 설정은 도로 뺐고, 여기서 멈춥니다."
+    J_CODE="J-PERM-01"
+    NEXT_STEP="저장 공간과 백신 알림을 확인하신 뒤 다시 실행해 주십시오."
+    SHOW_RERUN=1
+    return 8
+  fi
   say "[8/10] 자리를 잡았습니다 (실패 0)."
   return 0
 }
@@ -1054,13 +1267,64 @@ step_prepare_account() {
 FLEET_TRIGGER='너는 마스터다'
 FLEET_WAIT_TRIES=72   # 5초 × 72 = 6분
 FLEET_ROLES='master cso worker'
+# 🔴🔴**이전 설치의 좌석을 이번 선언으로 세지 않는다**(2R N2 봉인 2026-09-10).
+#   앞 판은 전역 목록에서 **역할 이름만** 셌다. 그러면 지난 설치의 master·cso·worker 가 아직 살아
+#   있는 기계에서는 사람이 **아무 선언도 하지 않았는데** 첫 폴링에 세 역할이 다 차서
+#   「함대가 섰습니다」로 끝난다 — 새로 연 자비스는 깨어 있지도 않다.
+#   ⇒ 자리를 열기 **전에** 목록을 찍어 두고(기준선), 그 뒤 **새로 생긴 자리만** 센다.
+# 🔴🔴**기준선을 못 찍었으면 세는 것 자체를 하지 않는다**(3R N2 봉인 2026-09-10 · master 결정).
+#   기준선은 「이번 설치의 자리」와 「지난 설치의 자리」를 가르는 **유일한 근거**다. 그 조회가 실패해
+#   빈 집합이 되면, 다음 조회에 보이는 **옛 좌석 전부가 새 좌석으로** 읽힌다 ⇒ 사람이 아무 말도
+#   하지 않았는데 첫 폴링에 「함대가 섰습니다」로 끝난다.
+#   ★빈 집합은 「아무것도 없었다」가 아니라 **「못 물어봤다」**일 수 있다. 그 둘을 한 칸에 담으면
+#     실패가 곧 거짓 성공이 된다(우리가 세 라운드 내내 되풀이한 형태다).
+#   ⇒ 실패면 **계산하지 않고 모른다고 말한다**(unknown 게이트).
+FLEET_BASELINE=""
+FLEET_BASELINE_OK=0
+set_fleet_baseline() {
+  local out
+  if ! out="$(CYS_NO_AUTOSTART=1 "$1" list 2>&1)"; then
+    FLEET_BASELINE=""; FLEET_BASELINE_OK=0
+    log "fleet baseline FAILED: cys list 가 답하지 않았다 -> 좌석 판정 안 함"
+    return 1
+  fi
+  FLEET_BASELINE=" $(printf '%s\n' "$out" | grep -oE 'surface:[0-9]+' | sort -u | tr '\n' ' ')"
+  FLEET_BASELINE_OK=1
+  log "fleet baseline surfaces:$FLEET_BASELINE"
+  return 0
+}
 live_roles() {
-  local out r live=""
+  local out r live="" line sid
   out="$(CYS_NO_AUTOSTART=1 "$1" list 2>&1)"
-  for r in $FLEET_ROLES; do
-    printf '%s' "$out" | grep -qE "role=${r}(\s|-|\b)" && live="$live $r"
-  done
+  while IFS= read -r line; do
+    [ -n "$line" ] || continue
+    sid="$(printf '%s' "$line" | grep -oE 'surface:[0-9]+' | head -1)"
+    # 기준선에 있던 자리는 **이번 설치의 것이 아니다** — 세지 않는다.
+    if [ -n "$sid" ]; then
+      case "$FLEET_BASELINE" in *" $sid "*) continue ;; esac
+    fi
+    for r in $FLEET_ROLES; do
+      case " $live " in *" $r "*) continue ;; esac
+      printf '%s' "$line" | grep -qE "role=${r}(\s|-|\b)" && live="$live $r"
+    done
+  done <<EOF_LIVE
+$out
+EOF_LIVE
   printf '%s' "${live# }"
+}
+# 🔴🔴**「선언됐다」의 근거를 바꾼다**(1R BLOCK ③ 봉인 2026-09-10).
+#   앞 판은 「목록에 master 가 있으면 사람이 선언한 것」으로 봤다. **그 축은 처음부터 거짓이었다** —
+#   ★master 좌석을 만든 것은 사람이 아니라 **우리 자신**이다(우리가 role=master 자리를 연다).
+#   그래서 사람이 아무것도 치지 않아도 「부르는 중 · 사람이 하실 일 없습니다」라고 말하고
+#   끝에는 「그 한마디는 들어갔습니다」라고 단정했다 ⇒ 선언이 영영 안 일어나고 6분을 버린다.
+#   ⇒ 근거 = **자식 좌석의 출현**. cso·worker 는 자비스가 선언을 듣고서야 부른다(우리가 안 만든다).
+#   ⚠자식이 없으면 **선언 여부를 우리는 모른다** — 모를 때는 단정하지 않고 조건문으로 말한다.
+declaration_seen() { # declaration_seen "<live 목록>"
+  local r
+  for r in $1; do
+    [ "$r" = "master" ] || return 0
+  done
+  return 1
 }
 step_fleet() {
   local ref="$1" cli i live missing r
@@ -1071,7 +1335,17 @@ step_fleet() {
     say "     cys 창에서 자비스에게 이렇게 말해 주십시오: $FLEET_TRIGGER"
     return 10
   fi
-  human "자비스" "동료들을 부르는 한마디 — cys 창에서 직접 쳐 주셔야 합니다"
+  # 🔴2026-09-10 실기에서 고친 것(R5 · 윈도우에서 드러났고 이쪽도 같은 문구다) — 옛 문구는 「강제」였는데
+  #   같은 시간에 자비스는 「사람이 할 일 없음」이라 적고 있었다 ⇒ 두 화면이 정면으로 모순이었다.
+  #   ★안전장치 설명은 남기고 「강제」의 어감만 뺀다.
+  # ★기준선을 못 찍었으면 **여기서 멈춘다** — 세어 봐야 그 수가 무엇을 뜻하는지 모른다.
+  if [ "$FLEET_BASELINE_OK" != "1" ]; then
+    say "[10/10] 지금 열려 있는 자리 목록을 읽지 못해, 동료들이 섰는지 판정하지 않습니다."
+    say "     cys 창에서 자비스에게 이렇게 말해 주십시오: $FLEET_TRIGGER"
+    say "     그 뒤 자비스에게 「동료들 다 섰어?」라고 물어보시면 자비스가 직접 확인해 알려 드립니다."
+    return 10
+  fi
+  human "자비스" "이 한마디만 사람이 칩니다 — cys 창에서 직접 쳐 주십시오(안전장치)"
   say ""
   say "   ┌─────────────────────────────────────────────┐"
   say "   │   cys 창(제목 jarvis)에 이렇게 쳐 주십시오:  │"
@@ -1089,8 +1363,16 @@ step_fleet() {
     live="$(live_roles "$cli")"
     [ "$(printf '%s' "$live" | wc -w | tr -d ' ')" -ge 3 ] && break
     i=$((i + 1))
+    # 🔴2026-09-10 수리(R5) — 앞 판은 **판정 없이** 「아직 치지 않으셨다면」을 되풀이했다.
+    #   ★판정 축은 이미 손에 있다 — master 자리가 목록에 서 있으면 그 한마디는 **이미 들어간 것**이다.
+    #   ⚠새 프로브를 만들지 않는다(5초마다 부르는 `cys list` 의 답을 그대로 읽는다).
     if [ "$i" -gt 0 ] && [ $((i % 12)) -eq 0 ]; then
-      say "   기다리는 중입니다 ($((i * 5 / 60))분 지남 · 최대 $((FLEET_WAIT_TRIES * 5 / 60))분). 아직 치지 않으셨다면 지금 쳐 주십시오."
+      if declaration_seen "$live"; then
+        say "   자비스가 동료들을 부르는 중입니다. 그대로 기다려 주십시오 ($((i * 5 / 60))분 지남 · 최대 $((FLEET_WAIT_TRIES * 5 / 60))분)."
+        say "     선 자리 = ${live:-없음}  (사람이 하실 일은 없습니다)"
+      else
+        say "   기다리는 중입니다 ($((i * 5 / 60))분 지남 · 최대 $((FLEET_WAIT_TRIES * 5 / 60))분). 아직 치지 않으셨다면 지금 쳐 주십시오."
+      fi
     fi
   done
   missing=""
@@ -1104,8 +1386,14 @@ step_fleet() {
   # 성공보다 이 문구가 중요하다 — 무엇이 없어서 못 섰는지를 그대로 말한다.
   say "[10/10] 아직 서지 않은 자리가 있습니다:${missing}"
   say "     선 자리 = ${live:-없음}"
-  say "     아직 그 한마디를 치지 않으셨다면, cys 창에서 지금 쳐 주시면 됩니다."
-  say "     치셨는데도 서지 않았다면 cys 창의 자비스에게 물어보십시오 — 무엇이 걸렸는지 사람 말로 알려 줍니다."
+  # ★여기서도 「아직 안 쳤다」를 단정하지 않는다 — master 가 서 있으면 그 말은 거짓이다(R5).
+  if declaration_seen "$live"; then
+    say "     자비스는 이미 깨어 있습니다(master 자리가 섰습니다) — 그 한마디는 들어갔습니다."
+    say "     남은 자리는 자비스가 이어서 세웁니다. cys 창의 자비스에게 무엇이 걸렸는지 물어보십시오."
+  else
+    say "     아직 그 한마디를 치지 않으셨다면, cys 창에서 지금 쳐 주시면 됩니다."
+    say "     치셨는데도 서지 않았다면 cys 창의 자비스에게 물어보십시오 — 무엇이 걸렸는지 사람 말로 알려 줍니다."
+  fi
   log "fleet missing:${missing}"
   return 10
 }
@@ -1147,6 +1435,9 @@ step_wake() {
     #   아니다.** 우리 창이 아닌 곳에서 도는 파일이므로, 남의 구현에 기대지 않고 우리가 아는 자리를 먼저 본다.
     printf '#!/bin/bash\nCLAUDE="$HOME/.local/bin/claude"\n[ -x "$CLAUDE" ] || CLAUDE=claude\nexec "$CLAUDE" --dangerously-skip-permissions %s\n' "'$first_prompt'" > "$wake_file" 2>/dev/null
     chmod +x "$wake_file" 2>/dev/null
+    # ★자리를 열기 **전에** 기준선을 찍는다(2R N2). 이 줄이 자리 여는 줄보다 뒤에 오면
+    #   우리가 만든 master 자리까지 기준선에 들어가 영영 안 세어진다.
+    set_fleet_baseline "$cli"
     cmd_line="bash $wake_file"
     if [ ! -f "$wake_file" ] || case "$wake_file" in *" "*) true ;; *) false ;; esac; then
       say "     여는 파일의 경로를 쓸 수 없어 cys 안에서는 열지 못합니다. 이 창에서 띄웁니다."
@@ -1180,7 +1471,7 @@ step_wake() {
   fi
   if [ -z "$claude_bin" ]; then
     say "[9/10] 자비스를 띄우지 못했습니다 — 클로드 명령을 찾지 못했습니다."
-    say "     창을 새로 열고 같은 한 줄을 다시 돌려 주십시오."
+    say "     터미널 창을 새로 열고 아래 「다시 하시는 법」대로 다시 실행해 주십시오."; SHOW_RERUN=1
     return 9
   fi
   if [ ! -t 0 ] && [ -r /dev/tty ]; then
@@ -1206,7 +1497,7 @@ write_report
 if [ "$MODE" = "detect" ]; then
   say "감지만 하고 끝냅니다."
   # 끝맺음 한 줄은 그 끝에 맞아야 한다 — 「살펴보기만 한 끝」에 「이어서 갑니다」는 맞지 않는다.
-  NEXT_STEP="실제로 설치하시려면 --detect-only 없이 같은 한 줄을 돌려 주십시오."
+  next_rerun "실제로 설치하시려면 --detect-only 없이 아래 「다시 하시는 법」대로 다시 실행해 주십시오."
   exit 0
 fi
 
