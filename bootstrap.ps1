@@ -66,11 +66,11 @@ $DlDir         = Join-Path $JarvisHome 'dl'
 # ★2026-09-09 자체 배포 전환(윈도우): 받을 곳 = 우리가 서명해 발행한 릴리스. 벤더 판을 깔면 그 뒤의
 #   업데이트도 벤더 궤도를 타서 우리 수리가 그 기계에 닿지 않는다(노트북 실기 2026-09-09).
 #   맥(bootstrap.sh)은 우리 빌드가 무서명이라 아직 벤더 dmg 그대로다.
-$CysVersion     = '0.14.33'
+$CysVersion     = '0.14.34'
 $CysDownloadDir = "https://github.com/oogisoogi/cys-terminal/releases/download/v${CysVersion}/"
 $CysWinFile     = "cys_${CysVersion}_x64-setup.exe"
-$CysWinBytes    = 139720664
-$CysWinSha256   = 'bfd7dd208d0135206482e47cc681bdb6cd91c654a17268a6b1fbd6c2f2cd755d'   # 릴리스 SHA256SUMS.txt 의 줄
+$CysWinBytes    = 139778158
+$CysWinSha256   = '36727b940b2b3770e013d0f4d464d4e96b7a3024c549d9f13fe1d56b25c5a437'   # 릴리스 SHA256SUMS.txt 의 줄
 $CysDownloadUrl = $CysDownloadDir + $CysWinFile
 
 $LoginPollInterval = 3     # 초
