@@ -317,6 +317,8 @@ closing_note() {
   else
     printf '%s\n' "  기록 파일은 아직 만들어지지 않았습니다 — 이 화면을 사진으로 남겨 주십시오."
   fi
+  # 원격 해결 — 막혀 멈춘 끝이면 여기서 진단을 보내고 창을 연 채 운영팀을 기다린다([1/10] 고지를 보여 드린 실행만).
+  [ "${NOTICE_SHOWN:-0}" = "1" ] && remote_help
   # ★안내는 **맨 마지막**에 둔다 — 사람이 마지막으로 보는 화면에 명령이 있어야 복사할 수 있다.
   [ "$SHOW_RERUN" = "1" ] && show_rerun_how
   return 0
@@ -1706,6 +1708,9 @@ step_wake() {
     case "$ref" in
       *surface:*)
         say "     cys 안에서 자비스를 열었습니다 ($ref). cys 창에서 이어서 이야기하십시오."
+        # 깨우기가 **성공한 뒤에만** 세운다(검수 지적 · D1 기각) — 깨우기가 실패한 끝은 원격 해결이 돈다.
+        #   이 창에서 띄우는 갈래(exec)는 성공하면 이 프로세스가 자비스로 바뀌어 끝맺음이 오지 않고, 실패하면 이 깃발 없이 끝맺음이 온다.
+        REACHED_WAKE=1
         # 창이 열렸으면 곧바로 동료들을 부른다(아래 폴백으로 내려가면 자비스 화면에 갇혀 다음 줄을 못 간다).
         step_fleet "$(printf '%s' "$ref" | sed -n 's/.*\(surface:[0-9][0-9]*\).*/\1/p')"
         fleet_rc=$?
@@ -1737,6 +1742,961 @@ step_wake() {
   exec "$claude_bin" --dangerously-skip-permissions "$first_prompt"
 }
 
+# ── 원격 해결 (help-s2) — 막히면 진단이 서버로 가고, 운영팀 명령을 이 창이 실행한다 ────────
+# 계약 정본 = ai-jarvis `web-install/docs/HELP-API.md` 4절·5절·7절·9-4절 · 실행 가능한 명세 = `web-install/test-s2/s2-double.ts`.
+# ★사람이 누르는 것은 없다 — [1/10] 에서 고지 1줄을 보여 드리고, 막혀 멈추면 묻지 않고 보낸다(서열 1 쉬운 설치).
+# ★서버 응답을 믿지 않는다 — 명령은 **이 파일에 넣어 둔 표**로 다시 재고(글자·칸·이름·모양·자리),
+#   작업 폴더 밖을 가리키는 경로를 막고, 실행한 번호를 **실행 전에** 파일에 남기고, 셸 없이 실행한다.
+#   ⇒ 응답이 위조돼도 닿는 것은 표 v1 의 읽기 명령뿐이다.
+# ★이 창이 닫히면 멈춘다 — 폴링은 이 프로세스 안에서만 돈다(뒤로 떼어 놓지 않는다).
+# ★언제 도는가 = 자비스를 깨우기 **전에** 진단 코드를 남기고 멈춘 끝. 자비스를 깨운 뒤에는 돌지 않는다
+#   (자비스가 이 창을 넘겨받으므로 두 쪽이 한 화면에 섞이지 않게).
+# ⚠JSON·재검사·스크럽은 macOS 기본 `osascript`(JavaScript)가 한다 — 깨끗한 맥에는 jq·python 이 없다.
+INSTALLER_VERSION="0.3.12"      # 보고의 installer_version · BOOTSTRAP_VERSION 은 화면 머리글 용도 그대로(보내지 않는다)
+HELP_API_URL="https://jarvis-install.godmeyou.kr"
+REMOTE_HELP_NOTICE_URL="jarvis-install.godmeyou.kr/help/notice"
+# [1/10] 고지 1줄 = /help/notice 정본(page.ts)이 인용하는 문장 그대로 + 끝에 자세한 안내 자리(계약 7-1절). ⛔문안 변경 금지.
+REMOTE_HELP_NOTICE="막히면 진단이 서버로 가고 운영 자비스가 원격으로 해결합니다 · 창을 닫으면 멈춥니다 · 자세히: $REMOTE_HELP_NOTICE_URL"
+# 「막혔을 때」 절 = page.ts REMOTE_LINES 3줄에서 태그만 뗀 것. ⛔문안 변경 금지(시험이 글자를 잰다).
+REMOTE_HELP_LINES=(
+  "무엇을 보내는가 — 설치가 막히면 설치 창이 진단(진단 코드·멈춘 단계·운영체제 판본·환경 보고·기록 끝부분)을 이 서버로 보냅니다. 집 폴더 경로·이메일·토큰, 그리고 환경 보고와 기록에 표시된 로그인 이름(같은 보고의 다른 곳에 나와도)은 보내기 전에 지우고, 서버가 한 번 더 지웁니다. 표시 없이 글 속에 홀로 적힌 이름은 알아보지 못해 남을 수 있습니다."
+  "누가 명령하는가 — 운영팀만 명령을 보낼 수 있습니다. 명령은 설치 창에 글자 그대로 표시된 뒤 실행되고, 이 화면에도 같은 글자로 남습니다. 서버는 명령을 실행하지 않습니다."
+  "어떻게 멈추는가 — 설치 창을 닫으면 곧바로 멈춥니다. 보고 화면의 「원격 해결 멈추기」로도 멈출 수 있고, 명령이 30분 동안 없거나 시작한 지 2시간이 지나면 저절로 닫힙니다."
+)
+REMOTE_HELP_POLL_SEC=20
+REMOTE_HELP_MAX_SEC=7200          # 2시간 — 서버의 절대 상한과 같다(서버가 못 닿아도 이 창이 따로 멈춘다)
+REMOTE_HELP_CMD_TIMEOUT=60        # 명령 하나의 시간 상한(초)
+REMOTE_HELP_NOTE_EVERY_SEC=300    # 기다리는 동안 몇 초마다 한 줄 말하는가(침묵은 「멈췄다」로 읽힌다)
+REMOTE_HELP_SEQ_FILE="$JARVIS_HOME/remote-help-executed.json"   # 실행한 명령 번호 · 재부팅 내성 · 깨지면 실행 0
+REMOTE_HELP_TOKEN_FILE="$JARVIS_HOME/remote-help-client-token"   # 보고 응답의 client_token(600) · ack·close 출처 헤더
+NOTICE_SHOWN=0
+REACHED_WAKE=0
+RH_TMP=""
+RH_ID=""
+RH_HTTP=""
+RH_REAL=""
+RH_RC=""
+RH_TIMEDOUT=0
+RH_REFUSED=""
+RH_RECORD=""
+RH_LOCK_HELD=0
+RH_LAST_ANSWER=""
+
+# 허용 명령 표 — ai-jarvis `web-install/docs/command-table.json` 과 **바이트 동일**(시험이 sha256 을 잰다).
+#   판본 글자는 이 표의 "version" 하나뿐이다(코드에 따로 적지 않는다).
+IFS= read -r -d '' REMOTE_HELP_TABLE <<'EOF_REMOTE_HELP_TABLE' || true
+{
+  "version": "v1-2026-09-11",
+  "token_pattern": "^[A-Za-z0-9_.:/\\\\-]+$",
+  "max_command_bytes": 512,
+  "max_tokens": 12,
+  "max_token_chars": 200,
+  "max_path_segments": 8,
+  "proc_names": [
+    "cys",
+    "cysd",
+    "claude",
+    "node"
+  ],
+  "entries": [
+    {
+      "id": "dir.root",
+      "shell": "ps1",
+      "usage": "Get-ChildItem",
+      "exec": "cmdlet",
+      "risk": 0,
+      "title": "작업 폴더 맨 위의 목록을 본다"
+    },
+    {
+      "id": "dir.list",
+      "shell": "ps1",
+      "usage": "Get-ChildItem -LiteralPath <path>",
+      "exec": "cmdlet",
+      "risk": 0,
+      "title": "작업 폴더 안 한 폴더의 목록을 본다"
+    },
+    {
+      "id": "file.tail",
+      "shell": "ps1",
+      "usage": "Get-Content -LiteralPath <path> -Tail <n:1-200>",
+      "exec": "cmdlet",
+      "risk": 0,
+      "title": "작업 폴더 안 파일의 끝 N줄을 본다"
+    },
+    {
+      "id": "file.hash",
+      "shell": "ps1",
+      "usage": "Get-FileHash -LiteralPath <path> -Algorithm SHA256",
+      "exec": "cmdlet",
+      "risk": 0,
+      "title": "작업 폴더 안 파일의 SHA256 을 본다"
+    },
+    {
+      "id": "file.exists",
+      "shell": "ps1",
+      "usage": "Test-Path -LiteralPath <path>",
+      "exec": "cmdlet",
+      "risk": 0,
+      "title": "작업 폴더 안에 그 파일(예: 표식 .jarvis-owned)이 있는지 본다"
+    },
+    {
+      "id": "disk.free",
+      "shell": "ps1",
+      "usage": "Get-PSDrive -Name C",
+      "exec": "cmdlet",
+      "risk": 0,
+      "title": "C 드라이브의 남은 공간을 본다"
+    },
+    {
+      "id": "net.check",
+      "shell": "ps1",
+      "usage": "Test-NetConnection -ComputerName jarvis-install.godmeyou.kr -Port 443 -InformationLevel Quiet",
+      "exec": "cmdlet",
+      "risk": 0,
+      "title": "우리 서버(443)에 닿는지 본다"
+    },
+    {
+      "id": "shell.version",
+      "shell": "ps1",
+      "usage": "Get-Host",
+      "exec": "cmdlet",
+      "risk": 0,
+      "title": "PowerShell 판본을 본다"
+    },
+    {
+      "id": "av.status",
+      "shell": "ps1",
+      "usage": "Get-MpComputerStatus",
+      "exec": "cmdlet",
+      "risk": 0,
+      "title": "백신 상태를 본다(끄지 않는다)"
+    },
+    {
+      "id": "proc.find",
+      "shell": "ps1",
+      "usage": "Get-Process -Name <proc>",
+      "exec": "cmdlet",
+      "risk": 0,
+      "title": "우리 프로그램(cys·cysd·claude·node)이 떠 있는지 본다"
+    },
+    {
+      "id": "cys.status",
+      "shell": "ps1",
+      "usage": "cys status",
+      "exec": "cys",
+      "risk": 0,
+      "title": "cys 노드 상태를 본다"
+    },
+    {
+      "id": "cys.doctor",
+      "shell": "ps1",
+      "usage": "cys doctor",
+      "exec": "cys",
+      "risk": 0,
+      "title": "cys 자기진단을 본다(고치지 않는다)"
+    },
+    {
+      "id": "cys.daemon",
+      "shell": "ps1",
+      "usage": "cys daemon status",
+      "exec": "cys",
+      "risk": 0,
+      "title": "cys 상시 가동 등록 상태를 본다"
+    },
+    {
+      "id": "dir.root",
+      "shell": "sh",
+      "usage": "ls -lan",
+      "exec": "/bin/ls",
+      "risk": 0,
+      "title": "작업 폴더 맨 위의 목록을 본다(소유자는 번호로)"
+    },
+    {
+      "id": "dir.list",
+      "shell": "sh",
+      "usage": "ls -lan <path>",
+      "exec": "/bin/ls",
+      "risk": 0,
+      "title": "작업 폴더 안 한 폴더의 목록을 본다(소유자는 번호로)"
+    },
+    {
+      "id": "file.tail",
+      "shell": "sh",
+      "usage": "tail -n <n:1-200> <path>",
+      "exec": "/usr/bin/tail",
+      "risk": 0,
+      "title": "작업 폴더 안 파일의 끝 N줄을 본다"
+    },
+    {
+      "id": "file.hash",
+      "shell": "sh",
+      "usage": "shasum -a 256 <path>",
+      "exec": "/usr/bin/shasum",
+      "risk": 0,
+      "title": "작업 폴더 안 파일의 SHA256 을 본다"
+    },
+    {
+      "id": "file.exists",
+      "shell": "sh",
+      "usage": "test -e <path>",
+      "exec": "/bin/test",
+      "risk": 0,
+      "title": "작업 폴더 안에 그 파일(예: 표식 .jarvis-owned)이 있는지 본다(종료 코드)"
+    },
+    {
+      "id": "disk.free",
+      "shell": "sh",
+      "usage": "df -h .",
+      "exec": "/bin/df",
+      "risk": 0,
+      "title": "작업 폴더가 있는 디스크의 남은 공간을 본다"
+    },
+    {
+      "id": "net.check",
+      "shell": "sh",
+      "usage": "nc -z -G 5 jarvis-install.godmeyou.kr 443",
+      "exec": "/usr/bin/nc",
+      "risk": 0,
+      "title": "우리 서버(443)에 닿는지 본다"
+    },
+    {
+      "id": "shell.version",
+      "shell": "sh",
+      "usage": "sw_vers",
+      "exec": "/usr/bin/sw_vers",
+      "risk": 0,
+      "title": "macOS 판본을 본다"
+    },
+    {
+      "id": "av.status",
+      "shell": "sh",
+      "usage": "spctl --status",
+      "exec": "/usr/sbin/spctl",
+      "risk": 0,
+      "title": "Gatekeeper 상태를 본다(끄지 않는다)"
+    },
+    {
+      "id": "proc.find",
+      "shell": "sh",
+      "usage": "pgrep -l <proc>",
+      "exec": "/usr/bin/pgrep",
+      "risk": 0,
+      "title": "우리 프로그램(cys·cysd·claude·node)이 떠 있는지 본다"
+    },
+    {
+      "id": "cys.status",
+      "shell": "sh",
+      "usage": "cys status",
+      "exec": "cys",
+      "risk": 0,
+      "title": "cys 노드 상태를 본다"
+    },
+    {
+      "id": "cys.doctor",
+      "shell": "sh",
+      "usage": "cys doctor",
+      "exec": "cys",
+      "risk": 0,
+      "title": "cys 자기진단을 본다(고치지 않는다)"
+    },
+    {
+      "id": "cys.daemon",
+      "shell": "sh",
+      "usage": "cys daemon status",
+      "exec": "cys",
+      "risk": 0,
+      "title": "cys 상시 가동 등록 상태를 본다"
+    }
+  ]
+}
+EOF_REMOTE_HELP_TABLE
+
+# 판정 쪽(JavaScript) — 입력은 환경(RH_*)과 인자로 받고, 결과는 파일이나 한 줄씩 돌려준다.
+#   ⚠`Ref()` 오류 포인터를 쓰지 않는다 — 이 기계(macOS 26.6.2)에서 osascript 가 그 자리에서 죽었다(rc 139 실측).
+IFS= read -r -d '' REMOTE_HELP_JS <<'EOF_REMOTE_HELP_JS' || true
+ObjC.import("Foundation");
+
+var ENV_REPORT_MAX_BYTES = 96000;
+var LOG_TAIL_MAX_BYTES = 128000;
+var LOG_TAIL_LINES = 200;
+var OUTPUT_MAX_BYTES = 4096;
+var REPORT_MAX_BYTES = 240000;   // 서버 본문 상한 262,144 바이트 안쪽 — 잘라 낸 글이 아니라 **직렬화한 JSON** 을 잰다(백슬래시·제어 글자는 두 배 이상 커진다)
+var MAX_NAMES = 64;
+
+function env(name) {
+  var value = $.NSProcessInfo.processInfo.environment.objectForKey(name);
+  return value.isNil() ? "" : ObjC.unwrap(value);
+}
+
+function readText(path) {
+  if (!path) return null;
+  var text = $.NSString.stringWithContentsOfFileEncodingError(path, $.NSUTF8StringEncoding, null);
+  return text.isNil() ? null : ObjC.unwrap(text);
+}
+
+function readJson(path) {
+  var text = readText(path);
+  if (text === null) throw new Error("unreadable");
+  return JSON.parse(text);
+}
+
+function writeText(path, text) {
+  if (!path || !$(text).writeToFileAtomicallyEncodingError(path, true, $.NSUTF8StringEncoding, null)) throw new Error("write");
+}
+
+function utf8Bytes(text) {
+  var bytes = 0;
+  for (var i = 0; i < text.length; i += 1) {
+    var c = text.charCodeAt(i);
+    if (c < 0x80) bytes += 1;
+    else if (c < 0x800) bytes += 2;
+    else if (c >= 0xd800 && c <= 0xdbff && i + 1 < text.length) { bytes += 4; i += 1; }
+    else bytes += 3;
+  }
+  return bytes;
+}
+
+function tailBytes(text, max) {
+  var chars = Array.from(text);
+  var bytes = utf8Bytes(text);
+  var start = 0;
+  while (bytes > max && start < chars.length) { bytes -= utf8Bytes(chars[start]); start += 1; }
+  return chars.slice(start).join("");
+}
+
+function headBytes(text, max) {
+  var chars = Array.from(text);
+  var bytes = utf8Bytes(text);
+  var end = chars.length;
+  while (bytes > max && end > 0) { end -= 1; bytes -= utf8Bytes(chars[end]); }
+  return chars.slice(0, end).join("");
+}
+
+// ── 1차 스크럽 — 서버 src/scrub.ts 와 같은 규칙(계약 5절) · 서버가 한 번 더 지운다 ──
+var SCRUB_PATTERNS = [
+  [/[A-Za-z0-9._%+-]{1,64}@[A-Za-z0-9-]{1,63}(?:\.[A-Za-z0-9-]{1,63})*\.[A-Za-z]{2,63}/g, "<이메일 지움>"],
+  [/\bBearer\s+[A-Za-z0-9._~+/=-]+/gi, "Bearer <토큰 지움>"],
+  [/\bsk-[A-Za-z0-9_-]{8,}/g, "<키 지움>"],
+  [/\b[A-Za-z]:(?:\\{1,2}|\/)Users(?:\\{1,2}|\/)[^\\/\r\n"'<>|:*?]+/gi, "~"],
+  [/\/Users\/[^/\s"'<>]+/g, "~"]
+];
+var NAME_LINES = /\b(?:USERNAME|USERPROFILE|LOGNAME|USER|HOME)\b[ \t]*[=:][ \t]*([^\r\n]+)|\bwhoami\b[ \t]*[:=>][ \t]*([^\r\n]+)|(?:^|\n)[ \t]*([A-Za-z][A-Za-z0-9.-]{1,63}\\[A-Za-z0-9._-]{2,63})[ \t]*(?:\r?\n|$)/gi;
+
+// known = 이 컴퓨터가 스스로 아는 로그인 이름(표시 없이 나와도 지운다 — 서버는 표시된 이름만 안다).
+function harvestNames(input, known) {
+  var names = [];
+  function add(raw) {
+    if (names.length >= MAX_NAMES) return;
+    var value = String(raw).trim().replace(/["']/g, "");
+    if (value.length >= 2 && names.indexOf(value) < 0) names.push(value);
+    var segment = (value.split(/[\\/]/).pop() || "").trim();
+    if (segment.length >= 2 && names.length < MAX_NAMES && names.indexOf(segment) < 0) names.push(segment);
+  }
+  known.forEach(add);
+  var matches = Array.from(input.matchAll(NAME_LINES));
+  for (var i = 0; i < matches.length && names.length < MAX_NAMES; i += 1) add(matches[i][1] || matches[i][2] || matches[i][3] || "");
+  return names.sort(function (a, b) { return b.length - a.length; });
+}
+
+function scrubWith(input, names) {
+  var text = input;
+  if (names.length > 0) {
+    var alternation = new RegExp(names.map(function (name) { return name.replace(/[.*+?^${}()|[\]\\]/g, "\\$&"); }).join("|"), "g");
+    text = text.replace(alternation, "~user");
+  }
+  return SCRUB_PATTERNS.reduce(function (acc, pattern) { return acc.replace(pattern[0], pattern[1]); }, text);
+}
+
+// ── 재검사 — 번들 표·같은 문법(계약 9-1절 · 서버 코드를 가져오지 않은 독립 구현) ──
+var SEGMENT = /^\.?[A-Za-z0-9_][A-Za-z0-9_.-]{0,62}$/;
+var DEVICE = /^(con|prn|aux|nul|com[0-9]|lpt[0-9])(\.|$)/i;
+
+function pathOk(table, shell, value) {
+  if (/^[\\/]/.test(value) || value.indexOf(":") >= 0) return false;
+  if (shell === "sh" && value.indexOf("\\") >= 0) return false;
+  var segments = value.split(/[\\/]/);
+  if (segments.length > table.max_path_segments) return false;
+  return segments.every(function (segment) { return SEGMENT.test(segment) && segment.charAt(segment.length - 1) !== "." && !DEVICE.test(segment); });
+}
+
+function slotOk(table, shell, slot, value) {
+  if (slot === "<path>") return pathOk(table, shell, value);
+  if (slot === "<proc>") return table.proc_names.indexOf(value) >= 0;
+  var range = /^<n:([0-9]+)-([0-9]+)>$/.exec(slot);
+  if (range !== null) return /^(0|[1-9][0-9]{0,3})$/.test(value) && Number(value) >= Number(range[1]) && Number(value) <= Number(range[2]);
+  return slot === value;
+}
+
+function recheckArgv(table, shell, argv) {
+  if (!Array.isArray(argv) || argv.length === 0) return { ok: false, rule: "empty" };
+  if (argv.length > table.max_tokens) return { ok: false, rule: "too_many_tokens" };
+  var token = new RegExp(table.token_pattern);
+  for (var i = 0; i < argv.length; i += 1) {
+    if (typeof argv[i] !== "string" || argv[i].length === 0) return { ok: false, rule: "empty" };
+    if (argv[i].length > table.max_token_chars || !token.test(argv[i])) return { ok: false, rule: "char" };
+  }
+  if (utf8Bytes(argv.join(" ")) > table.max_command_bytes) return { ok: false, rule: "too_long" };
+  var named = table.entries.filter(function (entry) { return entry.shell === shell && entry.usage.split(" ")[0] === argv[0]; });
+  if (named.length === 0) return { ok: false, rule: "unknown_command" };
+  for (var j = 0; j < named.length; j += 1) {
+    var slots = named[j].usage.split(" ");
+    if (slots.length === argv.length && slots.every(function (slot, k) { return k === 0 || slotOk(table, shell, slot, argv[k]); })) {
+      return { ok: true, entry: named[j], argv: argv.slice() };
+    }
+  }
+  return { ok: false, rule: "usage_mismatch" };
+}
+
+// 실행한 번호. 파일이 없으면 빈 목록 · 있는데 못 읽거나 깨졌으면 null(아무것도 실행하지 않는다).
+function loadExecuted(path) {
+  if (!$.NSFileManager.defaultManager.fileExistsAtPath(path)) return [];
+  var raw = readText(path);
+  if (raw === null) return null;
+  var parsed;
+  try { parsed = JSON.parse(raw); } catch (error) { return null; }
+  if (Array.isArray(parsed) && parsed.every(function (seq) { return Number.isSafeInteger(seq) && seq > 0; })) return parsed;
+  return null;
+}
+
+function positiveSeq(text) {
+  var seq = Number(text);
+  if (!Number.isSafeInteger(seq) || seq <= 0 || String(seq) !== text) throw new Error("seq");
+  return seq;
+}
+
+// 본문 한 칸을 줄여 직렬화한 본문이 상한 안에 들게 한다 — keep(글, 바이트) 가 남기는 쪽(끝 · 앞)을 정한다 · 이분 탐색
+function fitReport(body, field, keep) {
+  if (utf8Bytes(JSON.stringify(body)) <= REPORT_MAX_BYTES) return;
+  var full = body[field];
+  var lo = 0;
+  var hi = utf8Bytes(full);
+  while (lo < hi) {
+    var mid = Math.ceil((lo + hi) / 2);
+    body[field] = keep(full, mid);
+    if (utf8Bytes(JSON.stringify(body)) <= REPORT_MAX_BYTES) lo = mid; else hi = mid - 1;
+  }
+  body[field] = keep(full, lo);
+}
+
+function modeReport() {
+  var code = env("RH_CODE");
+  var step = env("RH_STEP");
+  var version = env("RH_VERSION");
+  if (!/^J-[A-Z]{2,6}-[0-9]{2}$/.test(code)) throw new Error("code");
+  if (!/^[0-9]{1,2}\/[0-9]{1,2}$/.test(step)) throw new Error("step");
+  if (!/^[0-9A-Za-z][0-9A-Za-z.+_-]{0,31}$/.test(version)) throw new Error("installer_version");
+  var envReport = readText(env("RH_ENV_FILE")) || "";
+  var lines = (readText(env("RH_LOG_FILE")) || "").split("\n");
+  if (lines.length > 0 && lines[lines.length - 1] === "") lines.pop();
+  var log = lines.slice(-LOG_TAIL_LINES).join("\n");
+  var names = harvestNames(envReport + "\n" + log, env("RH_EXTRA_NAMES").split("\n"));
+  var body = {
+    code: code,
+    step: step,
+    os: "mac",
+    installer_version: version,
+    env_report: headBytes(scrubWith(envReport, names), ENV_REPORT_MAX_BYTES),
+    log_tail: tailBytes(scrubWith(log, names), LOG_TAIL_MAX_BYTES),
+    notice_shown: true
+  };
+  // 직렬화한 본문이 상한을 넘으면 기록 끝(log_tail) → 환경 보고(env_report) 순으로, 남길 수 있는 가장 긴 길이를 찾아 줄인다
+  fitReport(body, "log_tail", tailBytes);
+  fitReport(body, "env_report", headBytes);
+  writeText(env("RH_REPORT_OUT"), JSON.stringify(body));
+  writeText(env("RH_NAMES_OUT"), names.join("\n"));
+  return "OK";
+}
+
+function modeId() {
+  var body = readJson(env("RH_BODY_FILE"));
+  var id = body !== null && typeof body === "object" ? body.id : null;
+  if (typeof id !== "string" || !/^[ABCDEFGHJKLMNPQRSTUVWXYZ23456789]{8}$/.test(id)) return "";
+  // 출처 증명 — 64자 16진만 받는다. 없거나 모양이 틀리면 빈 칸(옛 서버 = 헤더 없이 보낸다).
+  var token = body.client_token;
+  return id + " " + (typeof token === "string" && /^[0-9a-f]{64}$/.test(token) ? token : "");
+}
+
+// 한 번의 폴링 응답 → 줄마다 하나의 판정. 계약 7-4절·9-4절 ①② 까지(경로·실행은 bash 쪽).
+//   SESSION open|closed · HALT seqfile · DECLINE <seq> <rule> · RUN <seq> <exec> <칸 종류> <argv…>
+function modePoll() {
+  var poll = readJson(env("RH_BODY_FILE"));
+  var table = JSON.parse(env("RH_TABLE"));
+  var shell = env("RH_SHELL");
+  var session = poll !== null && typeof poll === "object" ? poll.session : null;
+  if (session === null || typeof session !== "object" || session.open !== true) return "SESSION closed";
+  var out = ["SESSION open"];
+  var executed = loadExecuted(env("RH_SEQ_FILE"));
+  if (executed === null) { out.push("HALT seqfile"); return out.join("\n"); }
+  var messages = Array.isArray(session.messages) ? session.messages : [];
+  for (var i = 0; i < messages.length; i += 1) {
+    var message = messages[i];
+    if (message === null || typeof message !== "object") continue;
+    var seq = message.seq;
+    if (message.kind !== "command") continue;
+    if (typeof seq !== "number" || !Number.isSafeInteger(seq) || seq <= 0) continue;
+    if (message.ack === null || typeof message.ack !== "object" || message.ack.status !== "pending") continue;
+    if (typeof message.sig !== "string" || !/^[0-9a-f]{64}$/.test(message.sig)) continue;
+    if (executed.indexOf(seq) >= 0) continue;
+    if (message.shell !== shell) { out.push("DECLINE " + seq + " shell"); continue; }
+    if (message.table_version !== table.version) { out.push("DECLINE " + seq + " table_version"); continue; }
+    // `text` 는 읽지 않는다 — 실행에 닿는 입력은 argv 하나뿐이다.
+    var verdict = recheckArgv(table, shell, message.argv);
+    if (!verdict.ok) { out.push("DECLINE " + seq + " " + verdict.rule); continue; }
+    var kinds = verdict.entry.usage.split(" ").slice(1).map(function (slot) { return slot === "<path>" ? "p" : "v"; }).join("");
+    out.push(["RUN", seq, verdict.entry.exec, kinds || "-"].concat(verdict.argv).join(" "));
+  }
+  return out.join("\n");
+}
+
+// 처방 표시. 운영팀 글이라도 화면 제어 글자(색·커서·방향 바꿈)는 지우고 보여 준다.
+function modeAnswer() {
+  var poll = readJson(env("RH_BODY_FILE"));
+  var answer = poll !== null && typeof poll === "object" ? poll.answer : null;
+  if (answer === null || typeof answer !== "object" || typeof answer.text !== "string") return "";
+  var number = Number.isInteger(answer.action_no) ? "(조치 " + answer.action_no + ")" : "";
+  var control = new RegExp("[" + [[0x00, 0x09], [0x0b, 0x1f], [0x7f, 0x9f], [0x200e, 0x200f], [0x202a, 0x202e], [0x2066, 0x2069]].map(function (r) { return String.fromCharCode(r[0]) + "-" + String.fromCharCode(r[1]); }).join("") + "]", "g");
+  var text = answer.text.replace(control, "").split("\n").join("\n       ");
+  return "     처방" + number + ": " + text;
+}
+
+function modeRecord(argv) {
+  var seq = positiveSeq(argv[1]);
+  var path = env("RH_SEQ_FILE");
+  var executed = loadExecuted(path);
+  if (executed === null) throw new Error("seq file");
+  if (executed.indexOf(seq) >= 0) return "ALREADY";
+  executed.push(seq);
+  writeText(path, JSON.stringify(executed));
+  var back = loadExecuted(path);
+  if (back === null || back.indexOf(seq) < 0) throw new Error("seq file verify");
+  return "OK";
+}
+
+// ack <seq> declined <rule> · ack <seq> ran <rc|null> <시간 초과 0|1> <상한 초>
+function modeAck(argv) {
+  var seq = positiveSeq(argv[1]);
+  var body;
+  if (argv[2] === "declined") {
+    if (!/^[a-z_]{1,40}$/.test(argv[3] || "")) throw new Error("rule");
+    body = { seq: seq, status: "declined", rc: null, output_tail: "policy:" + argv[3] };
+  } else if (argv[2] === "ran") {
+    var timedOut = argv[4] === "1";
+    var rc = timedOut || argv[3] === "null" ? null : Number(argv[3]);
+    if (rc !== null && !Number.isSafeInteger(rc)) throw new Error("rc");
+    var output = readText(env("RH_OUTPUT_FILE")) || "";
+    if (timedOut) output += "\ntimeout:" + argv[5] + "s";
+    var names = (readText(env("RH_NAMES_FILE")) || "").split("\n").filter(function (name) { return name.length >= 2; });
+    body = { seq: seq, status: "ran", rc: rc, output_tail: tailBytes(scrubWith(output, names), OUTPUT_MAX_BYTES) };
+  } else {
+    throw new Error("status");
+  }
+  writeText(env("RH_ACK_OUT"), JSON.stringify(body));
+  return "OK";
+}
+
+function run(argv) {
+  switch (argv[0]) {
+    case "report": return modeReport();
+    case "id": return modeId();
+    case "poll": return modePoll();
+    case "answer": return modeAnswer();
+    case "record": return modeRecord(argv);
+    case "ack": return modeAck(argv);
+  }
+  throw new Error("mode");
+}
+EOF_REMOTE_HELP_JS
+
+remote_help_js() {   # remote_help_js <mode> [인자…] — 입력은 환경(RH_*)으로 넘긴다
+  /usr/bin/osascript -l JavaScript -e "$REMOTE_HELP_JS" "$@" </dev/null
+}
+
+remote_help_http() {   # remote_help_http <METHOD> <경로> [본문 파일] → RH_HTTP(응답 코드 · 000 = 닿지 못함) · 응답 본문 = $RH_TMP/resp
+  local -a extra=()
+  rm -f "$RH_TMP/resp"
+  [ -n "${3:-}" ] && extra+=(-H 'content-type: application/json' --data-binary "@$3")
+  # 출처 헤더는 파일로 넘긴다(명령줄에 값이 보이지 않게) · ack·close 에만
+  case "$2" in
+    */ack|*/close) [ -s "$RH_TMP/client-header" ] && extra+=(-H "@$RH_TMP/client-header") ;;
+  esac
+  RH_HTTP="$(curl -sS -m "${RH_HTTP_MAX:-20}" -X "$1" ${extra[@]+"${extra[@]}"} -o "$RH_TMP/resp" -w '%{http_code}' \
+    "$HELP_API_URL$2" </dev/null 2>/dev/null)"
+  case "$RH_HTTP" in [1-5][0-9][0-9]) ;; *) RH_HTTP="000" ;; esac
+}
+
+# 끝맺음(closing_note)이 부른다 — [1/10] 고지를 보여 드린 실행에서만.
+remote_help() {
+  local line
+  [ -n "$J_CODE" ] || return 0
+  [ "$REACHED_WAKE" = "1" ] && return 0
+  if [ "$MODE" != "full" ]; then
+    [ "$MODE" = "dry" ] && say "  (dry-run) 원격 해결 진단을 보내지 않았습니다."
+    return 0
+  fi
+  say ""
+  say "  == 막혔을 때 — 원격 해결 =="
+  for line in "${REMOTE_HELP_LINES[@]}"; do say "   $line"; done
+  say "   자세히: $REMOTE_HELP_NOTICE_URL"
+  if [ ! -x /usr/bin/osascript ] || ! command -v curl >/dev/null 2>&1; then
+    say "     이 컴퓨터에서 진단을 보낼 도구를 찾지 못해 원격 해결을 시작하지 못했습니다."
+    return 0
+  fi
+  RH_TMP="$(mktemp -d -t jarvis-help 2>/dev/null)" || RH_TMP=""
+  if [ -z "$RH_TMP" ]; then
+    say "     임시 자리를 만들지 못해 원격 해결을 시작하지 못했습니다."
+    return 0
+  fi
+  trap 'remote_help_on_signal' HUP INT TERM
+  remote_help_report && remote_help_loop
+  trap - HUP INT TERM
+  rm -rf "$RH_TMP"
+  RH_TMP=""
+  return 0
+}
+
+remote_help_report() {   # rc 0 = 보고 번호를 받았다
+  local names step ids="" token="" tries=0
+  : > "$RH_TMP/env"
+  : > "$RH_TMP/log"
+  [ -f "$REPORT_FILE" ] && iconv -f UTF-8 -t UTF-8 -c < "$REPORT_FILE" > "$RH_TMP/env" 2>/dev/null
+  [ -f "$LOG_FILE" ] && tail -n 200 "$LOG_FILE" 2>/dev/null | iconv -f UTF-8 -t UTF-8 -c > "$RH_TMP/log" 2>/dev/null
+  # 멈춘 단계 = 이 실행이 기록 파일에 마지막으로 찍은 [n/10](이 실행은 [1/10] 을 찍었으므로 앞 실행의 것이 아니다)
+  step="$(grep -oE '\[[0-9]{1,2}/[0-9]{1,2}\]' "$LOG_FILE" 2>/dev/null | tail -1 | tr -d '[]')"
+  [ -n "$step" ] || step="0/10"
+  names="$(id -un 2>/dev/null)
+$(id -F 2>/dev/null)
+$(basename "$HOME")"
+  if ! RH_ENV_FILE="$RH_TMP/env" RH_LOG_FILE="$RH_TMP/log" RH_EXTRA_NAMES="$names" RH_CODE="$J_CODE" \
+       RH_STEP="$step" RH_VERSION="$INSTALLER_VERSION" RH_REPORT_OUT="$RH_TMP/report.json" RH_NAMES_OUT="$RH_TMP/names" \
+       remote_help_js report >/dev/null 2>&1; then
+    say "     진단을 꾸리지 못해 보내지 않았습니다."
+    return 1
+  fi
+  while :; do
+    remote_help_http POST "/api/help" "$RH_TMP/report.json"
+    case "$RH_HTTP" in
+      201) break ;;
+      000|429|5??)
+        tries=$((tries + 1))
+        [ "$tries" -lt 3 ] || break
+        sleep "$REMOTE_HELP_POLL_SEC" ;;
+      *) break ;;
+    esac
+  done
+  if [ "$RH_HTTP" = "201" ]; then
+    ids="$(RH_BODY_FILE="$RH_TMP/resp" remote_help_js id 2>/dev/null)"
+    RH_ID="${ids%% *}"
+    token="${ids#* }"
+    [ "$token" = "$ids" ] && token=""
+  fi
+  if [ -z "$RH_ID" ]; then
+    say "     진단을 보내지 못했습니다(서버 답 $RH_HTTP). 위 진단 코드로 안내를 찾아보실 수 있습니다."
+    return 1
+  fi
+  log "remote help: report $RH_ID"
+  # 출처 증명 — 서버가 준 client_token 을 이 기계에만 두고(600) ack·close 에 헤더로 붙인다
+  #   처음부터 본인만 읽는 권한으로 만든다(umask 077). 못 쓰거나 권한을 못 맞추면 파일을 지우고 토큰도 버린다(닫힌 쪽 · 검수 지적).
+  rm -f "$REMOTE_HELP_TOKEN_FILE"
+  if [ -n "$token" ]; then
+    if ! { ( umask 077; printf '%s\n' "$token" > "$REMOTE_HELP_TOKEN_FILE" ) 2>/dev/null && chmod 600 "$REMOTE_HELP_TOKEN_FILE" 2>/dev/null &&
+           ( umask 077; printf 'x-help-client: %s\n' "$token" > "$RH_TMP/client-header" ) 2>/dev/null; }; then
+      rm -f "$REMOTE_HELP_TOKEN_FILE" "$RH_TMP/client-header" 2>/dev/null
+      token=""
+      log "remote help: 출처 헤더 없음(출처 토큰을 본인만 읽는 파일로 두지 못해 버렸다)"
+    fi
+  else
+    log "remote help: 출처 헤더 없음(보고 응답에 client_token 이 없다)"
+  fi
+  say "     보고 번호 $RH_ID — 운영팀이 곧 봅니다."
+  say "     폰에서 보기: $HELP_API_URL/help/$RH_ID"
+  say "     이 창을 열어 두시면 처방과 운영팀 명령이 여기에 나타납니다. 창을 닫으면 멈춥니다."
+  return 0
+}
+
+remote_help_loop() {
+  local started=$SECONDS last_note=$SECONDS rc
+  while :; do
+    if [ $((SECONDS - started)) -ge "$REMOTE_HELP_MAX_SEC" ]; then
+      say "     원격 해결 시간($((REMOTE_HELP_MAX_SEC / 60))분)이 끝나 멈춥니다."
+      remote_help_http POST "/api/help/$RH_ID/close"
+      return 0
+    fi
+    remote_help_http GET "/api/help/$RH_ID"
+    case "$RH_HTTP" in
+      200)
+        remote_help_tick
+        rc=$?
+        case "$rc" in
+          0) ;;
+          2) remote_help_http POST "/api/help/$RH_ID/close"; return 0 ;;
+          *) remote_help_ended; return 0 ;;
+        esac ;;
+      404) say "     보고가 지워져 원격 해결을 멈춥니다."; return 0 ;;
+      410) remote_help_ended; return 0 ;;
+    esac
+    if [ $((SECONDS - last_note)) -ge "$REMOTE_HELP_NOTE_EVERY_SEC" ]; then
+      last_note=$SECONDS
+      say "     원격 해결을 기다리는 중입니다 ($(( (SECONDS - started) / 60 ))분 지남 · 최대 $((REMOTE_HELP_MAX_SEC / 60))분 · 창을 닫으면 멈춥니다)."
+    fi
+    sleep "$REMOTE_HELP_POLL_SEC"
+  done
+}
+
+# 계약 7-8절 과 같은 뜻. ⚠이 파일은 사람에게 「줄」을 말하지 않는다 — 다시 하는 방법은 끝맺음이 명령 전체로 인쇄한다.
+remote_help_ended() {
+  say "     원격 해결이 끝났습니다 · 아래 「다시 하시는 법」대로 다시 실행하시면 새 보고로 이어집니다."
+  SHOW_RERUN=1
+}
+
+remote_help_tick() {   # rc 0 = 계속 · 1 = 대화 닫힘 · 2 = 실행 기록을 못 믿어 멈춤 · 3 = 서버가 닫았다(410)
+  local plan answer line rc
+  local -a f
+  plan="$(RH_BODY_FILE="$RH_TMP/resp" RH_TABLE="$REMOTE_HELP_TABLE" RH_SEQ_FILE="$REMOTE_HELP_SEQ_FILE" RH_SHELL=sh \
+    remote_help_js poll 2>/dev/null)" || return 0
+  answer="$(RH_BODY_FILE="$RH_TMP/resp" remote_help_js answer 2>/dev/null)"
+  if [ -n "$answer" ] && [ "$answer" != "$RH_LAST_ANSWER" ]; then
+    RH_LAST_ANSWER="$answer"
+    say "$answer"
+  fi
+  while IFS= read -r line; do
+    [ -n "$line" ] || continue
+    read -r -a f <<< "$line"
+    case "${f[0]}" in
+      SESSION) [ "${f[1]}" = "open" ] || return 1 ;;
+      HALT)    say "     실행 기록 파일을 읽을 수 없어 명령을 실행하지 않고 멈춥니다."; return 2 ;;
+      DECLINE) remote_help_ack "${f[1]}" declined "${f[2]}" || return 3 ;;
+      RUN)     remote_help_run_one "${f[@]:1}"; rc=$?; [ "$rc" -eq 0 ] || return "$rc" ;;
+    esac
+  done <<< "$plan"
+  return 0
+}
+
+# 계약 9-4절 ③~⑦ — 판정 쪽이 ①②를 통과시킨 명령 하나. rc 는 remote_help_tick 과 같다.
+remote_help_run_one() {   # <seq> <exec> <칸 종류> <이름> [인자…]
+  local seq="$1" exec="$2" kinds="$3" prog shown i rel="" first="" dir leaf="" pidx=-1
+  shift 3
+  local -a toks=("$@") args=()
+  # ③ <path> 칸 = 링크를 푼 실제 경로가 작업 폴더 안인지 본다 · 표 v1 은 줄마다 <path> 가 많아야 하나다
+  #   없는 성분 뒤에 성분이 더 남으면(없는 폴더 안의 이름) 열 실제 부모가 없다 — 표시·번호 기록 **전에** path_missing
+  i=1
+  while [ "$i" -lt "${#toks[@]}" ]; do
+    if [ "${kinds:$((i - 1)):1}" = "p" ]; then
+      if [ -n "$rel" ]; then
+        remote_help_ack "$seq" declined path_count
+        return $?
+      fi
+      remote_help_confine "${toks[$i]}"
+      case $? in
+        0) ;;
+        2) remote_help_ack "$seq" declined path_missing; return $? ;;
+        *) remote_help_ack "$seq" declined path_outside; return $? ;;
+      esac
+      rel="${toks[$i]}"
+      first="$RH_REAL"
+      pidx=${#args[@]}
+    fi
+    args+=("${toks[$i]}")
+    i=$((i + 1))
+  done
+  # 실행 파일은 번들 표의 것만 — cys 는 절대 경로 후보에서만 찾는다(PATH 조회 없음)
+  case "$exec" in
+    cys) prog="$(remote_help_cys_path)" || { remote_help_ack "$seq" declined cys_not_found; return $?; } ;;
+    /*)  prog="$exec" ;;
+    *)   remote_help_ack "$seq" declined exec; return $? ;;
+  esac
+  # ④ 명령 글 = argv 를 공백 한 칸으로 이은 것 · 확인 대기 없이 창에 찍는다
+  shown="${toks[0]}"
+  i=1
+  while [ "$i" -lt "${#toks[@]}" ]; do shown="$shown ${toks[$i]}"; i=$((i + 1)); done
+  say "     운영팀 명령: $shown"
+  # ⑤ 번호를 실행 **전에** 파일에 남긴다 — 이미 있으면 다시 돌리지 않는다 · 못 남기면 실행 0
+  #   다른 창이 같은 기록을 쓰는 중이라 잠금을 못 잡으면 실행하지 않고 거절한다(policy:seq_lock)
+  remote_help_record "$seq"
+  case "$RH_RECORD" in
+    OK) ;;
+    ALREADY) return 0 ;;
+    LOCKED) remote_help_ack "$seq" declined seq_lock; return $? ;;
+    *) say "     실행 기록을 남기지 못해 이 명령을 실행하지 않고 멈춥니다."; return 2 ;;
+  esac
+  # ⑥-a 경로를 **실행 직전에 한 번 더** 푼다 — 처음과 다르면(그 사이 링크가 생겼다) 실행하지 않는다
+  dir="$(cd -P -- "$JARVIS_HOME" 2>/dev/null && pwd -P)" || dir=""
+  if [ -n "$rel" ]; then
+    if ! remote_help_confine "$rel" || [ "$RH_REAL" != "$first" ]; then
+      remote_help_ack "$seq" declined path_changed
+      return $?
+    fi
+    dir="$(dirname -- "$RH_REAL")"
+    leaf="$(basename -- "$RH_REAL")"
+  fi
+  if [ -z "$dir" ]; then
+    remote_help_ack "$seq" declined path_outside
+    return $?
+  fi
+  # ⑥-b 셸 없이 · 60초 상한 · 실제 부모 폴더에서 마지막 성분을 **열고 · 연 것의 정체를 대조하고 · 연 것을** 명령에 준다
+  remote_help_launch "$dir" "$leaf" "$pidx" "$prog" ${args[@]+"${args[@]}"}
+  if [ -n "$RH_REFUSED" ]; then
+    remote_help_ack "$seq" declined "$RH_REFUSED"
+    return $?
+  fi
+  # ⑦
+  remote_help_ack "$seq" ran "$RH_RC" "$RH_TIMEDOUT"
+}
+
+remote_help_confine() {   # <작업 폴더 기준 상대 경로> → RH_REAL · rc 1 = 밖(끊어진 링크 포함) · rc 2 = 없는 폴더 안의 이름(path_missing)
+  local root cur rest seg next real t l i
+  RH_REAL=""
+  root="$(cd -P -- "$JARVIS_HOME" 2>/dev/null && pwd -P)" || return 1
+  [ -n "$root" ] || return 1
+  cur="$root"
+  rest="$1"
+  while [ -n "$rest" ]; do
+    case "$rest" in
+      */*) seg="${rest%%/*}"; rest="${rest#*/}" ;;
+      *)   seg="$rest"; rest="" ;;
+    esac
+    next="$cur/$seg"
+    if [ ! -e "$next" ] && [ ! -L "$next" ]; then
+      # 아직 없는 성분은 링크일 수 없다 — 단 마지막 성분일 때만 붙인다(그 뒤에 성분이 더 남으면 열 실제 부모가 없다)
+      [ -z "$rest" ] || return 2
+      RH_REAL="$next"
+      return 0
+    fi
+    [ -e "$next" ] || return 1          # 끊어진 링크(또는 고리) = 밖
+    if [ -d "$next" ]; then
+      real="$(cd -P -- "$next" 2>/dev/null && pwd -P)" || return 1
+    else
+      t="$next"
+      i=0
+      while [ -L "$t" ]; do
+        i=$((i + 1))
+        [ "$i" -le 40 ] || return 1
+        l="$(readlink -- "$t")" || return 1
+        case "$l" in /*) t="$l" ;; *) t="$(dirname -- "$t")/$l" ;; esac
+      done
+      real="$(cd -P -- "$(dirname -- "$t")" 2>/dev/null && pwd -P)" || return 1
+      real="$real/$(basename -- "$t")"
+    fi
+    # 경로 성분 경계 — `install-jarvis-evil` 은 `install-jarvis` 안이 아니다
+    case "$real" in "$root"|"$root"/*) ;; *) return 1 ;; esac
+    cur="$real"
+  done
+  RH_REAL="$cur"
+  return 0
+}
+
+remote_help_cys_path() {   # 표 9-2절 「실행 대상」 — 절대 경로 후보만 본다
+  local c
+  for c in "$HOME/.local/bin/cys" "/usr/local/bin/cys" "/Applications/cys.app/Contents/MacOS/cys"; do
+    [ -x "$c" ] && { printf '%s\n' "$c"; return 0; }
+  done
+  return 1
+}
+
+# ⑤ 실행 번호 기록 — 두 창(또는 두 번 뜬 설치기)이 같은 번호를 동시에 남기지 못하게 잠근다(검수 지적: 잠금 없이 둘이 함께 부르면 둘 다 OK).
+#   잠금 = `mkdir`(원자) · 못 잡으면 0.1초씩 최대 2초 · 그래도 못 잡으면 LOCKED(실행하지 않는다).
+#   끝나지 못한 잠금(프로세스가 강제로 죽은 자리)은 30초가 지나면 치운다 — 한 번의 기록은 1초 안에 끝난다(치우지 않으면 그 뒤 모든 명령이 거절된다).
+#   ⚠전원 단절 내구성(정직): 기록은 임시 파일에 쓴 뒤 이름을 바꾼다(반쯤 쓴 파일은 없다). `sync` 는 디스크 전체를 비우는 명령이라 쓰지 않는다 —
+#     쓴 직후 전원이 끊기면 기록이 사라져 재부팅 뒤 같은 번호가 한 번 더 돌 수 있다(표 v1 은 읽기뿐이다).
+remote_help_record() {   # <seq> → RH_RECORD = OK · ALREADY · LOCKED · FAIL
+  local lock="$REMOTE_HELP_SEQ_FILE.lock" tries=0
+  RH_RECORD=FAIL
+  until mkdir "$lock" 2>/dev/null; do
+    [ -n "$(find "$lock" -maxdepth 0 -mtime +30s 2>/dev/null)" ] && rmdir "$lock" 2>/dev/null
+    tries=$((tries + 1))
+    [ "$tries" -le 20 ] || { RH_RECORD=LOCKED; return 0; }
+    sleep 0.1
+  done
+  RH_LOCK_HELD=1
+  RH_RECORD="$(RH_SEQ_FILE="$REMOTE_HELP_SEQ_FILE" remote_help_js record "$1" 2>/dev/null)"
+  [ -n "$RH_RECORD" ] || RH_RECORD=FAIL
+  rmdir "$lock" 2>/dev/null
+  RH_LOCK_HELD=0
+  return 0
+}
+
+# ⑥ 경로 칸은 **이름을 검사하고 그 이름을 넘기지 않는다 — 열고, 연 것의 정체를 대조하고, 연 것을 넘긴다**(검수 지적 BLOCKER).
+#   이름을 넘기면 프로그램이 그 이름을 다시 열고, 검사와 여는 순간 사이에 바꿔 끼운 링크를 따라간다.
+#   ①실제 부모 폴더로 들어가 그곳이 맞는지 `pwd -P` 로 본다 ②마지막 성분이 링크면 거부 ③fd 3 으로 연다
+#   ④fd 3 이 가리키는 파일과 그 이름이 **지금** 가리키는 파일의 장치:아이노드가 같고, 그 이름이 여전히 링크가 아닐 때만
+#   ⑤프로그램에는 이름이 아니라 `/dev/fd/3` 을 준다(`tail`·`shasum`·`ls` 가 fd 를 읽는다 · `test -e` 는 fd 가 열렸는가가 답).
+#     폴더는 `/dev/fd/3` 으로 목록을 못 낸다(이 기계 실측 「Not a directory」) — 그 안으로 들어가 들어간 곳이 연 것과 같은지 대조한 뒤 `.` 를 준다.
+#   ⚠연 것의 정체는 `stat <&3`(fstat)로 잰다 — `stat /dev/fd/3` 은 장치 번호가 fd 파일시스템의 것으로 나와 늘 어긋난다(이 기계 실측).
+#   못 열면(없는 이름·읽기 권한 없음) 이름을 다시 열지 않는다 — 프로그램이 닫힌 fd 3 을 받아 스스로 실패를 말한다(`test -e` 는 rc 1).
+# 잔여(정직): 같은 계정이 작업 폴더 안에 **밖 파일의 하드 링크**를 만들면 정체가 같아 통과한다 — 그 권한이면 명령 없이도 그 파일을 읽는다.
+remote_help_open_leaf() {   # <마지막 성분> — 지금 폴더에서 fd 3 으로 연다(시험이 이 자리를 바꿔 끼워 「여는 순간의 교체」를 재현한다)
+  { exec 3< "./$1"; } 2>/dev/null
+}
+
+remote_help_launch() {   # <실제 폴더> <마지막 성분 또는 빈 글> <경로 칸 번호(없으면 -1)> <프로그램 절대 경로> [인자…] → RH_RC · RH_TIMEDOUT · RH_REFUSED · 출력 = $RH_TMP/out
+  local dir="$1" leaf="$2" pidx="$3" prog="$4" pid watch rc
+  shift 4
+  local -a args=("$@")
+  rm -f "$RH_TMP/timedout" "$RH_TMP/refused"
+  RH_REFUSED=""
+  (
+    refuse() { printf '%s' "$1" > "$RH_TMP/refused"; exit 126; }
+    # 표의 읽기 명령이 cys 데몬을 깨우지 않게 한다(설치기가 자기 조회에 거는 것과 같은 안전장치 · 검수 지적)
+    export CYS_NO_AUTOSTART=1
+    exec 3<&-
+    cd -P -- "$dir" 2>/dev/null || refuse path_missing
+    [ "$(pwd -P)" = "$dir" ] || refuse path_changed
+    if [ -n "$leaf" ]; then
+      [ -L "$leaf" ] && refuse path_changed
+      if remote_help_open_leaf "$leaf"; then
+        opened="$(/usr/bin/stat -f '%d:%i' <&3 2>/dev/null)"
+        # 연 뒤의 불일치·실패 = path_outside(계약 9-4 ④ — 연 것이 작업 폴더 안의 그 이름이라고 말할 수 없다)
+        [ -n "$opened" ] && [ "$opened" = "$(/usr/bin/stat -L -f '%d:%i' "./$leaf" 2>/dev/null)" ] || refuse path_outside
+        [ -L "$leaf" ] && refuse path_outside
+        if [ "$(/usr/bin/stat -f '%HT' <&3 2>/dev/null)" = "Directory" ]; then
+          { cd -P -- "./$leaf" 2>/dev/null && [ "$(/usr/bin/stat -f '%d:%i' . 2>/dev/null)" = "$opened" ]; } || refuse path_outside
+          args[$pidx]="."
+        else
+          args[$pidx]="/dev/fd/3"
+        fi
+      else
+        args[$pidx]="/dev/fd/3"
+      fi
+    fi
+    exec "$prog" ${args[@]+"${args[@]}"}
+  ) </dev/null >"$RH_TMP/out.raw" 2>&1 &
+  pid=$!
+  # ⚠`&&` 로 잇는다 — 끝난 뒤 sleep 을 죽이면 `;` 는 다음 줄로 넘어가 멀쩡히 끝난 명령을 「시간 초과」로 적는다(첫 시험에서 7건 실측)
+  ( sleep "$REMOTE_HELP_CMD_TIMEOUT" && { : > "$RH_TMP/timedout"; kill -9 "$pid" 2>/dev/null; } ) </dev/null >/dev/null 2>&1 &
+  watch=$!
+  wait "$pid"
+  rc=$?
+  pkill -P "$watch" 2>/dev/null
+  kill "$watch" 2>/dev/null
+  wait "$watch" 2>/dev/null
+  [ -f "$RH_TMP/refused" ] && RH_REFUSED="$(cat "$RH_TMP/refused")"
+  iconv -f UTF-8 -t UTF-8 -c < "$RH_TMP/out.raw" > "$RH_TMP/out" 2>/dev/null || : > "$RH_TMP/out"
+  if [ -f "$RH_TMP/timedout" ]; then RH_TIMEDOUT=1; RH_RC=null; else RH_TIMEDOUT=0; RH_RC="$rc"; fi
+}
+
+remote_help_ack() {   # <seq> declined <rule> · <seq> ran <rc|null> <시간 초과 0|1> → rc 3 = 서버가 닫았다(410)
+  if [ "$2" = "declined" ]; then
+    RH_ACK_OUT="$RH_TMP/ack.json" remote_help_js ack "$1" declined "$3" >/dev/null 2>&1 || return 0
+  else
+    RH_OUTPUT_FILE="$RH_TMP/out" RH_NAMES_FILE="$RH_TMP/names" RH_ACK_OUT="$RH_TMP/ack.json" \
+      remote_help_js ack "$1" ran "$3" "$4" "$REMOTE_HELP_CMD_TIMEOUT" >/dev/null 2>&1 || return 0
+  fi
+  remote_help_http POST "/api/help/$RH_ID/ack" "$RH_TMP/ack.json"
+  [ "$RH_HTTP" = "410" ] && return 3
+  return 0
+}
+
+# 창이 닫히거나(HUP) 중단되면(INT·TERM) 닫기를 **시도**하고 끝낸다 — 실패해도 이 프로세스가 끝나므로 명령은 더 돌지 않는다.
+remote_help_on_signal() {
+  trap - HUP INT TERM
+  # 기록 잠금을 쥔 채 멈추면 다음 실행의 명령이 모두 거절된다 — 쥔 것은 풀고 나간다
+  [ "$RH_LOCK_HELD" = "1" ] && rmdir "$REMOTE_HELP_SEQ_FILE.lock" 2>/dev/null
+  log "remote help: stopped by signal - close"
+  if [ -n "$RH_ID" ] && [ -n "$RH_TMP" ]; then RH_HTTP_MAX=5 remote_help_http POST "/api/help/$RH_ID/close"; fi
+  [ -n "$RH_TMP" ] && rm -rf "$RH_TMP"
+  rm -f "$ROWS_FILE"
+  exit 129
+}
+
 # 시험이 이 파일을 「함수 묶음」으로만 읽는 문. 여기서 멈추므로 본문은 한 줄도 돌지 않는다.
 #   왜 필요한가: 좌석 여는 자리가 실제로 무엇을 넘기는지는 **글자로 세면 알 수 없다** —
 #   조건 갈래 양쪽이 파일에 다 적혀 있기 때문이다. 재려면 그 함수를 실제로 불러야 하고,
@@ -1747,6 +2707,8 @@ step_wake() {
 # ── 본문 ──────────────────────────────────────────────────────────
 say "=== 자비스 설치 도우미 $BOOTSTRAP_VERSION (모드: $MODE) ==="
 say "[1/10] 이 컴퓨터를 살펴봅니다."
+say "     $REMOTE_HELP_NOTICE"
+NOTICE_SHOWN=1
 detect_stage1
 detect_stage2
 write_report

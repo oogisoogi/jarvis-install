@@ -70,11 +70,11 @@ $DlDir         = Join-Path $JarvisHome 'dl'
 # ★2026-09-09 자체 배포 전환(윈도우): 받을 곳 = 우리가 서명해 발행한 릴리스. 벤더 판을 깔면 그 뒤의
 #   업데이트도 벤더 궤도를 타서 우리 수리가 그 기계에 닿지 않는다(노트북 실기 2026-09-09).
 #   맥(bootstrap.sh)은 우리 빌드가 무서명이라 아직 벤더 dmg 그대로다.
-$CysVersion     = '0.14.34'
+$CysVersion     = '0.14.35'
 $CysDownloadDir = "https://github.com/oogisoogi/cys-ro/releases/download/v${CysVersion}/"
 $CysWinFile     = "cys_${CysVersion}_x64-setup.exe"
-$CysWinBytes    = 139778158
-$CysWinSha256   = '36727b940b2b3770e013d0f4d464d4e96b7a3024c549d9f13fe1d56b25c5a437'   # 릴리스 SHA256SUMS.txt 의 줄
+$CysWinBytes    = 139807480
+$CysWinSha256   = 'b3d1b5b45673f10f0d2f8b92ef2ae86790ff9d83edebb1fb2652f6abbe41dd9a'   # 릴리스 SHA256SUMS.txt 의 줄
 $CysDownloadUrl = $CysDownloadDir + $CysWinFile
 
 $LoginPollInterval = 3     # 초
@@ -446,6 +446,8 @@ function Write-ClosingNote {
     } else {
         Say '  기록 파일은 아직 만들어지지 않았습니다 — 이 화면을 사진으로 남겨 주십시오.'
     }
+    # 원격 해결 — 막혀 멈춘 끝이면 여기서 진단을 보내고 창을 연 채 운영팀을 기다린다([1/10] 고지를 보여 드린 실행만).
+    if ($script:NoticeShown) { Invoke-RemoteHelp }
     # ★안내는 **맨 마지막**에 둔다 — 사람이 마지막으로 보는 화면에 명령이 있어야 복사할 수 있다.
     if ($script:ShowRerun) { Show-RerunHow }
 }
@@ -1975,6 +1977,8 @@ function Step-Wake {
         }
         if ($ref -match 'surface:') {
             Say "     cys 안에서 자비스를 열었습니다 ($ref). cys 창에서 이어서 이야기하십시오."
+            # 깨우기가 **성공한 뒤에만** 세운다(검수 지적 · D1 기각) — 깨우기가 실패한 끝은 원격 해결이 돈다
+            $script:ReachedWake = $true
             $m = [regex]::Match($ref, 'surface:\d+')
             $script:WakeRef = $(if ($m.Success) { $m.Value } else { '' })
             # 창이 열렸으면 곧바로 동료들을 부른다. 여기서 부르는 까닭 = 아래 폴백(이 창에서 자비스를
@@ -2003,7 +2007,11 @@ function Step-Wake {
         return
     }
     try {
+        # 깨우기가 **성공한 뒤에만**(자비스가 떠서 정상으로 끝났다 = 종료 코드 0) 원격 해결을 막는다 — 못 떴으면 원격 해결이 돈다(검수 지적 · D1 기각)
+        #   앞 명령의 종료 코드가 남아 있으면 「성공」으로 읽힌다 ⇒ 부르기 전에 비운다
+        $global:LASTEXITCODE = -1
         & claude --dangerously-skip-permissions $firstPrompt
+        if ($global:LASTEXITCODE -eq 0) { $script:ReachedWake = $true }
     } catch {
         Say "[9/10] 자비스를 띄우지 못했습니다: $($_.Exception.Message)"
         Say '     PowerShell 창을 새로 열고 아래 「다시 하시는 법」대로 다시 실행해 주십시오.'
@@ -2168,6 +2176,929 @@ function Step-Fleet {
     return 10
 }
 
+# ── 원격 해결 (help-s2) — 막히면 진단이 서버로 가고, 운영팀 명령을 이 창이 실행한다 ────────
+# 맥판(bootstrap.sh)과 같은 계약·같은 순서다. 계약 정본 = ai-jarvis `web-install/docs/HELP-API.md` 4·5·7·9-4절.
+# ★사람이 누르는 것은 없다 — [1/10] 에서 고지 1줄을 보여 드리고, 막혀 멈추면 묻지 않고 보낸다.
+# ★서버 응답을 믿지 않는다 — 이 파일에 넣어 둔 표로 다시 재고 · 작업 폴더 밖 경로를 막고 ·
+#   실행한 번호를 실행 **전에** 남기고 · 명령 글을 PowerShell 에 해석시키지 않고 실행한다.
+# ★자비스를 깨운 뒤에는 돌지 않는다 · 끝맺음(finally)이 부른다 — 창을 닫으면 이 프로세스와 함께 멈춘다.
+# ⚠.NET 정규식의 `$` 는 끝 줄바꿈 **앞**에서도 맞는다 ⇒ 표의 글자 규칙을 그대로 쓰면 줄바꿈 붙은 명령이 통과한다.
+#   글자 칸은 `\z` 로 끝을 못박아 다시 만든다. 이름·글자·판본 비교는 대소문자를 가르는 -ceq·-cmatch·-ccontains 만 쓴다.
+# ⚠PowerShell 은 `'true' -eq $true` 를 참으로 본다 ⇒ 칸마다 **형(type)을 먼저** 본다.
+# ⚠이 절은 맥에서 PowerShell 없이 **정적 검사 + 맥판과의 대조**로만 증명했다 — 윈도우 실기가 필요한 축은 docs/install-master/HANDOFF-s2.md.
+$InstallerVersion       = '0.3.12'   # 보고의 installer_version · $BootstrapVersion 은 화면 머리글 용도 그대로(보내지 않는다)
+$HelpApiUrl             = 'https://jarvis-install.godmeyou.kr'
+$RemoteHelpNoticeUrl    = 'jarvis-install.godmeyou.kr/help/notice'
+# [1/10] 고지 1줄 = /help/notice 정본이 인용하는 문장 그대로 + 끝에 자세한 안내 자리. ⛔문안 변경 금지(맥판과 글자가 같아야 한다).
+$RemoteHelpNotice       = '막히면 진단이 서버로 가고 운영 자비스가 원격으로 해결합니다 · 창을 닫으면 멈춥니다 · 자세히: ' + $RemoteHelpNoticeUrl
+# 「막혔을 때」 절 = page.ts REMOTE_LINES 3줄에서 태그만 뗀 것. ⛔문안 변경 금지(시험이 맥판과 글자를 대조한다).
+$RemoteHelpLines = @(
+    '무엇을 보내는가 — 설치가 막히면 설치 창이 진단(진단 코드·멈춘 단계·운영체제 판본·환경 보고·기록 끝부분)을 이 서버로 보냅니다. 집 폴더 경로·이메일·토큰, 그리고 환경 보고와 기록에 표시된 로그인 이름(같은 보고의 다른 곳에 나와도)은 보내기 전에 지우고, 서버가 한 번 더 지웁니다. 표시 없이 글 속에 홀로 적힌 이름은 알아보지 못해 남을 수 있습니다.',
+    '누가 명령하는가 — 운영팀만 명령을 보낼 수 있습니다. 명령은 설치 창에 글자 그대로 표시된 뒤 실행되고, 이 화면에도 같은 글자로 남습니다. 서버는 명령을 실행하지 않습니다.',
+    '어떻게 멈추는가 — 설치 창을 닫으면 곧바로 멈춥니다. 보고 화면의 「원격 해결 멈추기」로도 멈출 수 있고, 명령이 30분 동안 없거나 시작한 지 2시간이 지나면 저절로 닫힙니다.'
+)
+$RemoteHelpPollSec      = 20
+$RemoteHelpMaxSec       = 7200   # 2시간 — 서버의 절대 상한과 같다(서버에 못 닿아도 이 창이 따로 멈춘다)
+$RemoteHelpCmdTimeout   = 60     # 명령 하나의 시간 상한(초)
+$RemoteHelpReportMaxBytes = 240000   # 보고 본문(직렬화한 JSON) 상한 — 서버 262,144 바이트 안쪽
+$RemoteHelpNoteEverySec = 300    # 기다리는 동안 몇 초마다 한 줄 말하는가
+$RemoteHelpSeqFile      = Join-Path $JarvisHome 'remote-help-executed.json'   # 실행한 명령 번호 · 재부팅 내성 · 깨지면 실행 0
+$RemoteHelpTokenFile    = Join-Path $JarvisHome 'remote-help-client-token'    # 보고 응답의 client_token(본인만 읽게) · ack·close 출처 헤더
+$script:NoticeShown     = $false
+$script:ReachedWake     = $false
+$script:RhId            = ''
+$script:RhClientToken   = ''
+$script:RhNames         = [string[]]@()
+$script:RhLastAnswer    = ''
+
+# 허용 명령 표 — ai-jarvis `web-install/docs/command-table.json` 과 바이트 동일(here-string 이라 끝 줄바꿈 하나만 빠진다 · 시험이 잰다).
+#   판본 글자는 이 표의 "version" 하나뿐이다(코드에 따로 적지 않는다).
+$RemoteHelpTableJson = @'
+{
+  "version": "v1-2026-09-11",
+  "token_pattern": "^[A-Za-z0-9_.:/\\\\-]+$",
+  "max_command_bytes": 512,
+  "max_tokens": 12,
+  "max_token_chars": 200,
+  "max_path_segments": 8,
+  "proc_names": [
+    "cys",
+    "cysd",
+    "claude",
+    "node"
+  ],
+  "entries": [
+    {
+      "id": "dir.root",
+      "shell": "ps1",
+      "usage": "Get-ChildItem",
+      "exec": "cmdlet",
+      "risk": 0,
+      "title": "작업 폴더 맨 위의 목록을 본다"
+    },
+    {
+      "id": "dir.list",
+      "shell": "ps1",
+      "usage": "Get-ChildItem -LiteralPath <path>",
+      "exec": "cmdlet",
+      "risk": 0,
+      "title": "작업 폴더 안 한 폴더의 목록을 본다"
+    },
+    {
+      "id": "file.tail",
+      "shell": "ps1",
+      "usage": "Get-Content -LiteralPath <path> -Tail <n:1-200>",
+      "exec": "cmdlet",
+      "risk": 0,
+      "title": "작업 폴더 안 파일의 끝 N줄을 본다"
+    },
+    {
+      "id": "file.hash",
+      "shell": "ps1",
+      "usage": "Get-FileHash -LiteralPath <path> -Algorithm SHA256",
+      "exec": "cmdlet",
+      "risk": 0,
+      "title": "작업 폴더 안 파일의 SHA256 을 본다"
+    },
+    {
+      "id": "file.exists",
+      "shell": "ps1",
+      "usage": "Test-Path -LiteralPath <path>",
+      "exec": "cmdlet",
+      "risk": 0,
+      "title": "작업 폴더 안에 그 파일(예: 표식 .jarvis-owned)이 있는지 본다"
+    },
+    {
+      "id": "disk.free",
+      "shell": "ps1",
+      "usage": "Get-PSDrive -Name C",
+      "exec": "cmdlet",
+      "risk": 0,
+      "title": "C 드라이브의 남은 공간을 본다"
+    },
+    {
+      "id": "net.check",
+      "shell": "ps1",
+      "usage": "Test-NetConnection -ComputerName jarvis-install.godmeyou.kr -Port 443 -InformationLevel Quiet",
+      "exec": "cmdlet",
+      "risk": 0,
+      "title": "우리 서버(443)에 닿는지 본다"
+    },
+    {
+      "id": "shell.version",
+      "shell": "ps1",
+      "usage": "Get-Host",
+      "exec": "cmdlet",
+      "risk": 0,
+      "title": "PowerShell 판본을 본다"
+    },
+    {
+      "id": "av.status",
+      "shell": "ps1",
+      "usage": "Get-MpComputerStatus",
+      "exec": "cmdlet",
+      "risk": 0,
+      "title": "백신 상태를 본다(끄지 않는다)"
+    },
+    {
+      "id": "proc.find",
+      "shell": "ps1",
+      "usage": "Get-Process -Name <proc>",
+      "exec": "cmdlet",
+      "risk": 0,
+      "title": "우리 프로그램(cys·cysd·claude·node)이 떠 있는지 본다"
+    },
+    {
+      "id": "cys.status",
+      "shell": "ps1",
+      "usage": "cys status",
+      "exec": "cys",
+      "risk": 0,
+      "title": "cys 노드 상태를 본다"
+    },
+    {
+      "id": "cys.doctor",
+      "shell": "ps1",
+      "usage": "cys doctor",
+      "exec": "cys",
+      "risk": 0,
+      "title": "cys 자기진단을 본다(고치지 않는다)"
+    },
+    {
+      "id": "cys.daemon",
+      "shell": "ps1",
+      "usage": "cys daemon status",
+      "exec": "cys",
+      "risk": 0,
+      "title": "cys 상시 가동 등록 상태를 본다"
+    },
+    {
+      "id": "dir.root",
+      "shell": "sh",
+      "usage": "ls -lan",
+      "exec": "/bin/ls",
+      "risk": 0,
+      "title": "작업 폴더 맨 위의 목록을 본다(소유자는 번호로)"
+    },
+    {
+      "id": "dir.list",
+      "shell": "sh",
+      "usage": "ls -lan <path>",
+      "exec": "/bin/ls",
+      "risk": 0,
+      "title": "작업 폴더 안 한 폴더의 목록을 본다(소유자는 번호로)"
+    },
+    {
+      "id": "file.tail",
+      "shell": "sh",
+      "usage": "tail -n <n:1-200> <path>",
+      "exec": "/usr/bin/tail",
+      "risk": 0,
+      "title": "작업 폴더 안 파일의 끝 N줄을 본다"
+    },
+    {
+      "id": "file.hash",
+      "shell": "sh",
+      "usage": "shasum -a 256 <path>",
+      "exec": "/usr/bin/shasum",
+      "risk": 0,
+      "title": "작업 폴더 안 파일의 SHA256 을 본다"
+    },
+    {
+      "id": "file.exists",
+      "shell": "sh",
+      "usage": "test -e <path>",
+      "exec": "/bin/test",
+      "risk": 0,
+      "title": "작업 폴더 안에 그 파일(예: 표식 .jarvis-owned)이 있는지 본다(종료 코드)"
+    },
+    {
+      "id": "disk.free",
+      "shell": "sh",
+      "usage": "df -h .",
+      "exec": "/bin/df",
+      "risk": 0,
+      "title": "작업 폴더가 있는 디스크의 남은 공간을 본다"
+    },
+    {
+      "id": "net.check",
+      "shell": "sh",
+      "usage": "nc -z -G 5 jarvis-install.godmeyou.kr 443",
+      "exec": "/usr/bin/nc",
+      "risk": 0,
+      "title": "우리 서버(443)에 닿는지 본다"
+    },
+    {
+      "id": "shell.version",
+      "shell": "sh",
+      "usage": "sw_vers",
+      "exec": "/usr/bin/sw_vers",
+      "risk": 0,
+      "title": "macOS 판본을 본다"
+    },
+    {
+      "id": "av.status",
+      "shell": "sh",
+      "usage": "spctl --status",
+      "exec": "/usr/sbin/spctl",
+      "risk": 0,
+      "title": "Gatekeeper 상태를 본다(끄지 않는다)"
+    },
+    {
+      "id": "proc.find",
+      "shell": "sh",
+      "usage": "pgrep -l <proc>",
+      "exec": "/usr/bin/pgrep",
+      "risk": 0,
+      "title": "우리 프로그램(cys·cysd·claude·node)이 떠 있는지 본다"
+    },
+    {
+      "id": "cys.status",
+      "shell": "sh",
+      "usage": "cys status",
+      "exec": "cys",
+      "risk": 0,
+      "title": "cys 노드 상태를 본다"
+    },
+    {
+      "id": "cys.doctor",
+      "shell": "sh",
+      "usage": "cys doctor",
+      "exec": "cys",
+      "risk": 0,
+      "title": "cys 자기진단을 본다(고치지 않는다)"
+    },
+    {
+      "id": "cys.daemon",
+      "shell": "sh",
+      "usage": "cys daemon status",
+      "exec": "cys",
+      "risk": 0,
+      "title": "cys 상시 가동 등록 상태를 본다"
+    }
+  ]
+}
+'@
+
+function Read-RemoteHelpStream($stream) {
+    if ($null -eq $stream) { return '' }
+    if ($stream.CanSeek) { $stream.Position = 0 }
+    $reader = New-Object System.IO.StreamReader($stream, [System.Text.Encoding]::UTF8)
+    try { return $reader.ReadToEnd() } finally { $reader.Dispose() }
+}
+
+function Invoke-RemoteHelpHttp($Method, $Path, $Body) {
+    # 돌려주는 것 = @{ Code = <응답 코드 · 0 = 닿지 못함>; Text = <응답 본문(UTF-8)> }
+    #   ⚠5.1 은 응답에 글자셋이 없으면 본문을 라틴 글자로 읽는다 ⇒ 날 바이트를 UTF-8 로 직접 읽는다.
+    $ProgressPreference = 'SilentlyContinue'
+    try { [Net.ServicePointManager]::SecurityProtocol = [Net.ServicePointManager]::SecurityProtocol -bor [Net.SecurityProtocolType]::Tls12 } catch { }
+    $headers = @{}
+    if ($script:RhClientToken -and ($Path -like '*/ack' -or $Path -like '*/close')) { $headers['x-help-client'] = $script:RhClientToken }
+    $request = @{ Uri = ($HelpApiUrl + $Path); Method = $Method; UseBasicParsing = $true; TimeoutSec = 20; Headers = $headers; ErrorAction = 'Stop' }
+    if ($null -ne $Body) {
+        $request['Body'] = [System.Text.Encoding]::UTF8.GetBytes([string]$Body)
+        $request['ContentType'] = 'application/json; charset=utf-8'
+    }
+    try {
+        $response = Invoke-WebRequest @request
+        return @{ Code = [int]$response.StatusCode; Text = (Read-RemoteHelpStream $response.RawContentStream) }
+    } catch {
+        $failed = $null
+        try { $failed = $_.Exception.Response } catch { }
+        if ($null -ne $failed) {
+            $text = ''
+            try { $text = Read-RemoteHelpStream $failed.GetResponseStream() } catch { }
+            return @{ Code = [int]$failed.StatusCode; Text = $text }
+        }
+        return @{ Code = 0; Text = '' }
+    }
+}
+
+# ── 1차 스크럽 — 서버 src/scrub.ts 와 같은 규칙 · 서버가 한 번 더 지운다 ──
+function Get-RemoteHelpNames([string]$Text, [string[]]$Known) {
+    $names = New-Object System.Collections.Generic.List[string]
+    $add = {
+        param($raw)
+        if ($names.Count -ge 64) { return }
+        $value = (([string]$raw).Trim()) -replace '["'']', ''
+        if ($value.Length -ge 2 -and -not $names.Contains($value)) { $names.Add($value) }
+        $segment = ((($value -split '[\\/]')[-1])).Trim()
+        if ($segment.Length -ge 2 -and $names.Count -lt 64 -and -not $names.Contains($segment)) { $names.Add($segment) }
+    }
+    foreach ($k in $Known) { if ($k) { & $add $k } }
+    $pattern = '\b(?:USERNAME|USERPROFILE|LOGNAME|USER|HOME)\b[ \t]*[=:][ \t]*([^\r\n]+)|\bwhoami\b[ \t]*[:=>][ \t]*([^\r\n]+)|(?:^|\n)[ \t]*([A-Za-z][A-Za-z0-9.-]{1,63}\\[A-Za-z0-9._-]{2,63})[ \t]*(?:\r?\n|$)'
+    foreach ($m in [regex]::Matches($Text, $pattern, 'IgnoreCase')) {
+        if ($names.Count -ge 64) { break }
+        if ($m.Groups[1].Success) { & $add $m.Groups[1].Value } elseif ($m.Groups[2].Success) { & $add $m.Groups[2].Value } else { & $add $m.Groups[3].Value }
+    }
+    $sorted = @($names | Sort-Object -Property Length -Descending)
+    return ,([string[]]$sorted)
+}
+
+function Invoke-RemoteHelpScrub([string]$Text, [string[]]$Names) {
+    if ($null -eq $Text) { return '' }
+    if ($null -ne $Names -and $Names.Count -gt 0) {
+        $Text = [regex]::Replace($Text, (($Names | ForEach-Object { [regex]::Escape($_) }) -join '|'), '~user')
+    }
+    $Text = [regex]::Replace($Text, '[A-Za-z0-9._%+-]{1,64}@[A-Za-z0-9-]{1,63}(?:\.[A-Za-z0-9-]{1,63})*\.[A-Za-z]{2,63}', '<이메일 지움>')
+    $Text = [regex]::Replace($Text, '\bBearer\s+[A-Za-z0-9._~+/=-]+', 'Bearer <토큰 지움>', 'IgnoreCase')
+    $Text = [regex]::Replace($Text, '\bsk-[A-Za-z0-9_-]{8,}', '<키 지움>')
+    $Text = [regex]::Replace($Text, '\b[A-Za-z]:(?:\\{1,2}|/)Users(?:\\{1,2}|/)[^\\/\r\n"''<>|:*?]+', '~', 'IgnoreCase')
+    $Text = [regex]::Replace($Text, '/Users/[^/\s"''<>]+', '~')
+    return $Text
+}
+
+function Get-RemoteHelpTailBytes([string]$Text, [int]$Max) {
+    # 끝에서부터 Max 바이트(UTF-8) 이하 — 글자를 반으로 자르지 않는다
+    $enc = [System.Text.Encoding]::UTF8
+    if ($enc.GetByteCount($Text) -le $Max) { return $Text }
+    $lo = 0; $hi = $Text.Length
+    while ($lo -lt $hi) {
+        $mid = [int][math]::Floor(($lo + $hi) / 2)
+        if ($enc.GetByteCount($Text.Substring($mid)) -le $Max) { $hi = $mid } else { $lo = $mid + 1 }
+    }
+    if ($lo -lt $Text.Length -and [char]::IsLowSurrogate($Text[$lo])) { $lo++ }
+    return $Text.Substring($lo)
+}
+
+function Get-RemoteHelpHeadBytes([string]$Text, [int]$Max) {
+    $enc = [System.Text.Encoding]::UTF8
+    if ($enc.GetByteCount($Text) -le $Max) { return $Text }
+    $lo = 0; $hi = $Text.Length
+    while ($lo -lt $hi) {
+        $mid = [int][math]::Ceiling(($lo + $hi) / 2)
+        if ($enc.GetByteCount($Text.Substring(0, $mid)) -le $Max) { $lo = $mid } else { $hi = $mid - 1 }
+    }
+    if ($lo -gt 0 -and [char]::IsHighSurrogate($Text[$lo - 1])) { $lo-- }
+    return $Text.Substring(0, $lo)
+}
+
+# ── 재검사 — 번들 표·같은 문법(서버 코드를 가져오지 않은 독립 구현 · 맥판 JavaScript 와 한 줄씩 대응) ──
+function Test-RemoteHelpSeq($Value) {
+    # 양의 안전 정수만(1.5·"6"·2^53 은 아니다) — 형을 먼저 본다
+    if (-not ($Value -is [int] -or $Value -is [long])) { return $false }
+    return ($Value -gt 0 -and $Value -le 9007199254740991)
+}
+
+function Test-RemoteHelpPath($Table, [string]$Shell, [string]$Value) {
+    if ($Value -cmatch '\A[\\/]' -or $Value.Contains(':')) { return $false }
+    if ($Shell -ceq 'sh' -and $Value.Contains('\')) { return $false }
+    $segments = $Value -split '[\\/]'
+    if ($segments.Count -gt [int]$Table.max_path_segments) { return $false }
+    foreach ($s in $segments) {
+        if (-not ($s -cmatch '\A\.?[A-Za-z0-9_][A-Za-z0-9_.-]{0,62}\z')) { return $false }
+        if ($s.EndsWith('.')) { return $false }
+        # 장치 이름은 대소문자를 가리지 않는다(CON·con 둘 다 장치다)
+        if ($s -imatch '\A(con|prn|aux|nul|com[0-9]|lpt[0-9])(\.|\z)') { return $false }
+    }
+    return $true
+}
+
+function Test-RemoteHelpSlot($Table, [string]$Shell, [string]$Slot, [string]$Value) {
+    if ($Slot -ceq '<path>') { return (Test-RemoteHelpPath $Table $Shell $Value) }
+    if ($Slot -ceq '<proc>') { return (@($Table.proc_names) -ccontains $Value) }
+    if ($Slot -cmatch '\A<n:([0-9]+)-([0-9]+)>\z') {
+        $lo = [int]$Matches[1]; $hi = [int]$Matches[2]
+        if (-not ($Value -cmatch '\A(0|[1-9][0-9]{0,3})\z')) { return $false }
+        return ([int]$Value -ge $lo -and [int]$Value -le $hi)
+    }
+    return ($Slot -ceq $Value)
+}
+
+function Test-RemoteHelpArgv($Table, [string]$Shell, $Argv) {
+    # 돌려주는 것 = @{ Ok = $true; Entry = <표 줄>; Argv = <string[]> } 또는 @{ Ok = $false; Rule = '<규칙>' }
+    if ($null -eq $Argv -or -not ($Argv -is [array]) -or $Argv.Count -eq 0) { return @{ Ok = $false; Rule = 'empty' } }
+    if ($Argv.Count -gt [int]$Table.max_tokens) { return @{ Ok = $false; Rule = 'too_many_tokens' } }
+    $tokenPattern = '\A(?:' + ([string]$Table.token_pattern).TrimStart('^').TrimEnd('$') + ')\z'
+    foreach ($v in $Argv) {
+        if (-not ($v -is [string]) -or $v.Length -eq 0) { return @{ Ok = $false; Rule = 'empty' } }
+        if ($v.Length -gt [int]$Table.max_token_chars -or -not ($v -cmatch $tokenPattern)) { return @{ Ok = $false; Rule = 'char' } }
+    }
+    $tokens = [string[]]$Argv
+    if ([System.Text.Encoding]::UTF8.GetByteCount(($tokens -join ' ')) -gt [int]$Table.max_command_bytes) { return @{ Ok = $false; Rule = 'too_long' } }
+    $named = @($Table.entries | Where-Object { $_.shell -ceq $Shell -and ($_.usage -split ' ')[0] -ceq $tokens[0] })
+    if ($named.Count -eq 0) { return @{ Ok = $false; Rule = 'unknown_command' } }
+    foreach ($entry in $named) {
+        $slots = $entry.usage -split ' '
+        if ($slots.Count -ne $tokens.Count) { continue }
+        $all = $true
+        for ($i = 1; $i -lt $slots.Count; $i++) {
+            if (-not (Test-RemoteHelpSlot $Table $Shell $slots[$i] $tokens[$i])) { $all = $false; break }
+        }
+        if ($all) { return @{ Ok = $true; Entry = $entry; Argv = $tokens } }
+    }
+    return @{ Ok = $false; Rule = 'usage_mismatch' }
+}
+
+# ── 실행 번호 기록 — 없으면 빈 목록 · 있는데 못 읽거나 깨졌으면 $null(아무것도 실행하지 않는다) ──
+function Read-RemoteHelpExecuted {
+    if (-not (Test-Path -LiteralPath $RemoteHelpSeqFile)) { return ,([long[]]@()) }
+    $raw = $null
+    try { $raw = [System.IO.File]::ReadAllText($RemoteHelpSeqFile, [System.Text.Encoding]::UTF8) } catch { return $null }
+    $parsed = $null
+    try { $parsed = ConvertFrom-Json -InputObject $raw -ErrorAction Stop } catch { return $null }
+    if (-not ($parsed -is [array])) { return $null }
+    foreach ($s in $parsed) { if (-not (Test-RemoteHelpSeq $s)) { return $null } }
+    return ,([long[]]@($parsed))
+}
+
+function Save-RemoteHelpExecuted([long]$Seq) {
+    # 돌려주는 것 = 'OK' · 'ALREADY' · 'LOCKED' · 'FAIL' — 임시 파일에 쓴 뒤 바꿔 끼운다(반쯤 쓴 기록을 남기지 않는다)
+    #   두 창이 같은 번호를 동시에 남기지 못하게 이름 있는 잠금(Mutex)을 잡는다(검수 지적 — 잠금 없이 둘이 함께 읽으면 둘 다 OK 였다).
+    #   2초 안에 못 잡으면 LOCKED(실행하지 않는다) · 앞 주인이 잠근 채 죽었으면(AbandonedMutexException) 넘겨받는다.
+    #   쓴 바이트는 Flush($true) 로 디스크까지 내린 뒤 바꿔 끼운다(전원 단절 내구성).
+    $mutex = New-Object System.Threading.Mutex($false, 'Local\JarvisRemoteHelpSeq')
+    $held = $false
+    try {
+        try { $held = $mutex.WaitOne(2000) } catch [System.Threading.AbandonedMutexException] { $held = $true }
+        if (-not $held) { return 'LOCKED' }
+        $executed = Read-RemoteHelpExecuted
+        if ($null -eq $executed) { return 'FAIL' }
+        if ($executed -contains $Seq) { return 'ALREADY' }
+        $json = '[' + ((@($executed) + $Seq | ForEach-Object { [string]$_ }) -join ',') + ']'
+        $tmp = $RemoteHelpSeqFile + '.tmp'
+        try {
+            $bytes = (New-Object System.Text.UTF8Encoding($false)).GetBytes($json)
+            $fs = New-Object System.IO.FileStream($tmp, [System.IO.FileMode]::Create, [System.IO.FileAccess]::Write, [System.IO.FileShare]::None)
+            try { $fs.Write($bytes, 0, $bytes.Length); $fs.Flush($true) } finally { $fs.Dispose() }
+            if (Test-Path -LiteralPath $RemoteHelpSeqFile) { [System.IO.File]::Replace($tmp, $RemoteHelpSeqFile, $null) } else { [System.IO.File]::Move($tmp, $RemoteHelpSeqFile) }
+        } catch { return 'FAIL' }
+        $back = Read-RemoteHelpExecuted
+        if ($null -eq $back -or -not ($back -contains $Seq)) { return 'FAIL' }
+        return 'OK'
+    } finally {
+        if ($held) { try { $mutex.ReleaseMutex() } catch { } }
+        $mutex.Dispose()
+    }
+}
+
+# ── 경로 봉쇄 — 성분마다 재분석점(정션·심볼릭 링크)을 풀어 실제 경로로 · 끊어진 링크·고리 = $null ──
+function Get-RemoteHelpCanonical([string]$Path, [int]$Depth = 0) {
+    if ($Depth -gt 40) { return $null }
+    $full = $null
+    try { $full = [System.IO.Path]::GetFullPath($Path) } catch { return $null }
+    $drive = [System.IO.Path]::GetPathRoot($full)
+    if (-not $drive) { return $null }
+    $current = $drive
+    foreach ($seg in $full.Substring($drive.Length).Split([char[]]@('\', '/'), [System.StringSplitOptions]::RemoveEmptyEntries)) {
+        $next = Join-Path $current $seg
+        $item = Get-Item -LiteralPath $next -Force -ErrorAction SilentlyContinue
+        if ($null -eq $item) { return $null }
+        if ($item.Attributes -band [System.IO.FileAttributes]::ReparsePoint) {
+            $target = @($item.Target)[0]
+            if (-not $target) { return $null }
+            if (-not [System.IO.Path]::IsPathRooted($target)) { $target = Join-Path $current $target }
+            $current = Get-RemoteHelpCanonical $target ($Depth + 1)
+            if (-not $current) { return $null }
+        } else {
+            $current = $next
+        }
+    }
+    return $current
+}
+
+function Resolve-RemoteHelpPath([string]$Rel) {
+    # 작업 폴더에 한 성분씩 붙이며, 있는 성분마다 실제 경로가 작업 폴더의 실제 경로 안(성분 경계)인지 본다.
+    #   돌려주는 것 = @{ Real = <실제 경로>; Rule = '' } · 밖 = Rule 'path_outside' · 없는 폴더 안의 이름 = Rule 'path_missing'
+    #   아직 없는 성분은 링크일 수 없어 그대로 붙인다 — 단 **마지막 성분일 때만**(그 뒤에 성분이 더 있으면 열 실제 부모가 없다).
+    $root = Get-RemoteHelpCanonical $JarvisHome
+    if (-not $root) { return @{ Real = ''; Rule = 'path_outside' } }
+    $current = $root
+    $segments = $Rel.Split([char[]]@('\', '/'))
+    for ($i = 0; $i -lt $segments.Count; $i++) {
+        $next = Join-Path $current $segments[$i]
+        $item = Get-Item -LiteralPath $next -Force -ErrorAction SilentlyContinue
+        if ($null -eq $item) {
+            if ($i -lt $segments.Count - 1) { return @{ Real = ''; Rule = 'path_missing' } }
+            return @{ Real = $next; Rule = '' }
+        }
+        $real = Get-RemoteHelpCanonical $next
+        if (-not $real) { return @{ Real = ''; Rule = 'path_outside' } }
+        # 성분 경계 — install-jarvis-evil 은 install-jarvis 안이 아니다 · 대소문자는 가리지 않는다(윈도우 경로)
+        if (-not ($real -ieq $root) -and -not $real.StartsWith($root.TrimEnd('\') + '\', [System.StringComparison]::OrdinalIgnoreCase)) { return @{ Real = ''; Rule = 'path_outside' } }
+        $current = $real
+    }
+    return @{ Real = $current; Rule = '' }
+}
+
+function Get-RemoteHelpCysPath {
+    # 설치기가 이미 쓰는 cys 찾기 규칙(Test-CysBody) · 절대 경로의 cys.exe 만 · PATH 조회 없음
+    $b = Test-CysBody
+    if ($b.Cli -and [System.IO.Path]::IsPathRooted($b.Cli) -and ((Split-Path -Leaf $b.Cli) -ieq 'cys.exe') -and (Test-Path -LiteralPath $b.Cli -PathType Leaf)) { return $b.Cli }
+    return ''
+}
+
+function Invoke-RemoteHelpStreamRead([string]$Name, $Stream, [int]$Tail) {
+    # 연 핸들로 읽는다 — 이름을 다시 열지 않는다. 돌려주는 것 = Invoke-RemoteHelpLaunch 와 같다 · 핸들은 여기서 닫는다.
+    #   60초 상한 = 같은 프로세스 안의 따로 도는 러너(핸들은 프로세스를 못 건넌다 — Start-Job 은 새 프로세스라 쓸 수 없다).
+    #   시간을 넘기면 핸들을 먼저 닫아 읽기를 끊고 러너를 멈춘다(.NET 호출 한가운데서는 즉시 안 멈출 수 있다 · 윈도우 실기 필요).
+    if ($null -eq $Stream) {
+        # 못 열었다(없는 이름·권한) — Test-Path 의 답은 「없다」 · 읽기 명령은 실패를 말한다(이름을 다시 열지 않는다)
+        if ($Name -ceq 'Test-Path') { return @{ Refused = ''; Rc = 0; TimedOut = $false; Output = "False`r`n" } }
+        return @{ Refused = ''; Rc = 1; TimedOut = $false; Output = "cannot open`r`n" }
+    }
+    $runner = [System.Management.Automation.PowerShell]::Create()
+    try {
+        [void]$runner.AddScript({
+            param($name, $stream, $tail)
+            if ($name -ceq 'Test-Path') { return 'True' }
+            if ($name -ceq 'Get-FileHash') { return (Get-FileHash -InputStream $stream -Algorithm SHA256 | Format-List Algorithm, Hash | Out-String -Width 160) }
+            # Get-Content -Tail 과 같은 뜻 — 5.1 기본 인코딩으로 읽고(BOM 이 있으면 그것) 끝 N줄만 남긴다
+            $reader = New-Object System.IO.StreamReader($stream, [System.Text.Encoding]::Default, $true)
+            $keep = New-Object System.Collections.Generic.Queue[string]
+            while ($null -ne ($line = $reader.ReadLine())) {
+                $keep.Enqueue($line)
+                if ($keep.Count -gt $tail) { [void]$keep.Dequeue() }
+            }
+            return (@($keep) -join "`r`n")
+        }).AddArgument($Name).AddArgument($Stream).AddArgument($Tail)
+        $async = $runner.BeginInvoke()
+        if (-not $async.AsyncWaitHandle.WaitOne($RemoteHelpCmdTimeout * 1000)) {
+            $Stream.Dispose()
+            try { [void]$runner.BeginStop($null, $null) } catch { }
+            return @{ Refused = ''; Rc = $null; TimedOut = $true; Output = '' }
+        }
+        $out = @()
+        try { $out = @($runner.EndInvoke($async)) } catch { }
+        $errors = ($runner.Streams.Error | Out-String -Width 160)
+        return @{ Refused = ''; Rc = $(if ($runner.HadErrors) { 1 } else { 0 }); TimedOut = $false; Output = (($out | Out-String -Width 160) + $errors) }
+    } finally {
+        $Stream.Dispose()
+        $runner.Dispose()
+    }
+}
+
+function Invoke-RemoteHelpLaunch($Entry, [string[]]$Argv, [string]$RealPath, [int]$PathIndex) {
+    # 돌려주는 것 = @{ Refused = '<규칙>' 또는 ''; Rc; TimedOut; Output }
+    # 두 모양뿐이다 — cmdlet + 이름-값 해시테이블 · cys 절대 경로 + 인자 배열. 명령줄 글을 만들지 않는다.
+    $cwd = Get-RemoteHelpCanonical $JarvisHome
+    if (-not $cwd) { return @{ Refused = 'path_outside' } }
+    $values = New-Object System.Collections.Generic.List[string]
+    for ($i = 1; $i -lt $Argv.Count; $i++) { $values.Add($Argv[$i]) }
+    $stream = $null
+    $isFolder = $false
+    if ($PathIndex -ge 1) {
+        # 경로 칸은 **먼저 열고 · 연 뒤에 다시 확인하고 · 연 핸들로 읽는다**(검수 지적 BLOCKER — 이름을 확인한 뒤 cmdlet 이 그 이름을
+        #   다시 열면 그 사이에 정션·링크로 바꿔 끼운 것을 따라간다).
+        #   ①마지막 성분이 재분석점이면 거부 ②파일이면 읽기 핸들을 연다 — 공유 = 읽기만(지우기·이름 바꾸기를 막는다 · 열린 파일이 든 폴더도
+        #   이름을 못 바꾼다) ③연 뒤 다시 — 재분석점이거나 실제 이름이 달라졌으면 거부 ④읽기는 그 핸들로(Invoke-RemoteHelpStreamRead).
+        #   ⚠폴더는 .NET 핸들을 열 수 없다 — 다시 확인까지만 하고 cmdlet 에 이름을 준다(잔여 · 윈도우 실기 필요).
+        $leaf = Get-Item -LiteralPath $RealPath -Force -ErrorAction SilentlyContinue
+        if ($null -ne $leaf -and ($leaf.Attributes -band [System.IO.FileAttributes]::ReparsePoint)) { return @{ Refused = 'path_changed' } }
+        if ($null -eq $leaf -or -not $leaf.PSIsContainer) {
+            try { $stream = [System.IO.File]::Open($RealPath, 'Open', 'Read', 'Read') } catch { $stream = $null }
+        }
+        $again = Get-Item -LiteralPath $RealPath -Force -ErrorAction SilentlyContinue
+        # 연 뒤의 불일치 = path_outside(계약 9-4 ④ — 연 것이 작업 폴더 안의 그 이름이라고 말할 수 없다)
+        if ($null -ne $again -and (($again.Attributes -band [System.IO.FileAttributes]::ReparsePoint) -or -not ($again.FullName -ieq $RealPath))) {
+            if ($null -ne $stream) { $stream.Dispose() }
+            return @{ Refused = 'path_outside' }
+        }
+        $isFolder = ($null -ne $again -and $again.PSIsContainer)
+        if ($null -ne $stream -and ($null -eq $again -or $isFolder)) { $stream.Dispose(); return @{ Refused = 'path_outside' } }
+        $values[$PathIndex - 1] = $RealPath
+    }
+    if ($Entry.exec -ceq 'cmdlet') {
+        $params = @{}
+        for ($i = 0; $i + 1 -lt $values.Count; $i += 2) { $params[$values[$i].Substring(1)] = $values[$i + 1] }
+        if ($PathIndex -ge 1 -and -not $isFolder -and ($Argv[0] -ceq 'Get-Content' -or $Argv[0] -ceq 'Get-FileHash' -or $Argv[0] -ceq 'Test-Path')) {
+            $tail = 0
+            if ($params.ContainsKey('Tail')) { $tail = [int]$params['Tail'] }
+            return (Invoke-RemoteHelpStreamRead $Argv[0] $stream $tail)
+        }
+        if ($null -ne $stream) { $stream.Dispose() }
+        $job = Start-Job -ScriptBlock {
+            param($name, $params, $cwd)
+            Set-Location -LiteralPath $cwd
+            $state = @{ Ok = $true }
+            $command = Get-Command -Name $name -CommandType Cmdlet -ErrorAction Stop
+            $text = & $command @params 2>&1 | ForEach-Object { if ($_ -is [System.Management.Automation.ErrorRecord]) { $state.Ok = $false }; $_ } | Out-String -Width 160
+            [pscustomobject]@{ Output = $text; Rc = $(if ($state.Ok) { 0 } else { 1 }) }
+        } -ArgumentList $Argv[0], $params, $cwd
+    } elseif ($Entry.exec -ceq 'cys') {
+        $cysPath = Get-RemoteHelpCysPath
+        if (-not $cysPath) { return @{ Refused = 'cys_not_found' } }
+        $cysArgs = $values.ToArray()
+        $job = Start-Job -ScriptBlock {
+            param($cysPath, $cysArgs, $cwd)
+            Set-Location -LiteralPath $cwd
+            # 표의 읽기 명령이 cys 데몬을 깨우지 않게 한다(설치기가 자기 조회에 거는 것과 같은 안전장치 · 검수 지적)
+            $prev = $env:CYS_NO_AUTOSTART
+            $env:CYS_NO_AUTOSTART = '1'
+            try {
+                $text = & $cysPath @cysArgs 2>&1 | Out-String -Width 160
+                $rc = $LASTEXITCODE
+            } finally { $env:CYS_NO_AUTOSTART = $prev }
+            [pscustomobject]@{ Output = $text; Rc = $rc }
+        } -ArgumentList $cysPath, $cysArgs, $cwd
+    } else {
+        return @{ Refused = 'exec' }
+    }
+    $done = Wait-Job -Job $job -Timeout $RemoteHelpCmdTimeout
+    if ($null -eq $done) {
+        Stop-Job -Job $job -ErrorAction SilentlyContinue
+        Remove-Job -Job $job -Force -ErrorAction SilentlyContinue
+        return @{ Refused = ''; Rc = $null; TimedOut = $true; Output = '' }
+    }
+    $result = @(Receive-Job -Job $job -ErrorAction SilentlyContinue 2>&1)
+    Remove-Job -Job $job -Force -ErrorAction SilentlyContinue
+    $last = $result | Where-Object { $null -ne $_ -and $null -ne $_.PSObject.Properties['Output'] } | Select-Object -Last 1
+    if ($null -eq $last) { return @{ Refused = ''; Rc = 1; TimedOut = $false; Output = ($result | Out-String -Width 160) } }
+    return @{ Refused = ''; Rc = $last.Rc; TimedOut = $false; Output = [string]$last.Output }
+}
+
+function Send-RemoteHelpAck([long]$Seq, [string]$Status, $Rc, [string]$Tail) {
+    $body = [ordered]@{ seq = $Seq; status = $Status; rc = $Rc; output_tail = $Tail } | ConvertTo-Json -Compress
+    return (Invoke-RemoteHelpHttp 'POST' ('/api/help/' + $script:RhId + '/ack') $body).Code
+}
+
+function Send-RemoteHelpDecline([long]$Seq, [string]$Rule) {
+    # 돌려주는 것 = 0 계속 · 3 서버가 닫았다(410)
+    if ((Send-RemoteHelpAck $Seq 'declined' $null ('policy:' + $Rule)) -eq 410) { return 3 }
+    return 0
+}
+
+function Invoke-RemoteHelpCommand([long]$Seq, $Entry, [string[]]$Argv) {
+    # 계약 9-4절 3~7 — 표·문법을 통과한 명령 하나. 돌려주는 것 = Invoke-RemoteHelpTick 과 같다.
+    $slots = $Entry.usage -split ' '
+    $pathIndex = -1; $rel = ''; $first = $null
+    for ($i = 1; $i -lt $slots.Count; $i++) {
+        if ($slots[$i] -ceq '<path>') {
+            if ($pathIndex -ge 0) { return (Send-RemoteHelpDecline $Seq 'path_count') }
+            $pathIndex = $i; $rel = $Argv[$i]
+            # 밖(path_outside) · 없는 폴더 안의 이름(path_missing) — 표시·번호 기록 **전에** 거절한다
+            $first = Resolve-RemoteHelpPath $rel
+            if ($first.Rule) { return (Send-RemoteHelpDecline $Seq $first.Rule) }
+        }
+    }
+    if (-not ($Entry.exec -ceq 'cmdlet' -or $Entry.exec -ceq 'cys')) { return (Send-RemoteHelpDecline $Seq 'exec') }
+    if ($Entry.exec -ceq 'cys' -and -not (Get-RemoteHelpCysPath)) { return (Send-RemoteHelpDecline $Seq 'cys_not_found') }
+    # 4 명령 글 = argv 를 공백 한 칸으로 이은 것 · 확인 대기 없이 창에 찍는다
+    Say ('     운영팀 명령: ' + ($Argv -join ' '))
+    # 5 번호를 실행 **전에** 남긴다 — 이미 있으면 다시 돌리지 않는다 · 못 남기면 실행 0 · 다른 창이 기록 중이면 거절(policy:seq_lock)
+    $saved = Save-RemoteHelpExecuted $Seq
+    if ($saved -ceq 'ALREADY') { return 0 }
+    if ($saved -ceq 'LOCKED') { return (Send-RemoteHelpDecline $Seq 'seq_lock') }
+    if ($saved -cne 'OK') { Say '     실행 기록을 남기지 못해 이 명령을 실행하지 않고 멈춥니다.'; return 2 }
+    # 6 경로를 실행 직전에 한 번 더 푼다 — 처음과 다르면(그 사이 링크가 생겼다 · 폴더가 사라졌다) 실행하지 않는다
+    $real = @{ Real = ''; Rule = '' }
+    if ($pathIndex -ge 1) {
+        $real = Resolve-RemoteHelpPath $rel
+        if ($real.Rule -or -not ($real.Real -ieq $first.Real)) { return (Send-RemoteHelpDecline $Seq 'path_changed') }
+    }
+    $run = Invoke-RemoteHelpLaunch $Entry $Argv $real.Real $pathIndex
+    if ($run.Refused) { return (Send-RemoteHelpDecline $Seq $run.Refused) }
+    # 7 결과 — 끝 4KB · 보고 때 모은 이름으로 스크럽
+    $output = [string]$run.Output
+    $rc = $run.Rc
+    if ($run.TimedOut) { $output = $output + "`ntimeout:" + $RemoteHelpCmdTimeout + 's'; $rc = $null }
+    $tail = Get-RemoteHelpTailBytes (Invoke-RemoteHelpScrub $output $script:RhNames) 4096
+    if ((Send-RemoteHelpAck $Seq 'ran' $rc $tail) -eq 410) { return 3 }
+    return 0
+}
+
+function Show-RemoteHelpAnswer($Poll) {
+    # 처방 표시 — 운영팀 글이라도 화면 제어 글자(색·커서·방향 바꿈)는 지우고, 바뀌었을 때만 한 번 찍는다
+    $answer = $Poll.answer
+    if ($null -eq $answer -or -not ($answer.text -is [string])) { return }
+    $number = ''
+    if ($answer.action_no -is [int] -or $answer.action_no -is [long]) { $number = '(조치 ' + $answer.action_no + ')' }
+    $class = (@(@(0x00, 0x09), @(0x0B, 0x1F), @(0x7F, 0x9F), @(0x200E, 0x200F), @(0x202A, 0x202E), @(0x2066, 0x2069)) | ForEach-Object {
+        [regex]::Escape([string][char]$_[0]) + '-' + [regex]::Escape([string][char]$_[1])
+    }) -join ''
+    $text = [regex]::Replace($answer.text, '[' + $class + ']', '')
+    $shown = '     처방' + $number + ': ' + (($text -split "`r?`n") -join ("`n" + '       '))
+    if ($shown -cne $script:RhLastAnswer) {
+        $script:RhLastAnswer = $shown
+        Say $shown
+    }
+}
+
+# 계약 7-8절 과 같은 뜻 — ⚠이 파일은 사람에게 「줄」을 말하지 않는다 · 다시 하는 방법은 끝맺음이 명령 전체로 인쇄한다
+function Show-RemoteHelpEnded {
+    Say '     원격 해결이 끝났습니다 · 아래 「다시 하시는 법」대로 다시 실행하시면 새 보고로 이어집니다.'
+    $script:ShowRerun = $true
+}
+
+function Invoke-RemoteHelpTick([string]$Text) {
+    # 돌려주는 것 = 0 계속 · 1 대화 닫힘 · 2 실행 기록을 못 믿어 멈춤 · 3 서버가 닫았다(410)
+    $poll = $null
+    try { $poll = ConvertFrom-Json -InputObject $Text -ErrorAction Stop } catch { return 0 }
+    if ($null -eq $poll) { return 0 }
+    Show-RemoteHelpAnswer $poll
+    $session = $poll.session
+    if ($null -eq $session -or -not ($session.open -is [bool]) -or -not $session.open) { return 1 }
+    $executed = Read-RemoteHelpExecuted
+    if ($null -eq $executed) { Say '     실행 기록 파일을 읽을 수 없어 명령을 실행하지 않고 멈춥니다.'; return 2 }
+    $table = ConvertFrom-Json -InputObject $RemoteHelpTableJson
+    foreach ($m in @($session.messages)) {
+        if (-not ($m -is [System.Management.Automation.PSCustomObject])) { continue }
+        if (-not ($m.kind -is [string]) -or -not ($m.kind -ceq 'command')) { continue }
+        if (-not (Test-RemoteHelpSeq $m.seq)) { continue }
+        $seq = [long]$m.seq
+        if (-not ($m.ack -is [System.Management.Automation.PSCustomObject]) -or -not ($m.ack.status -is [string]) -or -not ($m.ack.status -ceq 'pending')) { continue }
+        if (-not ($m.sig -is [string]) -or -not ($m.sig -cmatch '\A[0-9a-f]{64}\z')) { continue }
+        if ($executed -contains $seq) { continue }
+        if (-not ($m.shell -is [string]) -or -not ($m.shell -ceq 'ps1')) {
+            if ((Send-RemoteHelpDecline $seq 'shell') -eq 3) { return 3 }
+            continue
+        }
+        if (-not ($m.table_version -is [string]) -or -not ($m.table_version -ceq $table.version)) {
+            if ((Send-RemoteHelpDecline $seq 'table_version') -eq 3) { return 3 }
+            continue
+        }
+        # 명령의 글 칸은 읽지 않는다 — 실행에 닿는 입력은 argv 하나뿐이다
+        $verdict = Test-RemoteHelpArgv $table 'ps1' $m.argv
+        if (-not $verdict.Ok) {
+            if ((Send-RemoteHelpDecline $seq $verdict.Rule) -eq 3) { return 3 }
+            continue
+        }
+        $state = @(Invoke-RemoteHelpCommand $seq $verdict.Entry $verdict.Argv)[-1]
+        if ($state -ne 0) { return $state }
+    }
+    return 0
+}
+
+function Save-RemoteHelpToken([string]$Token) {
+    # 출처 토큰은 이 기계에만 두고 본인만 읽게 한다(상속 권한을 끊고 지금 사용자 하나만).
+    #   돌려주는 것 = $true 두었다 · $false 못 두었다(파일을 지웠다 — 부르는 쪽이 토큰을 메모리에서도 버린다).
+    #   ★권한을 **먼저** 건 빈 파일을 만든 뒤 쓴다(검수 지적) — 앞 판은 토큰을 쓴 뒤 권한을 걸어, 권한이 실패하면 상속 권한 파일에 토큰이 남았다.
+    try {
+        $full = $ExecutionContext.SessionState.Path.GetUnresolvedProviderPathFromPSPath($RemoteHelpTokenFile)
+        [System.IO.File]::WriteAllBytes($full, [byte[]]@())
+        $acl = New-Object System.Security.AccessControl.FileSecurity
+        $acl.SetAccessRuleProtection($true, $false)
+        $me = [System.Security.Principal.WindowsIdentity]::GetCurrent().User
+        $acl.AddAccessRule((New-Object System.Security.AccessControl.FileSystemAccessRule($me, 'FullControl', 'Allow')))
+        Set-Acl -LiteralPath $full -AclObject $acl -ErrorAction Stop
+        # 있는 파일에 쓰면 권한은 그대로 남는다(내용만 바뀐다)
+        [System.IO.File]::WriteAllText($full, ($Token + "`r`n"), (New-Object System.Text.UTF8Encoding($false)))
+        return $true
+    } catch {
+        Remove-Item -LiteralPath $RemoteHelpTokenFile -Force -ErrorAction SilentlyContinue
+        Write-Log 'remote help: client token file not restricted - token discarded'
+        return $false
+    }
+}
+
+function Send-RemoteHelpReport {
+    # 돌려주는 것 = $true 보고 번호를 받았다
+    $envText = ''
+    $logText = ''
+    try { if (Test-Path -LiteralPath $ReportFile) { $envText = [System.IO.File]::ReadAllText($ReportFile, [System.Text.Encoding]::UTF8) } } catch { }
+    # 기록 파일은 Add-Content 기본 인코딩으로 쓰였다 — 같은 기본값으로 읽는다
+    try { if (Test-Path -LiteralPath $LogFile) { $logText = (@(Get-Content -LiteralPath $LogFile -Tail 200 -ErrorAction Stop) -join "`n") } } catch { }
+    # 멈춘 단계 = 이 실행이 마지막으로 찍은 [n/10]
+    $step = '0/10'
+    for ($i = $script:StepLog.Count - 1; $i -ge 0; $i--) {
+        if ([string]$script:StepLog[$i] -cmatch '\A\[([0-9]{1,2}/[0-9]{1,2})\]') { $step = $Matches[1]; break }
+    }
+    # 이 컴퓨터가 아는 로그인 이름 — 표시 없이 나와도 지운다(서버는 표시된 이름만 안다)
+    $known = @($env:USERNAME, (Split-Path -Leaf $env:USERPROFILE))
+    try { $known += [System.Security.Principal.WindowsIdentity]::GetCurrent().Name } catch { }
+    $script:RhNames = Get-RemoteHelpNames ($envText + "`n" + $logText) $known
+    $fields = [ordered]@{
+        code              = $script:JCode
+        step              = $step
+        os                = 'win'
+        installer_version = $InstallerVersion
+        env_report        = (Get-RemoteHelpHeadBytes (Invoke-RemoteHelpScrub $envText $script:RhNames) 96000)
+        log_tail          = (Get-RemoteHelpTailBytes (Invoke-RemoteHelpScrub $logText $script:RhNames) 128000)
+        notice_shown      = $true
+    }
+    $body = $fields | ConvertTo-Json -Compress
+    # 직렬화한 본문을 잰다(검수 지적 — 잘라 낸 글 기준이면 백슬래시 폭탄이 448KB 로 불어 413) · 넘으면 기록 끝 → 환경 보고 순으로
+    #   남길 수 있는 가장 긴 길이를 찾아 줄인다(끝을 남기는 칸 · 앞을 남기는 칸)
+    foreach ($fit in @(@{ Name = 'log_tail'; Tail = $true }, @{ Name = 'env_report'; Tail = $false })) {
+        if ([System.Text.Encoding]::UTF8.GetByteCount($body) -le $RemoteHelpReportMaxBytes) { break }
+        $full = [string]$fields[$fit.Name]
+        $lo = 0; $hi = [System.Text.Encoding]::UTF8.GetByteCount($full)
+        while ($lo -lt $hi) {
+            $mid = [int][math]::Ceiling(($lo + $hi) / 2)
+            $fields[$fit.Name] = $(if ($fit.Tail) { Get-RemoteHelpTailBytes $full $mid } else { Get-RemoteHelpHeadBytes $full $mid })
+            if ([System.Text.Encoding]::UTF8.GetByteCount(($fields | ConvertTo-Json -Compress)) -le $RemoteHelpReportMaxBytes) { $lo = $mid } else { $hi = $mid - 1 }
+        }
+        $fields[$fit.Name] = $(if ($fit.Tail) { Get-RemoteHelpTailBytes $full $lo } else { Get-RemoteHelpHeadBytes $full $lo })
+        $body = $fields | ConvertTo-Json -Compress
+    }
+    $tries = 0
+    while ($true) {
+        $r = Invoke-RemoteHelpHttp 'POST' '/api/help' $body
+        if ($r.Code -eq 201) { break }
+        if (($r.Code -eq 0 -or $r.Code -eq 429 -or $r.Code -ge 500) -and $tries -lt 2) { $tries++; Start-Sleep -Seconds $RemoteHelpPollSec; continue }
+        break
+    }
+    $id = ''
+    $token = ''
+    if ($r.Code -eq 201) {
+        try {
+            $resp = ConvertFrom-Json -InputObject $r.Text -ErrorAction Stop
+            if ($resp.id -is [string] -and $resp.id -cmatch '\A[ABCDEFGHJKLMNPQRSTUVWXYZ23456789]{8}\z') { $id = $resp.id }
+            # 출처 증명 — 64자 16진만 받는다. 없거나 모양이 틀리면 빈 칸(옛 서버 = 헤더 없이 보낸다)
+            if ($resp.client_token -is [string] -and $resp.client_token -cmatch '\A[0-9a-f]{64}\z') { $token = $resp.client_token }
+        } catch { }
+    }
+    if (-not $id) {
+        Say ('     진단을 보내지 못했습니다(서버 답 ' + $r.Code + '). 위 진단 코드로 안내를 찾아보실 수 있습니다.')
+        return $false
+    }
+    $script:RhId = $id
+    Write-Log ('remote help: report ' + $id)
+    Remove-Item -LiteralPath $RemoteHelpTokenFile -Force -ErrorAction SilentlyContinue
+    if ($token) {
+        # 본인만 읽는 파일에 둔 뒤에만 헤더로 쓴다 — 못 두었으면 토큰을 버리고 헤더 없이 보낸다(닫힌 쪽)
+        if (Save-RemoteHelpToken $token) {
+            $script:RhClientToken = $token
+        } else {
+            $script:RhClientToken = ''
+            Write-Log 'remote help: 출처 헤더 없음(출처 토큰을 본인만 읽는 파일로 두지 못해 버렸다)'
+        }
+    } else {
+        Write-Log 'remote help: 출처 헤더 없음(보고 응답에 client_token 이 없다)'
+    }
+    Say ('     보고 번호 ' + $id + ' — 운영팀이 곧 봅니다.')
+    Say ('     폰에서 보기: ' + $HelpApiUrl + '/help/' + $id)
+    Say '     이 창을 열어 두시면 처방과 운영팀 명령이 여기에 나타납니다. 창을 닫으면 멈춥니다.'
+    return $true
+}
+
+function Watch-RemoteHelp {
+    $started = Get-Date
+    $lastNote = Get-Date
+    while ($true) {
+        if (((Get-Date) - $started).TotalSeconds -ge $RemoteHelpMaxSec) {
+            Say ('     원격 해결 시간(' + [int]($RemoteHelpMaxSec / 60) + '분)이 끝나 멈춥니다.')
+            [void](Invoke-RemoteHelpHttp 'POST' ('/api/help/' + $script:RhId + '/close') $null)
+            return
+        }
+        $r = Invoke-RemoteHelpHttp 'GET' ('/api/help/' + $script:RhId) $null
+        if ($r.Code -eq 200) {
+            $state = @(Invoke-RemoteHelpTick $r.Text)[-1]
+            if ($state -eq 2) { [void](Invoke-RemoteHelpHttp 'POST' ('/api/help/' + $script:RhId + '/close') $null); return }
+            if ($state -ne 0) { Show-RemoteHelpEnded; return }
+        } elseif ($r.Code -eq 404) {
+            Say '     보고가 지워져 원격 해결을 멈춥니다.'
+            return
+        } elseif ($r.Code -eq 410) {
+            Show-RemoteHelpEnded
+            return
+        }
+        if (((Get-Date) - $lastNote).TotalSeconds -ge $RemoteHelpNoteEverySec) {
+            $lastNote = Get-Date
+            Say ('     원격 해결을 기다리는 중입니다 (' + [int][math]::Floor(((Get-Date) - $started).TotalMinutes) + '분 지남 · 최대 ' + [int]($RemoteHelpMaxSec / 60) + '분 · 창을 닫으면 멈춥니다).')
+        }
+        Start-Sleep -Seconds $RemoteHelpPollSec
+    }
+}
+
+# 끝맺음(Write-ClosingNote)이 부른다 — [1/10] 고지를 보여 드린 실행에서만.
+function Invoke-RemoteHelp {
+    if (-not $script:JCode) { return }
+    if ($script:ReachedWake) { return }
+    if ($Mode -ne 'full') {
+        if ($Mode -eq 'dry') { Say '  (dry-run) 원격 해결 진단을 보내지 않았습니다.' }
+        return
+    }
+    Say ''
+    Say '  == 막혔을 때 — 원격 해결 =='
+    foreach ($line in $RemoteHelpLines) { Say ('   ' + $line) }
+    Say ('   자세히: ' + $RemoteHelpNoticeUrl)
+    $script:RhOpen = $false
+    $exitHook = $null
+    try {
+        if (Send-RemoteHelpReport) {
+            $script:RhOpen = $true
+            # 엔진이 정상으로 끝날 때도 닫기를 한 번 보낸다(계약 7-7) — 아래 finally 가 먼저 닫으면 등록을 풀어 두 번 보내지 않는다.
+            #   이 동작은 따로 도는 자리라 이 파일의 함수를 못 본다 ⇒ 주소·토큰을 넘겨 직접 부른다.
+            try {
+                $exitHook = Register-EngineEvent -SourceIdentifier PowerShell.Exiting -MessageData @{ Uri = ($HelpApiUrl + '/api/help/' + $script:RhId + '/close'); Token = $script:RhClientToken } -Action {
+                    $h = @{}
+                    if ($Event.MessageData.Token) { $h['x-help-client'] = $Event.MessageData.Token }
+                    try { [void](Invoke-WebRequest -Uri $Event.MessageData.Uri -Method POST -Headers $h -UseBasicParsing -TimeoutSec 5) } catch { }
+                }
+            } catch { }
+            Watch-RemoteHelp
+            # 폴링이 스스로 끝났다(410·닫힘·지움은 서버가 이미 닫았고 · 2시간·기록 오류는 Watch 가 닫기를 보냈다)
+            $script:RhOpen = $false
+        }
+    } catch {
+        # 원격 해결이 끝맺음을 깨뜨리지 않게 — 「다시 하시는 법」은 그래도 뒤에 나온다
+        Write-Log ('remote help: stopped - ' + $_.Exception.Message)
+        Say '     원격 해결이 예상하지 못한 자리에서 멈췄습니다.'
+    } finally {
+        # 어느 길로 끝나도(예외·Ctrl+C 중단) 열린 원격 해결을 닫는다(검수 지적 · 계약 7-7).
+        #   ⚠창 X·작업 관리자로 프로세스가 죽으면 이 블록도 돌지 않는다 — 서버가 30분 무명령으로 닫는다(한계 · 윈도우 실기 필요).
+        if ($script:RhOpen) {
+            $script:RhOpen = $false
+            try { [void](Invoke-RemoteHelpHttp 'POST' ('/api/help/' + $script:RhId + '/close') $null) } catch { }
+        }
+        if ($null -ne $exitHook) {
+            Unregister-Event -SourceIdentifier PowerShell.Exiting -ErrorAction SilentlyContinue
+            Remove-Job -Job $exitHook -Force -ErrorAction SilentlyContinue
+        }
+    }
+}
+
 # 시험이 이 파일을 「함수 묶음」으로만 읽는 문(맥판 JARVIS_LIB_ONLY 과 같은 자리·같은 까닭).
 #   연결 원인 판별처럼 **부르지 않으면 잴 수 없는 것**을 러너에서 재려면 이 문이 필요하다.
 #   ⚠사람이 쓰는 길이 아니다 — 설치기는 이 변수 없이 돈다(없으면 이 줄은 아무 일도 하지 않는다).
@@ -2258,6 +3189,8 @@ try {
     Say "=== 자비스 설치 도우미 $BootstrapVersion (모드: $Mode) ==="
     Show-PrevRunNote
     Say '[1/10] 이 컴퓨터를 살펴봅니다.'
+    Say ('     ' + $RemoteHelpNotice)
+    $script:NoticeShown = $true
     Invoke-DetectStage1
     Invoke-DetectStage2
     Write-Report
