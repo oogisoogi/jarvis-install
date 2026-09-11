@@ -817,7 +817,7 @@ safe_jarvis_dir() { # safe_jarvis_dir <경로> → rc 0 = 지워도 된다 · �
   [ -n "$c" ] || { SAFE_WHY="빈 경로입니다"; return 1; }
   # ⑴이름 관문 — 실경로의 마지막 칸이 정확히 그 이름일 때만.
   if [ "$(basename "$c")" != "$JARVIS_HOME_BASENAME" ]; then
-    SAFE_WHY="이 도구가 지우는 폴더의 이름은 「$JARVIS_HOME_BASENAME」 하나입니다(실제 경로: $c)"
+    SAFE_WHY="이 도구가 지우는 폴더의 이름은 「${JARVIS_HOME_BASENAME}」 하나입니다(실제 경로: $c)"
     return 1
   fi
   # ⑵표식 관문 — 설치기가 **새로 만든 폴더에만** 놓는다.
@@ -1182,6 +1182,26 @@ if [ "$FOUND" -eq 0 ]; then
   say "지울 것이 없습니다."
   exit 0
 fi
+
+# ── 🔴「cys 를 먼저 닫아 주십시오」 (v0.3.10 · 실제 노트북에서 겪은 일 2026-09-10) ─────────────
+#   이 도구는 자리 기준으로 프로세스를 끈다. 그래도 **사람에게 먼저 말한다**:
+#   ⑴우리가 창을 끄면 사람은 「갑자기 꺼졌다」로 읽는다 ⑵쓰던 것을 저장할 틈을 드린다
+#   ⑶끄지 못한 프로세스가 폴더를 붙잡고 있으면 삭제가 그 자리에서 실패한다(실제로 그랬다).
+#   ⚠묻는 것이 아니라 **알리는 것**이다 — 답을 안 받아도 진행한다(사람이 없는 자리에서는 안 묻는다).
+notice_close_cys() {
+  local alive
+  alive="$(procs_under "$CYS_APP" "$HOME/.cys" 2>/dev/null | sort -u | wc -l | tr -d ' ')"
+  [ "${alive:-0}" -gt 0 ] || return 0
+  say ""
+  say "cys 가 아직 돌고 있습니다(${alive}가지). 먼저 cys 창을 닫아 주십시오."
+  say "     닫지 않으셔도 이 도구가 끕니다 — 다만 저장하지 않으신 것이 사라질 수 있습니다."
+  if [ "$ASSUME_YES" != "1" ] && { : < /dev/tty; } 2>/dev/null; then
+    printf '  확인하셨으면 Enter 를 눌러 주십시오: '
+    read -r _ignored < /dev/tty || true
+  fi
+  return 0
+}
+notice_close_cys
 
 if [ "$ASSUME_YES" != "1" ]; then
   say ""

@@ -43,6 +43,14 @@ JARVIS_SITE_URL="https://jarvis.godmeyou.kr/install/"
 # ── 자리 ──────────────────────────────────────────────────────────
 # 점 없는 이름을 쓴다(2026-09-04 개정 · 이유 둘):
 JARVIS_HOME="${JARVIS_HOME:-$HOME/install-jarvis}"
+# 🔴🔴**꼬리 빗금을 여기서 한 번에 걷어낸다**(적대검증 1R NEW-1 · 2026-09-11).
+#   `rm -rf "이음줄/"` 은 **이음줄이 아니라 가리키던 자리 안엣것**을 지운다(뒤에 빗금이 붙으면
+#   그 자리를 「폴더」로 풀어서 보기 때문이다). 이름 관문은 `%/` 로 하나만 떼고 봤으므로
+#   `…/install-jarvis//` 같은 값이 지우는 자리까지 그대로 흘러갈 수 있었다.
+#   ⇒ 들어온 자리를 **한 번만 정리해** 이후 모든 자리가 같은 글자를 보게 한다.
+while [ "${JARVIS_HOME%/}" != "$JARVIS_HOME" ] && [ ${#JARVIS_HOME} -gt 1 ]; do
+  JARVIS_HOME="${JARVIS_HOME%/}"
+done
 LOG_FILE="$JARVIS_HOME/bootstrap.log"
 REPORT_FILE="$JARVIS_HOME/env-report.md"
 DIRECTIVE_FILE="$JARVIS_HOME/install-directive.md"
@@ -333,7 +341,7 @@ write_owner_mark() {
 refuse_jarvis_home() {  # refuse_jarvis_home <까닭 한 줄>
   echo "작업 폴더로 쓸 수 없는 자리입니다: $JARVIS_HOME" >&2
   echo "     까닭: $1" >&2
-  echo "     진단 코드: J-HOME-01 — 이 도구가 만들고 지우는 폴더의 이름은 「$JARVIS_HOME_BASENAME」 하나입니다" >&2
+  echo "     진단 코드: J-HOME-01 — 이 도구가 만들고 지우는 폴더의 이름은 「${JARVIS_HOME_BASENAME}」 하나입니다" >&2
   J_CODE="J-HOME-01"
   NEXT_STEP="JARVIS_HOME 을 지정하지 않으신 채로 다시 실행하시면 기본 자리($HOME/$JARVIS_HOME_BASENAME)를 씁니다. 그 자리를 꼭 쓰시려면 그 폴더를 지우거나 옮기신 뒤 다시 실행해 주십시오 — 설치 도우미는 자기가 새로 만든 폴더만 씁니다."
   SHOW_RERUN=1
@@ -341,7 +349,7 @@ refuse_jarvis_home() {  # refuse_jarvis_home <까닭 한 줄>
 }
 # ⑴이름 관문 — **만들기 전에** 본다.
 if [ "$(basename "${JARVIS_HOME%/}")" != "$JARVIS_HOME_BASENAME" ]; then
-  refuse_jarvis_home "폴더 이름이 「$JARVIS_HOME_BASENAME」 이 아닙니다"
+  refuse_jarvis_home "폴더 이름이 「${JARVIS_HOME_BASENAME}」 이 아닙니다"
 fi
 # ⑵채택 관문 — 이미 있는 자리는 **우리 표식이 있을 때만** 쓴다.
 # 🔴🔴**「비어 있으면 채택」을 걷어냈다**(4R BLOCK N3 봉인 2026-09-10). 두 가지가 틀렸다:
@@ -353,23 +361,134 @@ fi
 #   ⇒ **세지 않는다.** 셀 필요가 없으면 틀릴 자리도 없다 — 표식이 없는 기존 폴더는 내용과 무관하게 거부한다.
 #   ⚠참가자 영향: 앞선 실행이 표식을 못 쓰고 죽어 **빈 폴더만 남은** 드문 경우에 한 번 막힌다.
 #     그때 화면이 「그 폴더를 지우고 다시 실행」이라고 정확히 말한다 — 손 한 번이 남의 폴더를 지키는 값이다.
-JARVIS_HOME_CREATED=0
-if [ -e "$JARVIS_HOME" ]; then
+# ── 🔴구판 폴더 이관 (v0.3.10 · 실제 노트북에서 겪은 일 2026-09-10) ───────────
+#   실제 노트북에서 구판(v0.3.7)이 만든 `~/install-jarvis` 에는 **표식이 없었다**(표식은 그 뒤에 생겼다).
+#   새 판은 규칙대로 거부했고, 그래서 **사람이 손으로 폴더를 지워야** 설치가 이어졌다.
+#   ⇒ **우리 구판 지문**(설치기가 만드는 이름만 있고 그 밖의 것이 0)일 때에 한해, 무엇이 들었는지
+#     보여 드리고 **사람이 「지웁니다」라고 한 번 쳐야** 지운다. ⛔자동 삭제는 하지 않는다.
+#   ★두 가지를 함께 지킨다: ⑴**빈 폴더는 지문이 아니다**(r5 결정 유지 — 남이 만들어 둔 빈 자리를
+#     채택하지 않는다) ⑵**못 세면 거부한다** — 열거 실패를 「우리 것뿐」으로 읽지 않는다(이 저장소가
+#     세 번 밟은 함정이다: 「비었다」와 「못 세었다」를 한 칸에 담지 마라).
+JARVIS_OLD_NAMES="bootstrap.log env-report.md install-directive.md trust-seed.tsv wake.sh wake.ps1 dl backup .jarvis-owned"
+JARVIS_OLD_SIGN="install-directive.md env-report.md bootstrap.log"   # 이 중 하나는 있어야 「우리 구판」이다
+list_home_entries() {  # 폴더 안 이름을 한 줄씩. **못 세면 rc 1** — 빈 목록과 구분한다.
+  local d="$1" out
+  [ -d "$d" ] && [ -r "$d" ] && [ -x "$d" ] || return 1
+  out="$(find "$d" -mindepth 1 -maxdepth 1 2>/dev/null)" || return 1
+  printf '%s\n' "$out"
+  return 0
+}
+old_layout_matches() {  # rc 0 = 우리 구판 지문이다
+  local entries p b known=1 sign=0
+  entries="$(list_home_entries "$JARVIS_HOME")" || return 1
+  while IFS= read -r p; do
+    [ -n "$p" ] || continue
+    b="$(basename "$p")"
+    # 🔴🔴**이음줄이 섞여 있으면 우리 구판이 아니다**(자기 적대검증 2026-09-11).
+    #   우리가 만드는 것 중 이음줄은 하나도 없다. 그런데 이름만 맞는 이음줄(`dl` 이 남의 폴더를
+    #   가리키는 것)이 섞이면, 지우는 순간 **가리키던 자리 안엣것**까지 함께 사라질 수 있다
+    #   (윈도우 5.1 의 `Remove-Item -Recurse` 가 실제로 그렇게 판 적이 있다 — 지우개가 그 때문에 고쳐졌다).
+    #   ⇒ 이름이 맞아도 이음줄이면 **지문 아님**으로 본다. 잃는 것은 없다(우리는 그런 것을 안 만든다).
+    [ -L "$p" ] && known=0
+    case " $JARVIS_OLD_NAMES " in *" $b "*) ;; *) known=0 ;; esac
+    case " $JARVIS_OLD_SIGN " in *" $b "*) sign=1 ;; esac
+  done <<ENTRIES
+$entries
+ENTRIES
+  [ "$known" = "1" ] && [ "$sign" = "1" ]
+}
+offer_old_home_cleanup() {  # rc 0 = 사람이 허락해 지웠다 · 그 밖 = 지우지 않았다
+  local answer p _full
+  [ "$MODE" = "full" ] || return 1     # 보기만 하는 판(detect·dry)에서는 바깥을 바꾸지 않는다
+  # ⚠사람이 있는지는 **열어 봐서** 안다 — `[ -r /dev/tty ]` 는 사람이 없어도 참이 될 수 있다
+  #   (실측 2026-09-11: 러너·파이프에서 -r 은 참인데 읽으면 「Device not configured」).
+  #   물어보지도 못할 자리에서 물음만 찍고 물러나면, 화면은 사람에게 고르라고 해 놓고 답을 안 받는다.
+  { : < /dev/tty; } 2>/dev/null || return 1
+  old_layout_matches || return 1
+  # ★사람에게는 **실제 자리**를 보여 준다 — `JARVIS_HOME` 이 상대 경로로 들어오면 화면의 글자만
+  #   보고는 어디를 지우는지 알 수 없다(지우겠다고 답할 사람이 무엇을 지우는지 몰라선 안 된다).
+  _full="$(cd "$JARVIS_HOME" 2>/dev/null && pwd -P)" || _full=""
+  [ -n "$_full" ] || _full="$JARVIS_HOME"
+  echo ""
+  echo "그 자리에 예전 판이 만든 작업 폴더가 있습니다: $(redact "$_full")"
+  echo "     안에 있는 것(이 도구가 만드는 이름뿐입니다):"
+  list_home_entries "$JARVIS_HOME" | while IFS= read -r p; do
+    [ -n "$p" ] && echo "       · $(basename "$p")"
+  done
+  echo "     이 폴더를 지우고 새로 만들면 그대로 이어서 설치합니다. 되돌릴 수 없습니다."
+  printf '계속하려면 「지웁니다」라고 쳐 주십시오(그만두시려면 그냥 Enter): '
+  read -r answer < /dev/tty || answer=""
+  if [ "$answer" != "지웁니다" ]; then
+    echo "     그만둡니다 — 아무것도 지우지 않았습니다."
+    return 1
+  fi
+  rm -rf "$JARVIS_HOME" 2>/dev/null
+  if [ -e "$JARVIS_HOME" ]; then
+    echo "     그 폴더를 지우지 못했습니다."
+    return 1
+  fi
+  echo "     예전 작업 폴더를 지웠습니다."
+  return 0
+}
+fail_make_home() {
+  echo "자리를 만들지 못했습니다: $JARVIS_HOME" >&2
+  echo "     진단 코드: J-PERM-01 — 파일이나 폴더를 쓸 권한이 없습니다(공간 부족·백신 차단도 같은 모양입니다)" >&2
+  J_CODE="J-PERM-01"
+  NEXT_STEP="회사·학교에서 관리하는 컴퓨터면 담당자에게 문의해 주십시오. 개인 컴퓨터면 저장 공간과 백신 알림을 확인해 주십시오."
+  exit 3
+}
+make_home_now() {  # 마지막 마디만 원자적으로 만든다(부모는 미리 만들어 둔다)
+  local parent
+  parent="$(dirname "${JARVIS_HOME%/}")"
+  if [ ! -d "$parent" ] && ! mkdir -p "$parent" 2>/dev/null; then
+    fail_make_home
+  fi
+  mkdir "$JARVIS_HOME" 2>/dev/null
+}
+adopt_existing_home() {  # 이미 있는 자리를 받아들일지 판정한다 — 두 갈래가 같은 잣대를 쓰게 한다
+  # 🔴🔴**그 자리 자신이 이음줄이면 여기서 멈춘다**(적대검증 1R NEW-1 · 2026-09-11).
+  #   `[ -d ]` 는 이음줄을 **따라가서** 참이 된다 ⇒ 남의 폴더를 가리키는 이음줄에 우리 이름을 붙여 두면
+  #   그 안엣것이 우리 지문처럼 보이고, 지우는 순간 **가리키던 자리**가 비워진다.
+  #   ★우리는 작업 폴더를 이음줄로 만들지 않는다 — 그러니 이음줄은 언제나 「우리 것이 아니다」.
+  #   ⚠**정직하게 적는다**: 맥에서는 이 줄이 없어도 지금은 안 뚫렸다(실측 2026-09-11) — `find` 가
+  #     **인자로 받은 이음줄을 따라가지 않아** 열거가 비고, 「빈 폴더는 지문이 아니다」에 걸려 거부된다.
+  #     그러나 그것은 **우연히 안전한 것**이다(열거 도구의 기본값 하나에 기대고 있다).
+  #     ⇒ 말로 못박는다. 윈도우는 다르다 — 열거가 junction 을 따라가므로 그쪽은 실제 구멍이었다.
+  if [ -L "$JARVIS_HOME" ]; then
+    refuse_jarvis_home "그 자리는 다른 곳을 가리키는 이음줄입니다(우리가 만드는 작업 폴더는 이음줄이 아닙니다)"
+  fi
   if [ ! -d "$JARVIS_HOME" ]; then
     refuse_jarvis_home "그 자리에 폴더가 아닌 것이 이미 있습니다"
   fi
-  if ! owner_mark_ok; then
-    refuse_jarvis_home "그 폴더는 이미 있는데 우리 표식이 없습니다(우리가 만든 자리가 아닙니다 — 지울 때 통째로 지우는 자리이므로 채택하지 않습니다)"
+  owner_mark_ok && return 0
+  if offer_old_home_cleanup; then
+    make_home_now || fail_make_home
+    JARVIS_HOME_CREATED=1
+    return 0
   fi
+  refuse_jarvis_home "그 폴더는 이미 있는데 우리 표식이 없습니다(우리가 만든 자리가 아닙니다 — 지울 때 통째로 지우는 자리이므로 채택하지 않습니다)"
+}
+JARVIS_HOME_CREATED=0
+if [ -e "$JARVIS_HOME" ]; then
+  adopt_existing_home
 else
-  if ! mkdir -p "$JARVIS_HOME" 2>/dev/null; then
-    echo "자리를 만들지 못했습니다: $JARVIS_HOME" >&2
-    echo "     진단 코드: J-PERM-01 — 파일이나 폴더를 쓸 권한이 없습니다(공간 부족·백신 차단도 같은 모양입니다)" >&2
-    J_CODE="J-PERM-01"
-    NEXT_STEP="회사·학교에서 관리하는 컴퓨터면 담당자에게 문의해 주십시오. 개인 컴퓨터면 저장 공간과 백신 알림을 확인해 주십시오."
-    exit 3
+  # 🔴🔴**보고 나서 만드는 사이에 남이 그 자리를 만들 수 있다**(2026-09-11 수리).
+  #   앞 판은 「없다」를 본 뒤 `mkdir -p` 로 만들고 곧바로 「우리가 만들었다」고 적었다. 그런데
+  #   `mkdir -p` 는 **이미 있는 폴더에도 성공한다** ⇒ 그 사이에 생긴 남의 폴더에 우리가 표식을
+  #   써 주고, 제거기는 그 표식을 소유 증거로 읽어 **통째로 지운다.**
+  #   ⇒ 마지막 마디는 `-p` 없이 만든다. **`mkdir` 은 이미 있으면 실패한다** — 그 실패가 곧
+  #     「우리가 만든 자리가 아니다」라는 신호다(만들기와 알리기가 한 동작이라 사이가 없다).
+  #   ★검사와 만들기를 따로 두면 그 사이는 반드시 남는다. **만드는 행위 자체에게 물어야** 사라진다.
+  if make_home_now; then
+    JARVIS_HOME_CREATED=1
+  elif [ -e "$JARVIS_HOME" ] || [ -L "$JARVIS_HOME" ]; then
+    # 경합 — 우리가 만든 자리가 아니므로 기존 폴더와 같은 잣대로 잰다.
+    # ⚠`-L` 도 함께 묻는다: **끊어진 이음줄**은 `-e` 가 거짓인데 `mkdir` 은 「이미 있다」로 실패한다.
+    #   그 자리를 「권한이 없다」로 말하면 사람이 엉뚱한 것을 고치러 간다.
+    adopt_existing_home
+  else
+    fail_make_home
   fi
-  JARVIS_HOME_CREATED=1
 fi
 # ★표식을 놓는다 — 제거기는 이 표식이 있을 때만 그 폴더를 재귀로 지운다.
 if ! write_owner_mark; then
@@ -850,6 +969,45 @@ seed_claude_settings() {
 #   끝나는 일이라 계속 간다. 그러나 **기록 실패는 다르다** — 그때는 설정을 도로 뺐고, 그 사실을
 #   단계가 삼키면 화면은 「갖춰 두었습니다」라고 말한다. 그 한 줄만 단계 실패로 올린다.
 TRUST_JOURNAL_FAILED=0
+# 🔴🔴**「키가 없다」와 「확인하지 못했다」를 한 칸에 담지 않는다**(2026-09-11 수리).
+#   앞 판은 되돌린 뒤 `plutil -extract` 가 실패하면 **까닭을 묻지 않고** 「도로 뺐습니다」라고 말했다.
+#   그런데 그 실패는 둘이다 — ⑴그 칸이 정말 없다 ⑵설정 파일을 못 읽거나 못 알아본다.
+#   디스크가 꽉 찬 판에서는 기록도, 되쓰기도, 되읽기도 **함께** 실패한다 ⇒ 키는 남았는데 화면은
+#   되돌렸다고 말하고, 다음 실행은 그 키를 **참가자의 것**으로 읽어 영영 건너뛴다.
+#   ⇒ 파일이 통째로 성한지를 따로 묻는다(`plutil -lint`). 성한데 칸이 없으면 「없다」,
+#     파일 자체를 못 알아보면 「확인 못 했다」다. ★확인 못 한 것을 했다고 말하지 않는다.
+TRUST_ROLLBACK_STATE=""   # verified(도로 뺐다) · kept(키가 남았다) · unknown(확인 못 했다)
+trust_set_rollback_state() {  # 설정 파일이 여럿이다 — **나쁜 쪽이 남는다**(뒤 파일이 앞 실패를 덮지 않게)
+  case "$TRUST_ROLLBACK_STATE" in
+    kept|unknown) [ "$1" = "verified" ] && return 0 ;;
+  esac
+  TRUST_ROLLBACK_STATE="$1"
+}
+trust_key_state() {  # trust_key_state <설정파일> <키경로> → present|absent|unknown
+  local cfg="$1" keypath="$2"
+  if plutil -extract "$keypath" raw -o - "$cfg" >/dev/null 2>&1; then
+    printf 'present\n'; return 0
+  fi
+  # ⚠파일이 성한지를 묻는 계기를 **틀리지 마라**: `plutil -lint` 는 JSON 을 안 받는다
+  #   (실측 2026-09-11: 성한 `.claude.json` 에도 `Unexpected character {` 를 내고 rc 1).
+  #   ★그것으로 갈랐다면 「없는 키」가 전부 「확인 못 함」이 되어, 고치려던 자리에서 또 한 번
+  #     한 칸에 두 사건을 담았을 것이다. 읽어서 다시 쓰는 변환을 **버리는 자리로** 시켜 성함만 묻는다
+  #     (`-o /dev/null` — 원본은 건드리지 않는다. 실측: 내용·해시 그대로).
+  if plutil -convert json -o /dev/null "$cfg" >/dev/null 2>&1; then
+    printf 'absent\n'
+  else
+    printf 'unknown\n'
+  fi
+  return 0
+}
+trust_rollback_words() {  # 단계 한 줄이 안에서 일어난 일을 그대로 말하게 한다
+  case "$TRUST_ROLLBACK_STATE" in
+    verified) printf '그 설정은 도로 뺐고,' ;;
+    kept)     printf '그 설정을 도로 빼지 못해 기록을 남겨 두었고(지울 때 되돌립니다),' ;;
+    unknown)  printf '그 설정이 도로 빠졌는지 확인하지 못해 기록을 남겨 두었고(지울 때 되돌립니다),' ;;
+    *)        printf '그 설정이 어떻게 됐는지 확인하지 못했고,' ;;
+  esac
+}
 seed_all_profiles() {
   local p
   for p in $(profile_configs); do
@@ -905,7 +1063,7 @@ seed_claude_prefs() {
          say "     (이 컴퓨터에는 홈 폴더 신뢰 설정이 이미 있어 그대로 두었습니다 — 우리가 바꾸지 않습니다.)"
        else
          # 되돌릴 때 **그만큼만** 되돌리려면, 무엇을 새로 만드는지 넣기 전에 갈라 둬야 한다.
-         _made_entry=0
+         _made_entry=0; _verify=""
          plutil -extract "projects.$HOME" json -o - "$cfg" >/dev/null 2>&1 || _made_entry=1
          if plutil -insert "projects.$HOME" -json '{"hasTrustDialogAccepted":true}' "$cfg" >/dev/null 2>&1 \
             || plutil -insert "projects.$HOME.hasTrustDialogAccepted" -bool true "$cfg" >/dev/null 2>&1; then
@@ -926,23 +1084,35 @@ seed_claude_prefs() {
              else
                plutil -remove "projects.$HOME.hasTrustDialogAccepted" "$cfg" >/dev/null 2>&1 || true
              fi
-             if ! plutil -extract "projects.$HOME.hasTrustDialogAccepted" raw -o - "$cfg" >/dev/null 2>&1; then
+             _verify="$(trust_key_state "$cfg" "projects.$HOME.hasTrustDialogAccepted")"
+             if [ "$_verify" = "absent" ]; then
+               trust_set_rollback_state verified
                say "     (홈 폴더 신뢰 기록을 남기지 못해 그 설정을 도로 뺐습니다 — 좌석이 폴더 신뢰를 한 번 물을 수 있습니다.)"
                log "trust seed record FAILED -> rollback verified: $(redact "$cfg") + $(redact "$HOME")"
                return 1
              fi
-             # 되돌리기도 실패했다. **키는 남고 기록은 없는** 상태만은 만들지 않는다 —
-             #   기록을 한 번 더 시도해 둘을 맞춘다(그러면 지울 때 되돌릴 수 있다).
+             # 여기부터는 **되돌렸다고 말하지 않는다**: present = 키가 남았다 · unknown = 확인하지 못했다.
+             #   둘 다 「키는 남고 기록은 없는」 상태일 수 있으므로, 기록을 한 번 더 시도해 둘을 맞춘다
+             #   (기록이 서면 지울 때 되돌아간다 — 없는 키를 되돌리는 것은 아무 일도 하지 않는 것이다).
+             if [ "$_verify" = "present" ]; then trust_set_rollback_state kept; else trust_set_rollback_state unknown; fi
              if printf '%s\t%s\n' "$cfg" "$HOME" >> "$TRUST_SEED_FILE" 2>/dev/null; then
-               say "     (설정을 도로 빼지 못해 기록을 남겨 두었습니다 — 지울 때 이 칸도 함께 되돌립니다.)"
-               log "trust seed rollback FAILED -> journal re-recorded: $(redact "$cfg") + $(redact "$HOME")"
+               if [ "$_verify" = "present" ]; then
+                 say "     (설정을 도로 빼지 못해 기록을 남겨 두었습니다 — 지울 때 이 칸도 함께 되돌립니다.)"
+               else
+                 say "     (그 설정이 도로 빠졌는지 확인하지 못해 기록을 남겨 두었습니다 — 지울 때 이 칸도 함께 되돌립니다.)"
+               fi
+               log "trust seed rollback $_verify -> journal re-recorded: $(redact "$cfg") + $(redact "$HOME")"
                return 1
              fi
              # 둘 다 실패했다. 조용히 지나가지 않는다 — 사람이 손으로 되돌릴 수 있게 **어디의 무엇**인지 적는다.
-             say "     홈 폴더 신뢰 설정을 넣었는데 그 기록도, 되돌리기도 하지 못했습니다."
+             if [ "$_verify" = "present" ]; then
+               say "     홈 폴더 신뢰 설정을 넣었는데 그 기록도, 되돌리기도 하지 못했습니다."
+             else
+               say "     홈 폴더 신뢰 설정을 넣었는데 그 기록도 남기지 못했고, 도로 빠졌는지도 확인하지 못했습니다."
+             fi
              say "        지울 때 이 칸은 자동으로 되돌아가지 않습니다. 손으로 빼시려면:"
              say "        파일 $(redact "$cfg") 의 projects → $(redact "$HOME") → hasTrustDialogAccepted 줄"
-             log "trust seed rollback FAILED and journal FAILED: $(redact "$cfg") + $(redact "$HOME")"
+             log "trust seed rollback $_verify and journal FAILED: $(redact "$cfg") + $(redact "$HOME")"
              return 1
            fi
            log "trust seed record: $(redact "$cfg") + $(redact "$HOME")"
@@ -964,7 +1134,9 @@ step_prepare() {
     return 0
   fi
   if ! seed_all_profiles; then
-    say "[4/10] 홈 폴더 신뢰 기록을 남기지 못했습니다 — 그 설정은 도로 뺐고, 여기서 멈춥니다."
+    # ★단계가 말하는 것과 안에서 일어난 것이 달라서는 안 된다(5R STILL OPEN N4).
+    #   앞 판은 어느 경우든 「도로 뺐고」라고 단정했다 — 되돌리지 못했거나 확인하지 못한 판에서도 그랬다.
+    say "[4/10] 홈 폴더 신뢰 기록을 남기지 못했습니다 — $(trust_rollback_words) 여기서 멈춥니다."
     say "     기록 없이 그 칸만 넣으면 지울 때 되돌릴 길이 없습니다(남의 컴퓨터에 자국이 남습니다)."
     J_CODE="J-PERM-01"
     NEXT_STEP="저장 공간과 백신 알림을 확인하신 뒤 다시 실행해 주십시오."
@@ -1249,7 +1421,7 @@ step_prepare_account() {
   fi
   # 자리를 잡으면서 자비스 전용 설정 자리가 새로 생긴다 — 동료들이 그 자리로 뜨므로 한 번 더 심는다.
   if ! seed_all_profiles; then
-    say "[8/10] 홈 폴더 신뢰 기록을 남기지 못했습니다 — 그 설정은 도로 뺐고, 여기서 멈춥니다."
+    say "[8/10] 홈 폴더 신뢰 기록을 남기지 못했습니다 — $(trust_rollback_words) 여기서 멈춥니다."
     J_CODE="J-PERM-01"
     NEXT_STEP="저장 공간과 백신 알림을 확인하신 뒤 다시 실행해 주십시오."
     SHOW_RERUN=1

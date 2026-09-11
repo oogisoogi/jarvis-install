@@ -52,10 +52,14 @@ $ReportHead = '[자비스] 환경 보고 v0'   # ④단 첫 응답의 고정 첫
 
 # ── 핀 (외부 URL은 이 두 줄이 전부다) ─────────────────────────────
 $ClaudeInstallUrl = 'https://claude.ai/install.ps1'
-$CysSiteUrl       = 'https://github.com/oogisoogi/cys-terminal/releases/latest'   # 손으로 받을 때의 자리 = 우리 릴리스 페이지
+$CysSiteUrl       = 'https://github.com/oogisoogi/cys-ro/releases/latest'   # 손으로 받을 때의 자리 = 우리 릴리스 페이지
 
 # ── 자리 ──────────────────────────────────────────────────────────
 $JarvisHome = if ($env:JARVIS_HOME) { $env:JARVIS_HOME } else { Join-Path $env:USERPROFILE 'install-jarvis' }
+# 🔴꼬리 빗금을 한 번에 걷어낸다(맥판과 같은 까닭 · 적대검증 1R NEW-1 · 2026-09-11).
+while ($JarvisHome.Length -gt 1 -and ($JarvisHome.EndsWith('\') -or $JarvisHome.EndsWith('/'))) {
+    $JarvisHome = $JarvisHome.Substring(0, $JarvisHome.Length - 1)
+}
 $LogFile       = Join-Path $JarvisHome 'bootstrap.log'
 $ReportFile    = Join-Path $JarvisHome 'env-report.md'
 $DirectiveFile = Join-Path $JarvisHome 'install-directive.md'
@@ -67,7 +71,7 @@ $DlDir         = Join-Path $JarvisHome 'dl'
 #   업데이트도 벤더 궤도를 타서 우리 수리가 그 기계에 닿지 않는다(노트북 실기 2026-09-09).
 #   맥(bootstrap.sh)은 우리 빌드가 무서명이라 아직 벤더 dmg 그대로다.
 $CysVersion     = '0.14.34'
-$CysDownloadDir = "https://github.com/oogisoogi/cys-terminal/releases/download/v${CysVersion}/"
+$CysDownloadDir = "https://github.com/oogisoogi/cys-ro/releases/download/v${CysVersion}/"
 $CysWinFile     = "cys_${CysVersion}_x64-setup.exe"
 $CysWinBytes    = 139778158
 $CysWinSha256   = '36727b940b2b3770e013d0f4d464d4e96b7a3024c549d9f13fe1d56b25c5a437'   # 릴리스 SHA256SUMS.txt 의 줄
@@ -608,6 +612,7 @@ $script:AutoStartState = 'unknown'
 #   파일을 읽고 쓰는데 한쪽에는 JSON 도구가 없을 수 있기 때문이다(맥 깨끗한 기계에 jq 가 없다).
 $script:TrustSeeded = @()
 $script:TrustJournalFailed = $false
+$script:TrustRollbackState = ''   # verified(도로 뺐다) · kept(키가 남았다) · unknown(확인 못 했다)
 $TrustSeedFile = Join-Path $JarvisHome 'trust-seed.tsv'
 # 🔴**우리가 만든 폴더라는 표식**(2R N3 봉인 2026-09-10). 제거기는 이 표식이 있을 때만 작업 폴더를
 #   재귀로 지운다 — JARVIS_HOME 은 환경변수라 무엇이든 들어올 수 있고, 검사 없이 지우면
@@ -615,6 +620,108 @@ $TrustSeedFile = Join-Path $JarvisHome 'trust-seed.tsv'
 $JarvisOwnerFile = Join-Path $JarvisHome '.jarvis-owned'
 $JarvisOwnerMark = 'jarvis-installer-owned v1'
 $JarvisHomeBaseName = 'install-jarvis'
+# 🔴구판 폴더 이관 (v0.3.10 · 실제 노트북에서 겪은 일 2026-09-10 · 맥판과 같은 규칙).
+#   구판(v0.3.7)이 만든 %USERPROFILE%\install-jarvis 에는 표식이 없다(표식은 그 뒤에 생겼다) ⇒
+#   새 판이 규칙대로 거부했고 사람이 손으로 폴더를 지워야 했다. **우리 구판 지문**일 때만,
+#   무엇이 들었는지 보여 드리고 사람이 「지웁니다」라고 한 번 쳐야 지운다. ⛔자동 삭제는 없다.
+$JarvisOldNames = @('bootstrap.log','env-report.md','install-directive.md','trust-seed.tsv','wake.sh','wake.ps1','dl','backup','.jarvis-owned')
+$JarvisOldSign  = @('install-directive.md','env-report.md','bootstrap.log')
+function Test-JarvisHomeIsLink {
+    # 🔴그 자리 **자신**이 이음줄(junction·symlink)인가. 5.1 의 `Remove-Item -Recurse` 는 이음줄을
+    #   타고 들어가 **가리키던 자리 안엣것**을 지운다(지우개가 그 때문에 고쳐졌다).
+    #   우리는 작업 폴더를 이음줄로 만들지 않으므로, 이음줄이면 언제나 「우리 것이 아니다」.
+    try {
+        $it = Get-Item -LiteralPath $JarvisHome -Force -ErrorAction Stop
+        return [bool]($it.Attributes -band [IO.FileAttributes]::ReparsePoint)
+    } catch { return $false }
+}
+function Test-JarvisHomePresent {
+    # `Test-Path` 는 **끊어진 이음줄**에 $false 를 낸다 ⇒ 그것을 「자리를 못 만들었다(권한)」로
+    #   말하면 사람이 엉뚱한 것을 고치러 간다(맥은 `-L` 로 갈라 「폴더가 아닌 것」이라 말한다).
+    if (Test-Path -LiteralPath $JarvisHome) { return $true }
+    try { $null = Get-Item -LiteralPath $JarvisHome -Force -ErrorAction Stop; return $true } catch { return $false }
+}
+function Test-JarvisOwnerMark {
+    # ★다시 읽는다 — 경합 갈래에서는 「아까 읽은 값」이 이미 낡았다.
+    if (-not (Test-Path -LiteralPath $JarvisOwnerFile)) { return $false }
+    try {
+        $mk = Get-Content -LiteralPath $JarvisOwnerFile -Raw -Encoding UTF8 -ErrorAction Stop
+        return ($null -ne $mk -and $mk.Contains($JarvisOwnerMark))
+    } catch { return $false }
+}
+function Get-HomeEntries {
+    # 폴더 안 항목. **못 세면 $null** — 빈 목록과 구분한다(「비었다」와 「못 세었다」를 한 칸에 담지 않는다).
+    #   ★이름이 아니라 **항목**을 돌려준다 — 이음줄인지(ReparsePoint)를 부르는 쪽이 물어야 하기 때문이다.
+    try { return ,@(Get-ChildItem -LiteralPath $JarvisHome -Force -ErrorAction Stop) } catch { return $null }
+}
+function Test-OldLayout {
+    # 🔴🔴**이음줄(junction·symlink)이 섞여 있으면 우리 구판이 아니다**(자기 적대검증 2026-09-11).
+    #   `Remove-Item -Recurse` 는 5.1 에서 이음줄을 뚫고 **가리키던 자리 안엣것**을 지운 적이 있다
+    #   (지우개가 그 때문에 고쳐졌다). 우리가 만드는 것 중 이음줄은 없으므로 잃는 것도 없다.
+    $names = Get-HomeEntries
+    if ($null -eq $names) { return $false }          # 못 셌으면 우리 것이라고 하지 않는다
+    $sign = $false
+    foreach ($it in $names) {
+        if ($it.Attributes -band [IO.FileAttributes]::ReparsePoint) { return $false }
+        if ($JarvisOldNames -notcontains $it.Name) { return $false }
+        if ($JarvisOldSign -contains $it.Name) { $sign = $true }
+    }
+    return $sign                                      # 빈 폴더는 지문이 아니다(r5 결정 유지)
+}
+function Test-HumanPresent {
+    # 사람이 있는지는 **물어봐서** 안다 — 입력이 딴 데로 이어져 있으면 묻지 않는다.
+    try { if ([Console]::IsInputRedirected) { return $false } } catch { return $false }
+    try { return [Environment]::UserInteractive } catch { return $false }
+}
+function Deny-JarvisHome($why, $nextStep) {
+    Write-Host ("작업 폴더로 쓸 수 없는 자리입니다: " + $JarvisHome)
+    Write-Host ("     까닭: " + $why)
+    Write-Host ("     진단 코드: J-HOME-01 — 이 도구가 만들고 지우는 폴더의 이름은 「" + $JarvisHomeBaseName + "」 하나입니다")
+    $script:JCode = 'J-HOME-01'
+    $script:NextStep = $nextStep
+    $script:ShowRerun = $true
+    exit 3
+}
+function Deny-CannotMakeHome {
+    Write-Host ("자리를 만들지 못했습니다: " + $JarvisHome)
+    Write-Host '     진단 코드: J-PERM-01 — 파일이나 폴더를 쓸 권한이 없습니다(공간 부족·백신 차단도 같은 모양입니다)'
+    $script:JCode = 'J-PERM-01'
+    $script:NextStep = '회사·학교에서 관리하는 컴퓨터면 담당자에게 문의해 주십시오. 개인 컴퓨터면 저장 공간과 백신 알림을 확인해 주십시오.'
+    exit 3
+}
+function New-JarvisHomeNow {
+    # $true = 우리가 방금 만들었다. ★`New-Item` 은 **이미 있으면 실패한다**(-Force 를 붙이지 않는다) —
+    #   그 실패가 곧 「우리가 만든 자리가 아니다」라는 신호다. 만들기와 알리기가 한 동작이라 사이가 없다.
+    # 🔴**부모는 미리 만든다**(적대검증 2R NEW · 2026-09-11 · 맥판 `mkdir -p "$parent"` 와 짝).
+    #   맥은 부모를 `-p` 로 만들고 마지막 마디만 원자적으로 만든다. 윈에도 같은 두 걸음을 명시한다 —
+    #   부모가 없을 때 어떻게 되는지를 **글로 못박아** 두 OS 가 같은 것을 하게 한다(러너 축으로도 잰다).
+    $parent = Split-Path -Parent $JarvisHome
+    if ($parent -and -not (Test-Path -LiteralPath $parent)) {
+        try { New-Item -ItemType Directory -Path $parent -Force -ErrorAction Stop | Out-Null } catch { return $false }
+    }
+    try { New-Item -ItemType Directory -Path $JarvisHome -ErrorAction Stop | Out-Null; return $true }
+    catch { return $false }
+}
+function Invoke-OldHomeCleanup {
+    # $true = 사람이 허락해 지웠다 · $false = 지우지 않았다
+    if ($Mode -ne 'full') { return $false }           # 보기만 하는 판에서는 바깥을 바꾸지 않는다
+    if (-not (Test-HumanPresent)) { return $false }
+    if (-not (Test-OldLayout)) { return $false }
+    Write-Host ''
+    # ★사람에게는 **실제 자리**를 보여 준다(상대 경로로 들어오면 화면 글자만으로는 어디인지 모른다).
+    $full = $JarvisHome
+    try { $full = (Get-Item -LiteralPath $JarvisHome -Force -ErrorAction Stop).FullName } catch { }
+    Write-Host ("그 자리에 예전 판이 만든 작업 폴더가 있습니다: " + (Redact $full))
+    Write-Host '     안에 있는 것(이 도구가 만드는 이름뿐입니다):'
+    foreach ($it in (Get-HomeEntries)) { Write-Host ("       · " + $it.Name) }
+    Write-Host '     이 폴더를 지우고 새로 만들면 그대로 이어서 설치합니다. 되돌릴 수 없습니다.'
+    $answer = Read-Host '계속하려면 「지웁니다」 라고 쳐 주십시오(그만두시려면 그냥 Enter)'
+    if ($answer -ne '지웁니다') { Write-Host '     그만둡니다 — 아무것도 지우지 않았습니다.'; return $false }
+    try { Remove-Item -LiteralPath $JarvisHome -Recurse -Force -ErrorAction Stop } catch { }
+    if (Test-Path -LiteralPath $JarvisHome) { Write-Host '     그 폴더를 지우지 못했습니다.'; return $false }
+    Write-Host '     예전 작업 폴더를 지웠습니다.'
+    return $true
+}
 
 function Invoke-DetectStage1 {
     #   상태 변수들이 켜지기만 하고 꺼지지 않으면 앞 호출의 `$true` 잔재가 남아 틀린 ok 를 낸다.
@@ -1300,14 +1407,26 @@ function Copy-LoginToIsolated {
 
 # 우리가 넣은 홈 신뢰 칸 하나를 도로 뺀다 — 기록에 실패했을 때 쓴다.
 #   ⚠제거기의 되돌리기와 같은 범위다: `hasTrustDialogAccepted` 한 칸만, 그 칸만 있던 자리면 칸째.
+# 🔴🔴**「도로 뺐다」·「아직 있다」·「확인 못 했다」를 가른다**(5R STILL OPEN N4 봉인 2026-09-11 · 맥판과 같다).
+#   앞 판은 되읽기 실패도 「안 빠졌다($false)」로 뭉갰다 — 그러면 화면이 「도로 빼지 못했습니다」라고
+#   **확인하지도 않은 것을 단정**한다. 되돌아간 것을 못 본 것과, 안 되돌아간 것을 본 것은 다른 말이다.
+#   ⇒ 'verified'(다시 읽었는데 없다) · 'kept'(다시 읽었는데 있다) · 'unknown'(다시 읽지 못했다).
+function Get-TrustRollbackWords {  # 단계 한 줄이 안에서 일어난 일을 그대로 말하게 한다
+    switch ($script:TrustRollbackState) {
+        'verified' { return '그 설정은 도로 뺐고,' }
+        'kept'     { return '그 설정을 도로 빼지 못해 기록을 남겨 두었고(지울 때 되돌립니다),' }
+        'unknown'  { return '그 설정이 도로 빠졌는지 확인하지 못해 기록을 남겨 두었고(지울 때 되돌립니다),' }
+        default    { return '그 설정이 어떻게 됐는지 확인하지 못했고,' }
+    }
+}
 function Undo-TrustSeed($cfg, $key) {
     try {
-        if (-not (Test-Path $cfg)) { return }
+        if (-not (Test-Path $cfg)) { return 'verified' }   # 파일 자체가 없으면 그 칸도 없다
         $o = Get-Content $cfg -Raw -Encoding UTF8 | ConvertFrom-Json
         $prj = $o.PSObject.Properties['projects']
-        if ($null -eq $prj -or $null -eq $prj.Value) { return }
+        if ($null -eq $prj -or $null -eq $prj.Value) { return 'verified' }
         $ex = $prj.Value.PSObject.Properties[$key]
-        if ($null -eq $ex -or $null -eq $ex.Value) { return }
+        if ($null -eq $ex -or $null -eq $ex.Value) { return 'verified' }
         if ($null -ne $ex.Value.PSObject.Properties['hasTrustDialogAccepted']) {
             $ex.Value.PSObject.Properties.Remove('hasTrustDialogAccepted')
         }
@@ -1318,20 +1437,26 @@ function Undo-TrustSeed($cfg, $key) {
         #   「도로 뺐습니다」라고 말했다. 디스크가 꽉 차면 기록 쓰기와 되쓰기가 **함께** 실패한다 ⇒
         #   키는 남고 기록은 없는데 화면은 되돌렸다고 말한다(다음 실행이 그 키를 남의 것으로 읽는다).
         #   ★「했다」는 **다시 읽어 없을 때만** 참이다.
-        $back = Get-Content $cfg -Raw -Encoding UTF8 -ErrorAction Stop | ConvertFrom-Json
+        try {
+            $back = Get-Content $cfg -Raw -Encoding UTF8 -ErrorAction Stop | ConvertFrom-Json
+        } catch {
+            # ★다시 읽지 못했다 — 없다고도, 있다고도 말하지 않는다.
+            Write-Log ("trust seed rollback UNKNOWN (되읽지 못했다): " + (Redact $cfg) + " + " + (Redact $key))
+            return 'unknown'
+        }
         $bp = $back.PSObject.Properties['projects']
         if ($null -ne $bp -and $null -ne $bp.Value) {
             $be = $bp.Value.PSObject.Properties[$key]
             if ($null -ne $be -and $null -ne $be.Value -and $null -ne $be.Value.PSObject.Properties['hasTrustDialogAccepted']) {
                 Write-Log ("trust seed rollback NOT verified (키가 아직 있다): " + (Redact $cfg) + " + " + (Redact $key))
-                return $false
+                return 'kept'
             }
         }
         Write-Log ("trust seed rollback: " + (Redact $cfg) + " + " + (Redact $key))
-        return $true
+        return 'verified'
     } catch {
         Write-Log ("trust seed rollback FAILED: " + $_.Exception.Message)
-        return $false
+        return 'unknown'
     }
 }
 function Set-AllProfiles {
@@ -1364,8 +1489,14 @@ function Set-AllProfiles {
         $script:TrustJournalFailed = $true
         # 되돌아가지 **않은** 것만 남긴다 — 추적 목록을 무조건 비우면 「키는 남고 기록은 없는」 상태가 된다.
         $stuck = @()
+        $script:TrustRollbackState = 'verified'
         foreach ($e in $script:TrustSeeded) {
-            if (-not (Undo-TrustSeed $e[0] $e[1])) { $stuck += ,$e }
+            $st = Undo-TrustSeed $e[0] $e[1]
+            if ($st -ne 'verified') {
+                $stuck += ,$e
+                # 나쁜 쪽이 남는다 — 뒤 파일이 앞 파일의 실패를 덮지 않게.
+                if ($script:TrustRollbackState -ne 'kept') { $script:TrustRollbackState = $st }
+            }
         }
         $script:TrustSeeded = @($stuck)
         if ($stuck.Count -eq 0) {
@@ -1382,15 +1513,23 @@ function Set-AllProfiles {
                 if ($null -ne $chk -and $chk.Trim()) { $ok2 = $true }
             } catch { $ok2 = $false }
             if ($ok2) {
-                Say '     (설정을 도로 빼지 못해 기록을 남겨 두었습니다 — 지울 때 이 칸도 함께 되돌립니다.)'
-                Write-Log ('trust seed rollback FAILED -> journal re-recorded: ' + $stuck.Count + ' 줄')
+                if ($script:TrustRollbackState -eq 'kept') {
+                    Say '     (설정을 도로 빼지 못해 기록을 남겨 두었습니다 — 지울 때 이 칸도 함께 되돌립니다.)'
+                } else {
+                    Say '     (그 설정이 도로 빠졌는지 확인하지 못해 기록을 남겨 두었습니다 — 지울 때 이 칸도 함께 되돌립니다.)'
+                }
+                Write-Log ('trust seed rollback ' + $script:TrustRollbackState + ' -> journal re-recorded: ' + $stuck.Count + ' 줄')
             } else {
-                Say '     홈 폴더 신뢰 설정을 넣었는데 그 기록도, 되돌리기도 하지 못했습니다.'
+                if ($script:TrustRollbackState -eq 'kept') {
+                    Say '     홈 폴더 신뢰 설정을 넣었는데 그 기록도, 되돌리기도 하지 못했습니다.'
+                } else {
+                    Say '     홈 폴더 신뢰 설정을 넣었는데 그 기록도 남기지 못했고, 도로 빠졌는지도 확인하지 못했습니다.'
+                }
                 Say '        지울 때 이 칸은 자동으로 되돌아가지 않습니다. 손으로 빼시려면:'
                 foreach ($e in $stuck) {
                     Say ('        파일 ' + (Redact $e[0]) + ' 의 projects → ' + (Redact $e[1]) + ' → hasTrustDialogAccepted 줄')
                 }
-                Write-Log ('trust seed rollback FAILED and journal FAILED: ' + $stuck.Count + ' 줄')
+                Write-Log ('trust seed rollback ' + $script:TrustRollbackState + ' and journal FAILED: ' + $stuck.Count + ' 줄')
             }
         }
     }
@@ -1407,7 +1546,7 @@ function Step-Prepare {
     # ⚠기록 실패만 단계 실패로 올린다 — 그때는 설정을 도로 뺐고, 그것을 삼키면 화면이 거짓을 말한다.
     #   (사전 설정 자체를 못 건 것은 예전처럼 「사람 손 한 번」이면 끝나므로 계속 간다.)
     if ($script:TrustJournalFailed) {
-        Say '[4/10] 홈 폴더 신뢰 기록을 남기지 못했습니다 — 그 설정은 도로 뺐고, 여기서 멈춥니다.'
+        Say ('[4/10] 홈 폴더 신뢰 기록을 남기지 못했습니다 — ' + (Get-TrustRollbackWords) + ' 여기서 멈춥니다.')
         Say '     기록 없이 그 칸만 넣으면 지울 때 되돌릴 길이 없습니다(남의 컴퓨터에 자국이 남습니다).'
         $script:JCode = 'J-PERM-01'
         $script:NextStep = '저장 공간과 백신 알림을 확인하신 뒤 다시 실행해 주십시오.'
@@ -1499,7 +1638,7 @@ function Step-DownloadCys {
             if (Test-Path $dst) { Remove-Item $dst -Force -ErrorAction SilentlyContinue }
             return 5
         }
-        if ($hash -eq $CysWinSha256) { Say '[5/10] 받았습니다 (크기·지문 확인 완료).'; return 0 }
+        if ($hash -eq $CysWinSha256) { Say "[5/10] 받았습니다 (원 = oogisoogi/cys-ro v$CysVersion · 크기·지문 확인 완료)."; return 0 }
         Say "[5/10] 지문이 맞지 않습니다 (받은 것 $($hash.Substring(0,12))… · 기대 $($CysWinSha256.Substring(0,12))…). 이 파일은 쓰지 않습니다."
         Write-JCode 'J-DL-04' '설치 파일 지문 불일치'
         if (Test-Path $dst) { Remove-Item $dst -Force -ErrorAction SilentlyContinue }
@@ -1747,7 +1886,7 @@ function Step-PrepareAccount {
     #   자리는 이미 생겼고, 심는 것은 실패해도 잃을 것이 없다. ⇒ 갈림길 **앞**으로 옮긴다.
     Set-AllProfiles | Out-Null
     if ($script:TrustJournalFailed) {
-        Say '[8/10] 홈 폴더 신뢰 기록을 남기지 못했습니다 — 그 설정은 도로 뺐고, 여기서 멈춥니다.'
+        Say ('[8/10] 홈 폴더 신뢰 기록을 남기지 못했습니다 — ' + (Get-TrustRollbackWords) + ' 여기서 멈춥니다.')
         $script:JCode = 'J-PERM-01'
         $script:NextStep = '저장 공간과 백신 알림을 확인하신 뒤 다시 실행해 주십시오.'
         $script:ShowRerun = $true
@@ -2051,26 +2190,18 @@ try {
         Write-Host ("     까닭: 폴더 이름이 「" + $JarvisHomeBaseName + "」 이 아닙니다")
         Write-Host ("     진단 코드: J-HOME-01 — 이 도구가 만들고 지우는 폴더의 이름은 「" + $JarvisHomeBaseName + "」 하나입니다")
         $script:JCode = 'J-HOME-01'
-        $script:NextStep = ("JARVIS_HOME 을 지정하지 않으신 채로 다시 실행하시면 기본 자리(" + (Join-Path $env:USERPROFILE $JarvisHomeBaseName) + ")를 씁니다. 그 자리를 꼭 쓰시려면 이름이 " + $JarvisHomeBaseName + " 인 빈 폴더를 지정해 주십시오.")
+        $script:NextStep = ("JARVIS_HOME 을 지정하지 않으신 채로 다시 실행하시면 기본 자리(" + (Join-Path $env:USERPROFILE $JarvisHomeBaseName) + ")를 씁니다. 그 자리를 꼭 쓰시려면 이름이 " + $JarvisHomeBaseName + " 이고 아직 만들지 않은 폴더 자리를 지정해 주십시오. 이미 있는 폴더는 이 도구가 놓은 표식이 있을 때만 씁니다.")
         $script:ShowRerun = $true
         exit 3
     }
     $jarvisHomeCreated = $false
-    $ownerMarkOk = $false
-    if (Test-Path -LiteralPath $JarvisOwnerFile) {
-        $mk = $null
-        try { $mk = Get-Content -LiteralPath $JarvisOwnerFile -Raw -Encoding UTF8 -ErrorAction Stop } catch { $mk = $null }
-        if ($null -ne $mk -and $mk.Contains($JarvisOwnerMark)) { $ownerMarkOk = $true }
-    }
-    if (Test-Path -LiteralPath $JarvisHome) {
+    $ownerMarkOk = Test-JarvisOwnerMark
+    if (Test-JarvisHomePresent) {
+        if (Test-JarvisHomeIsLink) {
+            Deny-JarvisHome '그 자리는 다른 곳을 가리키는 이음줄입니다(우리가 만드는 작업 폴더는 이음줄이 아닙니다)' 'JARVIS_HOME 을 지정하지 않으신 채로 다시 실행하시면 기본 자리를 씁니다.'
+        }
         if (-not (Test-Path -LiteralPath $JarvisHome -PathType Container)) {
-            Write-Host ("작업 폴더로 쓸 수 없는 자리입니다: " + $JarvisHome)
-            Write-Host '     까닭: 그 자리에 폴더가 아닌 것이 이미 있습니다'
-            Write-Host ("     진단 코드: J-HOME-01 — 이 도구가 만들고 지우는 폴더의 이름은 「" + $JarvisHomeBaseName + "」 하나입니다")
-            $script:JCode = 'J-HOME-01'
-            $script:NextStep = '그 자리의 파일을 옮기시거나, JARVIS_HOME 을 지정하지 않으신 채로 다시 실행해 주십시오.'
-            $script:ShowRerun = $true
-            exit 3
+            Deny-JarvisHome '그 자리에 폴더가 아닌 것이 이미 있습니다' '그 자리의 파일을 옮기시거나, JARVIS_HOME 을 지정하지 않으신 채로 다시 실행해 주십시오.'
         }
         # 🔴🔴**「비어 있으면 채택」을 걷어냈다**(4R BLOCK N3 봉인 2026-09-10 · 맥판과 같다).
         #   ⑴결정은 「자기가 만든 폴더에만 표식」이었는데 **남이 만들어 둔 빈 폴더**도 채택해 표식을 써 줬다.
@@ -2078,24 +2209,39 @@ try {
         #     있는」 폴더(남의 파일이 가득한 자리)에 표식을 써 준다.
         #   ⇒ **세지 않는다.** 표식이 없는 기존 폴더는 내용과 무관하게 거부한다(셀 필요가 없으면 틀릴 자리도 없다).
         if (-not $ownerMarkOk) {
-            Write-Host ("작업 폴더로 쓸 수 없는 자리입니다: " + $JarvisHome)
-            Write-Host '     까닭: 그 폴더는 이미 있는데 우리 표식이 없습니다(우리가 만든 자리가 아닙니다 — 지울 때 통째로 지우는 자리이므로 채택하지 않습니다)'
-            Write-Host ("     진단 코드: J-HOME-01 — 이 도구가 만들고 지우는 폴더의 이름은 「" + $JarvisHomeBaseName + "」 하나입니다")
-            $script:JCode = 'J-HOME-01'
-            $script:NextStep = ('그 폴더를 지우거나 옮기신 뒤 다시 해 주십시오 — 설치 도우미는 자기가 새로 만든 폴더만 씁니다. JARVIS_HOME 을 지정하지 않으신 채로 다시 실행하시면 기본 자리(' + (Join-Path $env:USERPROFILE $JarvisHomeBaseName) + ')를 씁니다.')
-            $script:ShowRerun = $true
-            exit 3
+            # 구판 지문이면 사람에게 한 번 물어 지울 수 있다(⛔자동 삭제 없음 · 아니면 종전대로 거부).
+            if (Invoke-OldHomeCleanup) {
+                if (-not (New-JarvisHomeNow)) { Deny-CannotMakeHome }
+                $jarvisHomeCreated = $true
+            } else {
+                Deny-JarvisHome '그 폴더는 이미 있는데 우리 표식이 없습니다(우리가 만든 자리가 아닙니다 — 지울 때 통째로 지우는 자리이므로 채택하지 않습니다)' ('그 폴더를 지우거나 옮기신 뒤 다시 해 주십시오 — 설치 도우미는 자기가 새로 만든 폴더만 씁니다. JARVIS_HOME 을 지정하지 않으신 채로 다시 실행하시면 기본 자리(' + (Join-Path $env:USERPROFILE $JarvisHomeBaseName) + ')를 씁니다.')
+            }
         }
     } else {
-        try {
-            New-Item -ItemType Directory -Path $JarvisHome -ErrorAction Stop | Out-Null
+        # 🔴🔴**보고 나서 만드는 사이에 남이 그 자리를 만들 수 있다**(맥판과 같은 자리를 같은 방식으로 고쳤다).
+        #   만들기가 실패했는데 그 자리가 **생겨 있으면** 그것은 권한 문제가 아니라 **경합**이다.
+        #   앞 판은 그 경우도 「자리를 만들지 못했습니다(J-PERM-01)」로 말해 사람을 엉뚱한 데로 보냈다.
+        if (New-JarvisHomeNow) {
             $jarvisHomeCreated = $true
-        } catch {
-            Write-Host ("자리를 만들지 못했습니다: " + $JarvisHome)
-            Write-Host '     진단 코드: J-PERM-01 — 파일이나 폴더를 쓸 권한이 없습니다(공간 부족·백신 차단도 같은 모양입니다)'
-            $script:JCode = 'J-PERM-01'
-            $script:NextStep = '회사·학교에서 관리하는 컴퓨터면 담당자에게 문의해 주십시오. 개인 컴퓨터면 저장 공간과 백신 알림을 확인해 주십시오.'
-            exit 3
+        } elseif (Test-JarvisHomePresent) {
+            # 경합 — 우리가 만든 자리가 아니다. 기존 폴더와 **같은 잣대**로 다시 잰다(표식도 다시 읽는다).
+            $ownerMarkOk = Test-JarvisOwnerMark
+            if (Test-JarvisHomeIsLink) {
+                Deny-JarvisHome '그 자리는 다른 곳을 가리키는 이음줄입니다(우리가 만드는 작업 폴더는 이음줄이 아닙니다)' 'JARVIS_HOME 을 지정하지 않으신 채로 다시 실행하시면 기본 자리를 씁니다.'
+            }
+            if (-not (Test-Path -LiteralPath $JarvisHome -PathType Container)) {
+                Deny-JarvisHome '그 자리에 폴더가 아닌 것이 이미 있습니다' '그 자리의 파일을 옮기시거나, JARVIS_HOME 을 지정하지 않으신 채로 다시 실행해 주십시오.'
+            }
+            if (-not $ownerMarkOk) {
+                if (Invoke-OldHomeCleanup) {
+                    if (-not (New-JarvisHomeNow)) { Deny-CannotMakeHome }
+                    $jarvisHomeCreated = $true
+                } else {
+                    Deny-JarvisHome '그 폴더는 이미 있는데 우리 표식이 없습니다(우리가 만든 자리가 아닙니다 — 지울 때 통째로 지우는 자리이므로 채택하지 않습니다)' ('그 폴더를 지우거나 옮기신 뒤 다시 해 주십시오 — 설치 도우미는 자기가 새로 만든 폴더만 씁니다.')
+                }
+            }
+        } else {
+            Deny-CannotMakeHome
         }
     }
     if (-not $ownerMarkOk) {

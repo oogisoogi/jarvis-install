@@ -1440,6 +1440,20 @@ if ($ListOnly) { Write-Host ''; Write-Host '(보기만 했습니다. 아무것�
 
 if ($script:Found -eq 0) { Write-Host ''; Write-Host '지울 것이 없습니다.'; exit 0 }
 
+# ── 🔴「cys 를 먼저 닫아 주십시오」 (v0.3.10 · 실제 노트북에서 겪은 일 2026-09-10 · 맥판과 같다) ──
+#   자리 기준으로 끄더라도 **사람에게 먼저 알린다**: 갑자기 꺼진 것으로 읽히지 않게 하고,
+#   저장할 틈을 드리고, 붙잡고 있는 프로세스 때문에 삭제가 실패하는 자리를 미리 줄인다.
+#   ⚠알리는 것이지 묻는 것이 아니다 — 사람이 없는 자리(-Yes·입력이 딴 데로 이어진 자리)에서는 안 묻는다.
+$aliveNow = @(Get-ProcsUnder @($CysDir, $CysDirOld))
+if ($aliveNow.Count -gt 0) {
+    Write-Host ''
+    Write-Host ("cys 가 아직 돌고 있습니다(" + $aliveNow.Count + "가지). 먼저 cys 창을 닫아 주십시오.")
+    Write-Host '     닫지 않으셔도 이 도구가 끕니다 — 다만 저장하지 않으신 것이 사라질 수 있습니다.'
+    $human = $false
+    try { $human = ((-not [Console]::IsInputRedirected) -and [Environment]::UserInteractive) } catch { $human = $false }
+    if ((-not $Yes) -and $human) { [void](Read-Host '  확인하셨으면 Enter 를 눌러 주십시오') }
+}
+
 if (-not $Yes) {
     Write-Host ''
     Write-Host '위 목록을 지웁니다. 되돌릴 수 없습니다.'
