@@ -66,15 +66,30 @@ JARVIS_OWNER_MARK="jarvis-installer-owned v1"
 BLOCKED_STEP=""
 
 # cys 설치 파일 — 판본이 파일 이름에 박혀 배포되므로 여기에 핀한다.
-# ★2026-09-10 판올림 — 벤더 마지막 판본으로 올린다. 바이트는 **받을 자리에 직접 물어** 적었다
-#   (`curl -sSI -L` 의 content-length · 2026-09-10 12:0x 실측: aarch64 270596222 · x64 280008429).
+# 🔴★2026-09-11 핫픽스(v0.3.11) — **받을 자리**와 **판본**을 함께 고친다.
+#   ⑴ 받을 자리를 **벤더 GitHub 릴리스**로 옮긴다. 앞 판이 쓰던 배포 폴더는 **최신 판본 하나만** 둔다 —
+#      벤더가 0.14.33 을 올린 날 우리가 핀해 둔 0.14.30 이 **404 로 사라졌고**, 그때부터 깨끗한 맥에서
+#      설치가 **100% 실패**했다(2026-09-11 09:47 실측: 옛 핀 두 파일 다 404 · 그 폴더에 남은 dmg 는
+#      0.14.33 둘뿐). 릴리스 자산은 **판본별로 남는다**(같은 시각 실측: v0.14.30 자산 270596222B 건재).
+#      ⇒ 판본이 박힌 자리를 쓰면 **벤더가 다음 판을 내도 우리 핀이 사라지지 않는다.**
+#      ★핀을 「늘 최신을 가리키는 자리」에 걸면, 그 자리가 움직이는 날 라이브가 조용히 죽는다.
+#   ⑵ 판본 0.14.30 → **0.14.33**(벤더 마지막 판본).
+#   크기·지문은 **받을 자리에서 두 번 받아** 쟀다(2026-09-11 09:5x · 두 번 동일 · 옛 배포 폴더에서 받은
+#   두 벌과도 같았다 = 네 벌 전수 일치):
+#     aarch64 272977882 · 3919ce1c… / x64 269923933 · 7ec9e557…
+#   서명·공증도 벤더 기준선(로컬 0.14.27 dmg)과 같다 —
+#     Developer ID Application: yoonsik choi (Q43YA2NMF9) · Notarized Developer ID · stapled.
+#     ⚠대라고 한 기준선은 0.14.30 이었는데 **그 파일을 이제 못 받는다**(위 404) ⇒ 0.14.27 로 잡았고
+#       그 사실을 여기 적는다. 못 잰 것을 잰 것처럼 적지 않는다.
 #   ⚠윈도우(bootstrap.ps1)는 2026-09-09부터 **우리 릴리스**를 받는다(우리 빌드가 서명돼 있다).
 #     맥은 우리 빌드가 무서명이라 아직 벤더 dmg 그대로다 — 두 OS 가 갈리는 것이 지금은 의도다.
-CYS_VERSION="0.14.30"
-CYS_DOWNLOAD_DIR="https://www.cysinsight.com/downloads/"
+CYS_VERSION="0.14.33"
+CYS_DOWNLOAD_DIR="https://github.com/idoforgod/cys-terminal/releases/download/v${CYS_VERSION}/"
 case "$(uname -m)" in
-  arm64) CYS_MAC_FILE="cys_${CYS_VERSION}_aarch64.dmg"; CYS_MAC_BYTES=270596222 ;;
-  *)     CYS_MAC_FILE="cys_${CYS_VERSION}_x64.dmg";     CYS_MAC_BYTES=280008429 ;;
+  arm64) CYS_MAC_FILE="cys_${CYS_VERSION}_aarch64.dmg"; CYS_MAC_BYTES=272977882
+         CYS_MAC_SHA256="3919ce1cad7ac834584951190420f92d6ba86b3a2343451829e784aadf3153df" ;;
+  *)     CYS_MAC_FILE="cys_${CYS_VERSION}_x64.dmg";     CYS_MAC_BYTES=269923933
+         CYS_MAC_SHA256="7ec9e557f9185d03416f949341f5b7b4dc3367aaf72206e754c736d4e7395153" ;;
 esac
 CYS_DOWNLOAD_URL="${CYS_DOWNLOAD_DIR}${CYS_MAC_FILE}"
 
@@ -1148,15 +1163,56 @@ step_prepare() {
 }
 
 
+# 받을 자리가 **뭐라고 답하는지** 한 번 물어 본다(HTTP 코드 세 자리 · 못 물으면 `000`).
+#   ★왜 있는가: 「그 파일이 자리에 없다」와 「연결이 끊겼다」는 **다른 일**인데 앞 판은 둘을 한 칸에
+#   두었다 — 그래서 벤더가 옛 판본 dmg 를 내린 날부터 사람은 **없는 파일을 30분씩 두 번 기다린 뒤에야**
+#   실패를 봤다(2026-09-11 라이브 실사고). 기다려서 생기는 파일이 아니다.
+cys_http_code() {
+  local c
+  c="$(curl -sSI -L -o /dev/null -w '%{http_code}' --max-time 60 "$1" 2>/dev/null)"
+  [ -n "$c" ] || c="000"
+  printf '%s' "$c"
+}
+
+# 받은 파일의 지문. 맥에는 `shasum` 이 기본으로 있고, 없으면 `openssl` 로 잰다. 둘 다 없으면 빈 문자열 —
+#   ★**못 쟀다는 것을 「맞다」로 바꾸지 않는다.** 부르는 쪽이 빈 문자열을 실패로 받는다.
+cys_file_sha256() {
+  local f="$1" out=""
+  if command -v shasum >/dev/null 2>&1; then
+    out="$(shasum -a 256 "$f" 2>/dev/null | awk '{print $1}')"
+  fi
+  if [ -z "$out" ] && command -v openssl >/dev/null 2>&1; then
+    out="$(openssl dgst -sha256 "$f" 2>/dev/null | awk '{print $NF}')"
+  fi
+  printf '%s' "$out" | tr 'A-F' 'a-f'
+}
+
 # ── 하는 일 5 — cys 설치 파일 받기 ────────────────────────────────
-# 완료 판정 = 파일이 있고 크기가 정확히 맞는가. 크기가 다르면 받다 끊긴 것이다.
+# 완료 판정 = 파일이 있고 **크기와 지문이 둘 다** 맞는가. 크기가 다르면 받다 끊긴 것이고,
+#   크기는 같은데 지문이 다르면 **다른 파일**이다(크기만 보던 앞 판은 그것을 그냥 지나갔다).
 step_download_cys() {
   mkdir -p "$DL_DIR"
-  local dst got try
+  local dst got try code have fresh
   dst="$DL_DIR/$CYS_MAC_FILE"
   if [ -f "$dst" ] && [ "$(wc -c < "$dst" | tr -d ' ')" = "$CYS_MAC_BYTES" ]; then
-    say "[5/10] 설치 파일이 이미 있습니다 — 건너뜁니다."
-    return 0
+    # 크기만 보고 건너뛰면 **같은 크기의 다른 파일**이 재실행 경로로 들어온다 — 지문까지 본다
+    # (윈도우판은 2026-09-09부터 이미 그렇게 한다. 맥만 크기로 지나가고 있었다.)
+    have="$(cys_file_sha256 "$dst")"
+    if [ -n "$have" ] && [ "$have" = "$CYS_MAC_SHA256" ]; then
+      say "[5/10] 설치 파일이 이미 있습니다 (지문 확인) — 건너뜁니다."
+      return 0
+    fi
+    if [ -z "$have" ]; then
+      say "[5/10] 남아 있던 설치 파일의 지문을 재지 못했습니다 — 확인 없이 쓰지 않고 다시 받습니다."
+    else
+      say "[5/10] 남아 있던 설치 파일의 지문이 다릅니다 — 버리고 다시 받습니다."
+    fi
+    # dry-run 은 아무것도 지우지 않는다 — 지울 것이 있다는 사실만 말한다(윈도우판과 같다).
+    if [ "$MODE" = "dry" ]; then
+      say "[5/10] (dry-run) 위 파일을 지우고 다시 받을 것입니다. 받을 곳 = $CYS_DOWNLOAD_URL"
+      return 0
+    fi
+    rm -f "$dst"
   fi
   if [ "$MODE" = "dry" ]; then
     say "[5/10] (dry-run) 받지 않았습니다. 받을 곳 = $CYS_DOWNLOAD_URL"
@@ -1176,6 +1232,20 @@ step_download_cys() {
     rm -f "$dst"
     say "[5/10] cys 설치 파일을 받습니다 (약 260MB · 잠시 걸립니다)."
     if ! curl -fsSL --max-time 900 "$CYS_DOWNLOAD_URL" -o "$dst"; then
+      # 🔴먼저 **까닭을 가른다**. 받을 자리가 「그런 파일 없다」고 답했으면 기다릴 일이 아니다.
+      #   ⚠**404·410 만** 이 갈래다. 5xx(자리는 살아 있는데 잠시 탈이 난 것)도, 물어보지도 못한
+      #     `000`(망 쪽)도 **여전히 기다리는 쪽**이다 — 새 갈래가 그 길까지 삼키면 안 된다.
+      code="$(cys_http_code "$CYS_DOWNLOAD_URL")"
+      case "$code" in
+        404|410)
+          rm -f "$dst"
+          say "[5/10] 받을 자리에 그 판본이 없습니다 (응답 $code)."
+          say "     받으려던 곳 = $CYS_DOWNLOAD_URL"
+          jcode "J-DL-05" "받을 자리에 그 판본이 없습니다"
+          NEXT_STEP="이 진단 코드와 함께 알려 주십시오 — 받는 길을 고쳐 드리겠습니다. 기다려도 생기는 파일이 아니라 다시 실행하셔도 같습니다."
+          return 5
+          ;;
+      esac
       say "[5/10] 받지 못했습니다."
       # 두 번 해 보고 포기하지 않는다. 연결이 돌아오면 이어간다(같은 자리·같은 문장).
       # ⚠다시 해 보는 명령에도 상한이 있어야 한다 — 없으면 curl 이 응답 없는 연결에 매달려
@@ -1195,8 +1265,23 @@ step_download_cys() {
     fi
     got="$(wc -c < "$dst" | tr -d ' ')"
     if [ "$got" = "$CYS_MAC_BYTES" ]; then
-      say "[5/10] 받았습니다 (크기 확인 완료)."
-      return 0
+      # 크기가 맞아도 지문을 본다 — 크기는 같은데 내용이 다른 파일이 「받았습니다」로 지나가면
+      # 그 뒤의 모든 단계가 남의 파일 위에서 돈다(윈도우판과 같은 갈래).
+      fresh="$(cys_file_sha256 "$dst")"
+      if [ -z "$fresh" ]; then
+        say "[5/10] 받은 파일의 지문을 잴 수 없습니다 — 확인 없이 설치하지 않습니다."
+        jcode "J-DL-03" "설치 파일 지문을 잴 수 없음"
+        rm -f "$dst"
+        return 5
+      fi
+      if [ "$fresh" = "$CYS_MAC_SHA256" ]; then
+        say "[5/10] 받았습니다 (크기·지문 확인 완료)."
+        return 0
+      fi
+      say "[5/10] 지문이 맞지 않습니다 (받은 것 $(printf '%s' "$fresh" | cut -c1-12)… · 기대 $(printf '%s' "$CYS_MAC_SHA256" | cut -c1-12)…). 이 파일은 쓰지 않습니다."
+      jcode "J-DL-04" "설치 파일 지문 불일치"
+      rm -f "$dst"
+      return 5
     fi
     say "[5/10] 크기가 맞지 않습니다 (받은 것 $got · 기대 $CYS_MAC_BYTES). 다시 받습니다."
   done
