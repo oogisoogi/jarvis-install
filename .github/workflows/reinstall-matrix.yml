@@ -59,22 +59,6 @@ jobs:
           PYTHONUTF8: 1
         run: python3 tests/ps-balance.py install-master/bootstrap.ps1 install-master/reset-clean.ps1 install-master/reinstall.ps1
 
-      # ── 반복해서 막힐 때 단계별 안내 (v0.3.15) ─────────────────────
-      #   같은 코드로 몇 번째 끝났는지 세고(작업 폴더 안 help-attempts.json), 2회째 = 공감+다른 방법 · 3회째부터 = 담당자 번호.
-      #   checks.sh 는 문구가 정본과 같은지만 본다. 몇 회째에 무엇이 나오는지·언제 0 으로 돌아가는지는 이 두 단계가 실제로 불러 잰다.
-      - name: 반복 막힘 횟수와 단계별 안내 (맥)
-        if: runner.os == 'macOS'
-        timeout-minutes: 5
-        run: bash tests/help-attempts-run.sh
-
-      - name: 반복 막힘 횟수와 단계별 안내 (윈)
-        if: runner.os == 'Windows'
-        timeout-minutes: 5
-        shell: pwsh
-        run: |
-          & powershell -ExecutionPolicy Bypass -File tests\help-attempts-run.ps1
-          if ($LASTEXITCODE -ne 0) { Write-Host '::error::반복 막힘 안내 시험이 붉다 — 위 FAIL 줄이 사유다'; exit 1 }
-
       # ── 상태 ①: 미설치 ────────────────────────────────────────
       - name: 미설치 상태에서 진단이 「미설치」라고 말하는가 (맥)
         if: runner.os == 'macOS'
@@ -906,6 +890,24 @@ jobs:
           # hosts 로 우리 주소만 막으면 인터넷은 되고 우리 서버만 안 답한다 ⇒ J-NET-02 여야 한다.
           & pwsh -NoProfile -File tests\net-cause-run.ps1 -Dir install-master
           if ($LASTEXITCODE -ne 0) { Write-Host '::error::연결 원인을 갈라 말하지 못했다'; exit 1 }
+
+      # ── 반복해서 막힐 때 단계별 안내 (v0.3.15) ─────────────────────
+      #   같은 코드로 몇 번째 끝났는지 세고(작업 폴더 안 help-attempts.json), 2회째 = 공감+다른 방법 · 3회째부터 = 담당자 번호.
+      #   ⚠잡의 **끝**(기록 남기기 바로 앞)에 둔다 — 새 시험이 붉어도 진단·삭제·재설치·멱등 단계가 먼저 돌아 설치기 검증이 가려지지 않게
+      #   (v0.3.15 첫 CI: 앞자리에 둔 이 단계가 인자 누락으로 붉어져 뒤 윈 단계가 전부 건너뛰어졌다).
+      #   checks.sh 는 문구가 정본과 같은지만 본다. 몇 회째에 무엇이 나오는지·언제 0 으로 돌아가는지는 이 두 단계가 실제로 불러 잰다.
+      - name: 반복 막힘 횟수와 단계별 안내 (맥)
+        if: runner.os == 'macOS'
+        timeout-minutes: 5
+        run: bash tests/help-attempts-run.sh
+
+      - name: 반복 막힘 횟수와 단계별 안내 (윈)
+        if: runner.os == 'Windows'
+        timeout-minutes: 5
+        shell: pwsh
+        run: |
+          & powershell -ExecutionPolicy Bypass -File tests\help-attempts-run.ps1 -Dir install-master
+          if ($LASTEXITCODE -ne 0) { Write-Host '::error::반복 막힘 안내 시험이 붉다 — 위 FAIL 줄이 사유다'; exit 1 }
 
       - name: 기록 남기기
         if: always()
