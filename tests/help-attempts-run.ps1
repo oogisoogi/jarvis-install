@@ -6,6 +6,7 @@
 #   ⑥성공 끝(코드 없음·깨우기 도달) = 코드 전부 지움 · 보고 기록은 남김  ⑦깨진 파일 = 단계1 + 올바른 모양으로 다시 씀
 #   ⑧곧바로 연락 코드(J-DL-05) 2번째 = 담당자 안내  ⑨미리보기·감지만 = 파일을 만들지 않는다
 #   ⑩보고 기록 뒤 다음 셈의 「이전 보고」 글  ⑪환경 보고의 두 줄은 교체된다(중복 0) · 화면 자리
+#   ⑫(윈도우 전용) 원격 해결 실행 번호 기록 — 1·2번째 둘 다 OK · 같은 번호 ALREADY · 그 자리를 $null 로 되돌린 사본(새 프로세스)은 2번째가 FAIL
 # ★기대 문구는 설치기 상수가 아니라 정본(tests/help-escalation.tsv)에서 읽는다 — 설치기가 틀리면 여기서 붉어진다.
 # ⛔네트워크 0 · 실제 설치 0 — 고지를 보이지 않은 실행이라 끝맺음이 원격 해결을 부르지 않는다.
 #
@@ -287,6 +288,61 @@ try {
     $TPosC = ($TICodeC -ge 0) -and ($TScrC[$TICodeC + 1] -ceq '') -and ($TIS3C -eq $TICodeC + 2) -and ($TISendC -gt $TIS3C) -and ($TINoC -gt $TISendC) -and ($TIRerunC -gt $TINoC) -and ($TScrC -cnotcontains $TOk)
     $TOkv = $TPosA -and $TPosB -and $TPosC
     Test-Axis '⑪ 화면 자리 = 진단 코드 줄 다음 · 회수 경로 줄 앞 · 전송 못 한 끝의 사진 부탁은 다시 하시는 법 앞' $TOkv ('1회=' + $TPosA + ' 2회=' + $TPosB + ' 3회=' + $TPosC + ' 3회 화면=' + ($TScrC -join ' | '))
+
+    # ⑫ (윈도우 전용) 원격 해결 실행 번호 기록 — 1번째 = 새 파일(Move) · 2번째부터 = 바꿔 끼우기(File.Replace)
+    #   백업 이름 자리에 $null 을 넘기던 판은 2번째 기록이 FAIL 이었다(= 둘째 명령부터 실행 0). 부르는 쪽처럼 그대로 받는다(글 하나여야 한다).
+    Remove-Item -LiteralPath $RemoteHelpSeqFile -Force -ErrorAction SilentlyContinue
+    $TR1 = Save-RemoteHelpExecuted 101
+    $TR2 = Save-RemoteHelpExecuted 102
+    $TR3 = Save-RemoteHelpExecuted 101
+    $TSeqText = ''
+    if (Test-Path -LiteralPath $RemoteHelpSeqFile) { $TSeqText = [System.IO.File]::ReadAllText($RemoteHelpSeqFile, [System.Text.Encoding]::UTF8) }
+    $TOkv = ($TR1 -is [string]) -and ($TR1 -ceq 'OK') -and ($TR2 -is [string]) -and ($TR2 -ceq 'OK') -and ($TR3 -is [string]) -and ($TR3 -ceq 'ALREADY') -and ($TSeqText -ceq '[101,102]') -and (-not (Test-Path -LiteralPath ($RemoteHelpSeqFile + '.tmp')))
+    Test-Axis '⑫ 실행 번호 기록 = 1번째(새 파일)·2번째(바꿔 끼우기) 둘 다 OK · 같은 번호 = ALREADY · 파일 = [101,102]' $TOkv ('1=' + $TR1 + ' 2=' + $TR2 + ' 3=' + $TR3 + ' 파일=' + $TSeqText)
+
+    # ⑫ 뮤턴트 — 설치기 사본에서 이 기록 자리 하나만 진짜 null → $null 로 되돌려 **새 powershell 프로세스**에서 부른다.
+    #   왜 새 프로세스인가: 같은 프로세스에서 사본을 다시 읽으면 함수·전역($RemoteHelpSeqFile 등)이 이 시험의 것을 덮는다 —
+    #   자식 범위(& { . 사본 })로 감싸도 사본 안의 $script: 대입은 이 스크립트 범위로 샌다. 프로세스는 끝나면 아무것도 남기지 않는다.
+    #   대조군(바꾸지 않은 사본)을 같은 길로 불러 OK OK 를 받아야 한다 — 뮤턴트의 FAIL 이 불러 오는 길이 아니라 그 한 자리 때문임을 보인다.
+    #   (되돌린 글은 이어 붙여 만든다 — 저장소의 「Replace 에 $null」 grep 이 이 시험 파일에서 거짓으로 잡히지 않게)
+    $TSeqGood = '[System.IO.File]::Replace($tmp, $RemoteHelpSeqFile, [NullString]::Value)'
+    $TSeqBad  = $TSeqGood.Replace('[NullString]::Value', ('$' + 'null'))
+    $TAttGood = '[System.IO.File]::Replace($fullTmp, $full, [NullString]::Value)'
+    $TSrc = [System.IO.File]::ReadAllText((Join-Path $Dir 'bootstrap.ps1'), [System.Text.Encoding]::UTF8)
+    $TMut = $TSrc.Replace($TSeqGood, $TSeqBad)
+    $TSites = [regex]::Matches($TSrc, [regex]::Escape($TSeqGood)).Count
+    $TMutOk = ($TSites -eq 1) -and ([regex]::Matches($TSrc, [regex]::Escape($TSeqBad)).Count -eq 0) -and ([regex]::Matches($TMut, [regex]::Escape($TSeqBad)).Count -eq 1) -and ([regex]::Matches($TMut, [regex]::Escape($TSeqGood)).Count -eq 0) -and ([regex]::Matches($TMut, [regex]::Escape($TAttGood)).Count -eq 1) -and ($TMut.Length -eq ($TSrc.Length - $TSeqGood.Length + $TSeqBad.Length))
+    $TChild = Join-Path $TBase 'seq-child.ps1'
+    [System.IO.File]::WriteAllText($TChild, (@(
+        'param([string]$Lib, [string]$SeqHome)',
+        '$env:JARVIS_LIB_ONLY = ''1''',
+        '$env:JARVIS_HOME = $SeqHome',
+        '. $Lib',
+        '$a = Save-RemoteHelpExecuted 201',
+        '$b = Save-RemoteHelpExecuted 202',
+        'Write-Output (''SEQREC '' + $a + '' '' + $b)'
+    ) -join "`r`n"), (New-Object System.Text.UTF8Encoding($true)))
+    # 이 시험을 돌리는 바로 그 powershell 실행 파일(5.1) — PATH 의 다른 판을 집지 않는다
+    $TPsExe = [System.Diagnostics.Process]::GetCurrentProcess().MainModule.FileName
+    $TSeen = @{}
+    foreach ($TCase in @(@{ N = 'control'; Text = $TSrc }, @{ N = 'mutant'; Text = $TMut })) {
+        $TLib = Join-Path $TBase ($TCase.N + '-bootstrap.ps1')
+        $TSeqHome = Join-Path $TBase ($TCase.N + '-home')
+        New-Item -ItemType Directory -Force -Path $TSeqHome | Out-Null
+        # BOM 을 붙여 쓴다 — 5.1 은 BOM 없는 .ps1 을 ANSI 로 읽어 한글 리터럴이 깨진다(설치기 머리말)
+        [System.IO.File]::WriteAllText($TLib, $TCase.Text, (New-Object System.Text.UTF8Encoding($true)))
+        $TOut = @(& $TPsExe -NoProfile -NonInteractive -ExecutionPolicy Bypass -File $TChild $TLib $TSeqHome 2>&1 | ForEach-Object { [string]$_ })
+        $TLine = @($TOut | Where-Object { $_ -cmatch '\ASEQREC ' })
+        if ($TLine.Count -eq 1) {
+            $TSeen[$TCase.N] = $TLine[0]
+        } else {
+            $TAll = $TOut -join ' | '
+            if ($TAll.Length -gt 600) { $TAll = $TAll.Substring(0, 600) }
+            $TSeen[$TCase.N] = 'none(' + $TAll + ')'
+        }
+    }
+    $TOkv = $TMutOk -and ($TSeen['control'] -ceq 'SEQREC OK OK') -and ($TSeen['mutant'] -ceq 'SEQREC OK FAIL')
+    Test-Axis '⑫ 뮤턴트 = 이 기록 자리만 $null 로 되돌린 사본은 2번째 기록이 FAIL · 대조 사본 = OK OK (새 프로세스)' $TOkv ('자리=' + $TSites + ' 한 자리 치환=' + $TMutOk + ' 대조=' + $TSeen['control'] + ' 뮤턴트=' + $TSeen['mutant'])
 } catch {
     $TFail++
     Write-Host ('  FAIL 예외 — ' + $_.Exception.Message)

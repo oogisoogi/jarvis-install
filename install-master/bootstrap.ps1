@@ -2901,7 +2901,8 @@ function Save-RemoteHelpExecuted([long]$Seq) {
             $bytes = (New-Object System.Text.UTF8Encoding($false)).GetBytes($json)
             $fs = New-Object System.IO.FileStream($tmp, [System.IO.FileMode]::Create, [System.IO.FileAccess]::Write, [System.IO.FileShare]::None)
             try { $fs.Write($bytes, 0, $bytes.Length); $fs.Flush($true) } finally { $fs.Dispose() }
-            if (Test-Path -LiteralPath $RemoteHelpSeqFile) { [System.IO.File]::Replace($tmp, $RemoteHelpSeqFile, $null) } else { [System.IO.File]::Move($tmp, $RemoteHelpSeqFile) }
+            # ⚠백업 이름 자리에 $null 을 넘기면 PowerShell 이 빈 글("")로 바꿔 넘긴다 → Replace 가 「올바르지 않은 경로」로 던진다(첫 번호만 남고 그 뒤 명령은 FAIL 로 실행되지 않는다) — 진짜 null 은 [NullString]::Value
+            if (Test-Path -LiteralPath $RemoteHelpSeqFile) { [System.IO.File]::Replace($tmp, $RemoteHelpSeqFile, [NullString]::Value) } else { [System.IO.File]::Move($tmp, $RemoteHelpSeqFile) }
         } catch { return 'FAIL' }
         $back = Read-RemoteHelpExecuted
         if ($null -eq $back -or -not ($back -contains $Seq)) { return 'FAIL' }
