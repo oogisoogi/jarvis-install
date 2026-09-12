@@ -1,0 +1,902 @@
+# 삭제-재설치 자동 검증 — 윈도우·맥 러너 매트릭스
+#
+# 왜 러너인가
+#   「지우고 다시 깐다」는 **기계를 바꾸는 일**이라 개발기에서 돌릴 수 없다. 사람 노트북으로만
+#   재려면 매번 사람 시간을 쓰고, 그 사람이 없는 날은 아무도 못 잰다. 러너는 매번 깨끗한 기계를
+#   새로 주므로 이 일에 정확히 맞는다.
+#
+# ⚠러너가 **못 보는 것** — 초록이 이것까지 보증하지 않는다(정직하게 적는다)
+#   · 백신(V3) 개입 — 러너에는 백신이 없다. 2026-09-05 사고는 여기서 재현되지 않는다.
+#   · 화면(GUI) — cys 앱 설정 화면, 맥 보안 확인 창, 윈도우 설정 앱 제거 흐름을 못 본다.
+#   · 우리말 계정 이름·공백 든 사용자 폴더 — 러너 계정은 영문이다.
+#   · 로그인이 필요한 뒷단([3/10] 이후) — 계정이 없다. 그래서 로그인 무관 구간만 돈다.
+#   ⇒ 그 넷은 사람 노트북 절차서(내부 문서)가 맡는다. 이 워크플로는 **나머지 전부**를 맡는다.
+name: 삭제-재설치 검증
+
+on:
+  workflow_dispatch:
+  push:
+    paths:
+      - 'install-master/**'
+      - 'tests/**'
+      - '.github/workflows/reinstall-matrix.yml'
+
+jobs:
+  cycle:
+    name: ${{ matrix.os }} — 진단·삭제·재설치·멱등
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [macos-latest, windows-latest]
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: 검사 축 전수 (맥에서만 — bash 축이다)
+        if: runner.os == 'macOS'
+        env:
+          PYTHONUTF8: 1
+        run: bash install-master/checks.sh
+
+      # 윈 cys 핀 3값(판본·크기·지문)이 우리 릴리스가 실제로 적은 값과 같은가 — 네트워크로 릴리스를 읽는다.
+      #   checks.sh 는 글자만 본다. 릴리스와 대조하는 곳은 이 단계뿐이고, 뮤턴트는 그 대조가 눈먼 초록이 아닌지 잰다.
+      #   릴리스를 못 읽으면(망·404) 통과가 아니라 실패다 — 사유는 FAIL 줄에 있다.
+      - name: 윈 cys 핀 = 릴리스 대조 · 뮤턴트 (맥 · 네트워크)
+        if: runner.os == 'macOS'
+        timeout-minutes: 5
+        run: |
+          bash tests/win-pin-release.sh || { echo '::error::윈 cys 핀이 릴리스와 다르거나 릴리스를 읽지 못했다 — 위 FAIL 줄이 사유다'; exit 1; }
+          bash tests/win-pin-mutate.sh || { echo '::error::핀 대조 뮤턴트가 기대한 축에서 붉어지지 않았다 — 위 FAIL 줄이 사유다'; exit 1; }
+
+      # 🔴ps1 괄호 균형 — **윈도우 job 의 맨 앞**에서 본다. 파싱이 깨지면 그 뒤 축들은
+      #   전부 「출력이 없다」로 붉어져 **원인이 안 보인다**(2026-09-10 실측: 「중간 멈춤을 못
+      #   알아봤다」로 나왔고 진짜 원인은 열두 줄 위의 MissingEndCurlyBrace 였다).
+      #   ⇒ 원인을 이름으로 먼저 말한다. 개발기 축(checks.sh)과 같은 도구를 쓴다.
+      - name: ps1 괄호 균형 (윈 · 파싱 사고를 먼저 이름으로 말한다)
+        if: runner.os == 'Windows'
+        shell: bash
+        env:
+          PYTHONUTF8: 1
+        run: python3 tests/ps-balance.py install-master/bootstrap.ps1 install-master/reset-clean.ps1 install-master/reinstall.ps1
+
+      # ── 상태 ①: 미설치 ────────────────────────────────────────
+      - name: 미설치 상태에서 진단이 「미설치」라고 말하는가 (맥)
+        if: runner.os == 'macOS'
+        run: |
+          set -e
+          out="$(bash install-master/reset-clean.sh --list)"
+          printf '%s\n' "$out"
+          printf '%s\n' "$out" | grep -q '아무것도 깔려 있지 않습니다' \
+            || { echo '::error::깨끗한 기계인데 미설치로 안 읽혔다'; exit 1; }
+
+      - name: 미설치 상태에서 진단이 「미설치」라고 말하는가 (윈)
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: |
+          $out = & powershell -ExecutionPolicy Bypass -File install-master\reset-clean.ps1 -List | Out-String
+          Write-Host $out
+          if ($out -notmatch '아무것도 깔려 있지 않습니다') { Write-Host '::error::깨끗한 기계인데 미설치로 안 읽혔다'; exit 1 }
+
+      # ── 🔴부모가 없는 새 자리에서도 정상 설치가 열리는가 (교차 검토 2차 NEW · 2026-09-11) ──
+      #   맥은 부모를 `mkdir -p` 로 만들고 마지막 마디만 원자적으로 만든다. 윈도 같은 두 걸음이어야 한다.
+      #   ★이것은 「막지 말아야 할 것을 막지 않는가」를 재는 축이다 — 이 저장소의 알려진 회귀 갈래다.
+      - name: 부모 없는 새 자리에 작업 폴더를 만드는가 (맥)
+        if: runner.os == 'macOS'
+        timeout-minutes: 5
+        run: |
+          set -e
+          base="$(mktemp -d)/없던자리/한겹더"
+          JARVIS_HOME="$base/install-jarvis" bash install-master/bootstrap.sh --detect-only >/dev/null 2>&1 || true
+          [ -d "$base/install-jarvis" ] || { echo '::error::부모가 없다고 새 자리 설치가 막혔다(맥)'; exit 1; }
+          [ -f "$base/install-jarvis/.jarvis-owned" ] || { echo '::error::자리는 생겼는데 표식이 없다(맥)'; exit 1; }
+          echo "만들었다: $base/install-jarvis"
+
+      - name: 부모 없는 새 자리에 작업 폴더를 만드는가 (윈)
+        if: runner.os == 'Windows'
+        timeout-minutes: 5
+        shell: pwsh
+        run: |
+          $base = Join-Path $env:TEMP ('nope-' + [guid]::NewGuid().ToString('N') + '\한겹더')
+          $home2 = Join-Path $base 'install-jarvis'
+          $env:JARVIS_HOME = $home2
+          & powershell -ExecutionPolicy Bypass -File install-master\bootstrap.ps1 -DetectOnly *> $null
+          if (-not (Test-Path -LiteralPath $home2 -PathType Container)) { Write-Host '::error::부모가 없다고 새 자리 설치가 막혔다(윈)'; exit 1 }
+          if (-not (Test-Path -LiteralPath (Join-Path $home2 '.jarvis-owned'))) { Write-Host '::error::자리는 생겼는데 표식이 없다(윈)'; exit 1 }
+          Write-Host ("만들었다: " + $home2)
+          Remove-Item env:JARVIS_HOME
+
+      # ── 상태 ②: 중간 멈춤 — [2/10] 까지만 간 기계 ─────────────
+      # 로그인 게이트 앞까지만 돌린다. 러너에 계정이 없으므로 그 앞에서 멈추는 것이 정상이다.
+      - name: 중간 멈춤 상태를 만든다 (맥 · [1]~[2])
+        if: runner.os == 'macOS'
+        timeout-minutes: 12
+        run: |
+          set -e
+          # 러너에는 계정이 없다. 로그인 앞에서 멈추는 것이 이 상태의 정의다.
+          # ⚠여기서 heredoc 을 쓰지 않는다 — YAML 블록 안에서는 끝 표시가 줄머리에 오지 못해 깨진다.
+          grep -q 'step_login          || exit \$?' install-master/bootstrap.sh \
+            || { echo '::error::로그인 게이트 자리를 못 찾았다 — 스크립트가 바뀌었다'; exit 1; }
+          # 구분자로 | 를 쓰면 안 된다 — 찾는 문구 자체에 || 가 들어 있다.
+          sed 's@step_login          || exit \$?@say "[3/10] (검증) 로그인 앞에서 멈춥니다."; exit 0@' \
+            install-master/bootstrap.sh > /tmp/bs-partial.sh
+          bash /tmp/bs-partial.sh || true
+
+      - name: 중간 멈춤을 진단이 알아보는가 (맥)
+        if: runner.os == 'macOS'
+        run: |
+          set -e
+          out="$(bash install-master/reset-clean.sh --list)"
+          printf '%s\n' "$out"
+          printf '%s\n' "$out" | grep -q '중간에 멈춘 상태' \
+            || { echo '::error::중간 멈춤을 못 알아봤다'; exit 1; }
+          printf '%s\n' "$out" | grep -q '클로드 실행 파일 · ~/.local/bin/claude' \
+            || { echo '::error::깐 것을 못 찾았다'; exit 1; }
+
+      # ── 지우고 나면 자국이 0 이어야 한다 ──────────────────────
+      - name: 지운다 · 자국 0 을 대조한다 (맥)
+        if: runner.os == 'macOS'
+        run: |
+          set -e
+          bash install-master/reset-clean.sh --yes
+          out="$(bash install-master/reset-clean.sh --list)"
+          printf '%s\n' "$out"
+          printf '%s\n' "$out" | grep -q '아무것도 깔려 있지 않습니다' \
+            || { echo '::error::다 지웠다는데 자국이 남았다'; exit 1; }
+          # 남의 파일은 살아 있어야 한다 — 지우는 것은 우리 것뿐이다.
+          test ! -e "$HOME/.claude" || test -d "$HOME/.claude" \
+            || { echo '::error::클로드 폴더가 파일이 됐다'; exit 1; }
+
+      - name: 다시 지워도 탈이 없는가 (멱등 · 맥)
+        if: runner.os == 'macOS'
+        run: |
+          set -e
+          out="$(bash install-master/reset-clean.sh --yes)"
+          printf '%s\n' "$out"
+          printf '%s\n' "$out" | grep -q '지울 것이 없습니다' \
+            || { echo '::error::두 번째 실행이 조용하지 않다'; exit 1; }
+
+      # ── 재설치 진입점 — 지우기 실패가 설치로 안 넘어가는지 ────
+      - name: 재설치 진입점의 살펴보기만 도는가 (맥)
+        if: runner.os == 'macOS'
+        env:
+          JARVIS_BASE_URL: file://${{ github.workspace }}/install-master
+        run: |
+          set -e
+          out="$(bash install-master/reinstall.sh --list)"
+          printf '%s\n' "$out"
+          printf '%s\n' "$out" | grep -q '아무것도 지우지 않았고, 설치도 하지 않았습니다' \
+            || { echo '::error::살펴보기만 하지 않았다'; exit 1; }
+
+      - name: 지우기가 실패하면 설치로 안 넘어가는가 (맥)
+        if: runner.os == 'macOS'
+        env:
+          JARVIS_BASE_URL: file://${{ github.workspace }}/tmpfail
+        run: |
+          set -e
+          # 지우는 도구가 늘 실패하는 가짜를 놓는다. 그때 설치가 시작되면 안 된다.
+          mkdir -p tmpfail
+          printf '#!/bin/bash\necho "  [남음] 일부러 실패시킨 것입니다"\nexit 7\n' > tmpfail/reset-clean.sh
+          printf '#!/bin/bash\necho INSTALL_STARTED\n' > tmpfail/bootstrap.sh
+          out="$(bash install-master/reinstall.sh || true)"
+          printf '%s\n' "$out"
+          printf '%s\n' "$out" | grep -q 'INSTALL_STARTED' \
+            && { echo '::error::지우기가 실패했는데 설치가 시작됐다'; exit 1; }
+          printf '%s\n' "$out" | grep -q '다시 설치하지 않았습니다' \
+            || { echo '::error::멈춘 까닭을 말하지 않는다'; exit 1; }
+          echo '지우기 실패 -> 설치 안 함: 확인'
+
+      # ── 윈도우: 사용자 PATH 등록·해제를 실측한다 ──────────────
+      - name: 사용자 실행 경로 등록과 해제 (윈)
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: |
+          $bin = Join-Path $env:USERPROFILE '.local\bin'
+          New-Item -ItemType Directory -Force -Path $bin | Out-Null
+          # 설치기가 하는 일과 같은 형태로 심는다
+          $u = [Environment]::GetEnvironmentVariable('Path','User')
+          $seeded = if ($u) { "$u;$bin" } else { $bin }
+          [Environment]::SetEnvironmentVariable('Path', $seeded, 'User')
+          $after = [Environment]::GetEnvironmentVariable('Path','User')
+          if ($after -notlike "*$bin*") { Write-Host '::error::심는 것부터 안 됐다'; exit 1 }
+          # 제거기가 그 조각만 빼는가
+          & powershell -ExecutionPolicy Bypass -File install-master\reset-clean.ps1 -Yes | Out-String | Write-Host
+          $end = [Environment]::GetEnvironmentVariable('Path','User')
+          if ($end -like "*$bin*") { Write-Host '::error::사용자 경로 조각이 안 빠졌다'; exit 1 }
+          Write-Host '사용자 경로 등록·해제: 확인'
+
+      # ── 윈도우도 같은 주기를 돈다 ──────────────────────────────
+      # 🔴교차 검토 지적 채택(2026-09-08): 앞 판은 매트릭스에 windows-latest 를 걸어 두고
+      #   정작 핵심 단계에 전부 `runner.os == 'macOS'` 를 달아 놨다. **윈도우 잡은 빈 껍데기로
+      #   초록을 냈다** — 윈도우 로직이 무너져도 아무도 모른다. 초록이 거짓말을 하고 있었다.
+      - name: 중간 멈춤 상태를 만든다 (윈 · [1]~[2])
+        if: runner.os == 'Windows'
+        shell: pwsh
+        # 상한이 없으면 파이프를 잡은 자식 프로세스 하나가 잡 전체를 6시간 잠재운다(2026-09-08 첫 실행 실측).
+        timeout-minutes: 12
+        run: |
+          $src = Get-Content install-master\bootstrap.ps1 -Raw
+          $anchor = 'if ($rc -ne 0) { $script:BlockedStep = $st.Name; break }'
+          if ($src -notmatch [regex]::Escape($anchor)) {
+            # 앵커가 바뀌었으면 조용히 지나가지 않는다 — 안 잰 것을 잰 것으로 세지 않기 위해서다.
+            Write-Host '::error::본문 사슬 앵커를 못 찾았다 — bootstrap.ps1 이 바뀌었다'; exit 1
+          }
+          # 러너에는 계정이 없다. 로그인 앞에서 멈추는 것이 이 상태의 정의다.
+          # ⚠머리에 덧붙이지 않는다 — param() 앞에 문장이 오면 param 이 명령으로 읽혀 깨진다(3차 실행 실측 · 2차는 stderr 를 안 받아 안 보였다).
+          #   원 함수 자리에 스텁을 두고 원본은 개명한다(맥의 sed 치환과 같은 자리).
+          $gate = 'function Step-Login {'
+          if ($src -notmatch [regex]::Escape($gate)) { Write-Host '::error::로그인 함수 자리를 못 찾았다 — bootstrap.ps1 이 바뀌었다'; exit 1 }
+          $stub = "function Step-Login { Write-Host '[3/10] (검증) 로그인 앞에서 멈춥니다.'; exit 0 }`r`nfunction Step-LoginOriginal {"
+          $patched = $src.Replace($gate, $stub)
+          # ⚠utf8BOM 이어야 한다. pwsh 7 의 -Encoding UTF8 은 BOM 을 안 붙이고, 그 파일을 Windows PowerShell 5.1 이
+          #   ANSI 로 읽어 한글이 깨지며 파싱 오류가 난다(첫 실행 2026-09-08 실증 · 원본 bootstrap.ps1 은 BOM 있음).
+          #   JSON 은 BOM 없이(아래 축), .ps1 은 BOM 있이 — 파일 종류마다 반대다.
+          Set-Content -Path $env:TEMP\bs-partial.ps1 -Value $patched -Encoding utf8BOM
+          # ⚠파이프로 받지 않는다. 공식 설치기가 띄운 자식 프로세스가 stdout 을 물고 남아
+          #   `| Out-String` 이 EOF 를 못 받고 20분+ 멈췄다(2026-09-08 첫 실행 실측 · 스크립트 자체는 27초에 exit 0).
+          #   출력은 파일로, 기다림은 프로세스 자체에만(자손 무관) · 상한 10분.
+          #   3차 실행: .NET 리다이렉트(Start-Process -RedirectStandardOutput)로 띄우니 자식 5.1 안에서 공식 설치기가
+          #   Get-FileHash 를 못 찾았다(2차의 `& powershell` 콘솔 환경에선 됐다). 그래서 cmd 파일 리다이렉트로 띄운다.
+          $o = Join-Path $env:TEMP 'bs-partial.out'; $f = Join-Path $env:TEMP 'bs-partial.ps1'
+          Write-Host "PSModulePath(부모)=$env:PSModulePath"
+          $p = Start-Process -FilePath cmd -ArgumentList '/c', "powershell -ExecutionPolicy Bypass -File `"$f`" > `"$o`" 2>&1" -NoNewWindow -PassThru
+          if (-not $p.WaitForExit(600000)) { Write-Host '::error::부분 설치가 10분 안에 안 끝났다'; Stop-Process -Id $p.Id -Force; exit 1 }
+          Get-Content $o -ErrorAction SilentlyContinue | Write-Host
+          # 무엇이 남아 파이프를 물었는지 다음 판독을 위해 적는다(설치기 자손 후보).
+          Get-Process | Where-Object { $_.Name -like 'claude*' -or $_.Name -like 'powershell*' } | Select-Object Name,Id,StartTime | Format-Table | Out-String | Write-Host
+          exit 0
+
+      - name: 중간 멈춤을 진단이 알아보는가 (윈)
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: |
+          $out = & powershell -ExecutionPolicy Bypass -File install-master\reset-clean.ps1 -List | Out-String
+          Write-Host $out
+          if ($out -notmatch '중간에 멈춘 상태') { Write-Host '::error::중간 멈춤을 못 알아봤다'; exit 1 }
+          if ($out -notmatch '클로드 실행 파일') { Write-Host '::error::깐 것을 못 찾았다'; exit 1 }
+
+      - name: 지운다 · 자국 0 을 대조한다 (윈)
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: |
+          & powershell -ExecutionPolicy Bypass -File install-master\reset-clean.ps1 -Yes | Out-String | Write-Host
+          $out = & powershell -ExecutionPolicy Bypass -File install-master\reset-clean.ps1 -List | Out-String
+          Write-Host $out
+          if ($out -notmatch '아무것도 깔려 있지 않습니다') { Write-Host '::error::다 지웠다는데 자국이 남았다'; exit 1 }
+
+      - name: 다시 지워도 탈이 없는가 (멱등 · 윈)
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: |
+          $out = & powershell -ExecutionPolicy Bypass -File install-master\reset-clean.ps1 -Yes | Out-String
+          Write-Host $out
+          if ($out -notmatch '지울 것이 없습니다') { Write-Host '::error::두 번째 실행이 조용하지 않다'; exit 1 }
+
+      - name: 고쳐 쓴 설정 파일에 BOM 이 안 붙는가 (윈)
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: |
+          # PowerShell 5.1 의 Set-Content -Encoding UTF8 은 BOM 을 붙인다. JSON 앞의 BOM 은
+          # 읽는 쪽이 파싱에 실패하게 만든다 — 칸 하나 빼려다 남의 파일을 못 읽게 만드는 자리다.
+          $d = Join-Path $env:USERPROFILE '.claude'
+          New-Item -ItemType Directory -Force -Path $d | Out-Null
+          $f = Join-Path $d 'settings.json'
+          # theme 만 심으면 진단이 「미설치」로 판정해 삭제 단계 자체를 안 탄다(3차 실행 실측) — 우리 칸 정본 키를 함께 심는다.
+          '{"theme":"dark","skipDangerousModePermissionPrompt":true,"mine":"keep"}' | Out-File -FilePath $f -Encoding ascii
+          & powershell -ExecutionPolicy Bypass -File install-master\reset-clean.ps1 -Yes | Out-String | Write-Host
+          $bytes = [System.IO.File]::ReadAllBytes($f)
+          if ($bytes.Length -ge 3 -and $bytes[0] -eq 0xEF -and $bytes[1] -eq 0xBB -and $bytes[2] -eq 0xBF) {
+            Write-Host '::error::고쳐 쓴 파일에 BOM 이 붙었다'; exit 1
+          }
+          $o = Get-Content $f -Raw | ConvertFrom-Json
+          if ($null -eq $o.mine) { Write-Host '::error::남의 칸이 사라졌다'; exit 1 }
+          if ($null -ne $o.theme) { Write-Host '::error::우리 칸이 안 빠졌다'; exit 1 }
+          if ($null -ne $o.skipDangerousModePermissionPrompt) { Write-Host '::error::우리 칸 2가 안 빠졌다'; exit 1 }
+          Write-Host 'BOM 없음 · 남의 칸 보존 · 우리 칸 제거: 확인'
+
+      - name: 지우기가 실패하면 설치로 안 넘어가는가 (윈)
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: |
+          # 늘 실패하는 가짜 지우개와 「설치 시작」만 찍는 가짜 설치기를 로컬 주소에 놓고, 진입점이 설치로 넘어가는지 본다.
+          # (4차 실행: 진입점이 사이트에서 새로 받으므로 사용자 폴더에 놓은 가짜는 덮여 버렸다 — 맥과 같은 JARVIS_BASE_URL 손잡이로 푼다.)
+          $d = Join-Path $env:RUNNER_TEMP 'tmpfail'
+          New-Item -ItemType Directory -Force -Path $d | Out-Null
+          "Write-Host '  [남음] 일부러 실패시킨 것입니다'`r`nexit 7" | Set-Content -Path (Join-Path $d 'reset-clean.ps1') -Encoding utf8BOM
+          "Write-Host 'INSTALL_STARTED'" | Set-Content -Path (Join-Path $d 'bootstrap.ps1') -Encoding utf8BOM
+          $env:JARVIS_BASE_URL = 'file:///' + ($d -replace '\\','/')
+          $out = & powershell -ExecutionPolicy Bypass -File install-master\reinstall.ps1 2>&1 | Out-String
+          $rc = $LASTEXITCODE
+          Write-Host $out
+          Write-Host "진입점 종료 코드 = $rc"
+          if ($out -match 'INSTALL_STARTED') { Write-Host '::error::지우기가 실패했는데 설치가 시작됐다'; exit 1 }
+          if ($out -notmatch '다시 설치하지 않았습니다') { Write-Host '::error::멈춘 까닭을 말하지 않는다(가짜 지우개가 실행되지 않았을 수 있다)'; exit 1 }
+          if ($rc -ne 7) { Write-Host "::error::지우개의 종료 코드(7)를 그대로 돌려주지 않았다: $rc"; exit 1 }
+          Write-Host '지우기 실패 -> 설치 안 함: 확인'
+          exit 0
+
+      # ── 로그인 보존 — 「로그인은 그대로 둡니다」를 기계가 재는 자리 ──
+      # 🔴왜 생겼는가(2026-09-08 운영자 실기): 「완전 삭제 후 재설치」 뒤 [3/10] 에서 로그인 화면이
+      #   다시 열렸다. 그때까지 이 축이 러너에 **없었다** — 러너에 계정이 없어 [3/10] 앞에서 멈추므로
+      #   「로그인 보존」은 사람 노트북에서만 재고 있었고, 윈도우에서는 한 번도 안 재고 배포됐다.
+      # ★계정 없이도 잴 수 있다. 로그인 화면까지 갈 필요가 없기 때문이다 —
+      #   재야 할 것은 「**지우개가 로그인 자리를 건드렸는가**」이고, 그건 씨앗을 심고 대조하면 된다.
+      # ⚠글자로 비교하지 않는다. 파싱한 뒤 뜻으로 비교한다(login-verify.py).
+      - name: 로그인 보존 — 씨앗·지우기·대조 (맥)
+        if: runner.os == 'macOS'
+        timeout-minutes: 10
+        env:
+          PYTHONUTF8: 1
+        run: bash tests/login-preserve-run.sh --dir install-master --sandbox "$RUNNER_TEMP/lp-home"
+
+      - name: 로그인 보존 — 뮤턴트가 붉어지는가 (맥)
+        if: runner.os == 'macOS'
+        timeout-minutes: 10
+        env:
+          PYTHONUTF8: 1
+        run: |
+          set -e
+          # 초록이 「수정이 섰다」인지 「축이 아무것도 안 잰다」인지 가르는 유일한 방법이다.
+          for m in mac-cred-delete mac-hook-overreach mac-json-overreach; do
+            echo "───── 뮤턴트 $m ─────"
+            exp="$(python3 tests/login-mutate.py --src install-master --dst "$RUNNER_TEMP/x-$m" --mutant "$m" --print-expect)"
+            python3 tests/login-mutate.py --src install-master --dst "$RUNNER_TEMP/mut-$m" --mutant "$m"
+            # ★「적색이 났다」로 끝내지 않는다 — 지우개가 죽어도 씨앗이 그대로 남아 온통 적색이 된다.
+            #   그때 증명되는 것은 「망가뜨렸더니 붉어졌다」가 아니라 「아무것도 안 돌았다」이다.
+            bash tests/login-preserve-run.sh --dir "$RUNNER_TEMP/mut-$m" \
+                 --sandbox "$RUNNER_TEMP/lp-$m" --expect-fail --expect-fail-at "$exp" \
+              || { echo "::error::뮤턴트 $m 이 기대한 자리($exp)를 붉히지 못했다"; exit 1; }
+          done
+
+      # ── 토론장 참가 자리 보존 — 「남깁니다」가 참인지 동작으로 재는 자리 ──
+      # 🔴왜 러너가 재야 하는가: 이 축은 **제거기를 실제로 돌려야** 잴 수 있다. 개발기에서는
+      #   입구가 거절한다(제거기의 몇 자리는 절대경로라 HOME 을 바꿔도 격리되지 않는다).
+      # ★교차 검토 2차가 잡은 자리다 — 화면은 「남깁니다」라고 말하는데 동작은 상위를 통째로 지웠다.
+      - name: 토론장 자리 보존 — 중첩 설정에서 열쇠가 살아남는가 (맥)
+        if: runner.os == 'macOS'
+        timeout-minutes: 10
+        env:
+          PYTHONUTF8: 1
+        run: |
+          set -e
+          # ★같은 자리를 **세 가지 글자 모양**으로 넘겨 본다. 정규화를 안 하면 뒤 둘에서 열쇠가 지워진다
+          #   (2차 검토 반례: `~/.cys/./forum` · 링크를 거친 경로는 중첩 판정을 빠져나간다).
+          for shape in plain dotseg symlink; do
+            echo "───── 모양 $shape ─────"
+            bash tests/agora-preserve-run.sh --dir install-master --sandbox "$RUNNER_TEMP/ag-$shape" --shape "$shape"
+          done
+          # ★재실행 고착(1차-RETRY) — 밖에 **내용이 다른 반쪽 안내**가 남은 채 다시 돌린 상황.
+          #   앞 판은 그 반쪽을 「이미 있다」로 읽고 이전을 건너뛴 뒤 원본을 지웠다.
+          #   ⇒ 이번엔 **원본이 그대로 남아야** 한다(fail-closed).
+          echo "───── 재실행 고착(밖에 반쪽이 남아 있다) ─────"
+          bash tests/agora-preserve-run.sh --dir install-master --sandbox "$RUNNER_TEMP/ag-stale" \
+            --stale-out --expect-cys-kept --expect-cleaner-says '손으로 정리하신 뒤' 
+          # ★열거·삭제 실패를 **실제로 주입**한다(2차-NEW-ENUM) — 권한을 뺏은 하위 자리를 심는다.
+          #   지우개는 「지웠다」가 아니라 「일부 남음」이라 말하고 **비영으로** 끝나야 한다.
+          echo "───── 못 여는 자리를 심는다(열거·삭제가 진짜로 실패한다) ─────"
+          bash tests/agora-preserve-run.sh --dir install-master --sandbox "$RUNNER_TEMP/ag-lock" \
+            --unreadable --expect-partial
+          # ★바깥을 가리키는 링크 — 지우개는 **링크만** 지우고 대상은 손대면 안 된다.
+          #   맥은 `rm -rf` 가 원래 그렇다(실측). 이 축은 그 사실을 **묶어 두는** 자리다 —
+          #   윈도우 쪽 수정과 같은 것을 재고 있음을 두 OS 로 확인한다(윈 5.1 이 뚫는지는 판본에 따라
+          #   다르다 - 2026-09-09 러너 실측: 안 뚫었다. 본체 축은 「열거 못한 자리를 지웠는가」다).
+          echo "───── 바깥을 가리키는 링크(뚫고 지우는지) ─────"
+          bash tests/agora-preserve-run.sh --dir install-master --sandbox "$RUNNER_TEMP/ag-link" --outside-link
+          # ★끊어진 링크 잔재가 있어도 **깨끗이** 끝나야 한다(5차 MEDIUM · 맥도 같이 잰다).
+          echo "───── 끊어진 링크 잔재(그래도 깨끗이 끝나는가) ─────"
+          bash tests/agora-preserve-run.sh --dir install-master --sandbox "$RUNNER_TEMP/ag-dang" \
+            --dangling-link --expect-clean
+          # ★삭제 루트 **자신이** 링크인 경우 — 지우개는 이름표만 지우고 가리키던 자리는 손대면 안 된다.
+          #   앞 판은 실경로를 구해 **그 대상 폴더**를 훑어 지웠다(6차 BLOCK · 두 OS 공통 결함이었다).
+          echo "───── 삭제 루트 자신이 링크(이름표만 지우는가) ─────"
+          bash tests/agora-preserve-run.sh --dir install-master --sandbox "$RUNNER_TEMP/ag-root" \
+            --root-link --expect-clean
+          # ★링크 사슬 — 맥은 사슬 길이를 **OS 가** 정한다(`cd -P`) ⇒ 어느 판본에서도 안전한 2단만 건다.
+          #   32/33 경계 계약은 우리 코드가 세는 윈도우 쪽에서 잰다.
+          echo "───── 링크 사슬 2단(같은 곳을 가리킨다) ─────"
+          bash tests/agora-preserve-run.sh --dir install-master --sandbox "$RUNNER_TEMP/ag-ch2" --chain 2
+
+      - name: 토론장 자리 보존 — 뮤턴트가 붉어지는가 (맥)
+        if: runner.os == 'macOS'
+        timeout-minutes: 10
+        env:
+          PYTHONUTF8: 1
+        run: |
+          set -e
+          # 초록이 「보존이 섰다」인지 「축이 아무것도 안 잰다」인지 가르는 유일한 방법이다.
+          # ⑴중첩 보존을 없앤다 → 열쇠가 상위 삭제에 딸려 간다(2차 검토가 지적한 바로 그 상태).
+          rm -rf "$RUNNER_TEMP/mut-ag1"; cp -R install-master "$RUNNER_TEMP/mut-ag1"
+          sed -i '' 's|^PRESERVE_PATHS="\$AGORA_HOME$|PRESERVE_PATHS="|' "$RUNNER_TEMP/mut-ag1/reset-clean.sh"
+          grep -q 'PRESERVE_PATHS="$' "$RUNNER_TEMP/mut-ag1/reset-clean.sh" || { echo "::error::뮤턴트 ag1 이 적용되지 않았다"; exit 1; }
+          bash tests/agora-preserve-run.sh --dir "$RUNNER_TEMP/mut-ag1" --sandbox "$RUNNER_TEMP/ag-m1" --expect-fail \
+            || { echo "::error::뮤턴트 ag1(중첩 보존 제거)이 붉어지지 않았다"; exit 1; }
+          # ⑵안내 파일 이전을 없앤다 → 재설치 뒤 「아고라에 참가해」가 안 먹는 공백이 생긴다(1차).
+          rm -rf "$RUNNER_TEMP/mut-ag2"; cp -R install-master "$RUNNER_TEMP/mut-ag2"
+          sed -i '' 's|^  if \[ -d "\$AGORA_SKILL_IN_CYS" \]; then$|  if false; then|' "$RUNNER_TEMP/mut-ag2/reset-clean.sh"
+          grep -q '^  if false; then$' "$RUNNER_TEMP/mut-ag2/reset-clean.sh" || { echo "::error::뮤턴트 ag2 가 적용되지 않았다"; exit 1; }
+          bash tests/agora-preserve-run.sh --dir "$RUNNER_TEMP/mut-ag2" --sandbox "$RUNNER_TEMP/ag-m2" --expect-fail \
+            || { echo "::error::뮤턴트 ag2(안내 이전 제거)가 붉어지지 않았다"; exit 1; }
+          # ⑶경로 정규화를 없앤다 → `.` 이 낀 자리에서 중첩 판정이 빠져나가 열쇠가 지워진다.
+          #   canon() 을 「받은 글자를 그대로 돌려주는」 것으로 바꾼다(원래 몸통은 뒤에 남겨 문법을 지킨다).
+          rm -rf "$RUNNER_TEMP/mut-ag3"; cp -R install-master "$RUNNER_TEMP/mut-ag3"
+          sed -i '' 's|^canon() {.*$|canon() { printf "%s\\n" "${1%/}"; return 0; }\
+          canon_unused() {|' "$RUNNER_TEMP/mut-ag3/reset-clean.sh"
+          grep -q '^canon() { printf' "$RUNNER_TEMP/mut-ag3/reset-clean.sh" || { echo "::error::뮤턴트 ag3 이 적용되지 않았다"; exit 1; }
+          bash -n "$RUNNER_TEMP/mut-ag3/reset-clean.sh" || { echo "::error::뮤턴트 ag3 이 문법을 깨뜨렸다"; exit 1; }
+          bash tests/agora-preserve-run.sh --dir "$RUNNER_TEMP/mut-ag3" --sandbox "$RUNNER_TEMP/ag-m3" --shape dotseg --expect-fail \
+            || { echo "::error::뮤턴트 ag3(경로 정규화 제거)이 붉어지지 않았다"; exit 1; }
+          # ⑷안내를 옮기되 **내용이 달라지게** 한다(반쪽 복사 흉내) → 바이트 대조가 그것을 잡아야 한다.
+          #   앞 판은 「폴더가 생겼는가」만 봐서 이 뮤턴트가 그대로 통과했다.
+          rm -rf "$RUNNER_TEMP/mut-ag5"; cp -R install-master "$RUNNER_TEMP/mut-ag5"
+          # ⚠같은 문구가 이제 **두 곳**에 있다(「이미 있다」 갈래에도 tree_same 이 있다) ⇒ 줄머리로 가른다.
+          sed -i '' 's|^       && tree_same "$AGORA_SKILL_IN_CYS" "$AGORA_SKILL"; then|       \&\& sh -c "printf X >> \\"$AGORA_SKILL/SKILL.md\\"; true"; then|' "$RUNNER_TEMP/mut-ag5/reset-clean.sh"
+          grep -q 'printf X >>' "$RUNNER_TEMP/mut-ag5/reset-clean.sh" || { echo "::error::뮤턴트 ag5 가 적용되지 않았다"; exit 1; }
+          bash -n "$RUNNER_TEMP/mut-ag5/reset-clean.sh" || { echo "::error::뮤턴트 ag5 가 문법을 깨뜨렸다"; exit 1; }
+          bash tests/agora-preserve-run.sh --dir "$RUNNER_TEMP/mut-ag5" --sandbox "$RUNNER_TEMP/ag-m5" --expect-fail \
+            || { echo "::error::뮤턴트 ag5(안내 내용 변조)가 붉어지지 않았다"; exit 1; }
+          # ⑸★여기서부터는 **실패를 실제로 주입**한다. 앞 판의 ⑸는 「뮤턴트를 적용했다」까지만 확인하고
+          #   끝냈는데(러너에서 실패를 만들 수 없다고 적었다), ★**적용 확인은 축이 아니다** — 4차 검토가 그것을
+          #   지적했다. 권한을 뺏은 자리를 심으면 러너에서도 실패는 만들 수 있었다.
+          # ⑸-1 삭제·열거 실패를 성공으로 세는 자리를 되돌린다 → 실패를 심어도 「지움」이라 말한다.
+          rm -rf "$RUNNER_TEMP/mut-ag4"; cp -R install-master "$RUNNER_TEMP/mut-ag4"
+          # ⚠구분자를 `|` 로 쓰면 본문의 `||` 에 걸려 sed 가 죽는다(러너 실측) ⇒ `#` 를 쓴다.
+          sed -i '' 's#^  PRUNE_FAIL=$((left + enum_fail))$#  PRUNE_FAIL=0#' "$RUNNER_TEMP/mut-ag4/reset-clean.sh"
+          grep -q '^  PRUNE_FAIL=0$' "$RUNNER_TEMP/mut-ag4/reset-clean.sh" || { echo "::error::뮤턴트 ag4 가 적용되지 않았다"; exit 1; }
+          bash -n "$RUNNER_TEMP/mut-ag4/reset-clean.sh" || { echo "::error::뮤턴트 ag4 가 문법을 깨뜨렸다"; exit 1; }
+          rc=0
+          bash tests/agora-preserve-run.sh --dir "$RUNNER_TEMP/mut-ag4" --sandbox "$RUNNER_TEMP/ag-m4" \
+            --unreadable --expect-partial || rc=$?
+          [ "$rc" != "0" ] || { echo "::error::뮤턴트 ag4(실패를 0으로 고정)가 붉어지지 않았다"; exit 1; }
+          echo "뮤턴트 ag4: 기대대로 적색(실패를 심었는데 「지움」이라 말한다)"
+          # ⑹★남길 자리를 못 푸는 상황을 **대역(double)으로 강제**한다 → 그 실행은 아무것도 지우면 안 된다.
+          #   `canon` 이 참가 자리에서만 실패하게 만든다(지울 자리는 정상으로 푼다) — 앞 판은 그 경로를
+          #   보존 목록에서 조용히 빼고 상위를 통째로 지웠다(2차-CANON-FAIL).
+          rm -rf "$RUNNER_TEMP/mut-ag7"; cp -R install-master "$RUNNER_TEMP/mut-ag7"
+          sed -i '' 's|^canon() {.*$|canon() { case "$1" in *forum*) return 1 ;; esac; canon_real "$@"; }\
+          canon_real() {|' "$RUNNER_TEMP/mut-ag7/reset-clean.sh"
+          grep -q '^canon() { case' "$RUNNER_TEMP/mut-ag7/reset-clean.sh" || { echo "::error::대역 ag7 이 적용되지 않았다"; exit 1; }
+          bash -n "$RUNNER_TEMP/mut-ag7/reset-clean.sh" || { echo "::error::대역 ag7 이 문법을 깨뜨렸다"; exit 1; }
+          bash tests/agora-preserve-run.sh --dir "$RUNNER_TEMP/mut-ag7" --sandbox "$RUNNER_TEMP/ag-m7" \
+            --expect-cys-kept --expect-cleaner-says '확인 못한 자리:' \
+            || { echo "::error::남길 자리를 못 푸는데 지웠다(fail-closed 가 안 물었다)"; exit 1; }
+          echo "대역 ag7: 삭제 0 확인(남길 자리를 못 풀면 아무것도 지우지 않는다)"
+          # ⑺그 fail-closed 를 빼면 **같은 대역에서 열쇠가 지워져야** 한다 — 위 초록이 장치 덕분임의 증명.
+          rm -rf "$RUNNER_TEMP/mut-ag8"; cp -R "$RUNNER_TEMP/mut-ag7" "$RUNNER_TEMP/mut-ag8"
+          sed -i '' 's#^  if \[ "${PRESERVE_CANON_FAIL:-0}" -ne 0 \]; then$#  if false; then#' "$RUNNER_TEMP/mut-ag8/reset-clean.sh"
+          grep -q '^  if false; then$' "$RUNNER_TEMP/mut-ag8/reset-clean.sh" || { echo "::error::뮤턴트 ag8 이 적용되지 않았다"; exit 1; }
+          bash -n "$RUNNER_TEMP/mut-ag8/reset-clean.sh" || { echo "::error::뮤턴트 ag8 이 문법을 깨뜨렸다"; exit 1; }
+          rc=0
+          bash tests/agora-preserve-run.sh --dir "$RUNNER_TEMP/mut-ag8" --sandbox "$RUNNER_TEMP/ag-m8" \
+            --expect-cys-kept --expect-cleaner-says '확인 못한 자리:' || rc=$?
+          [ "$rc" != "0" ] || { echo "::error::뮤턴트 ag8(fail-closed 제거)이 붉어지지 않았다"; exit 1; }
+          echo "뮤턴트 ag8: 기대대로 적색(장치를 빼면 열쇠가 지워진다)"
+          # ⑻재실행 고착 판정을 옛 것(「대상이 있다」)으로 되돌린다 → 반쪽이 남은 재실행에서 원본을 지운다.
+          rm -rf "$RUNNER_TEMP/mut-ag6"; cp -R install-master "$RUNNER_TEMP/mut-ag6"
+          sed -i '' 's|^  if \[ -d "\$AGORA_SKILL_IN_CYS" \]; then$|  if [ -d "$AGORA_SKILL_IN_CYS" ] \&\& [ ! -d "$AGORA_SKILL" ]; then|' "$RUNNER_TEMP/mut-ag6/reset-clean.sh"
+          grep -q '! -d "\$AGORA_SKILL" \]; then$' "$RUNNER_TEMP/mut-ag6/reset-clean.sh" || { echo "::error::뮤턴트 ag6 이 적용되지 않았다"; exit 1; }
+          bash -n "$RUNNER_TEMP/mut-ag6/reset-clean.sh" || { echo "::error::뮤턴트 ag6 이 문법을 깨뜨렸다"; exit 1; }
+          rc=0
+          bash tests/agora-preserve-run.sh --dir "$RUNNER_TEMP/mut-ag6" --sandbox "$RUNNER_TEMP/ag-m6" \
+            --stale-out --expect-cys-kept --expect-cleaner-says '손으로 정리하신 뒤' || rc=$?
+          [ "$rc" != "0" ] || { echo "::error::뮤턴트 ag6(옛 「대상이 있다」 판정)이 붉어지지 않았다"; exit 1; }
+          echo "뮤턴트 ag6: 기대대로 적색(반쪽이 남은 재실행에서 원본을 지운다)"
+          # ⑼삭제 루트가 링크일 때 「이름표만」 규칙을 되돌린다 → 실경로 대상 쪽으로 흘러가 이름표가 남는다.
+          rm -rf "$RUNNER_TEMP/mut-ag9"; cp -R install-master "$RUNNER_TEMP/mut-ag9"
+          sed -i '' 's|^  if \[ -L "\$1" \]; then$|  if false; then|' "$RUNNER_TEMP/mut-ag9/reset-clean.sh"
+          grep -q '^  if false; then$' "$RUNNER_TEMP/mut-ag9/reset-clean.sh" || { echo "::error::뮤턴트 ag9 가 적용되지 않았다"; exit 1; }
+          bash -n "$RUNNER_TEMP/mut-ag9/reset-clean.sh" || { echo "::error::뮤턴트 ag9 가 문법을 깨뜨렸다"; exit 1; }
+          rc=0
+          bash tests/agora-preserve-run.sh --dir "$RUNNER_TEMP/mut-ag9" --sandbox "$RUNNER_TEMP/ag-m9" --root-link || rc=$?
+          [ "$rc" != "0" ] || { echo "::error::뮤턴트 ag9(루트 링크 규칙 제거)가 붉어지지 않았다"; exit 1; }
+          echo "뮤턴트 ag9: 기대대로 적색(루트가 링크인데 이름표 규칙을 안 탄다)"
+          # ⑽★**무동작 대조군** — 씨앗만 놓고 **아무것도 안 한 채 `exit 7`** 만 하는 가짜 지우개.
+          #   앞 판의 fail-closed 축은 이것을 **통과시켰다**(원본이 그대로인 건 당연하고 종료값도 맞으니까).
+          #   ⇒ 그 갈래만 찍는 문구를 요구하도록 고쳤으니, 이 대조군은 이제 **적색이어야** 한다.
+          rm -rf "$RUNNER_TEMP/mut-noop"; cp -R install-master "$RUNNER_TEMP/mut-noop"
+          printf '#!/bin/bash\nexit 7\n' > "$RUNNER_TEMP/mut-noop/reset-clean.sh"
+          rc=0
+          bash tests/agora-preserve-run.sh --dir "$RUNNER_TEMP/mut-noop" --sandbox "$RUNNER_TEMP/ag-noop" \
+            --stale-out --expect-cys-kept --expect-cleaner-says '손으로 정리하신 뒤' || rc=$?
+          [ "$rc" != "0" ] || { echo "::error::아무것도 안 하고 exit 7 만 한 지우개가 통과했다(축이 공허하다)"; exit 1; }
+          echo "대조군(무동작 exit 7): 기대대로 적색 — fail-closed 축이 이제 실제 실행을 요구한다"
+          # ⑾★열거가 링크 안으로 안 들어간다는 **전제 자체**를 맥에서도 축으로 만든다(개발 중 신고).
+          #   `find` 에 `-L` 을 붙이면 링크를 따라 들어가 바깥 파일이 목록에 올라 지워진다.
+          rm -rf "$RUNNER_TEMP/mut-ag10"; cp -R install-master "$RUNNER_TEMP/mut-ag10"
+          sed -i '' 's|find "\$root" -depth|find -L "$root" -depth|g' "$RUNNER_TEMP/mut-ag10/reset-clean.sh"
+          [ "$(grep -c 'find -L "\$root" -depth' "$RUNNER_TEMP/mut-ag10/reset-clean.sh")" = "2" ] \
+            || { echo "::error::뮤턴트 ag10 이 두 자리 모두에 적용되지 않았다"; exit 1; }
+          bash -n "$RUNNER_TEMP/mut-ag10/reset-clean.sh" || { echo "::error::뮤턴트 ag10 이 문법을 깨뜨렸다"; exit 1; }
+          rc=0
+          bash tests/agora-preserve-run.sh --dir "$RUNNER_TEMP/mut-ag10" --sandbox "$RUNNER_TEMP/ag-m10" --outside-link || rc=$?
+          [ "$rc" != "0" ] || { echo "::error::뮤턴트 ag10(find -L)이 붉어지지 않았다 — 전제가 축으로 안 서 있다"; exit 1; }
+          echo "뮤턴트 ag10: 기대대로 적색(링크를 따라 들어가면 바깥이 지워진다)"
+
+      - name: 윈도우 미리보기가 1→10 차례로 찍는가 (윈)
+        if: runner.os == 'Windows'
+        timeout-minutes: 6
+        shell: pwsh
+        run: |
+          # 맥 차례는 checks.sh 가 잰다. 윈도우는 여기서만 잴 수 있다(그 기계에만 PowerShell 이 있다).
+          # 2차 검토 지적: checks.sh 주석은 「윈도우는 러너가 잰다」고 적었는데 그 축이 없었다.
+          $log = Join-Path $env:RUNNER_TEMP 'win-dry.txt'
+          # ⚠v0.3.8 r4 부터 설치기는 **이름이 install-jarvis 인 자리만** 쓴다(3차 N3 = 표면 축소).
+          #   시험이 쓰는 자리도 그 규칙을 지켜야 한다 — 참가자 기계와 다른 모양으로 재면 시험이 거짓이 된다.
+          $env:JARVIS_HOME = Join-Path (Join-Path $env:RUNNER_TEMP 'dry-home') 'install-jarvis'
+          & powershell -ExecutionPolicy Bypass -File install-master\bootstrap.ps1 -DryRun *> $log
+          $seq = @(Select-String -Path $log -Pattern '^\[[0-9]+/10\]' -AllMatches |
+                   ForEach-Object { $_.Matches.Value }) | Select-Object -Unique
+          $got = ($seq -join ' ')
+          $want = '[1/10] [2/10] [3/10] [4/10] [5/10] [6/10] [7/10] [8/10] [9/10] [10/10]'
+          Write-Host ("찍힌 차례 = " + $got)
+          if ($got -ne $want) {
+            Get-Content $log | Write-Host
+            Write-Host ("::error::윈도우 미리보기 차례가 기대와 다르다. 기대=" + $want)
+            exit 1
+          }
+          Write-Host '윈도우 미리보기 차례 = 기대와 같다'
+
+      - name: 검사 축이 공백 든 경로에서도 도는가 (맥)
+        if: runner.os == 'macOS'
+        timeout-minutes: 5
+        run: |
+          set -e
+          # 교차 검토 4차: 파일 목록을 공백으로 이으면 공백 든 경로에서 조각나 축이 조용히 건너뛴다.
+          d="$RUNNER_TEMP/review space/install-master"
+          rm -rf "$RUNNER_TEMP/review space"; mkdir -p "$RUNNER_TEMP/review space"
+          cp -R install-master "$d"
+          out="$(bash install-master/checks.sh "$d" 2>&1 || true)"
+          printf '%s\n' "$out" | grep -E '분리\]|공개\]' || true
+          for f in bootstrap.sh bootstrap.ps1 reinstall.sh reinstall.ps1; do
+            printf '%s\n' "$out" | grep -q "ok   \[분리\] $f 에 아고라 문자열 0건" \
+              || { echo "::error::공백 든 경로에서 $f 의 분리 축이 돌지 않았다"; exit 1; }
+          done
+
+      - name: 자리 복원 플래그 — 실제로 무엇을 넘겼는가 (맥)
+        if: runner.os == 'macOS'
+        timeout-minutes: 5
+        run: |
+          set -e
+          # 글자 세기로는 못 재는 자리다 — 갈래가 파일에 둘 다 적혀 있기 때문이다.
+          # 가짜 cys 를 놓고 **넘어간 인자**를 받아 적는다(진짜 좌석을 만들지 않는다).
+          #   ①②는 판본 두 갈래 · ③④는 뮤턴트(판정을 상수로 바꿔도 같은 값이 나오면 축이 죽은 것이다).
+          bash tests/agent-flag-run.sh --dir install-master --sandbox "$RUNNER_TEMP/af-yes" \
+               --cys has-agent --expect-agent 1
+          bash tests/agent-flag-run.sh --dir install-master --sandbox "$RUNNER_TEMP/af-no" \
+               --cys no-agent  --expect-agent 0
+          bash tests/agent-flag-run.sh --dir install-master --sandbox "$RUNNER_TEMP/af-m1" \
+               --cys has-agent --mutant always-false --expect-agent 0
+          bash tests/agent-flag-run.sh --dir install-master --sandbox "$RUNNER_TEMP/af-m2" \
+               --cys no-agent  --mutant always-true  --expect-agent 1
+
+      - name: 3호 수정 — 뮤턴트가 붉어지는가 (맥 · 정적 축)
+        if: runner.os == 'macOS'
+        timeout-minutes: 5
+        env:
+          PYTHONUTF8: 1
+        run: |
+          set -e
+          # 앵커가 흐르면 뮤턴트가 조용히 아무것도 안 바꾼다 — 먼저 앵커부터 센다.
+          python3 tests/win-v3-mutate.py --src install-master --audit
+          for m in reg-blind silent-timeout swallow-rc reg-orphan no-proc-check; do
+            echo "───── 뮤턴트 $m ─────"
+            exp="$(python3 tests/win-v3-mutate.py --mutant "$m" --print-expect)"
+            python3 tests/win-v3-mutate.py --src install-master --dst "$RUNNER_TEMP/v3-$m" --mutant "$m"
+            out="$(bash install-master/checks.sh "$RUNNER_TEMP/v3-$m" 2>&1 | grep -F "$exp" || true)"
+            printf '%s\n' "$out"
+            printf '%s\n' "$out" | grep -q '^  FAIL' \
+              || { echo "::error::뮤턴트 $m 이 기대한 축($exp)을 붉히지 못했다"; exit 1; }
+          done
+
+      - name: 멈추지 않는 설치기 — 뮤턴트·규칙 표 (맥)
+        if: runner.os == 'macOS'
+        timeout-minutes: 5
+        env:
+          PYTHONUTF8: 1
+        run: |
+          set -e
+          # ① 표·설치기·안내 문서가 같은 코드 집합인가(셋 중 하나만 고치면 여기서 붉어진다)
+          python3 tests/help-rules-check.py
+          # ② 앵커부터 센다 — 안 걸리면 뮤턴트가 조용히 아무것도 안 바꾼다
+          python3 tests/never-stalls-mutate.py --src . --audit
+          for m in $(python3 tests/never-stalls-mutate.py --list); do
+            echo "───── 뮤턴트 $m ─────"
+            exp="$(python3 tests/never-stalls-mutate.py --mutant "$m" --print-expect)"
+            sd="$(python3 tests/never-stalls-mutate.py --mutant "$m" --print-src)"
+            python3 tests/never-stalls-mutate.py --src "$sd" --dst "$RUNNER_TEMP/ns-$m" --mutant "$m"
+            if [ "$exp" = "checker" ]; then
+              # 규칙 표에서 행을 지우면 검사기가 붉어져야 한다
+              if python3 tests/help-rules-check.py --rules "$RUNNER_TEMP/ns-$m/help-rules.tsv" >/dev/null 2>&1; then
+                echo "::error::뮤턴트 $m 인데 검사기가 통과했다"; exit 1
+              fi
+            else
+              out="$(bash install-master/checks.sh "$RUNNER_TEMP/ns-$m" 2>&1 | grep -F "$exp" || true)"
+              printf '%s\n' "$out"
+              printf '%s\n' "$out" | grep -q '^  FAIL' \
+                || { echo "::error::뮤턴트 $m 이 기대한 축($exp)을 붉히지 못했다"; exit 1; }
+            fi
+          done
+
+      - name: 시험 입구가 살아 있는 기계에서 멈추는가 (맥)
+        if: runner.os == 'macOS'
+        timeout-minutes: 10
+        env:
+          PYTHONUTF8: 1
+        run: |
+          set -e
+          # 🔴2026-09-08 사고의 수정을 재는 축이다. 개발 에이전트가 HOME 만 바꿔 놓고 개발기에서 제거기를
+          #   돌렸고, HOME 을 안 보는 절대경로(/Applications/cys.app)가 실제로 지워졌다.
+          #   ⇒ 입구가 그런 기계에서 **시작 자체를 거절**해야 한다.
+          if [ -e /Applications/cys.app ]; then
+            echo '::error::이 러너에 진짜 cys.app 이 있다 — 가짜를 만들지 않는다'; exit 1
+          fi
+          mkdir -p /Applications/cys.app 2>/dev/null \
+            || { sudo mkdir -p /Applications/cys.app && sudo chown "$(id -un)" /Applications/cys.app; }
+          rc=0
+          env -u CI bash tests/login-preserve-run.sh --dir install-master \
+              --sandbox "$RUNNER_TEMP/lp-guard" || rc=$?
+          [ "$rc" = "4" ] || { echo "::error::살아 있는 기계인데 입구가 안 멈췄다(rc=$rc)"; exit 1; }
+          # 뮤턴트: 거절 장치를 빼면 **안 멈춰야** 한다. 그래야 위 적색이 장치 덕분임이 증명된다.
+          #   ⚠이 실행은 가짜 /Applications/cys.app 을 실제로 지운다 — 그것이 바로 장치가 막는 일이다.
+          python3 tests/login-mutate.py --src tests --dst "$RUNNER_TEMP/mut-guard" --mutant guard-removed
+          rc2=0
+          env -u CI bash tests/login-preserve-run.sh --dir install-master \
+              --sandbox "$RUNNER_TEMP/lp-guard2" --seeder "$RUNNER_TEMP/mut-guard/login-seed.py" || rc2=$?
+          [ "$rc2" != "4" ] || { echo '::error::장치를 뺐는데도 멈췄다 — 위 적색은 이 장치 때문이 아니다'; exit 1; }
+          rm -rf /Applications/cys.app 2>/dev/null || sudo rm -rf /Applications/cys.app || true
+          echo '입구 거절 장치: 확인 (장치 있으면 정지 · 빼면 진행)'
+
+      - name: 로그인 보존 — 씨앗·지우기·대조 (윈)
+        if: runner.os == 'Windows'
+        shell: pwsh
+        timeout-minutes: 10
+        # ⚠러너 축 전용이다. 잡 전체에 걸면 설치기 스텝의 파이썬 동작까지 바꾸게 되고,
+        #   참가자 기계에는 이 변수가 없으므로 **우리만 되는 조건**으로 재는 셈이 된다.
+        env:
+          PYTHONUTF8: 1
+        run: |
+          & pwsh -NoProfile -File tests\login-preserve-run.ps1 -Dir install-master -Sandbox "$env:RUNNER_TEMP\lp-home"
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+
+      - name: 토론장 자리 보존 — 중첩 설정에서 열쇠가 살아남는가 (윈)
+        if: runner.os == 'Windows'
+        timeout-minutes: 12
+        env:
+          PYTHONUTF8: 1
+        shell: pwsh
+        run: |
+          # ★맥과 같은 잣대로 잰다 - 앞 판은 `plain` 한 모양만 불렀다(4차 지적 채택 2026-09-09).
+          #   윈도우의 `symlink` 모양은 권한이 없으면 junction 으로 대신 만든다(씨앗이 어느 쪽인지 찍는다).
+          foreach ($shape in @('plain','dotseg','symlink')) {
+            Write-Host "----- 모양 $shape -----"
+            & pwsh -NoProfile -File tests\agora-preserve-run.ps1 -Dir install-master -Sandbox "$env:RUNNER_TEMP\ag-$shape" -Shape $shape
+            if ($LASTEXITCODE -ne 0) { Write-Host "::error::윈 보존 축이 모양 $shape 에서 붉어졌다"; exit 1 }
+          }
+          # ★바깥을 가리키는 링크(junction·symlink)를 삭제 루트 안에 심는다 - 지우개는 링크만 지워야 한다.
+          #   ⚠5.1 이 링크를 뚫는지는 판본에 따라 다르다(2026-09-09 러너 실측: `Remove-Item -Recurse` 는
+          #   안 뚫었고, 우리 열거가 들어가면 뚫렸다). 어느 쪽이든 **들어가지 않는 것**이 수정이다.
+          Write-Host '----- 바깥을 가리키는 링크(뚫고 지우는지) -----'
+          & pwsh -NoProfile -File tests\agora-preserve-run.ps1 -Dir install-master -Sandbox "$env:RUNNER_TEMP\ag-link" -OutsideLink
+          if ($LASTEXITCODE -ne 0) { Write-Host '::error::링크를 뚫고 바깥을 건드렸다'; exit 1 }
+          # ★끊어진 링크(가리키던 곳이 사라진 이름표) - 흔한 잔재다. 그래도 **깨끗이** 끝나야 한다.
+          #   `Test-Path` 가 거짓이라 건너뛰면 멀쩡한 트리까지 「[남음]」이 된다(5차 MEDIUM).
+          Write-Host '----- 끊어진 링크 잔재(그래도 깨끗이 끝나는가) -----'
+          & pwsh -NoProfile -File tests\agora-preserve-run.ps1 -Dir install-master -Sandbox "$env:RUNNER_TEMP\ag-dang" -DanglingLink -ExpectClean
+          if ($LASTEXITCODE -ne 0) { Write-Host '::error::끊어진 링크 잔재에서 정상 삭제가 막혔다'; exit 1 }
+          # ★맥에만 있던 실패 갈래 둘을 윈도우에도 배선한다(5차 MEDIUM · MISSING-WIN-FAILURE-COVERAGE).
+          Write-Host '----- 재실행 고착(밖에 반쪽이 남아 있다) -----'
+          & pwsh -NoProfile -File tests\agora-preserve-run.ps1 -Dir install-master -Sandbox "$env:RUNNER_TEMP\ag-stale" -StaleOut -ExpectCysKept -ExpectCleanerSays '손으로 정리하신 뒤'
+          if ($LASTEXITCODE -ne 0) { Write-Host '::error::반쪽이 남은 재실행에서 원본을 지켰어야 한다'; exit 1 }
+          Write-Host '----- 못 여는 자리를 심는다(열거·삭제가 진짜로 실패한다) -----'
+          & pwsh -NoProfile -File tests\agora-preserve-run.ps1 -Dir install-master -Sandbox "$env:RUNNER_TEMP\ag-lock" -Unreadable -ExpectPartial
+          if ($LASTEXITCODE -ne 0) { Write-Host '::error::실패를 심었는데 그대로 말하지 않았다'; exit 1 }
+          # ★삭제 루트 **자신이** junction 인 경우 - 이름표만 지우고 가리키던 자리는 통째로 남아야 한다.
+          Write-Host '----- 삭제 루트 자신이 링크(이름표만 지우는가) -----'
+          & pwsh -NoProfile -File tests\agora-preserve-run.ps1 -Dir install-master -Sandbox "$env:RUNNER_TEMP\ag-root" -RootLink -ExpectClean
+          if ($LASTEXITCODE -ne 0) { Write-Host '::error::삭제 루트 링크를 따라가 남의 자리를 건드렸다'; exit 1 }
+          # ★링크 사슬 경계 계약 - 「32겹까지 따라간다」. 경계는 **양쪽을 다 재야** 계약이다.
+          #   2단·32단은 되어야 하고(참가 자리를 찾아 남긴다), 33단은 사유와 함께 멈춰야 한다(삭제 0).
+          foreach ($n in @(2, 32)) {
+            Write-Host "----- 링크 사슬 $n 단(따라가야 한다) -----"
+            & pwsh -NoProfile -File tests\agora-preserve-run.ps1 -Dir install-master -Sandbox "$env:RUNNER_TEMP\ag-ch$n" -Chain $n
+            if ($LASTEXITCODE -ne 0) { Write-Host "::error::사슬 $n 단을 못 따라갔다(계약은 32겹까지다)"; exit 1 }
+          }
+          Write-Host '----- 링크 사슬 33단(사유와 함께 멈춰야 한다) -----'
+          & pwsh -NoProfile -File tests\agora-preserve-run.ps1 -Dir install-master -Sandbox "$env:RUNNER_TEMP\ag-ch33" -Chain 33 -ExpectCysKept -ExpectCleanerSays '확인 못한 자리:'
+          if ($LASTEXITCODE -ne 0) { Write-Host '::error::사슬 33단에서 계약대로 멈추지 않았다'; exit 1 }
+          # ★무동작 대조군 - 씨앗만 놓고 아무것도 안 한 채 exit 7 만 하는 가짜 지우개는 **적색이어야** 한다.
+          $noop = Join-Path $env:RUNNER_TEMP 'mut-noop'
+          if (Test-Path $noop) { Remove-Item $noop -Recurse -Force }
+          New-Item -ItemType Directory -Force -Path $noop | Out-Null
+          Copy-Item 'install-master\*' $noop -Recurse -Force
+          [System.IO.File]::WriteAllText((Join-Path $noop 'reset-clean.ps1'), "exit 7`r`n", (New-Object System.Text.UTF8Encoding($true)))
+          & pwsh -NoProfile -File tests\agora-preserve-run.ps1 -Dir $noop -Sandbox "$env:RUNNER_TEMP\ag-noop" -StaleOut -ExpectCysKept -ExpectCleanerSays '손으로 정리하신 뒤'
+          if ($LASTEXITCODE -eq 0) { Write-Host '::error::아무것도 안 하고 exit 7 만 한 지우개가 통과했다(축이 공허하다)'; exit 1 }
+          Write-Host '대조군(무동작 exit 7): 기대대로 적색 - fail-closed 축이 이제 실제 실행을 요구한다'
+          # ⚠**일부러 붉힌 실행의 종료값을 여기서 지워야 한다.** 안 그러면 스텝 끝에서 GitHub 이
+          #   남아 있는 $LASTEXITCODE 를 보고 **스텝을 실패로 만든다**(2026-09-09 러너 실측 - 안 준
+          #   실패로 죽었다). 「기대대로 적색」과 「스텝 실패」는 다른 말이다.
+          $global:LASTEXITCODE = 0
+
+      - name: 토론장 자리 보존 — 삭제층 두 번째 재귀·canon 대역 (윈)
+        if: runner.os == 'Windows'
+        timeout-minutes: 15
+        env:
+          PYTHONUTF8: 1
+        shell: pwsh
+        run: |
+          # ★5차 BLOCK 둘을 재는 자리다. 둘 다 **그 분기를 실제로 때리는 실사격 1 + 뮤턴트 1**로 짝을 짓는다.
+          $srcFile = (Resolve-Path 'install-master\reset-clean.ps1').Path
+          $src = [System.IO.File]::ReadAllText($srcFile)
+          function New-Mut($name, $pairs) {
+            $txt = $src
+            foreach ($pair in $pairs) {
+              if (-not $txt.Contains($pair[0])) { Write-Host ("::error::앵커를 못 찾았다: " + $name); exit 1 }
+              $txt = $txt.Replace($pair[0], $pair[1])
+            }
+            $dst = Join-Path $env:RUNNER_TEMP $name
+            if (Test-Path $dst) { Remove-Item $dst -Recurse -Force }
+            New-Item -ItemType Directory -Force -Path $dst | Out-Null
+            Copy-Item 'install-master\*' $dst -Recurse -Force
+            # ⚠BOM 을 붙여 쓴다 - 5.1 이 우리말을 깨뜨린다(이 저장소가 이미 아는 함정).
+            [System.IO.File]::WriteAllText((Join-Path $dst 'reset-clean.ps1'), $txt, (New-Object System.Text.UTF8Encoding($true)))
+            return $dst
+          }
+          # 대역 ⓐ: `.cys\sub` 의 **열거만** 실패시킨다(권한으로는 이 조합을 못 만든다 - 열거는 실패하고
+          #   재귀 삭제는 되는 상태여야 하기 때문이다). 그 폴더 안에 바깥을 가리키는 링크가 있다.
+          $enumFrom = '    try { $kids = @(Get-ChildItem -LiteralPath $dir -Force -ErrorAction Stop) }'
+          $enumTo   = '    try { if ($dir -like ''*\sub'') { throw ''열거 실패 대역'' }; $kids = @(Get-ChildItem -LiteralPath $dir -Force -ErrorAction Stop) }'
+          $d1 = New-Mut 'mut-enumfail' @(,@($enumFrom, $enumTo))
+          Write-Host '----- 실사격: 하위 열거가 실패해도 그 안 링크를 뚫지 않는다 -----'
+          & pwsh -NoProfile -File tests\agora-preserve-run.ps1 -Dir $d1 -Sandbox "$env:RUNNER_TEMP\ag-sr1" -OutsideLink -LinkInSubdir -ExpectPartial
+          if ($LASTEXITCODE -ne 0) { Write-Host '::error::열거 실패 조합에서 바깥을 건드렸거나 사실대로 말하지 않았다'; exit 1 }
+          # 뮤턴트: 거기에 **삭제층 재귀**를 되돌린다 → 부모가 **열거하지 못한 폴더를 통째로** 지운다.
+          #   ⚠실측 정정(2026-09-09 러너): 지금 러너의 5.1 `Remove-Item -Recurse` 는 junction 을
+          #   **안 뚫었다**(바깥 파일이 살아남았다). 그래서 이 축은 「바깥이 지워졌는가」가 아니라
+          #   **「열거하지 못한 자리를 지웠는가」**로 잰다 — 그것이 판본과 무관한 결함이다.
+          #   ★막는 까닭(모르는 채로 지운다)은 그대로다. 다만 **축은 실제로 무는 것으로** 놓는다.
+          $recFrom = '        [System.IO.Directory]::Delete($p, $false)'
+          $recTo   = '        if (Test-IsReparse $it) { [System.IO.Directory]::Delete($p, $false) } else { Remove-Item -LiteralPath $p -Recurse -Force -ErrorAction Stop }'
+          $d2 = New-Mut 'mut-secondrec' @(@($enumFrom, $enumTo), @($recFrom, $recTo))
+          Write-Host '----- 뮤턴트: 삭제층 재귀를 되돌리면 붉어지는가 -----'
+          & pwsh -NoProfile -File tests\agora-preserve-run.ps1 -Dir $d2 -Sandbox "$env:RUNNER_TEMP\ag-sr2" -OutsideLink -LinkInSubdir -ExpectFail
+          if ($LASTEXITCODE -ne 0) { Write-Host '::error::삭제층 재귀를 되돌렸는데 붉어지지 않았다'; exit 1 }
+          Write-Host '뮤턴트(삭제층 두 번째 재귀 복원): 기대대로 적색'
+          # 대역 ⓑ: 참가 자리로 넘긴 링크의 **대상만 못 읽게** 한다(reparse 인데 Target 이 비는 상황).
+          #   그러면 남길 자리를 못 푼 것이므로 **아무것도 지우면 안 된다**(2차-CANON-FAIL fail-closed).
+          $tgtFrom = '    try { $t = $it.Target } catch { $t = $null }'
+          $tgtTo   = '    try { $t = $it.Target } catch { $t = $null }; if ($p -like ''*forum-link*'') { $t = $null }'
+          $d3 = New-Mut 'mut-blindtarget' @(,@($tgtFrom, $tgtTo))
+          Write-Host '----- 대역: 링크의 대상을 못 읽으면 삭제 0 인가 -----'
+          & pwsh -NoProfile -File tests\agora-preserve-run.ps1 -Dir $d3 -Sandbox "$env:RUNNER_TEMP\ag-bt" -Shape symlink -ExpectCysKept -ExpectCleanerSays '확인 못한 자리:'
+          if ($LASTEXITCODE -ne 0) { Write-Host '::error::남길 자리를 못 푸는데 지웠다(fail-closed 가 안 물었다)'; exit 1 }
+          Write-Host '대역(대상을 못 읽는 링크): 삭제 0 확인'
+          # 뮤턴트 ⓒ: 삭제 루트가 링크일 때의 「이름표만」 규칙을 없앤다 → 실경로 대상 쪽으로 흘러
+          #   남의 폴더를 열어 그 안을 지운다(6차 BLOCK 이 지적한 바로 그 경로).
+          $rootFrom = '    if ($rootItem -and (Test-IsReparse $rootItem)) {'
+          $rootTo   = '    if ($false) {'
+          $d4 = New-Mut 'mut-rootlink' @(,@($rootFrom, $rootTo))
+          Write-Host '----- 뮤턴트: 루트 링크 규칙을 없애면 붉어지는가 -----'
+          & pwsh -NoProfile -File tests\agora-preserve-run.ps1 -Dir $d4 -Sandbox "$env:RUNNER_TEMP\ag-rm" -RootLink -ExpectFail
+          if ($LASTEXITCODE -ne 0) { Write-Host '::error::루트 링크 규칙을 없앴는데 붉어지지 않았다'; exit 1 }
+          Write-Host '뮤턴트(루트 링크 규칙 제거): 기대대로 적색'
+
+      - name: 토론장 자리 보존 — 링크를 뚫는 뮤턴트가 붉어지는가 (윈)
+        if: runner.os == 'Windows'
+        timeout-minutes: 12
+        env:
+          PYTHONUTF8: 1
+        shell: pwsh
+        run: |
+          # ★초록이 「링크를 안 뚫는다」인지 「축이 아무것도 안 잰다」인지 가르는 유일한 방법이다.
+          #   재귀 진입 금지를 되돌리면 바깥 파일이 목록에 올라 하나씩 지워져야 한다.
+          $srcFile = (Resolve-Path 'install-master\reset-clean.ps1').Path
+          $src = [System.IO.File]::ReadAllText($srcFile)
+          # ⚠앵커는 코드를 고칠 때마다 함께 고쳐야 한다 - 안 고치면 「앵커를 못 찾았다」로 죽는다(그게 정상이다.
+          #   조용히 통과하는 것보다 낫다). r7 에서 훑는 방식이 stack 에서 재귀로 바뀌어 여기도 옮겼다.
+          $from = 'if ($k.PSIsContainer -and -not (Test-IsReparse $k)) { Add-TreeItems $k.FullName $out ($depth + 1) }'
+          $to   = 'if ($k.PSIsContainer) { Add-TreeItems $k.FullName $out ($depth + 1) }'
+          if (-not $src.Contains($from)) { Write-Host '::error::뮤턴트 앵커를 못 찾았다'; exit 1 }
+          $dst = Join-Path $env:RUNNER_TEMP 'mut-link'
+          if (Test-Path $dst) { Remove-Item $dst -Recurse -Force }
+          New-Item -ItemType Directory -Force -Path $dst | Out-Null
+          Copy-Item 'install-master\*' $dst -Recurse -Force
+          # ⚠BOM 을 붙여 쓴다 - 5.1 이 우리말을 깨뜨린다(이 저장소가 이미 아는 함정).
+          [System.IO.File]::WriteAllText((Join-Path $dst 'reset-clean.ps1'), $src.Replace($from, $to), (New-Object System.Text.UTF8Encoding($true)))
+          & pwsh -NoProfile -File tests\agora-preserve-run.ps1 -Dir $dst -Sandbox "$env:RUNNER_TEMP\ag-linkmut" -OutsideLink -ExpectFail
+          if ($LASTEXITCODE -ne 0) { Write-Host '::error::링크 재귀 진입을 되돌렸는데 붉어지지 않았다'; exit 1 }
+          Write-Host '뮤턴트(링크 재귀 진입 복원): 기대대로 적색'
+
+      - name: 로그인 보존 — 뮤턴트가 붉어지는가 (윈)
+        if: runner.os == 'Windows'
+        shell: pwsh
+        timeout-minutes: 15
+        env:
+          PYTHONUTF8: 1
+        run: |
+          foreach ($m in @('win-cred-delete','win-shallow-depth','win-hook-overreach','win-no-encoding')) {
+            Write-Host "----- 뮤턴트 $m -----"
+            $exp = (& python tests\login-mutate.py --src install-master --dst "$env:RUNNER_TEMP\x-$m" --mutant $m --print-expect) | Out-String
+            $exp = $exp.Trim()
+            & python tests\login-mutate.py --src install-master --dst "$env:RUNNER_TEMP\mut-$m" --mutant $m
+            if ($LASTEXITCODE -ne 0) { exit 1 }
+            # ★「적색이 났다」로 끝내지 않는다 — 지우개가 죽어도 씨앗이 그대로 남아 온통 적색이 된다.
+            $says = (& python tests\login-mutate.py --mutant $m --print-cleaner-says) | Out-String
+            $says = $says.Trim()
+            & pwsh -NoProfile -File tests\login-preserve-run.ps1 -Dir "$env:RUNNER_TEMP\mut-$m" -Sandbox "$env:RUNNER_TEMP\lp-$m" -ExpectFail -ExpectFailAt $exp -ExpectCleanerSays $says
+            if ($LASTEXITCODE -ne 0) {
+              Write-Host "::error::뮤턴트 $m 이 기대한 자리($exp)를 붉히지 못했다"; exit 1
+            }
+          }
+
+      - name: 시험 입구가 살아 있는 기계에서 멈추는가 (윈)
+        if: runner.os == 'Windows'
+        shell: pwsh
+        timeout-minutes: 10
+        env:
+          PYTHONUTF8: 1
+        run: |
+          $marker = Join-Path $env:LOCALAPPDATA 'cys'
+          if (Test-Path $marker) { Write-Host '::error::이 러너에 진짜 cys 자리가 있다 — 가짜를 만들지 않는다'; exit 1 }
+          New-Item -ItemType Directory -Force -Path $marker | Out-Null
+          $keepCI = $env:CI; $env:CI = ''
+          try {
+            & pwsh -NoProfile -File tests\login-preserve-run.ps1 -Dir install-master -Sandbox "$env:RUNNER_TEMP\lp-guard"
+            $rc = $LASTEXITCODE
+            if ($rc -ne 4) { Write-Host "::error::살아 있는 기계인데 입구가 안 멈췄다(rc=$rc)"; exit 1 }
+            & python tests\login-mutate.py --src tests --dst "$env:RUNNER_TEMP\mut-guard" --mutant guard-removed
+            if ($LASTEXITCODE -ne 0) { exit 1 }
+            & pwsh -NoProfile -File tests\login-preserve-run.ps1 -Dir install-master -Sandbox "$env:RUNNER_TEMP\lp-guard2" -Seeder "$env:RUNNER_TEMP\mut-guard\login-seed.py"
+            if ($LASTEXITCODE -eq 4) { Write-Host '::error::장치를 뺐는데도 멈췄다 — 위 적색은 이 장치 때문이 아니다'; exit 1 }
+          } finally {
+            $env:CI = $keepCI
+            Remove-Item $marker -Recurse -Force -ErrorAction SilentlyContinue
+          }
+          Write-Host '입구 거절 장치: 확인 (장치 있으면 정지 · 빼면 진행)'
+
+      - name: 등록 안 된 잔재 — 지우개가 스스로 지우는가 (윈)
+        if: runner.os == 'Windows'
+        shell: pwsh
+        timeout-minutes: 15
+        env:
+          PYTHONUTF8: 1
+        run: |
+          # 2026-09-09 실사용자 3호 교착의 재현이다. 두 상태를 각각 만들어 갈라서 행동하는지 본다.
+          #   no-entry   = 폴더만 있음      → 스스로 지우고 rc 0
+          #   with-entry = 폴더 + 목록 항목 → 정식 제거 경로 안내 · [남음] · rc 7
+          & pwsh -NoProfile -File tests\win-stale-cys-run.ps1 -Dir install-master -Sandbox "$env:RUNNER_TEMP\stale-none" -State no-entry
+          if ($LASTEXITCODE -ne 0) { Write-Host '::error::등록 없는 잔재를 스스로 지우지 못했다'; exit 1 }
+          & pwsh -NoProfile -File tests\win-stale-cys-run.ps1 -Dir install-master -Sandbox "$env:RUNNER_TEMP\stale-entry" -State with-entry
+          if ($LASTEXITCODE -ne 0) { Write-Host '::error::등록 항목이 있는 자리에서 종전 동작이 깨졌다'; exit 1 }
+          # 항목은 있는데 제거 프로그램이 없는 자리 — 스스로 지우되 까닭을 다르게 말해야 한다.
+          & pwsh -NoProfile -File tests\win-stale-cys-run.ps1 -Dir install-master -Sandbox "$env:RUNNER_TEMP\stale-noexe" -State entry-no-exe
+          if ($LASTEXITCODE -ne 0) { Write-Host '::error::항목만 남고 제거 프로그램이 없는 자리에서 말이 사실과 어긋났다'; exit 1 }
+
+      - name: 프로브 진단 — 무엇으로 재는지 한 줄씩 찍는다 (윈)
+        if: runner.os == 'Windows'
+        shell: pwsh
+        timeout-minutes: 6
+        # ⚠재기만 한다. 이 단계는 잡을 붉히지 않는다 — 진단이 실패로 끝나면 정작 진단 줄을 못 읽는다.
+        continue-on-error: true
+        run: |
+          & pwsh -NoProfile -File tests\net-probe-diag.ps1 -Dir install-master
+          # 5.1 에서도 같은 결과인지 함께 본다(참가자가 실제로 밟는 것은 5.1 이다).
+          & powershell -ExecutionPolicy Bypass -File tests\net-probe-diag.ps1 -Dir install-master
+
+      - name: 연결 원인 판별 — 우리 서버만 막아 본다 (윈)
+        if: runner.os == 'Windows'
+        shell: pwsh
+        timeout-minutes: 6
+        run: |
+          # 「서버 사정」으로 뭉뚱그리지 않는다는 약속이 실제로 갈라지는지 잰다.
+          # hosts 로 우리 주소만 막으면 인터넷은 되고 우리 서버만 안 답한다 ⇒ J-NET-02 여야 한다.
+          & pwsh -NoProfile -File tests\net-cause-run.ps1 -Dir install-master
+          if ($LASTEXITCODE -ne 0) { Write-Host '::error::연결 원인을 갈라 말하지 못했다'; exit 1 }
+
+      - name: 기록 남기기
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: reinstall-${{ matrix.os }}
+          path: |
+            ~/install-jarvis/bootstrap.log
+            C:\Users\runneradmin\install-jarvis\bootstrap.log
+          if-no-files-found: ignore

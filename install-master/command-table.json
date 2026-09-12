@@ -1,0 +1,224 @@
+{
+  "version": "v1-2026-09-11",
+  "token_pattern": "^[A-Za-z0-9_.:/\\\\-]+$",
+  "max_command_bytes": 512,
+  "max_tokens": 12,
+  "max_token_chars": 200,
+  "max_path_segments": 8,
+  "proc_names": [
+    "cys",
+    "cysd",
+    "claude",
+    "node"
+  ],
+  "entries": [
+    {
+      "id": "dir.root",
+      "shell": "ps1",
+      "usage": "Get-ChildItem",
+      "exec": "cmdlet",
+      "risk": 0,
+      "title": "작업 폴더 맨 위의 목록을 본다"
+    },
+    {
+      "id": "dir.list",
+      "shell": "ps1",
+      "usage": "Get-ChildItem -LiteralPath <path>",
+      "exec": "cmdlet",
+      "risk": 0,
+      "title": "작업 폴더 안 한 폴더의 목록을 본다"
+    },
+    {
+      "id": "file.tail",
+      "shell": "ps1",
+      "usage": "Get-Content -LiteralPath <path> -Tail <n:1-200>",
+      "exec": "cmdlet",
+      "risk": 0,
+      "title": "작업 폴더 안 파일의 끝 N줄을 본다"
+    },
+    {
+      "id": "file.hash",
+      "shell": "ps1",
+      "usage": "Get-FileHash -LiteralPath <path> -Algorithm SHA256",
+      "exec": "cmdlet",
+      "risk": 0,
+      "title": "작업 폴더 안 파일의 SHA256 을 본다"
+    },
+    {
+      "id": "file.exists",
+      "shell": "ps1",
+      "usage": "Test-Path -LiteralPath <path>",
+      "exec": "cmdlet",
+      "risk": 0,
+      "title": "작업 폴더 안에 그 파일(예: 표식 .jarvis-owned)이 있는지 본다"
+    },
+    {
+      "id": "disk.free",
+      "shell": "ps1",
+      "usage": "Get-PSDrive -Name C",
+      "exec": "cmdlet",
+      "risk": 0,
+      "title": "C 드라이브의 남은 공간을 본다"
+    },
+    {
+      "id": "net.check",
+      "shell": "ps1",
+      "usage": "Test-NetConnection -ComputerName jarvis-install.godmeyou.kr -Port 443 -InformationLevel Quiet",
+      "exec": "cmdlet",
+      "risk": 0,
+      "title": "우리 서버(443)에 닿는지 본다"
+    },
+    {
+      "id": "shell.version",
+      "shell": "ps1",
+      "usage": "Get-Host",
+      "exec": "cmdlet",
+      "risk": 0,
+      "title": "PowerShell 판본을 본다"
+    },
+    {
+      "id": "av.status",
+      "shell": "ps1",
+      "usage": "Get-MpComputerStatus",
+      "exec": "cmdlet",
+      "risk": 0,
+      "title": "백신 상태를 본다(끄지 않는다)"
+    },
+    {
+      "id": "proc.find",
+      "shell": "ps1",
+      "usage": "Get-Process -Name <proc>",
+      "exec": "cmdlet",
+      "risk": 0,
+      "title": "우리 프로그램(cys·cysd·claude·node)이 떠 있는지 본다"
+    },
+    {
+      "id": "cys.status",
+      "shell": "ps1",
+      "usage": "cys status",
+      "exec": "cys",
+      "risk": 0,
+      "title": "cys 노드 상태를 본다"
+    },
+    {
+      "id": "cys.doctor",
+      "shell": "ps1",
+      "usage": "cys doctor",
+      "exec": "cys",
+      "risk": 0,
+      "title": "cys 자기진단을 본다(고치지 않는다)"
+    },
+    {
+      "id": "cys.daemon",
+      "shell": "ps1",
+      "usage": "cys daemon status",
+      "exec": "cys",
+      "risk": 0,
+      "title": "cys 상시 가동 등록 상태를 본다"
+    },
+    {
+      "id": "dir.root",
+      "shell": "sh",
+      "usage": "ls -lan",
+      "exec": "/bin/ls",
+      "risk": 0,
+      "title": "작업 폴더 맨 위의 목록을 본다(소유자는 번호로)"
+    },
+    {
+      "id": "dir.list",
+      "shell": "sh",
+      "usage": "ls -lan <path>",
+      "exec": "/bin/ls",
+      "risk": 0,
+      "title": "작업 폴더 안 한 폴더의 목록을 본다(소유자는 번호로)"
+    },
+    {
+      "id": "file.tail",
+      "shell": "sh",
+      "usage": "tail -n <n:1-200> <path>",
+      "exec": "/usr/bin/tail",
+      "risk": 0,
+      "title": "작업 폴더 안 파일의 끝 N줄을 본다"
+    },
+    {
+      "id": "file.hash",
+      "shell": "sh",
+      "usage": "shasum -a 256 <path>",
+      "exec": "/usr/bin/shasum",
+      "risk": 0,
+      "title": "작업 폴더 안 파일의 SHA256 을 본다"
+    },
+    {
+      "id": "file.exists",
+      "shell": "sh",
+      "usage": "test -e <path>",
+      "exec": "/bin/test",
+      "risk": 0,
+      "title": "작업 폴더 안에 그 파일(예: 표식 .jarvis-owned)이 있는지 본다(종료 코드)"
+    },
+    {
+      "id": "disk.free",
+      "shell": "sh",
+      "usage": "df -h .",
+      "exec": "/bin/df",
+      "risk": 0,
+      "title": "작업 폴더가 있는 디스크의 남은 공간을 본다"
+    },
+    {
+      "id": "net.check",
+      "shell": "sh",
+      "usage": "nc -z -G 5 jarvis-install.godmeyou.kr 443",
+      "exec": "/usr/bin/nc",
+      "risk": 0,
+      "title": "우리 서버(443)에 닿는지 본다"
+    },
+    {
+      "id": "shell.version",
+      "shell": "sh",
+      "usage": "sw_vers",
+      "exec": "/usr/bin/sw_vers",
+      "risk": 0,
+      "title": "macOS 판본을 본다"
+    },
+    {
+      "id": "av.status",
+      "shell": "sh",
+      "usage": "spctl --status",
+      "exec": "/usr/sbin/spctl",
+      "risk": 0,
+      "title": "Gatekeeper 상태를 본다(끄지 않는다)"
+    },
+    {
+      "id": "proc.find",
+      "shell": "sh",
+      "usage": "pgrep -l <proc>",
+      "exec": "/usr/bin/pgrep",
+      "risk": 0,
+      "title": "우리 프로그램(cys·cysd·claude·node)이 떠 있는지 본다"
+    },
+    {
+      "id": "cys.status",
+      "shell": "sh",
+      "usage": "cys status",
+      "exec": "cys",
+      "risk": 0,
+      "title": "cys 노드 상태를 본다"
+    },
+    {
+      "id": "cys.doctor",
+      "shell": "sh",
+      "usage": "cys doctor",
+      "exec": "cys",
+      "risk": 0,
+      "title": "cys 자기진단을 본다(고치지 않는다)"
+    },
+    {
+      "id": "cys.daemon",
+      "shell": "sh",
+      "usage": "cys daemon status",
+      "exec": "cys",
+      "risk": 0,
+      "title": "cys 상시 가동 등록 상태를 본다"
+    }
+  ]
+}
