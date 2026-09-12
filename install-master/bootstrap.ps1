@@ -424,6 +424,199 @@ function Wait-ForConnection($Tag, [scriptblock]$Try) {
     return $false
 }
 
+# ── 반복 막힘 단계별 안내 (v0.3.15 · 2026-09-12) ─────────────────────
+# 같은 자리에서 또 막히면 같은 말만 되풀이하지 않는다 — 2회째는 다른 방법, 3회째부터는 담당자와 직접.
+# ★문구 정본 = tests/help-escalation.tsv(글자 그대로 · checks.sh 가 잰다). 맥판(bootstrap.sh)과 같은 규칙이다.
+# ★센 기록 = 작업 폴더의 help-attempts.json(고정 모양 · 줄 단위 정규식으로 읽는다 — 맥에 JSON 도구가 없어 두 OS 가 같은 방법을 쓴다).
+$HelpContactPhone = '010-7745-5885'
+$HelpAttemptsFile = Join-Path $JarvisHome 'help-attempts.json'
+$HelpStage2Lines = @(
+    '  같은 자리에서 다시 막히셨네요. 난감하시겠어요. 이렇게 한 번 해 보세요.',
+    '<WAY>',
+    '  그래도 같으면 다음에는 담당자 연락처를 안내해 드리겠습니다.'
+)
+$HelpStage3Lines = @(
+    '  계속 같은 자리에서 막히셔서 많이 불편하셨지요.',
+    '  개발자와 직접 이야기해 보시면 어떨까요?',
+    '  담당자 전화 <PHONE> (문자나 전화 · 편하신 시간에)',
+    '  진단 코드 <CODE> 만 말씀해 주시면 됩니다.'
+)
+$HelpSentOkLine = '  막힌 자리 정보는 방금 자동으로 전달됐습니다.'
+$HelpSentNoLine = '  전화하실 때 이 화면을 사진으로 보내 주시면 더 빠릅니다.'
+$HelpWays = @{
+    'J-AV-01'    = @('백신의 보호 기록(격리함)에 claude 가 있으면 [복원]을 골라 주십시오.', '안 되면 백신 알림에 나온 파일(또는 그 폴더)을 백신의 「예외(허용)」에', '추가하신 뒤 다시 실행해 주십시오. 설치 뒤 예외에서 지우시면 원래대로입니다.')
+    'J-AV-02'    = @('백신의 보호 기록(격리함)에 cys 설치 파일이 있으면 [복원]을 골라 주십시오.', '안 되면 install-jarvis 폴더를 백신의 「예외(허용)」에 추가하신 뒤', '다시 실행해 주십시오. 설치 뒤 예외에서 지우시면 원래대로입니다.')
+    'J-AV-03'    = @('백신 알림 기록에 install-jarvis.ps1 을 막은 기록이 있으면 그 파일을', '백신의 「예외(허용)」에 추가하신 뒤 다시 실행해 주십시오.', '설치 뒤 예외에서 지우시면 원래대로입니다.')
+    'J-NET-01'   = @('휴대폰 핫스팟 같은 다른 인터넷에 연결하신 뒤 다시 실행해 주십시오.')
+    'J-NET-02'   = @('10분쯤 뒤에 다시 실행해 주십시오.', '휴대폰 핫스팟 같은 다른 인터넷으로 바꿔 보셔도 됩니다.')
+    'J-NET-03'   = @('회사·학교 망은 바깥 서버를 막아 둔 경우가 있습니다.', '휴대폰 핫스팟 같은 다른 인터넷으로 연결하신 뒤 다시 실행해 주십시오.')
+    'J-RM-01'    = @('컴퓨터를 한 번 다시 시작하신 뒤(열려 있던 cys 가 완전히 닫힙니다)', '재설치 명령을 실행해 주십시오.')
+    'J-PATH-01'  = @('컴퓨터를 한 번 다시 시작하신 뒤 새 창에서 다시 실행해 주십시오.')
+    'J-LOGIN-01' = @('브라우저가 뜨지 않았거나 다른 브라우저에 로그인돼 있으면,', '설치 창에 보이는 https:// 로 시작하는 로그인 주소를 복사해', '로그인된 브라우저 주소창에 붙여넣어 주십시오.')
+    'J-HOME-01'  = @('창을 닫고 새 창을 여신 뒤(남은 설정이 따라오지 않습니다)', '다시 실행해 주십시오.')
+    'J-PERM-01'  = @('컴퓨터를 한 번 다시 시작하신 뒤 다시 실행해 주십시오.', '저장 공간이 3GB 이상 남았는지도 함께 봐 주십시오.')
+    'J-DISK-01'  = @('휴지통을 비우시고, 설정의 저장 공간 화면에서 큰 파일을', '정리하신 뒤 다시 실행해 주십시오.')
+    'J-VER-01'   = @('컴퓨터를 한 번 다시 시작하신 뒤 새 창에서 다시 실행해 주십시오.')
+    'J-UNK-00'   = @('컴퓨터를 한 번 다시 시작하신 뒤 다시 실행해 주십시오.')
+    'J-DL-03'    = @('컴퓨터를 한 번 다시 시작하신 뒤 새 창에서 다시 실행해 주십시오.')
+    'J-DL-04'    = @('휴대폰 핫스팟 같은 다른 인터넷으로 연결하신 뒤 다시 실행해 주십시오.')
+}
+$HelpDirectCodes = @('J-DL-05')   # 다른 방법이 없는 코드 = 2회째부터 곧바로 담당자 안내
+$script:HelpStage      = 1
+$script:HelpFirst      = ''    # 셈을 한 실행만 채운다(비어 있으면 보고서에 「같은 진단 코드」 줄이 없다)
+$script:HelpPrevReport = ''
+$script:HelpStage3     = $false
+$script:HelpSentSaid   = $false
+
+# 시각 = +0900 모양(맥판 date '+%Y-%m-%dT%H:%M:%S%z' 와 같게 · 문화권 구분자에 흔들리지 않게 고정 문화권)
+function Get-HelpNow {
+    $d = Get-Date
+    $inv = [System.Globalization.CultureInfo]::InvariantCulture
+    return ($d.ToString('yyyy-MM-ddTHH:mm:ss', $inv) + ($d.ToString('zzz', $inv) -replace ':', ''))
+}
+
+# 돌려주는 것 = @{ Codes = @{ 코드 = @{ N; First; Last; Step } }; Report = $null 또는 @{ Id; At; Code } }
+#   파일이 없으면 빈 상태 · 첫 줄이 모양이 아니거나 못 읽으면 빈 상태 + 기록 한 줄(설치를 막지 않는다)
+#   ⚠칸 이름을 count 로 두지 않는다 — 해시표의 .Count 와 섞인다.
+function Read-HelpAttempts {
+    $state = @{ Codes = @{}; Report = $null }
+    if (-not (Test-Path -LiteralPath $HelpAttemptsFile)) { return $state }
+    $lines = @()
+    try {
+        $full = $ExecutionContext.SessionState.Path.GetUnresolvedProviderPathFromPSPath($HelpAttemptsFile)
+        $lines = @([System.IO.File]::ReadAllText($full, [System.Text.Encoding]::UTF8) -split "\r?\n")
+    } catch { $lines = @() }
+    if ($lines.Count -eq 0 -or $lines[0] -cne '{"v":1,') {
+        Write-Log 'help attempts: unreadable - reset'
+        return $state
+    }
+    foreach ($ln in $lines) {
+        if ($ln -cmatch '^"(J-[A-Z]+-[0-9]{2})":\{"count":([0-9]{1,4}),"first":"([^"]*)","last":"([^"]*)","step":"([0-9]{1,2})"\},?$') {
+            $state.Codes[$Matches[1]] = @{ N = [int]$Matches[2]; First = $Matches[3]; Last = $Matches[4]; Step = [int]$Matches[5] }
+        } elseif ($ln -cmatch '^"last_report":\{"id":"([A-Z2-9]{8})","at":"([^"]*)","code":"(J-[A-Z]+-[0-9]{2})"\}$') {
+            $state.Report = @{ Id = $Matches[1]; At = $Matches[2]; Code = $Matches[3] }
+        }
+    }
+    return $state
+}
+
+# 고정 모양으로 쓴다(코드 이름순 · LF · BOM 없음) — 임시 파일에 쓴 뒤 바꿔 끼운다 · 못 쓰면 기록 한 줄만 남기고 넘어간다
+function Save-HelpAttempts($State) {
+    $keys = [string[]]@($State.Codes.Keys)
+    [Array]::Sort($keys, [System.StringComparer]::Ordinal)
+    $out = New-Object System.Collections.ArrayList
+    [void]$out.Add('{"v":1,')
+    [void]$out.Add('"codes":{')
+    for ($i = 0; $i -lt $keys.Count; $i++) {
+        $c = $State.Codes[$keys[$i]]
+        $ln = '"' + $keys[$i] + '":{"count":' + $c.N + ',"first":"' + $c.First + '","last":"' + $c.Last + '","step":"' + $c.Step + '"}'
+        if ($i -lt $keys.Count - 1) { $ln += ',' }
+        [void]$out.Add($ln)
+    }
+    if ($null -ne $State.Report) {
+        [void]$out.Add('},')
+        [void]$out.Add('"last_report":{"id":"' + $State.Report.Id + '","at":"' + $State.Report.At + '","code":"' + $State.Report.Code + '"}')
+    } else {
+        [void]$out.Add('}')
+    }
+    [void]$out.Add('}')
+    $tmp = $HelpAttemptsFile + '.tmp'
+    try {
+        Write-TextNoBom $tmp (($out -join "`n") + "`n")
+        $fullTmp = $ExecutionContext.SessionState.Path.GetUnresolvedProviderPathFromPSPath($tmp)
+        $full = $ExecutionContext.SessionState.Path.GetUnresolvedProviderPathFromPSPath($HelpAttemptsFile)
+        if ([System.IO.File]::Exists($full)) { [System.IO.File]::Replace($fullTmp, $full, $null) } else { [System.IO.File]::Move($fullTmp, $full) }
+    } catch {
+        Remove-Item -LiteralPath $tmp -Force -ErrorAction SilentlyContinue
+        Write-Log 'help attempts: write failed'
+    }
+}
+
+# 끝맺음이 한 번 부른다 — 이 실행의 진단 코드를 세어 단계(= 그 코드의 횟수)를 $script:HelpStage 에 둔다.
+function Update-HelpAttempts {
+    $script:HelpStage = 1
+    $script:HelpFirst = ''
+    $script:HelpPrevReport = ''
+    if ($Mode -ne 'full') { return }    # 미리보기·감지만 = 세지도 읽지도 쓰지도 않는다
+    if (-not (Test-Path -LiteralPath $JarvisHome -PathType Container)) { return }   # 자리를 못 만든 끝
+    # 우리 표식이 없는 폴더(거절한 남의 폴더·구판 폴더)에는 새 파일을 두지 않는다 — 두면 구판 지문이 깨진다
+    if (-not (Test-JarvisOwnerMark)) { return }
+    $code = [string]$script:JCode
+    if ($code -and -not ($code -cmatch '\AJ-[A-Z]+-[0-9]{2}\z')) { return }
+    if (-not $code -and -not $script:ReachedWake) { return }
+    # 현재 단계 번호 n = 이 실행이 마지막으로 찍은 [n/10] (없으면 0 · 원격 해결 보고와 같은 방법)
+    $n = 0
+    for ($i = $script:StepLog.Count - 1; $i -ge 0; $i--) {
+        if ([string]$script:StepLog[$i] -cmatch '\A\[([0-9]{1,2})/[0-9]{1,2}\]') { $n = [int]$Matches[1]; break }
+    }
+    if (-not $code) {
+        # 깨우기까지 간 성공 끝 = 막힌 기록을 모두 지운다(보고 기록은 남긴다)
+        if (-not (Test-Path -LiteralPath $HelpAttemptsFile)) { return }
+        $state = Read-HelpAttempts
+        $state.Codes = @{}
+        Save-HelpAttempts $state
+        return
+    }
+    $state = Read-HelpAttempts
+    $now = Get-HelpNow
+    # 다른 코드 가운데 더 앞 단계에서 난 것 = 그 단계는 지나갔다 ⇒ 지운다
+    foreach ($k in @($state.Codes.Keys)) {
+        if ($k -cne $code -and $state.Codes[$k].Step -lt $n) { $state.Codes.Remove($k) }
+    }
+    $prev = $state.Codes[$code]
+    if ($null -eq $prev) {
+        $entry = @{ N = 1; First = $now; Last = $now; Step = $n }
+    } else {
+        $cnt = $prev.N
+        if ($cnt -lt 9999) { $cnt++ }    # 읽기 정규식이 네 자리까지다 — 넘기면 다음 실행이 못 읽는다
+        $entry = @{ N = $cnt; First = $prev.First; Last = $now; Step = $n }
+    }
+    $state.Codes[$code] = $entry
+    Save-HelpAttempts $state
+    $script:HelpStage = $entry.N
+    $script:HelpFirst = $entry.First
+    if ($null -ne $state.Report) {
+        $same = '같은 코드'
+        if ($state.Report.Code -cne $code) { $same = '다른 코드 ' + $state.Report.Code }
+        $script:HelpPrevReport = $state.Report.Id + ' (' + $state.Report.At + ' · ' + $same + ')'
+    }
+    Write-Log ('help attempts: ' + $code + ' count=' + $entry.N + ' step=' + $n)
+}
+
+# 끝맺음의 「진단 코드:」 줄 바로 다음에 부른다 — 2회째 = 다른 방법 · 3회째부터(곧바로 연락 코드는 2회째부터) = 담당자
+function Write-HelpEscalation {
+    $script:HelpStage3 = $false
+    $code = [string]$script:JCode
+    if (-not $code -or $script:HelpStage -lt 2) { return }
+    if ($script:HelpStage -ge 3 -or ($HelpDirectCodes -ccontains $code)) {
+        Say ''
+        foreach ($t in $HelpStage3Lines) { Say ($t.Replace('<PHONE>', $HelpContactPhone).Replace('<CODE>', $code)) }
+        $script:HelpStage3 = $true
+        return
+    }
+    if (-not $HelpWays.ContainsKey($code)) { return }    # 두 번째 방법이 없는 코드 = 1회째처럼 둔다
+    Say ''
+    foreach ($t in $HelpStage2Lines) {
+        if ($t -cne '<WAY>') { Say $t; continue }
+        $ws = @($HelpWays[$code])
+        for ($i = 0; $i -lt $ws.Count; $i++) {
+            if ($i -eq 0) { Say ('   - ' + $ws[$i]) } else { Say ('     ' + $ws[$i]) }
+        }
+    }
+}
+
+# 보고 번호를 받은 직후 부른다 — 다음 실행이 「이전 보고」를 말할 수 있게(같은 실행에서 여러 번 보내도 매번 갱신)
+function Save-HelpLastReport {
+    if ($Mode -ne 'full') { return }
+    if (-not (Test-Path -LiteralPath $JarvisHome -PathType Container)) { return }
+    if (-not (Test-JarvisOwnerMark)) { return }
+    if (-not ([string]$script:RhId -cmatch '\A[A-Z2-9]{8}\z')) { return }
+    if (-not ([string]$script:JCode -cmatch '\AJ-[A-Z]+-[0-9]{2}\z')) { return }
+    $state = Read-HelpAttempts
+    $state.Report = @{ Id = [string]$script:RhId; At = (Get-HelpNow); Code = [string]$script:JCode }
+    Save-HelpAttempts $state
+}
+
 # ── 끝맺음 (어느 끝에서도 「다음에 할 일」이 있다) ────────────────
 # ⚠맥판은 이 줄을 EXIT 트랩에 매달았다(끝나는 자리가 여럿이라 기억에 맡기지 않기 위해서다).
 #   PowerShell 에는 그 트랩이 없으므로 본문을 try/finally 로 감싸 **같은 성질**을 만든다 —
@@ -441,6 +634,8 @@ function Write-ClosingNote {
     $next = $script:NextStep
     Say ''
     Say ('다음에 할 일: ' + $next)
+    # 반복 막힘 셈 — 끝맺음 이 한 자리에서 한 번만 센다
+    Update-HelpAttempts
     if ($script:JCode) {
         Say ('  진단 코드: ' + $script:JCode + '  (' + $HelpCodeUrl + $script:JCode + ')')
         # 🔴화면과 보고서가 갈리지 않게 한다(검토 지적 채택) — 단계가 코드를 남기고 그 자리에서 끝나면
@@ -448,10 +643,15 @@ function Write-ClosingNote {
         if (Test-Path $ReportFile) {
             try {
                 $keep = @(Get-Content $ReportFile -Encoding UTF8 -ErrorAction Stop | Where-Object { $_ -notmatch '^- 진단 코드: ' })
+                # 셈의 두 줄도 같은 방법으로 지우고 다시 붙인다(원격 해결 보고보다 앞 · 두 번 끝맺어도 한 줄씩)
+                $keep = @($keep | Where-Object { $_ -notmatch '^- (같은 진단 코드|이전 보고): ' })
                 $keep += ('- 진단 코드: **' + $script:JCode + '** (' + $HelpCodeUrl + $script:JCode + ')')
+                if ($script:HelpFirst) { $keep += ('- 같은 진단 코드: ' + $script:HelpStage + '회째 (이 컴퓨터 · 첫 기록 ' + $script:HelpFirst + ')') }
+                if ($script:HelpPrevReport) { $keep += ('- 이전 보고: ' + $script:HelpPrevReport) }
                 Write-TextNoBom $ReportFile (($keep -join "`r`n") + "`r`n")
             } catch { }
         }
+        Write-HelpEscalation
     }
     # ⚠없는 파일을 보내 달라고 하지 않는다 — 자리 자체를 못 만든 끝에서는 그 두 줄이 거짓이다.
     if ((Test-Path $ReportFile) -or (Test-Path $LogFile)) {
@@ -462,6 +662,8 @@ function Write-ClosingNote {
     }
     # 원격 해결 — 막혀 멈춘 끝이면 여기서 진단을 보내고 창을 연 채 운영팀을 기다린다([1/10] 고지를 보여 드린 실행만).
     if ($script:NoticeShown) { Invoke-RemoteHelp }
+    # 담당자 안내를 보인 끝에서 자동 전달을 못 했으면(미동의·전송 실패·원격 해결 안 돎) 사진을 부탁드린다
+    if ($script:HelpStage3 -and -not $script:HelpSentSaid) { Say $HelpSentNoLine }
     # ★안내는 **맨 마지막**에 둔다 — 사람이 마지막으로 보는 화면에 명령이 있어야 복사할 수 있다.
     if ($script:ShowRerun) { Show-RerunHow }
 }
@@ -506,8 +708,9 @@ function Show-RerunHow {
 
 # 백신이 파일을 붙들었을 때 하는 말은 한 자리에서만 만든다 — 두 곳(설치 대기·받은 파일 사라짐)에서
 # 같은 일이 나는데 문장이 갈리면, 같은 사고를 두 가지 이름으로 배우게 된다.
-# ⛔여기에 백신을 끄거나 예외로 등록하는 안내를 넣지 않는다. 우리가 하는 일은 「막혔다」를 알아볼 수
-#   있게 적어 두는 것뿐이다.
+# ⛔백신을 통째로 끄라는 안내는 어느 단계에도 넣지 않는다 · 우리가 대신 예외로 등록하지도 않는다.
+#   이 자리는 「막혔다」를 알아볼 수 있게 적어 두는 것뿐이다. 사람이 직접 「예외(허용)」에 추가하는 법과
+#   되돌리는 법은 같은 자리에서 2회째 막혔을 때만 반복 막힘 안내(J-AV-* 두 번째 방법)가 보여 드린다(운영자 결정 2026-09-12).
 function Say-AntivirusHold($what) {
     Say '     백신이 그 파일을 붙들고 있는 것으로 보입니다.'
     Say ("     대상 = " + $what)
@@ -2262,7 +2465,7 @@ function Step-Fleet {
 #   글자 칸은 `\z` 로 끝을 못박아 다시 만든다. 이름·글자·판본 비교는 대소문자를 가르는 -ceq·-cmatch·-ccontains 만 쓴다.
 # ⚠PowerShell 은 `'true' -eq $true` 를 참으로 본다 ⇒ 칸마다 **형(type)을 먼저** 본다.
 # ⚠이 절은 맥에서 PowerShell 없이 **정적 검사 + 맥판과의 대조**로만 증명했다 — 윈도우 실기가 필요한 축은 내부 문서.
-$InstallerVersion       = '0.3.14'   # 보고의 installer_version · $BootstrapVersion 은 화면 머리글 용도 그대로(보내지 않는다)
+$InstallerVersion       = '0.3.15'   # 보고의 installer_version · $BootstrapVersion 은 화면 머리글 용도 그대로(보내지 않는다)
 $HelpApiUrl             = 'https://jarvis-install.godmeyou.kr'
 $RemoteHelpNoticeUrl    = 'jarvis-install.godmeyou.kr/help/notice'
 # [1/10] 고지 1줄 = /help/notice 정본이 인용하는 문장 그대로 + 끝에 자세한 안내 자리. ⛔문안 변경 금지(맥판과 글자가 같아야 한다).
@@ -3143,7 +3346,10 @@ function Invoke-RemoteHelp {
     $exitHook = $null
     try {
         if (Send-RemoteHelpReport) {
+            if ($script:HelpStage3) { Say $HelpSentOkLine; $script:HelpSentSaid = $true }
             $script:RhOpen = $true
+            # 다음 실행이 「이전 보고」를 말할 수 있게 보고 번호를 남긴다(열린 원격 해결을 닫는 표시 뒤 — 여기서 넘어져도 닫힌다)
+            Save-HelpLastReport
             # 엔진이 정상으로 끝날 때도 닫기를 한 번 보낸다(계약 7-7) — 아래 finally 가 먼저 닫으면 등록을 풀어 두 번 보내지 않는다.
             #   이 동작은 따로 도는 자리라 이 파일의 함수를 못 본다 ⇒ 주소·토큰을 넘겨 직접 부른다.
             try {

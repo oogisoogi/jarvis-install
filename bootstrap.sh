@@ -356,6 +356,181 @@ wait_for_connection() {
   return 1
 }
 
+# ── 반복 막힘 단계별 안내 (2026-09-12 · v0.3.15) ─────────────────
+# 같은 컴퓨터에서 같은 진단 코드로 끝난 횟수를 센다 — 2회째 = 다른 방법 · 3회째부터 = 담당자와 직접.
+#   문구 정본 = tests/help-escalation.tsv(글자 그대로 · checks.sh 가 잰다).
+# ⚠상태 파일은 고정 모양 JSON — 두 설치기가 같은 모양으로 쓰고 줄 단위 정규식으로 읽는다(깨끗한 맥에 jq·python 이 없다).
+# ⚠끝맺음 트랩이 자리 만들기보다 먼저 매달리므로, 이른 끝(J-HOME-01 등)에서도 여기 값·함수가 정의돼 있어야 한다.
+HELP_CONTACT_PHONE="010-7745-5885"   # 담당자 번호 — 글자로는 이 한 곳뿐(나머지는 이 변수)
+HELP_ATTEMPTS_FILE="$JARVIS_HOME/help-attempts.json"
+HELP_RE_CODE='^"(J-[A-Z]+-[0-9]{2})":\{"count":([0-9]{1,4}),"first":"([^"]*)","last":"([^"]*)","step":"([0-9]{1,2})"\},?$'
+HELP_RE_REPORT='^"last_report":\{"id":"([A-Z2-9]{8})","at":"([^"]*)","code":"(J-[A-Z]+-[0-9]{2})"\}$'
+HELP_STAGE=1          # 이 코드로 끝난 횟수(세지 않은 실행 = 1)
+HELP_FIRST=""         # 첫 기록 시각(세지 않은 실행 = 빈칸 · 보고서 「같은 진단 코드」 줄의 조건)
+HELP_PREV_REPORT=""   # 「ID (시각 · 같은 코드)」·「ID (시각 · 다른 코드 코드명)」 또는 빈칸
+HELP_STAGE3_SHOWN=0
+HELP_SENT_OK=0
+HA_CODES=""           # 읽은 코드 줄들(끝 쉼표 뗌)
+HA_REPORT=""          # 읽은 보고 줄(없으면 빈칸)
+
+help_way_lines() {   # help_way_lines <코드> — 두 번째 방법 줄들(정본 way · 없는 코드 = 아무것도 안 찍는다)
+  case "$1" in
+    # 윈도우에서만 나는 코드(tests/help-rules.tsv 7번째 칸 = win)는 두지 않는다 — 맥에서는 찍힐 일이 없다.
+    # 백신: 끄라고 하지 않고 우리가 예외를 등록하지도 않는다 — 사람이 직접 예외에 넣고 되돌리는 법까지 말한다.
+    J-AV-02)    printf '%s\n' '백신의 보호 기록(격리함)에 cys 설치 파일이 있으면 [복원]을 골라 주십시오.' \
+                  '안 되면 install-jarvis 폴더를 백신의 「예외(허용)」에 추가하신 뒤' \
+                  '다시 실행해 주십시오. 설치 뒤 예외에서 지우시면 원래대로입니다.' ;;
+    J-NET-01)   printf '%s\n' '휴대폰 핫스팟 같은 다른 인터넷에 연결하신 뒤 다시 실행해 주십시오.' ;;
+    J-NET-02)   printf '%s\n' '10분쯤 뒤에 다시 실행해 주십시오.' '휴대폰 핫스팟 같은 다른 인터넷으로 바꿔 보셔도 됩니다.' ;;
+    J-NET-03)   printf '%s\n' '회사·학교 망은 바깥 서버를 막아 둔 경우가 있습니다.' '휴대폰 핫스팟 같은 다른 인터넷으로 연결하신 뒤 다시 실행해 주십시오.' ;;
+    J-PATH-01)  printf '%s\n' '컴퓨터를 한 번 다시 시작하신 뒤 새 창에서 다시 실행해 주십시오.' ;;
+    J-LOGIN-01) printf '%s\n' '브라우저가 뜨지 않았거나 다른 브라우저에 로그인돼 있으면,' \
+                  '설치 창에 보이는 https:// 로 시작하는 로그인 주소를 복사해' '로그인된 브라우저 주소창에 붙여넣어 주십시오.' ;;
+    J-HOME-01)  printf '%s\n' '창을 닫고 새 창을 여신 뒤(남은 설정이 따라오지 않습니다)' '다시 실행해 주십시오.' ;;
+    J-PERM-01)  printf '%s\n' '컴퓨터를 한 번 다시 시작하신 뒤 다시 실행해 주십시오.' '저장 공간이 3GB 이상 남았는지도 함께 봐 주십시오.' ;;
+    J-DISK-01)  printf '%s\n' '휴지통을 비우시고, 설정의 저장 공간 화면에서 큰 파일을' '정리하신 뒤 다시 실행해 주십시오.' ;;
+    J-VER-01)   printf '%s\n' '컴퓨터를 한 번 다시 시작하신 뒤 새 창에서 다시 실행해 주십시오.' ;;
+    J-UNK-00)   printf '%s\n' '컴퓨터를 한 번 다시 시작하신 뒤 다시 실행해 주십시오.' ;;
+    J-DL-03)    printf '%s\n' '컴퓨터를 한 번 다시 시작하신 뒤 새 창에서 다시 실행해 주십시오.' ;;
+    J-DL-04)    printf '%s\n' '휴대폰 핫스팟 같은 다른 인터넷으로 연결하신 뒤 다시 실행해 주십시오.' ;;
+  esac
+}
+help_is_direct() {   # 다른 방법이 없는 코드 — 2회째부터 곧바로 담당자 안내(정본 direct)
+  case "$1" in J-DL-05) return 0 ;; esac
+  return 1
+}
+
+help_attempts_read() {   # → HA_CODES · HA_REPORT · 없으면 빈 상태 · 못 읽거나 첫 줄이 틀리면 빈 상태 + 기록 한 줄
+  local head="" line
+  HA_CODES=""; HA_REPORT=""
+  [ -e "$HELP_ATTEMPTS_FILE" ] || return 0
+  { IFS= read -r head; } 2>/dev/null < "$HELP_ATTEMPTS_FILE"
+  if [ "${head%$'\r'}" != '{"v":1,' ]; then
+    log "help attempts: unreadable - reset"
+    return 0
+  fi
+  while IFS= read -r line || [ -n "$line" ]; do
+    line="${line%$'\r'}"
+    if [[ "$line" =~ $HELP_RE_CODE ]]; then
+      HA_CODES="$HA_CODES${line%,}
+"
+    elif [[ "$line" =~ $HELP_RE_REPORT ]]; then
+      HA_REPORT="$line"
+    fi
+  done 2>/dev/null < "$HELP_ATTEMPTS_FILE"
+}
+
+help_attempts_write() {   # HA_CODES · HA_REPORT → 고정 모양(코드 이름순) · 임시 파일에 쓴 뒤 이름 바꾸기 · 실패 = 기록 한 줄
+  local tmp="$HELP_ATTEMPTS_FILE.tmp" sorted
+  sorted="$(printf '%s' "$HA_CODES" | LC_ALL=C sort | sed '/^$/d; $!s/$/,/')"
+  if [ ! -d "$HELP_ATTEMPTS_FILE" ] && {
+       printf '%s\n' '{"v":1,' '"codes":{'
+       if [ -n "$sorted" ]; then printf '%s\n' "$sorted"; fi
+       if [ -n "$HA_REPORT" ]; then printf '%s\n' '},' "$HA_REPORT"; else printf '%s\n' '}'; fi
+       printf '%s\n' '}'
+     } 2>/dev/null > "$tmp" && mv -f "$tmp" "$HELP_ATTEMPTS_FILE" 2>/dev/null; then
+    return 0
+  fi
+  rm -f "$tmp" 2>/dev/null
+  log "help attempts: write failed"
+  return 1
+}
+
+# 끝맺음이 한 번 부른다 → HELP_STAGE · HELP_FIRST · HELP_PREV_REPORT
+help_attempts_update() {
+  local n now line code cnt=0 first="" keep=""
+  HELP_STAGE=1; HELP_FIRST=""; HELP_PREV_REPORT=""
+  [ "$MODE" = "full" ] || return 0     # 미리보기·감지만 = 세지 않는다(읽지도 쓰지도 않는다)
+  # 작업 폴더가 없거나 우리 표식이 없는 자리(J-HOME-01 로 거절한 남의 폴더)에는 쓰지 않는다 —
+  #   거절한 자리에 파일을 보태면 그 폴더가 「우리 구판 지문」에서 벗어나 다음 이관 제안도 막힌다.
+  owner_mark_ok || return 0
+  if [ -z "$J_CODE" ]; then
+    # 성공 끝(깨우기 도달) = 코드 줄 전부 지운다 · 이전 보고는 남긴다
+    { [ "${REACHED_WAKE:-0}" = "1" ] && [ -f "$HELP_ATTEMPTS_FILE" ]; } || return 0
+    help_attempts_read
+    HA_CODES=""
+    help_attempts_write && log "help attempts: cleared"
+    return 0
+  fi
+  help_attempts_read
+  # 현재 단계 = 이 실행이 기록 파일에 마지막으로 찍은 [n/10] 의 n(remote_help_report 와 같은 방법 · 없으면 0)
+  n="$(grep -oE '\[[0-9]{1,2}/[0-9]{1,2}\]' "$LOG_FILE" 2>/dev/null | tail -1 | tr -d '[]')"
+  n="${n%%/*}"
+  [ -n "$n" ] || n=0
+  n=$((10#$n))
+  while IFS= read -r line; do
+    [[ "$line" =~ $HELP_RE_CODE ]] || continue
+    code="${BASH_REMATCH[1]}"
+    if [ "$code" = "$J_CODE" ]; then
+      cnt=$((10#${BASH_REMATCH[2]})); first="${BASH_REMATCH[3]}"
+    elif [ $((10#${BASH_REMATCH[5]})) -ge "$n" ]; then
+      keep="$keep$line
+"
+    fi   # 그 밖 = 기록된 단계를 이번 실행이 지나갔다 → 지운다(D4)
+  done <<EOF_HELP_CODES
+$HA_CODES
+EOF_HELP_CODES
+  now="$(date '+%Y-%m-%dT%H:%M:%S%z')"
+  [ "$cnt" -lt 9999 ] && cnt=$((cnt + 1))
+  [ -n "$first" ] || first="$now"
+  line="\"$J_CODE\":{\"count\":$cnt,\"first\":\"$first\",\"last\":\"$now\",\"step\":\"$n\"}"
+  [[ "$line" =~ $HELP_RE_CODE ]] || return 0     # 읽을 수 없는 모양은 쓰지 않는다(코드 모양이 다르면 세지 않는다)
+  if [[ "$HA_REPORT" =~ $HELP_RE_REPORT ]]; then
+    if [ "${BASH_REMATCH[3]}" = "$J_CODE" ]; then
+      HELP_PREV_REPORT="${BASH_REMATCH[1]} (${BASH_REMATCH[2]} · 같은 코드)"
+    else
+      HELP_PREV_REPORT="${BASH_REMATCH[1]} (${BASH_REMATCH[2]} · 다른 코드 ${BASH_REMATCH[3]})"
+    fi
+  fi
+  HA_CODES="$keep$line
+"
+  help_attempts_write
+  HELP_STAGE=$cnt
+  HELP_FIRST="$first"
+  log "help attempts: $J_CODE count=$cnt step=$n"
+}
+
+# 끝맺음 「진단 코드:」 줄 바로 다음 — 1회째 = 아무것도 안 찍는다
+help_escalation_print() {
+  local way line i=0
+  [ -n "$J_CODE" ] || return 0
+  if [ "$HELP_STAGE" -ge 3 ] || { [ "$HELP_STAGE" -ge 2 ] && help_is_direct "$J_CODE"; }; then
+    printf '%s\n' "" \
+      "  계속 같은 자리에서 막히셔서 많이 불편하셨지요." \
+      "  개발자와 직접 이야기해 보시면 어떨까요?" \
+      "  담당자 전화 $HELP_CONTACT_PHONE (문자나 전화 · 편하신 시간에)" \
+      "  진단 코드 $J_CODE 만 말씀해 주시면 됩니다."
+    HELP_STAGE3_SHOWN=1
+    return 0
+  fi
+  [ "$HELP_STAGE" -eq 2 ] || return 0
+  way="$(help_way_lines "$J_CODE")"
+  [ -n "$way" ] || return 0     # 두 번째 방법이 없는 코드는 1회째처럼 둔다
+  printf '%s\n' "" "  같은 자리에서 다시 막히셨네요. 난감하시겠어요. 이렇게 한 번 해 보세요."
+  while IFS= read -r line; do
+    if [ "$i" -eq 0 ]; then printf '%s\n' "   - $line"; else printf '%s\n' "     $line"; fi
+    i=$((i + 1))
+  done <<EOF_HELP_WAY
+$way
+EOF_HELP_WAY
+  printf '%s\n' "  그래도 같으면 다음에는 담당자 연락처를 안내해 드리겠습니다."
+}
+
+# 보고 전송 성공 직후 — 같은 실행에서 여러 번 보내도 매번 갱신한다
+help_last_report_save() {   # help_last_report_save <보고 번호>
+  local line
+  [ "$MODE" = "full" ] || return 0
+  owner_mark_ok || return 0
+  line="\"last_report\":{\"id\":\"$1\",\"at\":\"$(date '+%Y-%m-%dT%H:%M:%S%z')\",\"code\":\"$J_CODE\"}"
+  if ! [[ "$line" =~ $HELP_RE_REPORT ]]; then
+    log "help attempts: report not saved"
+    return 0
+  fi
+  help_attempts_read
+  HA_REPORT="$line"
+  help_attempts_write
+}
+
 # ── 끝맺음 (어느 끝에서도 「다음에 할 일」이 있다) ────────────────
 # ★이것을 함수 호출로 두지 않고 **트랩**에 매단 까닭: 끝나는 자리가 여럿이고(성공·실패·중단·
 #   감지만·미리보기), 사람이 새 종료 자리를 만들 때마다 이 줄을 기억해서 붙여야 한다면
@@ -369,14 +544,22 @@ closing_note() {
   #   기본값을 「다시 실행」으로 두고 **깃발도 함께 세운다**(문구만 두면 방법이 안 나온다).
   if [ -z "$NEXT_STEP" ]; then NEXT_STEP="아래 「다시 하시는 법」대로 다시 실행해 주십시오."; SHOW_RERUN=1; fi
   printf '%s\n' "다음에 할 일: $NEXT_STEP"
+  # 반복 막힘 셈 — 끝맺음 이 한 자리에서 한 번만
+  help_attempts_update
   if [ -n "$J_CODE" ]; then
     printf '%s\n' "  진단 코드: $J_CODE  (${HELP_CODE_URL}${J_CODE})"
+    help_escalation_print
     # 🔴화면과 보고서가 갈리지 않게 한다(검토 지적 채택 2026-09-09) — 단계가 코드를 남기고 그 자리에서
     #   끝나면 보고서는 그 전에 쓰인 것이라 **옛 코드나 빈칸**이 남는다. 그 둘이 다르면 사람이 읽어 주는 코드와
     #   우리가 받는 파일이 어긋나 소통이 꼬인다. ⇒ 끝나기 직전에 보고서의 그 줄만 지금 값으로 맞춘다.
+    #   반복 막힘 두 줄(같은 진단 코드 · 이전 보고)도 같은 방법으로 맞춘다(원격 해결 전송보다 앞).
     if [ -f "$REPORT_FILE" ]; then
-      grep -v '^- 진단 코드: ' "$REPORT_FILE" > "$REPORT_FILE.tmp" 2>/dev/null &&
-        printf '%s\n' "- 진단 코드: **$J_CODE** (${HELP_CODE_URL}${J_CODE})" >> "$REPORT_FILE.tmp" &&
+      grep -v -e '^- 진단 코드: ' -e '^- 같은 진단 코드: ' -e '^- 이전 보고: ' "$REPORT_FILE" > "$REPORT_FILE.tmp" 2>/dev/null &&
+        {
+          printf '%s\n' "- 진단 코드: **$J_CODE** (${HELP_CODE_URL}${J_CODE})"
+          if [ -n "$HELP_FIRST" ]; then printf '%s\n' "- 같은 진단 코드: ${HELP_STAGE}회째 (이 컴퓨터 · 첫 기록 $HELP_FIRST)"; fi
+          if [ -n "$HELP_PREV_REPORT" ]; then printf '%s\n' "- 이전 보고: $HELP_PREV_REPORT"; fi
+        } >> "$REPORT_FILE.tmp" &&
         mv "$REPORT_FILE.tmp" "$REPORT_FILE"
       rm -f "$REPORT_FILE.tmp"
     fi
@@ -390,6 +573,10 @@ closing_note() {
   fi
   # 원격 해결 — 막혀 멈춘 끝이면 여기서 진단을 보내고 창을 연 채 운영팀을 기다린다([1/10] 고지를 보여 드린 실행만).
   [ "${NOTICE_SHOWN:-0}" = "1" ] && remote_help
+  # 3회째 안내의 마지막 줄 — 「전달됐다」는 전송이 성공한 순간에만 찍었다(D3). 그 밖(미동의·실패·안 돎)은 이 줄.
+  if [ "$HELP_STAGE3_SHOWN" = "1" ] && [ "$HELP_SENT_OK" != "1" ]; then
+    printf '%s\n' "  전화하실 때 이 화면을 사진으로 보내 주시면 더 빠릅니다."
+  fi
   # ★안내는 **맨 마지막**에 둔다 — 사람이 마지막으로 보는 화면에 명령이 있어야 복사할 수 있다.
   [ "$SHOW_RERUN" = "1" ] && show_rerun_how
   return 0
@@ -1839,7 +2026,7 @@ step_wake() {
 # ★언제 도는가 = 자비스를 깨우기 **전에** 진단 코드를 남기고 멈춘 끝. 자비스를 깨운 뒤에는 돌지 않는다
 #   (자비스가 이 창을 넘겨받으므로 두 쪽이 한 화면에 섞이지 않게).
 # ⚠JSON·재검사·스크럽은 macOS 기본 `osascript`(JavaScript)가 한다 — 깨끗한 맥에는 jq·python 이 없다.
-INSTALLER_VERSION="0.3.14"      # 보고의 installer_version · BOOTSTRAP_VERSION 은 화면 머리글 용도 그대로(보내지 않는다)
+INSTALLER_VERSION="0.3.15"      # 보고의 installer_version · BOOTSTRAP_VERSION 은 화면 머리글 용도 그대로(보내지 않는다)
 HELP_API_URL="https://jarvis-install.godmeyou.kr"
 REMOTE_HELP_NOTICE_URL="jarvis-install.godmeyou.kr/help/notice"
 # [1/10] 고지 1줄 = /help/notice 정본(page.ts)이 인용하는 문장 그대로 + 끝에 자세한 안내 자리(계약 7-1절). ⛔문안 변경 금지.
@@ -2434,7 +2621,14 @@ remote_help() {
     return 0
   fi
   trap 'remote_help_on_signal' HUP INT TERM
-  remote_help_report && remote_help_loop
+  if remote_help_report; then
+    # 3회째 안내를 보인 실행만 — 보고가 실제로 전달된 순간에 그렇다고 말한다(D3)
+    if [ "$HELP_STAGE3_SHOWN" = "1" ]; then
+      printf '%s\n' "  막힌 자리 정보는 방금 자동으로 전달됐습니다."
+      HELP_SENT_OK=1
+    fi
+    remote_help_loop
+  fi
   trap - HUP INT TERM
   rm -rf "$RH_TMP"
   RH_TMP=""
@@ -2481,6 +2675,7 @@ $(basename "$HOME")"
     return 1
   fi
   log "remote help: report $RH_ID"
+  help_last_report_save "$RH_ID"
   # 출처 증명 — 서버가 준 client_token 을 이 기계에만 두고(600) ack·close 에 헤더로 붙인다
   #   처음부터 본인만 읽는 권한으로 만든다(umask 077). 못 쓰거나 권한을 못 맞추면 파일을 지우고 토큰도 버린다(닫힌 쪽 · 검토 지적).
   rm -f "$REMOTE_HELP_TOKEN_FILE"

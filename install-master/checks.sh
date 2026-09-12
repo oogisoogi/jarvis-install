@@ -651,6 +651,27 @@ if [ -f "$DIR/../tests/help-rules-check.py" ]; then
   ck "[코드] 표·설치기·안내 문서가 같은 집합" $? "셋 중 하나가 갈라졌다 (python3 tests/help-rules-check.py 로 자세히)"
 fi
 
+echo "== 반복해서 막힐 때 단계별 안내 (2026-09-12 · v0.3.15) =="
+# 같은 문구만 되풀이하면 사람은 막힌 채 짜증이 난다 — 2회째는 공감과 다른 방법, 3회째부터는 담당자와 직접 이야기.
+#   문구의 정본은 tests/help-escalation.tsv 하나다. 설치 창(두 설치기)·도움말 문서가 그 줄을 글자 그대로 품는지 잰다.
+#   ⚠어느 코드에 어느 줄이 붙는지·몇 회째에 무엇이 나오는지는 실행 시험(tests/help-attempts-run.sh · .ps1)이 잰다.
+if [ -f "$DIR/../tests/help-escalation-check.py" ] && [ -f "$DIR/../tests/help-escalation.tsv" ]; then
+  python3 "$DIR/../tests/help-escalation-check.py" tsv --root "$DIR/.." >/dev/null 2>&1
+  ck "[반복] 모든 진단 코드에 두 번째 방법 또는 곧바로 연락이 있다" $? "어떤 코드는 두 번째에도 같은 말만 한다"
+  python3 "$DIR/../tests/help-escalation-check.py" sh --root "$DIR/.." >/dev/null 2>&1
+  ck "[반복] sh 설치 창 문구가 정본과 같다" $? "화면이 정본과 갈렸다 (python3 tests/help-escalation-check.py sh 로 자세히)"
+  python3 "$DIR/../tests/help-escalation-check.py" ps1 --root "$DIR/.." >/dev/null 2>&1
+  ck "[반복] ps1 설치 창 문구가 정본과 같다" $? "화면이 정본과 갈렸다 (python3 tests/help-escalation-check.py ps1 로 자세히)"
+  python3 "$DIR/../tests/help-escalation-check.py" docs --root "$DIR/.." >/dev/null 2>&1
+  ck "[반복] 도움말 문서 「계속 막히시면」 절이 정본과 같다" $? "설치 창과 도움말이 다른 방법을 말한다"
+  python3 "$DIR/../tests/help-escalation-check.py" phone --root "$DIR/.." >/dev/null 2>&1
+  ck "[반복] 담당자 번호는 설치기마다 상수 한 곳" $? "번호가 여러 곳에 흩어져 바뀔 때 한 곳이 남는다"
+  python3 "$DIR/../tests/help-escalation-check.py" width --root "$DIR/.." >/dev/null 2>&1
+  ck "[반복] 새 화면 줄이 80칸 이하" $? "좁은 창에서 줄이 잘려 읽기 어렵다"
+else
+  sk "[반복] 단계별 안내 문구 검사" "정본 또는 검사기가 이 디렉터리에 없다"
+fi
+
 echo "== 등록 안 된 잔재 (2026-09-09 · 사람이 할 수 없는 일을 요구하지 않는다) =="
 # 그 기계 상태 = cys 폴더 있음 · 설치 목록 항목 없음. 설정 앱은 그 항목을 보므로 cys 가 안 보인다.
 #   앞 판은 판별이 「uninstall.exe 가 있는가」 하나뿐이라 설정 앱 제거를 8번 요구했고 사람은 q 로 나왔다.
