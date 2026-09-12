@@ -525,7 +525,8 @@ function Save-HelpAttempts($State) {
         Write-TextNoBom $tmp (($out -join "`n") + "`n")
         $fullTmp = $ExecutionContext.SessionState.Path.GetUnresolvedProviderPathFromPSPath($tmp)
         $full = $ExecutionContext.SessionState.Path.GetUnresolvedProviderPathFromPSPath($HelpAttemptsFile)
-        if ([System.IO.File]::Exists($full)) { [System.IO.File]::Replace($fullTmp, $full, $null) } else { [System.IO.File]::Move($fullTmp, $full) }
+        # ⚠백업 이름 자리에 $null 을 넘기면 PowerShell 이 빈 글("")로 바꿔 넘긴다 → Replace 가 「올바르지 않은 경로」로 던진다(첫 쓰기만 되고 그 뒤 셈이 조용히 멈춘다) — 진짜 null 은 [NullString]::Value
+        if ([System.IO.File]::Exists($full)) { [System.IO.File]::Replace($fullTmp, $full, [NullString]::Value) } else { [System.IO.File]::Move($fullTmp, $full) }
     } catch {
         Remove-Item -LiteralPath $tmp -Force -ErrorAction SilentlyContinue
         Write-Log 'help attempts: write failed'
