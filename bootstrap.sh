@@ -1123,7 +1123,11 @@ step_login() {
   fi
   human "벤더" "로그인 승인 클릭 — 클로드 회사 화면에서만 할 수 있다(우리가 대신 못 누른다)"
   say "[3/10] 지금 로그인 화면을 엽니다. 브라우저가 뜨면 승인을 눌러 주십시오."
-  say "     승인 화면이 뜨면 「코드」를 복사해 이 창에 붙여넣고 Enter 를 눌러 주십시오."
+  # 로그인 카드(2026-09-14 워크숍 · 윈과 같은 세 가지 · 붙여넣기 키만 맥 것) — 승인을 두 번 누르거나 주소창 주소를 붙여넣어 코드가 무효가 됐다.
+  say "     로그인은 이렇게 해 주십시오 (3가지만):"
+  say "     1) 열려 있는 Claude 탭을 모두 닫고, 브라우저에서 「승인」은 한 번만 누르십시오 (두 번 누르면 앞 코드가 무효가 됩니다)."
+  say "     2) 「Authentication code」 화면에서 복사 단추로 코드만 복사하십시오 (주소창의 주소는 안 됩니다)."
+  say "     3) 이 창에 붙여넣고(⌘+V) Enter 를 누르십시오 — 5분 안에."
   say "     기다리는 동안 $((LOGIN_SAY_INTERVAL))초마다 한 줄씩 알려 드리고, $((LOGIN_WAIT_TIMEOUT / 60))분이 지나면 이 기다림을 끝냅니다."
   LOGIN_WAIT_MARK="$JARVIS_HOME/.login-wait"
   LOGIN_PID_FILE="$JARVIS_HOME/.login-pid"
@@ -2026,7 +2030,7 @@ step_wake() {
 # ★언제 도는가 = 자비스를 깨우기 **전에** 진단 코드를 남기고 멈춘 끝. 자비스를 깨운 뒤에는 돌지 않는다
 #   (자비스가 이 창을 넘겨받으므로 두 쪽이 한 화면에 섞이지 않게).
 # ⚠JSON·재검사·스크럽은 macOS 기본 `osascript`(JavaScript)가 한다 — 깨끗한 맥에는 jq·python 이 없다.
-INSTALLER_VERSION="0.3.15"      # 보고의 installer_version · BOOTSTRAP_VERSION 은 화면 머리글 용도 그대로(보내지 않는다)
+INSTALLER_VERSION="0.3.16"      # 보고의 installer_version · BOOTSTRAP_VERSION 은 화면 머리글 용도 그대로(보내지 않는다)
 HELP_API_URL="https://jarvis-install.godmeyou.kr"
 REMOTE_HELP_NOTICE_URL="jarvis-install.godmeyou.kr/help/notice"
 # [1/10] 고지 1줄 = /help/notice 정본(page.ts)이 인용하는 문장 그대로 + 끝에 자세한 안내 자리(계약 7-1절). ⛔문안 변경 금지.

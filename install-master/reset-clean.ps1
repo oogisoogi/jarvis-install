@@ -631,6 +631,20 @@ function Write-AliveProcs($alive) {
     }
     Write-Host '         작업 관리자(Ctrl+Shift+Esc)에서 위 번호의 항목을 끝내시거나, 컴퓨터를 다시 켜 주십시오.'
 }
+# 🔴2026-09-14 워크숍 사진 — 「지우고 다시 깔기」에서 ~\.local\bin\claude.exe 가 Access denied 로 3번 다 안 지워졌고
+#   「지우다가 멈췄습니다 — 그래서 다시 설치하지 않았습니다」로 끝났다. 붙들고 있던 것은 직전 설치 창에서 남은 claude 였다.
+#   ⇒ 그 파일을 지우기 **직전에만** 그 자리에서 도는 것을 끈다(자리 = 우리가 [2/10] 에서 놓은 파일 · cys 를 자리 기준으로 끄는 것과 같은 원칙).
+#   ⚠이 도구(지우기·재설치)에서만 한다 — 첫 설치에서 끄면 다른 창의 클로드 대화가 끊긴다.
+#   ⚠cys 를 끄는 함수(Stop-CysProcesses)에 섞지 않는다 — 그 결과가 「cys 폴더를 지워도 되는가」 판정에 쓰인다.
+function Stop-ClaudeUnderBin {
+    $procs = @(Get-ProcsUnder @($ClaudeBin))
+    foreach ($pr in $procs) {
+        Write-Host ('  ' + $pr.ProcessName + '.exe(번호 ' + $pr.Id + ')가 돌고 있습니다 — 끄고 지웁니다.')
+        try { Stop-Process -Id $pr.Id -Force -ErrorAction Stop } catch { }
+    }
+    if ($procs.Count -gt 0) { Start-Sleep -Seconds 2 }
+    return @(Get-ProcsUnder @($ClaudeBin))
+}
 function Get-ClaudeCmd {
     if (Test-Path $ClaudeExe) { return $ClaudeExe }
     $c = Get-Command claude -ErrorAction SilentlyContinue
@@ -1352,7 +1366,11 @@ function Invoke-Purge {
     # footprint: W-CYSHOME
     if ($agoraMigrateOk) { Drop 'cys 계정 자리' $CysHome }
     # footprint: W-CLAUDEBIN
+    # ★지우기 직전에 그 자리에서 도는 클로드를 끈다(Stop-ClaudeUnderBin 참조) — 「다시 해 봅니다(1/3)」도 이 자리를 다시 지난다.
+    $claudeAlive = @()
+    if (Test-Path $ClaudeExe) { $claudeAlive = @(Stop-ClaudeUnderBin) }
     Drop '클로드 실행 파일' $ClaudeExe
+    if ((Test-Path $ClaudeExe) -and ($claudeAlive.Count -gt 0)) { Write-AliveProcs $claudeAlive }
     # 🔴**신뢰 키 정리를 작업 폴더 삭제보다 앞에 둔다**(2차 N4 확정 2026-09-10).
     #   기록 파일은 그 폴더 안에 있다. 폴더를 먼저 지우면, 키 정리가 실패했을 때 **다시 해 볼 근거가
     #   사라진다** — 재시도는 「기록 없음」으로 읽고 그 키를 영영 건너뛴다.

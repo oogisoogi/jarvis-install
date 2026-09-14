@@ -85,6 +85,14 @@ $LoginPollTimeout  = 600   # 초 (10분)
 #   ⇒ 60초마다 한 줄 말하고, 20분이면 이 기다림을 끝낸다(그 뒤는 이미 있는 J-LOGIN-01 회복 경로).
 $LoginSayInterval  = 60    # 초 — 기다리는 동안 화면에 한 줄씩 말하는 간격
 $LoginWaitTimeout  = 1200  # 초 (20분) — 승인 대기 자체의 상한 (그 뒤 폴링 10분 ⇒ 최악 30분으로 닫힌다)
+# 🔴로그인 카드(2026-09-14 워크숍 · 로그인 막힘 9건) — 승인을 두 번 누르거나 주소창 주소를 붙여넣어 코드가 무효가 됐다(사진 · 400).
+#   「코드를 복사해 붙여넣으라」 한 줄로는 어느 코드·어느 단추인지 몰랐다 ⇒ 로그인 화면을 열기 전에 한 번 · 기다리는 동안 60초마다 번호 줄 셋.
+$LoginCardLines = @(
+    '     로그인은 이렇게 해 주십시오 (3가지만):',
+    '     1) 열려 있는 Claude 탭을 모두 닫고, 브라우저에서 「승인」은 한 번만 누르십시오 (두 번 누르면 앞 코드가 무효가 됩니다).',
+    '     2) 「Authentication code」 화면에서 복사 단추로 코드만 복사하십시오 (주소창의 주소는 안 됩니다).',
+    '     3) 이 창에 마우스 오른쪽 단추를 눌러 붙여넣고 Enter 를 누르십시오 — 5분 안에.'
+)
 
 # 설치기를 기다리는 한도. 한도가 없으면 백신 경고 창 같은 것이 떠 있는 동안 영원히 서 있게 된다.
 $InstallWaitMs    = 300000   # 조용한 설치 (5분)
@@ -94,6 +102,14 @@ $InstallGuiWaitMs = 900000   # 설치 창을 띄웠을 때 (15분 · 사람이 �
 #   정작 눌러야 할 창은 다른 곳에 떠 있었다. ⇒ 기다리는 동안 말을 하고, 끝이 있는 기다림으로 바꾼다.
 $ClaudeInstallWaitMs  = 600000   # 클로드 설치 상한 (10분 · 넘으면 조용히 다음으로 가지 않는다)
 $InstallNoteEverySec  = 30       # 기다리는 동안 몇 초마다 한 줄을 적는가
+# 🔴2026-09-14 워크숍 — 한 기기에서 공식 설치기가 30분 동안 3회 모두 10분 상한에 닿아 끝내 설치하지 못했다.
+#   ⇒ 같은 자리(J-AV-01)에서 이미 막혔던 컴퓨터는 상한을 5분으로 줄이고, 상한에 닿으면 멈추기 전에 같은 공식 파일을 직접 받아 끝까지 간다.
+$ClaudeInstallRetryWaitMs  = 300000   # 같은 자리에서 다시 막힌 실행의 상한 (5분)
+$ClaudeDirectBaseUrl       = 'https://downloads.claude.ai/claude-code-releases'   # 공식 설치기(install.ps1)가 받는 자리 그대로
+$ClaudeDirectInstallWaitMs = 180000   # 받은 파일로 공식 설치(install 하위명령)를 한 번 더 해 볼 때의 상한 (3분)
+$ClaudeVersionWaitMs       = 90000    # 제자리에 둔 파일이 판본을 답하기까지의 상한
+# 떠 있는 창 제목 가운데 백신 창으로 보이는 것(읽기만 · 짐작이다 — 틀릴 수 있다)
+$AvWindowPattern = '\bV3\b|AhnLab|안랩|알약|ALYac|이스트시큐리티|ESTsecurity|Avast|\bAVG\b|Norton|McAfee|Kaspersky|카스퍼스키|Bitdefender|\bESET\b|Defender|백신|보안 알림|실행 알림|분석 요청'
 # ── 멈추지 않는 설치기 (2026-09-09) ───────────────────────────────
 #   못 나가는 단계에서 침묵하거나 즉시 실패하지 않는다. 원인을 갈라 말하고, 기다리고, 이어간다.
 $NetWaitTimeoutSec   = 1800      # 30분 — 이 한 줄이 기다림의 상한이다
@@ -116,9 +132,23 @@ $OutputEncoding = [System.Text.Encoding]::UTF8
 # 백신이 PowerShell 자체를 종료시키면 이 스크립트는 한마디도 남기지 못하고 사라진다(2026-09-05 실측).
 # 그때 유일하게 남는 것이 기록 파일의 마지막 줄이다 — 그래서 이번 실행이 한 줄이라도 적기 전에 떠 둔다.
 $script:PrevTail = ''
+$script:PrevRunState = ''   # 지난 실행이 어디까지 갔나 — '' 모름 · closed 끝맺음까지 · wait 원격 해결 대기 중 · answer 처방을 받은 뒤 · ended 원격 해결이 스스로 끝남
 if (Test-Path $LogFile) {
     $prevLines = @(Get-Content $LogFile -ErrorAction SilentlyContinue | Where-Object { $_ -ne '' })
-    if ($prevLines.Count -gt 0) { $script:PrevTail = $prevLines[-1] }
+    if ($prevLines.Count -gt 0) {
+        $script:PrevTail = $prevLines[-1]
+        # 🔴2026-09-14 워크숍 — 처방을 받고 창을 닫은 실행에도 「창이 갑자기 닫혔다(J-AV-03)」가 붙었고, 처방 500자가 첫 화면을 덮었다.
+        #   ⇒ 마지막 실행(마지막 머리글 줄 뒤)이 어디까지 갔는지 본다. 뒤에 적힌 줄이 앞의 것을 이긴다.
+        $from = 0
+        for ($i = $prevLines.Count - 1; $i -ge 0; $i--) { if ($prevLines[$i] -match '=== 자비스 설치 도우미 ') { $from = $i; break } }
+        for ($i = $from; $i -lt $prevLines.Count; $i++) {
+            $ln = $prevLines[$i]
+            if ($ln -match '^\S+\s+다음에 할 일: ') { $script:PrevRunState = 'closed' }
+            elseif ($ln -match '^\S+\s+remote help: report [A-Z2-9]{8}') { $script:PrevRunState = 'wait' }
+            elseif ($ln -match '^\S+\s+처방(\(조치 [0-9]+\))?: ') { $script:PrevRunState = 'answer' }
+            elseif ($ln -match '^\S+\s+(원격 해결 시간\([0-9]+분\)이 끝나 멈춥니다|원격 해결이 끝났습니다)') { $script:PrevRunState = 'ended' }
+        }
+    }
 }
 
 function Write-Log($msg) {
@@ -309,9 +339,27 @@ function Human($who, $what) {
 function Show-PrevRunNote {
     if (-not $script:PrevTail) { return }
     if ($script:PrevTail -match '\[9/9\]|끝냅니다') { return }
+    # 끝맺음까지 간 실행 · 원격 해결이 스스로 끝난 실행 = 「갑자기 닫힘」이 아니다(끝맺음이 이미 다음에 할 일을 알렸다)
+    if (($script:PrevRunState -eq 'closed') -or ($script:PrevRunState -eq 'ended')) { Write-Log ('prevrun ' + $script:PrevRunState + ' - no J-AV-03'); return }
+    # 원격 해결을 기다리던 중에 닫힌 창 = 사람이 처방을 보고 새로 실행한 것이다 — J-AV-03 을 붙이지 않고 한 줄로 알린다
+    if (($script:PrevRunState -eq 'answer') -or ($script:PrevRunState -eq 'wait')) {
+        if ($script:PrevRunState -eq 'answer') { Say '지난번 실행 기록: (운영팀 처방을 받은 뒤 창이 닫혔습니다)' }
+        else { Say '지난번 실행 기록: (원격 해결을 기다리던 중에 창이 닫혔습니다)' }
+        Write-Log ('prevrun ' + $script:PrevRunState + ' - no J-AV-03')
+        Say '     이어서 진행합니다 — 이미 끝난 단계는 다시 하지 않습니다.'
+        return
+    }
     Say '지난번 실행이 끝을 알리지 않고 멈춘 자리가 있습니다. 그때 마지막으로 적힌 줄입니다:'
-    Write-JCode 'J-AV-03' '지난 실행이 끝을 알리지 않고 멈췄습니다(창이 갑자기 닫혔을 수 있습니다)'
-    Say "       $script:PrevTail"
+    # 🔴Write-JCode 를 쓰지 않는다(2026-09-14 도움 채널 3건) — $script:JCode 에 넣으면 이번 실행이 다른 까닭으로 끝나도
+    #   끝맺음 보고에 이 코드가 실려 「백신이 창을 닫았다」는 엉뚱한 안내가 나갔다. 지난 실행 표시는 별도 칸이다.
+    $script:PrevRunCode = 'J-AV-03'
+    Say '     지난 실행의 진단 코드: J-AV-03 — 지난 실행이 끝을 알리지 않고 멈췄습니다(창이 갑자기 닫혔을 수 있습니다)'
+    Say ('     이 코드로 찾아보실 수 있습니다: ' + $HelpCodeUrl + 'J-AV-03')
+    Write-Log 'prevrun J-AV-03'
+    # 마지막 줄이 길면 새 실행의 첫 화면이 덮인다(2026-09-14 · 처방 500자가 통째로 찍혔다) — 120자에서 자른다
+    $tail = [string]$script:PrevTail
+    if ($tail.Length -gt 120) { $tail = $tail.Substring(0, 120) + '…' }
+    Say "       $tail"
     Say '     창이 갑자기 닫힌 것이었다면 백신이 PowerShell 을 종료한 것일 수 있습니다.'
     Say '     이어서 진행합니다 — 이미 끝난 단계는 다시 하지 않습니다.'
 }
@@ -321,6 +369,7 @@ function Show-PrevRunNote {
 #   자리마다 다른 이름을 쓰면 그 셋을 맞춰 보는 일이 사람 몫이 된다.
 $script:JCode = ''
 $script:NextStep = ''
+$script:PrevRunCode = ''    # 지난 실행 표시(Show-PrevRunNote) — 이번 실행의 코드와 섞지 않는다
 function Write-JCode($code, $desc) {
     $script:JCode = $code
     Say ("     진단 코드: " + $code + " — " + $desc)
@@ -453,6 +502,7 @@ $HelpWays = @{
     'J-RM-01'    = @('컴퓨터를 한 번 다시 시작하신 뒤(열려 있던 cys 가 완전히 닫힙니다)', '재설치 명령을 실행해 주십시오.')
     'J-PATH-01'  = @('컴퓨터를 한 번 다시 시작하신 뒤 새 창에서 다시 실행해 주십시오.')
     'J-LOGIN-01' = @('브라우저가 뜨지 않았거나 다른 브라우저에 로그인돼 있으면,', '설치 창에 보이는 https:// 로 시작하는 로그인 주소를 복사해', '로그인된 브라우저 주소창에 붙여넣어 주십시오.')
+    'J-LOGIN-02' = @('브라우저 창을 모두 닫으신 뒤 다시 실행해 주십시오.', '승인은 한 번만 누르시고 코드만 복사해 붙여넣어 주십시오.')
     'J-HOME-01'  = @('창을 닫고 새 창을 여신 뒤(남은 설정이 따라오지 않습니다)', '다시 실행해 주십시오.')
     'J-PERM-01'  = @('컴퓨터를 한 번 다시 시작하신 뒤 다시 실행해 주십시오.', '저장 공간이 3GB 이상 남았는지도 함께 봐 주십시오.')
     'J-DISK-01'  = @('휴지통을 비우시고, 설정의 저장 공간 화면에서 큰 파일을', '정리하신 뒤 다시 실행해 주십시오.')
@@ -631,6 +681,14 @@ function Write-ClosingNote {
     if (-not $script:NextStep) {
         $script:NextStep = '아래 「다시 하시는 법」대로 다시 실행해 주십시오.'
         $script:ShowRerun = $true
+        # 🔴본문 try/finally 에 catch 가 없어 오류 문구는 화면에만 나가고 기록 파일엔 한 줄도 안 남았다(2026-09-14 3건).
+        #   마지막 오류를 적는다 — 끝난 원인이 아닐 수 있고, Ctrl-C 중단은 여기에 안 잡힌다.
+        if ($Error.Count -gt 0) {
+            $why = (($Error[0] | Out-String) -replace '\s+', ' ').Trim()
+            Write-Log ('unexpected end: last error = ' + $Error[0].Exception.GetType().FullName + ' - ' + $why.Substring(0, [Math]::Min(300, $why.Length)))
+        }
+        # 코드가 비면 원격 해결(Invoke-RemoteHelp)이 보고를 보내지 않는다 ⇒ 설치 모드·깨우기 전의 끝만 「분류 못 함」으로 채운다.
+        if ((-not $script:JCode) -and ($Mode -eq 'full') -and (-not $script:ReachedWake)) { $script:JCode = 'J-UNK-00'; Write-Log 'jcode J-UNK-00 unexpected end' }
     }
     $next = $script:NextStep
     Say ''
@@ -645,8 +703,9 @@ function Write-ClosingNote {
             try {
                 $keep = @(Get-Content $ReportFile -Encoding UTF8 -ErrorAction Stop | Where-Object { $_ -notmatch '^- 진단 코드: ' })
                 # 셈의 두 줄도 같은 방법으로 지우고 다시 붙인다(원격 해결 보고보다 앞 · 두 번 끝맺어도 한 줄씩)
-                $keep = @($keep | Where-Object { $_ -notmatch '^- (같은 진단 코드|이전 보고): ' })
+                $keep = @($keep | Where-Object { $_ -notmatch '^- (같은 진단 코드|이전 보고|지난 실행 진단 코드)' })
                 $keep += ('- 진단 코드: **' + $script:JCode + '** (' + $HelpCodeUrl + $script:JCode + ')')
+                if ($script:PrevRunCode) { $keep += ('- 지난 실행 진단 코드(참고 · 이번 끝의 코드가 아님): ' + $script:PrevRunCode) }
                 if ($script:HelpFirst) { $keep += ('- 같은 진단 코드: ' + $script:HelpStage + '회째 (이 컴퓨터 · 첫 기록 ' + $script:HelpFirst + ')') }
                 if ($script:HelpPrevReport) { $keep += ('- 이전 보고: ' + $script:HelpPrevReport) }
                 Write-TextNoBom $ReportFile (($keep -join "`r`n") + "`r`n")
@@ -1240,6 +1299,253 @@ function Seed-LocalBinPath {
     return $true
 }
 
+# ── [2/10] 공식 설치기가 상한에 닿았을 때 (v0.3.16 · 2026-09-14 워크숍) ─────────────
+# 🔴그날 한 기기가 30분 동안 3회 모두 10분 상한에 닿았고 끝내 설치하지 못했다. 기록에는 「백신으로 보입니다」 한 문장만
+#   남아 무엇이 멈췄는지 갈리지 않았다 ⇒ ⑴무엇이 살아 있었는지 적고(읽기만) ⑵같은 공식 파일을 직접 받아 끝까지 간다.
+# ★공식 설치기(https://claude.ai/install.ps1 · 2026-09-14 실물)가 하는 일 = ①{BASE}/latest 로 판본 ②{BASE}/<판본>/manifest.json 의
+#   해시 ③claude.exe 받기 ④해시 대조 ⑤받은 파일로 `install latest` ⑥받은 파일 삭제. 멈춘 자리는 ③ 또는 ⑤다.
+#   ⇒ ①~④를 같은 주소·같은 해시 대조로 우리가 하고, ⑤를 짧은 상한(3분)으로 한 번 해 본다(되면 셸 연동·자동 판올림 준비까지
+#     공식 그대로 깔린다). 그것도 상한이면 받은 파일을 ~\.local\bin\claude.exe 에 두고 판본을 답하는지로 판정한다.
+#   ★기록 파일에 「공식 설치기가 받던 파일」(③ 진행)과 「install hold diag (⑤ 받은 파일로 설치)」(⑤ 멈춤)가 따로 남아 다음 보고에서 원인이 갈린다.
+# ⛔백신을 끄거나 피하거나 예외로 등록하지 않는다 — 같은 공식 파일을 받고, 백신 검사는 그대로 받는다.
+function Get-ProcTree($rootId) {
+    # 돌려주는 것 = 자식·손자 목록(Id · Name · Start · Parent · Depth) · 못 읽으면 빈 목록(설치를 막지 않는다)
+    $all = $null
+    try {
+        $all = @(Get-CimInstance Win32_Process -ErrorAction Stop | ForEach-Object {
+            [pscustomobject]@{ Id = [int]$_.ProcessId; Parent = [int]$_.ParentProcessId; Name = [string]$_.Name; Start = $_.CreationDate }
+        })
+    } catch { $all = $null }
+    if ($null -eq $all) {
+        # CIM 이 없는 자리 — PowerShell 7 의 Parent 칸으로 대신 잰다(5.1 에는 없는 칸이다)
+        try {
+            $all = @(Get-Process -ErrorAction Stop | ForEach-Object {
+                $pp = 0; try { if ($_.Parent) { $pp = [int]$_.Parent.Id } } catch { $pp = 0 }
+                $st = $null; try { $st = $_.StartTime } catch { $st = $null }
+                [pscustomobject]@{ Id = [int]$_.Id; Parent = $pp; Name = [string]$_.ProcessName; Start = $st }
+            })
+        } catch { return @() }
+    }
+    $out = @()
+    $frontier = @([int]$rootId)
+    $depth = 0
+    while (($frontier.Count -gt 0) -and ($depth -lt 6)) {
+        $depth++
+        $next = @()
+        foreach ($c in $all) {
+            if (($frontier -contains $c.Parent) -and ($c.Id -ne $c.Parent)) {
+                $out += [pscustomobject]@{ Id = $c.Id; Name = $c.Name; Start = $c.Start; Parent = $c.Parent; Depth = $depth }
+                $next += $c.Id
+            }
+        }
+        $frontier = $next
+    }
+    return $out
+}
+function Get-AvWindowTitles {
+    $t = @()
+    foreach ($pr in @(Get-Process -ErrorAction SilentlyContinue)) {
+        $w = ''
+        try { $w = [string]$pr.MainWindowTitle } catch { $w = '' }
+        if ($w -and ($w -match $AvWindowPattern)) { $t += ($w + ' (' + $pr.ProcessName + ')') }
+    }
+    return @($t | Select-Object -Unique)
+}
+function Get-FileStateWords($path) {
+    # 있음 · 크기 · 잠김(다른 프로그램이 쥐고 있어 열리지 않는가) — 읽기만 한다
+    $full = $ExecutionContext.SessionState.Path.GetUnresolvedProviderPathFromPSPath($path)
+    if (-not [System.IO.File]::Exists($full)) { return '없음' }
+    $size = '?'
+    try { $size = [string]([System.IO.FileInfo]$full).Length } catch { $size = '?' }
+    $lock = '아니오'
+    $fs = $null
+    try { $fs = [System.IO.File]::Open($full, [System.IO.FileMode]::Open, [System.IO.FileAccess]::Read, [System.IO.FileShare]::None) }
+    catch { $lock = '예(' + $_.Exception.GetType().Name + ')' }
+    finally { if ($fs) { $fs.Dispose() } }
+    return ('있음 · ' + $size + '바이트 · 잠김 ' + $lock)
+}
+function Add-ReportLines($lines) {
+    # 환경 보고(원격 해결이 보내는 본문)에 줄을 덧붙인다 — 보고서를 쓰는 방식과 같게 BOM 없는 UTF-8
+    try {
+        $full = $ExecutionContext.SessionState.Path.GetUnresolvedProviderPathFromPSPath($ReportFile)
+        [System.IO.File]::AppendAllText($full, ((@($lines) -join "`r`n") + "`r`n"), (New-Object System.Text.UTF8Encoding($false)))
+    } catch { Write-Log 'report append failed' }
+}
+function Write-ClaudeInstallDiag($p, $where) {
+    # 돌려주는 것 = 그때 본 자식 목록(끄는 데 쓴다)
+    $tree = @(Get-ProcTree $p.Id)
+    $procWords = '없음(또는 읽지 못함)'
+    if ($tree.Count -gt 0) {
+        $procWords = (@($tree | ForEach-Object {
+            $s = ''
+            try { if ($_.Start) { $s = ([datetime]$_.Start).ToString('HH:mm:ss') } } catch { $s = '' }
+            $_.Name + '(번호 ' + $_.Id + ' · 부모 ' + $_.Parent + ' · 시작 ' + $s + ')'
+        })) -join ' · '
+    }
+    $av = @(Get-AvWindowTitles)
+    $avWords = if ($av.Count -gt 0) { $av -join ' · ' } else { '없음' }
+    $exe = Join-Path $env:USERPROFILE '.local\bin\claude.exe'
+    $dls = @()
+    try { $dls = @(Get-ChildItem -LiteralPath (Join-Path $env:USERPROFILE '.claude\downloads') -Filter 'claude-*.exe' -Force -ErrorAction Stop | ForEach-Object { $_.Name + ' ' + $_.Length + '바이트' }) } catch { $dls = @() }
+    $dlWords = if ($dls.Count -gt 0) { $dls -join ' · ' } else { '없음' }
+    $lines = @(
+        ('설치기 프로세스 번호 ' + $p.Id + ' · 자식: ' + $procWords),
+        ('백신으로 보이는 창 제목: ' + $avWords),
+        ('~\.local\bin\claude.exe: ' + (Get-FileStateWords $exe)),
+        ('공식 설치기가 받던 파일(~\.claude\downloads): ' + $dlWords)
+    )
+    foreach ($l in $lines) { Write-Log ('install hold diag (' + $where + '): ' + (Redact $l)) }
+    Add-ReportLines (@('', ('## [2/10] 설치가 상한에 닿았을 때 본 것 (' + $where + ')')) + @($lines | ForEach-Object { '- ' + (Redact $_) }))
+    if ($av.Count -gt 0) {
+        Say ('     지금 떠 있는 창 가운데 백신 창으로 보이는 것: 『' + $av[0] + '』 — 그 창에서 [실행] 또는 [파일 전송] 을 눌러 주십시오.')
+    }
+    return $tree
+}
+function Stop-ProcTree($p, $tree) {
+    # 깊은 자식부터 끄고 마지막에 본인 — 우리가 띄운 설치기와 그 자식만 겨눈다
+    foreach ($t in @(@($tree) | Sort-Object Depth -Descending)) {
+        try { Stop-Process -Id $t.Id -Force -ErrorAction Stop } catch { }
+    }
+    try { if (-not $p.HasExited) { $p.Kill() } } catch { }
+    try { [void]$p.WaitForExit(5000) } catch { }
+    Write-Log ('install hold: stopped installer ' + $p.Id + ' and ' + @($tree).Count + ' child process(es) - exited=' + $p.HasExited)
+}
+function Wait-ProcBounded($proc, $capMs, $label) {
+    # 돌려주는 것 = $true 상한 안에 끝났다 · $false 상한에 닿았다(그 사이 몇 초마다 한 줄 · 콘솔을 건드리지 않는 대기)
+    $w = 0; $since = 0
+    while (-not $proc.WaitForExit(1000)) {
+        $w += 1000; $since += 1000
+        if ($w -ge $capMs) { return $false }
+        if ($since -ge ($InstallNoteEverySec * 1000)) {
+            $since = 0
+            Say ('     ' + $label + ' (' + [int][math]::Floor($w / 60000) + '분 ' + ([int][math]::Floor($w / 1000) % 60) + '초 지남 · 최대 ' + [int][math]::Floor($capMs / 60000) + '분)')
+        }
+    }
+    return $true
+}
+function Install-ClaudeDirect {
+    # 돌려주는 것 = $true 클로드가 ~\.local\bin 에서 판본을 답했다 · $false 못 했다(까닭은 화면·기록에)
+    $platform = if ($env:PROCESSOR_ARCHITECTURE -eq 'ARM64') { 'win32-arm64' } else { 'win32-x64' }
+    $saved = $ProgressPreference
+    $ProgressPreference = 'SilentlyContinue'   # 5.1 은 진행 막대를 그리느라 큰 파일 받기가 몇 배 느려진다
+    try {
+        # ① 판본
+        $ver = ''
+        try { $ver = ([string](Invoke-RestMethod -Uri ($ClaudeDirectBaseUrl + '/latest') -UseBasicParsing -TimeoutSec 60 -ErrorAction Stop)).Trim() } catch { $ver = '' }
+        if (-not ($ver -cmatch '\A[0-9]+\.[0-9]+\.[0-9]+(-[0-9A-Za-z.]+)?\z')) {
+            Say '     공식 자리에서 판본 번호를 읽지 못했습니다.'
+            Write-Log ('install direct: step1 latest unreadable (' + $ver.Length + ' chars)')
+            return $false
+        }
+        # ② 해시
+        $sum = ''; $size = 0
+        try {
+            $m = Invoke-RestMethod -Uri ($ClaudeDirectBaseUrl + '/' + $ver + '/manifest.json') -UseBasicParsing -TimeoutSec 60 -ErrorAction Stop
+            $sum = ([string]$m.platforms.$platform.checksum).ToLower()
+            try { $size = [long]$m.platforms.$platform.size } catch { $size = 0 }
+        } catch { $sum = '' }
+        if (-not ($sum -cmatch '\A[0-9a-f]{64}\z')) {
+            Say '     공식 자리에서 파일 확인값(해시)을 읽지 못했습니다 — 확인 없이 설치하지 않습니다.'
+            Write-Log ('install direct: step2 manifest checksum unreadable for ' + $ver + ' ' + $platform)
+            return $false
+        }
+        # ③ 받기
+        New-Item -ItemType Directory -Force -Path $DlDir | Out-Null
+        $dl = Join-Path $DlDir ('claude-' + $ver + '-' + $platform + '.exe')
+        Remove-Item -LiteralPath $dl -Force -ErrorAction SilentlyContinue
+        Say ('     공식 자리에서 클로드 ' + $ver + ' 파일을 받습니다 (약 ' + [int][math]::Floor($size / 1MB) + 'MB · 보통 1~3분).')
+        $t0 = Get-Date
+        try {
+            Invoke-WebRequest -Uri ($ClaudeDirectBaseUrl + '/' + $ver + '/' + $platform + '/claude.exe') -OutFile $dl -UseBasicParsing -TimeoutSec 900 -ErrorAction Stop
+        } catch {
+            Remove-Item -LiteralPath $dl -Force -ErrorAction SilentlyContinue
+            Say ('     파일을 받지 못했습니다: ' + $_.Exception.Message)
+            Write-Log ('install direct: step3 download failed - ' + $_.Exception.Message)
+            return $false
+        }
+        Write-Log ('install direct: step3 download ok ' + $ver + ' in ' + [int][math]::Floor(((Get-Date) - $t0).TotalSeconds) + 's')
+        # ④ 해시 대조 — 못 재면 쓰지 않는다
+        $got = Get-CysFileSha256 $dl
+        if ($null -eq $got) {
+            Remove-Item -LiteralPath $dl -Force -ErrorAction SilentlyContinue
+            Say '     받은 파일의 확인값(해시)을 잴 수 없어 그 파일은 쓰지 않았습니다.'
+            Write-Log 'install direct: step4 checksum unmeasurable'
+            return $false
+        }
+        if ($got -cne $sum) {
+            Remove-Item -LiteralPath $dl -Force -ErrorAction SilentlyContinue
+            Say '     받은 파일의 확인값(해시)이 공식 값과 다릅니다 — 그 파일은 쓰지 않았습니다.'
+            Write-Log ('install direct: step4 checksum mismatch got=' + $got + ' want=' + $sum)
+            return $false
+        }
+        Write-Log 'install direct: step4 checksum ok'
+        # ⑤ 받은 파일로 공식 설치를 짧은 상한으로 한 번 해 본다 — 되면 셸 연동·자동 판올림 준비까지 공식 그대로 깔린다
+        $exe = Join-Path (Join-Path $env:USERPROFILE '.local\bin') 'claude.exe'
+        $step5 = 'not-run'
+        $ip = $null
+        try { $ip = Start-Process -FilePath $dl -ArgumentList 'install','latest' -NoNewWindow -PassThru -ErrorAction Stop } catch { $ip = $null; $step5 = 'start-failed' }
+        if ($null -ne $ip) {
+            if (Wait-ProcBounded $ip $ClaudeDirectInstallWaitMs '받은 파일로 설치하는 중입니다') {
+                [void]$ip.WaitForExit()
+                $step5 = 'rc=' + $(if ($null -eq $ip.ExitCode) { 'unread' } else { [string]$ip.ExitCode })
+            } else {
+                $step5 = 'timeout ' + [int][math]::Floor($ClaudeDirectInstallWaitMs / 60000) + 'min'
+                $t5 = @(Write-ClaudeInstallDiag $ip '⑤ 받은 파일로 설치')
+                Stop-ProcTree $ip $t5
+            }
+        }
+        Write-Log ('install direct: step5 install latest ' + $step5)
+        # ⑤가 끝나고 파일이 제자리에 있으면 그대로 쓴다 · 아니면 받은 파일을 제자리에 둔다(옮기는 동안만 .jarvis-new)
+        if (-not (($step5 -eq 'rc=0') -and (Test-Path -LiteralPath $exe))) {
+            New-Item -ItemType Directory -Force -Path (Split-Path -Parent $exe) | Out-Null
+            $tmp = $exe + '.jarvis-new'
+            $placed = $false
+            for ($try = 1; ($try -le 2) -and (-not $placed); $try++) {
+                try {
+                    Copy-Item -LiteralPath $dl -Destination $tmp -Force -ErrorAction Stop
+                    Move-Item -LiteralPath $tmp -Destination $exe -Force -ErrorAction Stop
+                    $placed = $true
+                } catch {
+                    Remove-Item -LiteralPath $tmp -Force -ErrorAction SilentlyContinue
+                    Write-Log ('install direct: place try ' + $try + ' failed - ' + $_.Exception.Message)
+                    if ($try -lt 2) { Start-Sleep -Seconds 3 }
+                }
+            }
+            if (-not $placed) {
+                Say ('     받은 파일을 제자리(' + (Redact $exe) + ')에 두지 못했습니다 — ' + (Get-FileStateWords $exe))
+                return $false
+            }
+            Write-Log ('install direct: placed ' + (Redact $exe))
+        }
+        Remove-Item -LiteralPath $dl -Force -ErrorAction SilentlyContinue
+        # 판정 = 제자리 파일이 판본을 답하는가(상한 있음)
+        $vout = Join-Path $DlDir 'claude-version.txt'
+        Remove-Item -LiteralPath $vout -Force -ErrorAction SilentlyContinue
+        $vp = $null
+        try { $vp = Start-Process -FilePath $exe -ArgumentList '--version' -NoNewWindow -PassThru -RedirectStandardOutput $vout -ErrorAction Stop } catch { $vp = $null }
+        $vtext = ''
+        if ($null -ne $vp) {
+            if ($vp.WaitForExit($ClaudeVersionWaitMs)) {
+                $vtext = [string](@(Get-Content -LiteralPath $vout -ErrorAction SilentlyContinue) | Select-Object -First 1)
+            } else {
+                try { $vp.Kill() } catch { }
+                Write-Log 'install direct: --version timeout'
+            }
+        }
+        Remove-Item -LiteralPath $vout -Force -ErrorAction SilentlyContinue
+        if (-not ($vtext -match '[0-9]+\.[0-9]+\.[0-9]+')) {
+            Say '     제자리에 둔 클로드가 판본을 답하지 않았습니다.'
+            Write-Log ('install direct: --version no answer (' + $vtext + ')')
+            return $false
+        }
+        Say ('     직접 받은 클로드가 판본을 답했습니다: ' + $vtext.Trim())
+        Write-Log ('install direct: ok ' + $vtext.Trim() + ' - step5 ' + $step5)
+        return $true
+    } finally {
+        $ProgressPreference = $saved
+    }
+}
+
 # ── 하는 일 2 — 공식 설치기 호출 (멱등: 이미 있으면 건너뛴다) ─────
 function Step-InstallClaude {
     if ($script:ClaudeOk) { Say '[2/10] 클로드가 이미 있습니다 — 건너뜁니다 (멱등).'; return 0 }
@@ -1267,22 +1573,51 @@ function Step-InstallClaude {
         $script:ShowRerun = $true
         return 4
     }
+    # 같은 자리(J-AV-01)에서 이미 막혔던 컴퓨터는 상한을 5분으로 줄인다 — 한 기기가 10분 × 3회 = 30분을 썼다(2026-09-14).
+    $prevHold = 0
+    try { $ph = (Read-HelpAttempts).Codes['J-AV-01']; if ($ph) { $prevHold = [int]$ph.N } } catch { $prevHold = 0 }
+    $waitCap = if ($prevHold -ge 1) { $ClaudeInstallRetryWaitMs } else { $ClaudeInstallWaitMs }
+    Write-Log ('install wait cap ' + $waitCap + 'ms (J-AV-01 before: ' + $prevHold + ')')
     $waitedMs = 0
     $sinceNoteMs = 0
-    while ((-not $p.HasExited) -and ($waitedMs -lt $ClaudeInstallWaitMs)) {
+    $avShown = ''
+    while ((-not $p.HasExited) -and ($waitedMs -lt $waitCap)) {
         Start-Sleep -Milliseconds 1000
         $waitedMs += 1000
         $sinceNoteMs += 1000
         if ($sinceNoteMs -ge ($InstallNoteEverySec * 1000)) {
             $sinceNoteMs = 0
-            $mm = [int]($waitedMs / 60000); $ss = [int]($waitedMs / 1000) % 60
-            Say ("     아직 설치 중입니다 (" + $mm + "분 " + $ss + "초 지남 · 최대 " + [int]($ClaudeInstallWaitMs / 60000) + "분). 작업 표시줄에 백신 창이 떠 있는지 확인해 주십시오 — 「파일 전송」이나 [실행] 을 누르시면 이어집니다.")
+            # 🔴[int] 는 반올림이다 — 1분 30초가 「2분 30초」로 찍혀 시간이 뒤죽박죽이었다(2026-09-14 사진). 버림으로 센다.
+            $mm = [int][math]::Floor($waitedMs / 60000); $ss = [int][math]::Floor($waitedMs / 1000) % 60
+            Say ("     아직 설치 중입니다 (" + $mm + "분 " + $ss + "초 지남 · 최대 " + [int]($waitCap / 60000) + "분). 작업 표시줄에 백신 창이 떠 있는지 확인해 주십시오 — 「파일 전송」이나 [실행] 을 누르시면 이어집니다.")
+            # 백신 창으로 보이는 창 제목이 떠 있으면 그 이름을 그대로 적는다(읽기만 · 바뀌었을 때만)
+            $av = @(Get-AvWindowTitles)
+            if (($av.Count -gt 0) -and ($av[0] -cne $avShown)) {
+                $avShown = $av[0]
+                Say ('     지금 떠 있는 창 가운데 백신 창으로 보이는 것: 『' + $av[0] + '』 — 그 창에서 [실행] 또는 [파일 전송] 을 눌러 주십시오.')
+            }
         }
     }
+    $held = $false
+    $direct = $false
     if (-not $p.HasExited) {
+        $held = $true
+        Say ("[2/10] 설치가 " + [int]($waitCap / 60000) + "분 안에 끝나지 않았습니다.")
+        # ⑴무엇이 살아 있었는지 적는다 ⑵공식 설치기를 멈추고 같은 공식 파일을 직접 받아 이어 간다(위 「상한에 닿았을 때」)
+        $tree = @(Write-ClaudeInstallDiag $p '공식 설치기')
+        Stop-ProcTree $p $tree
+        Say '     공식 설치기를 멈추고, 같은 공식 자리에서 클로드 파일을 직접 받아 설치를 이어 갑니다(백신 검사는 그대로 받습니다).'
+        $direct = (@(Install-ClaudeDirect)[-1] -eq $true)
+    }
+    if ($held -and (-not $direct)) {
         # 조용히 다음 단계로 가지 않는다. 여기서 멈춰야 사람이 무엇을 누를지 알게 된다.
-        Say ("[2/10] 설치가 " + [int]($ClaudeInstallWaitMs / 60000) + "분 안에 끝나지 않았습니다.")
         Write-JCode 'J-AV-01' '백신 창이 설치 파일을 붙들고 있는 것으로 보입니다'
+        if ($prevHold -ge 1) {
+            # 같은 자리 2회째부터 — 현장에서 통한 처방(공식 설치기를 도우미 밖에서 직접)을 설치기가 먼저 알린다
+            Say '     클로드 공식 설치기를 이 도우미 밖에서 직접 돌려 보실 수도 있습니다 — 새 PowerShell 창에 아래 한 줄을 붙여넣고 Enter:'
+            Say ('     irm ' + $ClaudeInstallUrl + ' | iex')
+            Say '     「Installation complete」 가 보이면 그 창을 닫고 아래 「다시 하시는 법」대로 다시 실행해 주십시오.'
+        }
         Say-AntivirusHold '클로드 설치 파일 (이름이 claude 로 시작하는 파일)'
         Set-NextStepRerun '작업 표시줄에서 백신 창을 찾아 [파일 전송] 또는 [실행] 을 누르신 뒤, 아래 「다시 하시는 법」대로 다시 실행해 주십시오.'
         return 4
@@ -1297,7 +1632,10 @@ function Step-InstallClaude {
     [void]$p.WaitForExit()
     $installRc = $p.ExitCode
     $rcShown = if ($null -eq $installRc) { '읽지 못함' } else { [string]$installRc }
-    if ($null -eq $installRc) {
+    if ($direct) {
+        # 직접 받은 파일이 판본을 답했다 — 멈춘 공식 설치기는 우리가 껐으므로 그 종료 코드는 판정에 쓰지 않는다
+        $rcShown = '공식 설치기는 멈춤 · 직접 받은 파일'
+    } elseif ($null -eq $installRc) {
         Say '[2/10] 설치기가 끝났는데 종료 코드를 읽지 못했습니다 — 숫자 대신 클로드 명령이 답하는지로 판정합니다.'
     } elseif ($installRc -ne 0) {
         Say "[2/10] 실패 (종료 코드 $installRc). 아래 「다시 하시는 법」대로 다시 실행하시면 여기서부터 이어서 갑니다."
@@ -1365,7 +1703,7 @@ function Step-Login {
     }
     Human '벤더' '로그인 승인 클릭 — 클로드 회사 화면에서만 할 수 있다(우리가 대신 못 누른다)'
     Say '[3/10] 지금 로그인 화면을 엽니다. 브라우저가 뜨면 승인을 눌러 주십시오.'
-    Say "     승인 화면이 뜨면 「코드」를 복사해 이 창에 붙여넣고 Enter 를 눌러 주십시오."
+    foreach ($ln in $LoginCardLines) { Say $ln }
     Say "     기다리는 동안 $LoginSayInterval 초마다 한 줄씩 알려 드리고, $([int]($LoginWaitTimeout / 60))분이 지나면 이 기다림을 끝냅니다."
     # ⛔승인 프로세스는 **이 창을 그대로 쓴다**(-NoNewWindow) — 사람이 코드를 붙여넣어야 하므로
     #   입력을 뺏으면 안 된다. 우리는 기다리기만 하고 **입력을 읽지 않는다**.
@@ -1378,39 +1716,84 @@ function Step-Login {
     #   ⚠검토 의견은 「별 스레드/타이머(Register-ObjectEvent)」를 제시했다. 같은 성질을 더 적은 장치로
     #     얻을 수 있어 이 모양을 골랐다 — 타이머는 **다른 runspace** 로 상태를 넘겨야 하고 여기서
     #     실기로 재 볼 길이 없다(윈 러너는 과금 정지). **검토 의견과 다른 선택이므로 그대로 적어 둔다.**
-    $loginProc = $null
-    try { $loginProc = Start-Process -FilePath 'claude' -ArgumentList 'auth','login' -NoNewWindow -PassThru -ErrorAction Stop } catch { $loginProc = $null }
-    if ($null -eq $loginProc) {
-        # 🔴폴백에서 **파이프를 쓰지 않는다**(검토 지적 채택 2026-09-11). `| Out-Host` 는 stdout 을 파이프로 바꿔
-        #   벤더 도구의 「대화 중인가」 판정을 깨뜨리고, 그러면 **코드 입력 칸 자체가 안 뜬다.**
-        #   기다림 안내는 못 하더라도 **길은 막지 않는다** — 안내가 없는 것보다 못 까는 것이 나쁘다.
-        & claude auth login
-    } else {
-        $w = 0
-        # WaitForExit 는 ms 를 받고, 끝났으면 $true 를 준다. 콘솔을 읽지 않는다.
-        while (-not $loginProc.WaitForExit(5000)) {
-            $w += 5
-            if ($w -ge $LoginWaitTimeout) {
-                [Console]::Error.WriteLine("     $([int]($LoginWaitTimeout / 60))분 동안 승인이 오지 않아 이 기다림을 끝냅니다.")
-                # 🔴바로 `Kill()` 하지 않는다(검토 지적 채택 2026-09-11) — 잠금 파일·임시 파일을 정리할 틈을 준다.
-                #   맥이 INT → (안 되면) TERM 인 것과 **같은 순서**다: 부드럽게 한 번, 그래도 안 되면 세게.
-                try { [void]$loginProc.CloseMainWindow() } catch { }
-                if (-not $loginProc.WaitForExit(3000)) {
-                    try { $loginProc.Kill() } catch { }
-                    [Console]::Error.WriteLine('     (승인 창이 바로 닫히지 않아 한 번 더 끝냈습니다)')
+    # 🔴이름이 아니라 [2/10] 이 확정한 전체 경로로 부른다(2026-09-14) — 승인과 폴링이 같은 파일을 묻게. 못 찾으면 종전대로 이름.
+    $claudeExe = @(Get-Command claude -CommandType Application -ErrorAction SilentlyContinue)[0].Source
+    if (-not $claudeExe) { $claudeExe = 'claude' }
+    # ★승인 창이 상한 전에 스스로 끝났는데 로그인이 안 됐으면 = 코드가 받아들여지지 않은 것(J-LOGIN-02 · 2026-09-14 워크숍 4건)
+    #   ⇒ 10분 폴링을 기다리지 않고 로그인 화면을 **한 번만** 더 연다(현장에서 통한 처방 「claude 를 다시 실행해 로그인」을 안에 둔 것).
+    #   폴링은 승인 창이 살아 있을 때만 뜻이 있다. 두 번째도 같으면 종전 길(폴링 → J-LOGIN-01)로 간다 — 다시 열기는 1회로 닫힌다.
+    $reopened = $false
+    while ($true) {
+        $loginProc = $null
+        $timedOut = $false
+        try { $loginProc = Start-Process -FilePath $claudeExe -ArgumentList 'auth','login' -NoNewWindow -PassThru -ErrorAction Stop } catch { $loginProc = $null }
+        if ($null -eq $loginProc) {
+            # 다시 여는 자리에서 못 띄웠으면 폴링으로 넘어간다(없는 명령을 앞에서 부르면 설치가 통째로 끝난다)
+            if ($reopened) { Write-Log 'login reopen: could not start - go to polling'; break }
+            # 🔴폴백에서 **파이프를 쓰지 않는다**(검토 지적 채택 2026-09-11). `| Out-Host` 는 stdout 을 파이프로 바꿔
+            #   벤더 도구의 「대화 중인가」 판정을 깨뜨리고, 그러면 **코드 입력 칸 자체가 안 뜬다.**
+            #   기다림 안내는 못 하더라도 **길은 막지 않는다** — 안내가 없는 것보다 못 까는 것이 나쁘다.
+            & claude auth login
+        } else {
+            $w = 0
+            # WaitForExit 는 ms 를 받고, 끝났으면 $true 를 준다. 콘솔을 읽지 않는다.
+            while (-not $loginProc.WaitForExit(5000)) {
+                $w += 5
+                if ($w -ge $LoginWaitTimeout) {
+                    $timedOut = $true
+                    [Console]::Error.WriteLine("     $([int]($LoginWaitTimeout / 60))분 동안 승인이 오지 않아 이 기다림을 끝냅니다.")
+                    # 🔴위 안내는 화면(stderr)에만 가서 기록 파일에 한 줄도 안 남았다 — 20분 상한이 작동했는지 기록으로 못 갈랐다(2026-09-14 57분·26분 대기 2건).
+                    Write-Log ('login wait timeout ' + [int]($LoginWaitTimeout / 60) + 'min: CloseMainWindow')
+                    # 🔴바로 `Kill()` 하지 않는다(검토 지적 채택 2026-09-11) — 잠금 파일·임시 파일을 정리할 틈을 준다.
+                    #   맥이 INT → (안 되면) TERM 인 것과 **같은 순서**다: 부드럽게 한 번, 그래도 안 되면 세게.
+                    try { [void]$loginProc.CloseMainWindow() } catch { }
+                    if (-not $loginProc.WaitForExit(3000)) {
+                        try { $loginProc.Kill() } catch { }
+                        [Console]::Error.WriteLine('     (승인 창이 바로 닫히지 않아 한 번 더 끝냈습니다)')
+                        Write-Log ('login wait timeout: Kill - exited=' + $loginProc.HasExited)
+                    } else {
+                        Write-Log 'login wait timeout: closed without Kill'
+                    }
+                    break
                 }
-                break
+                if (($w % $LoginSayInterval) -eq 0) {
+                    foreach ($ln in @($LoginCardLines | Select-Object -Skip 1)) { [Console]::Error.WriteLine($ln) }
+                    [Console]::Error.WriteLine("     (기다린 지 $([int]($w / 60))분 · 창을 닫거나 Ctrl-C 를 누르시면 다시 하는 법을 안내합니다)")
+                }
             }
-            if (($w % $LoginSayInterval) -eq 0) {
-                [Console]::Error.WriteLine('     브라우저의 승인 화면에서 「코드」를 복사해 이 창에 붙여넣고 Enter 를 눌러 주십시오.')
-                [Console]::Error.WriteLine("     (기다린 지 $([int]($w / 60))분 · 창을 닫거나 Ctrl-C 를 누르시면 다시 하는 법을 안내합니다)")
+            if ((-not $timedOut) -and (-not $reopened)) {
+                $early = ''
+                try { $early = (& $claudeExe auth status 2>$null) -join "`n" } catch { $early = '' }
+                if ($early -notmatch '"loggedIn"\s*:\s*true') {
+                    Write-Log ('login ended early after ' + $w + 's without login')
+                    Say '[3/10] 로그인 코드가 받아들여지지 않은 것으로 보입니다 — 로그인 화면을 한 번 더 엽니다.'
+                    Write-JCode 'J-LOGIN-02' '로그인 코드 입력이 받아들여지지 않았습니다(로그인 화면을 한 번 더 엽니다)'
+                    # 이 코드는 끝의 코드가 아니다 — 다시 연 로그인이 되면 성공 끝이다. 화면·기록에만 남기고 칸은 비운다.
+                    $script:JCode = ''
+                    foreach ($ln in $LoginCardLines) { Say $ln }
+                    $reopened = $true
+                    continue
+                }
             }
         }
+        break
     }
     Say "     승인이 끝났는지 확인합니다. 최대 $([int]($LoginPollTimeout / 60))분까지 기다립니다."
     $waited = 0
+    $pollFail = 0
     while ($waited -lt $LoginPollTimeout) {
-        $auth = (& claude auth status 2>$null) -join "`n"
+        # 🔴한 번의 실행 실패가 설치를 끝내지 않게 한다(2026-09-14 도움 채널 3건). 본문 try/finally 에 catch 가 없어
+        #   여기서 던지면 폴링 결과 한 줄 없이 끝맺음으로 갔다. 까닭은 기록 파일에 · 5번 연속이면 J-LOGIN-01 로 간다.
+        try {
+            $auth = (& $claudeExe auth status 2>$null) -join "`n"
+            $pollFail = 0
+        } catch {
+            $auth = ''
+            $pollFail++
+            $why = (($_ | Out-String) -replace '\s+', ' ').Trim()
+            Write-Log ('login poll failed ' + $pollFail + ': ' + $_.Exception.GetType().FullName + ' - ' + $why.Substring(0, [Math]::Min(300, $why.Length)))
+            if ($pollFail -ge 5) { break }
+        }
         if ($auth -match '"loggedIn"\s*:\s*true') {
             $script:LoggedIn = $true
             Say '[3/10] 로그인 확인했습니다.'
@@ -1419,7 +1802,8 @@ function Step-Login {
         Start-Sleep -Seconds $LoginPollInterval
         $waited += $LoginPollInterval
     }
-    Say "[3/10] $([int]($LoginPollTimeout / 60))분 동안 로그인이 확인되지 않았습니다."
+    if ($pollFail -ge 5) { Say '[3/10] 로그인 확인 명령이 5번 연속 실행되지 못했습니다(까닭은 기록 파일에 적었습니다).' }
+    else { Say "[3/10] $([int]($LoginPollTimeout / 60))분 동안 로그인이 확인되지 않았습니다." }
     Write-JCode 'J-LOGIN-01' '로그인 승인이 시간 안에 끝나지 않았습니다'
     Set-NextStepRerun '브라우저에서 승인을 누르신 뒤 아래 「다시 하시는 법」대로 다시 실행해 주십시오.'
     return 5
@@ -2466,7 +2850,7 @@ function Step-Fleet {
 #   글자 칸은 `\z` 로 끝을 못박아 다시 만든다. 이름·글자·판본 비교는 대소문자를 가르는 -ceq·-cmatch·-ccontains 만 쓴다.
 # ⚠PowerShell 은 `'true' -eq $true` 를 참으로 본다 ⇒ 칸마다 **형(type)을 먼저** 본다.
 # ⚠이 절은 맥에서 PowerShell 없이 **정적 검사 + 맥판과의 대조**로만 증명했다 — 윈도우 실기가 필요한 축은 내부 문서.
-$InstallerVersion       = '0.3.15'   # 보고의 installer_version · $BootstrapVersion 은 화면 머리글 용도 그대로(보내지 않는다)
+$InstallerVersion       = '0.3.16'   # 보고의 installer_version · $BootstrapVersion 은 화면 머리글 용도 그대로(보내지 않는다)
 $HelpApiUrl             = 'https://jarvis-install.godmeyou.kr'
 $RemoteHelpNoticeUrl    = 'jarvis-install.godmeyou.kr/help/notice'
 # [1/10] 고지 1줄 = /help/notice 정본이 인용하는 문장 그대로 + 끝에 자세한 안내 자리. ⛔문안 변경 금지(맥판과 글자가 같아야 한다).

@@ -2099,5 +2099,97 @@ else
   sk "[대기] 더블" "시험 파일을 못 찾았다"
 fi
 
+echo "== v0.3.16 — 2026-09-14 워크숍 교훈 (도움 채널 12건 · 현장 사진 3장) =="
+# ★이 절의 축은 tests/v0316-mutate.py 뮤턴트로 붉어지는 것을 확인했다 — 축 이름 앞부분이 곧 뮤턴트의 기대값이다(이름을 바꾸면 거기도 같이).
+# [2/10] 공식 설치기가 상한에 닿았다 — 무엇이 살아 있었는지 **먼저** 적고 끈다(끄고 나면 잴 것이 남지 않는다).
+awk '/^[[:space:]]*\$tree = @\(Write-ClaudeInstallDiag \$p /{a=NR}
+     a&&NR==a+1&&/^[[:space:]]*Stop-ProcTree \$p \$tree/{ok=1}
+     END{exit !ok}' "$PS"
+ck "[v0316] 설치 상한에 닿으면 진단을 먼저 적고 설치기를 끈다" $? "끈 뒤에는 자식 프로세스·창 제목을 잴 수 없다"
+# 직접 받은 파일은 확인값(해시)이 공식 값과 같을 때만 실행한다 — 틀리면 그 갈래 안에서 끝난다.
+awk '/^[[:space:]]*if \(\$got -cne \$sum\) \{/{a=NR}
+     a&&!r&&NR>a&&NR<=a+5&&/return \$false/{r=NR}
+     !s&&/Start-Process -FilePath \$dl /{s=NR}
+     END{exit !(a&&r&&s>r)}' "$PS"
+ck "[v0316] 직접 받은 파일은 해시 대조 뒤에만 실행한다" $? "대조 안 된 파일을 실행하게 된다"
+# 받는 자리 = 공식 설치기(install.ps1)가 받는 자리 그대로(2026-09-14 벤더 설치기 해부) — 다른 자리면 같은 파일이라는 보장이 없다.
+u="$(awk -F"'" '/^\$ClaudeDirectBaseUrl *=/{print $2; exit}' "$PS")"
+[ "$u" = "https://downloads.claude.ai/claude-code-releases" ] && codegrep "$PS" 'Invoke-WebRequest -Uri \(\$ClaudeDirectBaseUrl \+ '
+ck "[v0316] 받는 자리는 공식 설치기와 같은 주소(${u:-없음})" $? "값이 바뀌었거나 받기가 그 값을 안 쓴다"
+# ⑤ 받은 파일로 공식 설치(install latest)를 3분 상한으로 **먼저** 해 보고, 그 뒤에만 제자리에 둔다(master 보정 2026-09-14 21:21).
+codegrep "$PS" '^\$ClaudeDirectInstallWaitMs *= *180000([^0-9]|$)' \
+  && awk '!w&&/^[[:space:]]*if \(Wait-ProcBounded \$ip \$ClaudeDirectInstallWaitMs /{w=NR}
+          !m&&/Move-Item -LiteralPath \$tmp -Destination \$exe/{m=NR}
+          END{exit !(w&&m>w)}' "$PS"
+ck "[v0316] 받은 파일로 공식 설치를 3분 상한으로 먼저 해 본다" $? "⑤를 건너뛰면 셸 연동·자동 판올림 준비가 빠진다"
+# 같은 자리(J-AV-01)에서 이미 막혔던 기기는 상한 5분 — 한 기기가 10분 × 3회 = 30분을 썼다.
+codegrep "$PS" '^\$ClaudeInstallRetryWaitMs *= *300000([^0-9]|$)' \
+  && codegrep "$PS" '\$waitCap = if \(\$prevHold -ge 1\) \{ \$ClaudeInstallRetryWaitMs \} else \{ \$ClaudeInstallWaitMs \}' \
+  && codegrep "$PS" '\$waitedMs -lt \$waitCap\)'
+ck "[v0316] 같은 자리 2회째부터 설치 상한 5분" $? "2회째에도 10분을 다시 기다린다"
+# [int] 는 반올림이다 — 1분 30초가 「2분 30초」로 찍혀 시간이 뒤죽박죽이었다(사진 ③).
+codegrep "$PS" '\$mm = \[int\]\[math\]::Floor\(\$waitedMs / 60000\)' && no_code "$PS" '\$mm = \[int\]\(\$waitedMs'
+ck "[v0316] 대기 시간 표시는 버림으로 센다" $? "반올림으로 되돌아갔다"
+# [3/10] 로그인 카드 — 로그인 화면을 열기 **전에** 세 가지를 보여 준다(승인 두 번 · 주소창 주소 붙여넣기 9건).
+count_or_fail "$PS" "^    '     [123][)] "
+[ "$COUNT_N" = 3 ] && awk '!a&&/^[[:space:]]*Say .\[3\/10\] 지금 로그인 화면을 엽니다/{a=NR}
+     a&&NR==a+1&&/^[[:space:]]*foreach \(\$ln in \$LoginCardLines\) \{ Say \$ln \}/{c=NR}
+     !l&&/-ArgumentList .auth.,.login./{l=NR}
+     END{exit !(c&&l>c)}' "$PS"
+ck "[v0316] 로그인 화면을 열기 전에 카드를 보여 준다" $? "카드 줄 $(why_or_count) · 또는 카드가 화면을 연 뒤에 나온다"
+# 승인 창이 상한 전에 끝났는데 로그인이 안 됐다 → 한 번만 다시 연다(표시를 세우고 곧바로 다시 돈다).
+awk '/^[[:space:]]*\$reopened = \$false[[:space:]]*$/{f=NR}
+     /if \(\(-not \$timedOut\) -and \(-not \$reopened\)\)/{g=NR}
+     /^[[:space:]]*\$reopened = \$true[[:space:]]*$/{t=NR}
+     t&&NR==t+1&&/^[[:space:]]*continue[[:space:]]*$/{ok=1}
+     END{exit !(f&&g>f&&t>g&&ok)}' "$PS"
+ck "[v0316] 코드 실패 뒤 다시 열기는 한 번뿐" $? "표시를 안 세우면 코드가 틀릴 때마다 로그인 화면이 끝없이 열린다"
+awk '/^[[:space:]]*Write-JCode .J-LOGIN-02./{a=NR}
+     a&&NR>a&&NR<=a+3&&/^[[:space:]]*\$script:JCode = ..[[:space:]]*$/{ok=1}
+     END{exit !ok}' "$PS"
+ck "[v0316] J-LOGIN-02 는 끝의 코드로 남지 않는다" $? "안 비우면 다시 연 로그인이 성공해도 끝맺음이 막힘으로 센다"
+# 20분 상한 안내는 화면(stderr)에만 가서 기록 파일에 한 줄도 없었다(57분·26분 대기 2건 — 상한이 작동했는지 못 갈랐다).
+codegrep "$PS" "Write-Log \('login wait timeout ' \+" \
+  && codegrep "$PS" "Write-Log \('login wait timeout: Kill - exited=' \+" \
+  && codegrep "$PS" "Write-Log 'login wait timeout: closed without Kill'"
+ck "[v0316] 로그인 대기 상한 도달을 기록 파일에 적는다" $? "상한이 작동했는지 기록으로 못 가른다"
+# 지난 실행 표시 — 처방을 받거나 원격 해결을 기다리다 닫힌 창은 J-AV-03 갈래에 닿기 전에 끝난다.
+awk '/^function Show-PrevRunNote/{inf=1}
+     inf&&/^[[:space:]]*if \(\(\$script:PrevRunState -eq .answer.\) -or \(\$script:PrevRunState -eq .wait.\)\) \{/{a=NR}
+     inf&&a&&!r&&NR>a&&/^[[:space:]]*return[[:space:]]*$/{r=NR}
+     inf&&!b&&/^[[:space:]]*\$script:PrevRunCode = .J-AV-03./{b=NR}
+     inf&&/^}/{inf=0}
+     END{exit !(a&&r&&b>r)}' "$PS"
+ck "[v0316] 원격 해결 대기 중 닫힌 실행에는 J-AV-03 을 붙이지 않는다" $? "처방을 보고 새로 실행한 사람에게 「백신이 창을 닫았다」가 나간다"
+awk '/^[[:space:]]*\$tail = \[string\]\$script:PrevTail/{a=NR}
+     a&&NR==a+1&&/if \(\$tail\.Length -gt 120\) \{ \$tail = \$tail\.Substring\(0, 120\)/{c=NR}
+     c&&NR==c+1&&/^[[:space:]]*Say "       \$tail"/{ok=1}
+     END{exit !ok}' "$PS"
+ck "[v0316] 지난 실행 마지막 줄은 120자에서 자른다" $? "처방 500자가 새 실행 첫 화면을 덮었다"
+# 지우기 — 클로드 실행 파일 자리에서 도는 것을 **지우기 직전에만** 끈다 · 첫 설치(bootstrap)는 사용자가 쓰던 클로드를 끄지 않는다.
+awk '/^[[:space:]]*if \(Test-Path \$ClaudeExe\) \{ \$claudeAlive = @\(Stop-ClaudeUnderBin\) \}/{a=NR}
+     a&&NR==a+1&&/^[[:space:]]*Drop .클로드 실행 파일. \$ClaudeExe/{ok=1}
+     END{exit !ok}' "$RESET" && codegrep "$RESET" '^function Stop-ClaudeUnderBin'
+ck "[v0316] 지우기는 클로드 실행 파일을 지우기 직전에 그 자리의 클로드를 끈다" $? "돌고 있으면 파일이 잠겨 [남음]이 된다"
+no_code "$PS" 'Stop-ClaudeUnderBin'; rc=$?
+ck "[v0316] 첫 설치에는 클로드를 끄는 자리가 없다" "$rc" "지우기에만 둔 것이 설치로 번졌다(${GREP_WHY})"
+awk '!a&&/^[[:space:]]*say "\[3\/10\] 지금 로그인 화면을 엽니다/{a=NR}
+     a&&NR>a&&NR<=a+6&&/^[[:space:]]*say "     1\) /{n1=1}
+     a&&NR>a&&NR<=a+6&&/^[[:space:]]*say "     2\) .*Authentication code/{n2=1}
+     a&&NR>a&&NR<=a+6&&/^[[:space:]]*say "     3\) .*⌘\+V/{n3=1}
+     END{exit !(n1&&n2&&n3)}' "$SH"
+ck "[v0316] 맥 로그인 카드 세 가지" $? "맥만 「어느 코드·어느 단추」를 모르는 채 남는다"
+# 흉내 실행 — 정적 축은 「그 줄이 있다」까지만 본다. 실제로 부르면 그렇게 되는가는 흉내가 잰다(윈 실기 대체 아님).
+if [ "${V0316_EMU_SKIP:-}" = "1" ]; then
+  sk "[v0316] 흉내 실행 시험" "V0316_EMU_SKIP=1 — 뮤턴트 러너가 끈 것(흉내 축은 그 러너가 따로 잰다)"
+elif ! command -v pwsh >/dev/null 2>&1; then
+  sk "[v0316] 흉내 실행 시험" "pwsh 가 없다"
+elif [ -f "$DIR/../tests/v0316-emu-run.sh" ]; then
+  bash "$DIR/../tests/v0316-emu-run.sh" --dir "$DIR" >/dev/null 2>&1
+  ck "[v0316] 흉내 실행 시험이 전건 통과한다(설치기 멈춤·로그인 다시 열기·지난 실행·지우기)" $? "bash tests/v0316-emu-run.sh 로 자세히"
+else
+  sk "[v0316] 흉내 실행 시험" "시험 파일을 못 찾았다"
+fi
+
 printf '\n통과 %s · 실패 %s%s\n' "$pass" "$fail" "$([ "$skip" -gt 0 ] && printf ' · 건너뜀 %s' "$skip")"
 [ "$fail" -eq 0 ]
