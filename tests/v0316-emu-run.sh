@@ -17,6 +17,7 @@
 #   쓰기는 mktemp -d 안에서만(USERPROFILE · JARVIS_HOME 모두 그 안).
 # ⚠여기서 **안 재는 것**(윈도우에서만 있는 것): 사용자 PATH 등록(맥 .NET 은 User 대상을 무시해 흉내에서는 이름을 이어 준다) ·
 #   CIM 프로세스 목록(PowerShell 7 의 Parent 칸으로 대신 잰다) · 창 제목(가짜 함수로 한 갈래만) · 레지스트리 · 콘솔 붙여넣기.
+export JARVIS_NO_PROGRESS=1   # 🔴흉내·검사는 라이브 서버로 진행 이벤트를 보내지 않는다(2026-09-15 15:49 master 게이트 실행이 라이브 progress에 가짜 4건을 남긴 사고 · Send-Progress의 레버)
 set -u
 HERE="$(cd "$(dirname "$0")" && pwd)"
 DIR="$HERE/../install-master"
@@ -119,7 +120,8 @@ for s in reopen-ok reopen-fail reopen-then-poll-exc ok-first timeout; do
     timeout)
       has "$L" 'login wait timeout [0-9]+min: CloseMainWindow' && has "$L" 'login wait timeout: (Kill|closed without Kill)'
       t $? "[timeout] 승인 대기 상한 도달과 끝낸 방법을 기록 파일에 적는다" "상한 기록 줄이 없다"
-      grep -q '1) 열려 있는 Claude 탭' "$SB/err.txt"; t $? "[timeout] 기다리는 동안 카드 번호 줄을 화면(stderr)에 되풀이한다" "되풀이 줄이 없다"
+      # v0.3.17 — 로그인은 새 창에서 한다. 설치 창은 기다리는 동안 조용하다(경과는 창 제목에만) ⇒ 되풀이가 **없어야** 한다.
+      ! grep -q '1) 열려 있는 Claude 탭' "$SB/err.txt"; t $? "[timeout] 기다리는 동안 설치 창(stderr)에 카드를 되풀이하지 않는다" "카드 줄이 화면에 되풀이됐다"
       ;;
   esac
 done

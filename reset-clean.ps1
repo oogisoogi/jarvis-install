@@ -35,7 +35,12 @@
 # 창이 갑자기 닫히면 백신이 PowerShell 을 종료한 것일 수 있다. 그때는 Show-RerunHow 가 인쇄한
 #   명령 전체를 다시 붙여넣으면 이어서 진행된다(사람에게 「같은 줄」이라고 말하지 않는다 - 아래 참조).
 
-param([switch]$WhatIf, [switch]$List, [switch]$Yes, [switch]$PurgeLogin, [switch]$UseUninstaller)
+param([switch]$WhatIf, [switch]$List, [switch]$Yes, [switch]$PurgeLogin, [switch]$UseUninstaller, [switch]$KeepApp)
+# -KeepApp : cys 프로그램은 지우지 않는다(재설치 길 · reinstall.ps1 이 -Yes 와 함께 넘긴다).
+#   그 길에서는 제거 프로그램 실행 · 설정 앱 안내 · Enter 고리 · 폴더 삭제 확인을 통째로 건너뛴다 — 사람 손 0.
+#   프로그램과 한 쌍인 시작 메뉴 바로가기 · 설치 목록 항목도 함께 남긴다(프로그램만 남고 그 둘이 사라지면 고아가 된다).
+#   프로세스 끄기 · 상시 가동 등록 떼기 · 설정 · 로그인 처리는 종전대로 한다.
+#   ⚠프로그램 폴더 안의 **지난 편성 기록**(동료 좌석을 되살리는 기록)은 지운다 — Get-CysStateItems 머리 주석.
 
 $ErrorActionPreference = 'Continue'
 try { [Console]::OutputEncoding = [System.Text.Encoding]::UTF8 } catch { }
@@ -45,6 +50,22 @@ $CysDir     = Join-Path $env:LOCALAPPDATA 'cys'
 $CysDirOld  = Join-Path $env:LOCALAPPDATA 'Programs\cys'
 $UninstExe  = Join-Path $CysDir 'uninstall.exe'
 $RegKey     = 'HKCU:\Software\Microsoft\Windows\CurrentVersion\Uninstall\cys'
+# 🔴재설치 길(-KeepApp)에서 프로그램과 함께 남으면 안 되는 것 = cys 의 **지난 편성 기록**이다(2026-09-15 윈 2차 재설치).
+#   윈도우 기본 cys 의 상태 자리가 곧 프로그램 폴더다(cys 코드: 상태 자리 = %LOCALAPPDATA%\cys).
+#   cys 는 켜지자마자 그 자리의 편성 기록으로 지난 동료 좌석을 되살린다. 프로그램만 남기려다 이것까지 남기면,
+#   로그인·첫 실행 설정이 지워진 빈 자리로 동료 셋이 설치 도우미보다 먼저 떠서 첫 실행 질문 앞에 선다.
+#   ⇒ 프로그램 파일은 남기고 **아래 이름만** 지운다(이름은 cys 코드에서 읽었다 — 모르는 것은 지우지 않는다).
+function Get-CysStateItems {
+    $out = New-Object System.Collections.ArrayList
+    foreach ($n in @('topology.json', 'phoenix', 'boot-intents', 'dept_tombstones.json')) {
+        $p = Join-Path $CysDir $n
+        if (Test-Path -LiteralPath $p) { [void]$out.Add($p) }
+    }
+    # 같은 기록의 손상 격리본·임시본(topology.json.corrupt-<시각> 등)
+    #   ⚠실경로(FullName)가 아니라 이름으로 다시 잇는다 — 지우는 함수는 원문 자리 모양(C:\…)만 받는다(Drop · 링크를 따라가지 않는 규칙).
+    foreach ($f in @(Get-ChildItem -LiteralPath $CysDir -Filter 'topology.json.*' -Force -ErrorAction SilentlyContinue)) { [void]$out.Add((Join-Path $CysDir $f.Name)) }
+    return $out.ToArray()
+}
 # 🔴설치기가 `JARVIS_HOME` 을 존중하므로 제거기도 존중해야 한다(1차 REVISE ⑦ 확정 2026-09-10).
 #   앞 판은 고정 `%USERPROFILE%\install-jarvis` 만 지웠다 ⇒ 사용자 지정 폴더로 깐 기계에서는
 #   ⑴진짜 작업 폴더와 그 신뢰 자국이 **그대로 남고** ⑵기본 자리에 같은 이름의 남의 폴더가 있으면
@@ -115,7 +136,7 @@ function Get-RerunCmd {
 function Show-RerunHow {
     Write-Host ''
     Write-Host '  == 다시 하시는 법 (이대로 따라 하시면 됩니다) =='
-    Write-Host '   1) 시작 단추를 누르고 powershell 이라고 치신 뒤 [Windows PowerShell] 을 여십시오.'
+    Write-Host '   1) ⊞ 윈도우 키(키보드 왼쪽 아래, Ctrl과 Alt 사이)를 누르고 powershell 이라고 치신 뒤 [Windows PowerShell] 을 여십시오.'
     Write-Host '   2) 아래 명령을 처음부터 끝까지 마우스로 끌어 선택한 뒤 Ctrl+C 를 누르십시오.'
     Write-Host '   3) 그 창을 한 번 누르고 마우스 오른쪽 단추를 눌러 붙여넣은 뒤 Enter 를 누르십시오.'
     Write-Host ''
@@ -715,11 +736,18 @@ function Invoke-Diagnose {
     $script:Found = 0
     Write-Host '=== 이 컴퓨터의 상태 ==='
     # footprint: W-APP
-    [void](Row 'cys 프로그램' $CysDir)
-    [void](Row 'cys 프로그램(옛 자리)' $CysDirOld)
-    foreach ($lnk in (Get-StartMenuLinks)) { [void](Row 'cys 시작 메뉴 바로가기' $lnk) }
+    if ($KeepApp) {
+        # 재설치 길 — 지울 목록에 넣지 않는다(개수에도 안 센다). 무엇을 남기는지는 말한다.
+        Write-Host '  [남김] cys 프로그램 — 프로그램 파일은 지우지 않고 그대로 둡니다(다시 깔 때 이 프로그램을 씁니다)'
+        # 지난 편성 기록은 지운다(Get-CysStateItems 머리 주석) — 있으면 지울 목록에 센다.
+        foreach ($s in (Get-CysStateItems)) { [void](Row 'cys 지난 편성 기록(동료 좌석을 되살리는 기록)' $s) }
+    } else {
+        [void](Row 'cys 프로그램' $CysDir)
+        [void](Row 'cys 프로그램(옛 자리)' $CysDirOld)
+        foreach ($lnk in (Get-StartMenuLinks)) { [void](Row 'cys 시작 메뉴 바로가기' $lnk) }
+    }
     # footprint: W-REG
-    [void](Row 'cys 설치 목록 항목' $RegKey)
+    if (-not $KeepApp) { [void](Row 'cys 설치 목록 항목' $RegKey) }
     # footprint: W-DAEMON
     $tk = @(Get-CysTasks)
     RowFlag 'cys 상시 가동 등록' ($tk.Count -gt 0) '작업 스케줄러'
@@ -1190,7 +1218,12 @@ function Invoke-Purge {
     #   ⇒ 판별을 두 축으로 가른다. **요구하기 전에 그 항목이 실제로 있는지 먼저 본다** —
     #     사람이 할 수 없는 일을 요구하는 고리가 구조적으로 생기지 못하게.
     $hasRegEntry = Test-Path $RegKey
-    if ((Test-Path $UninstExe) -and $UseUninstaller) {
+    if ($KeepApp) {
+        # 재설치 길(-KeepApp) — 이 절 전체를 건너뛴다. 제거 프로그램 · 설정 앱 안내 · Enter 고리 · 폴더 삭제 확인이 모두 없다.
+        #   이 절이 사람 손을 부르다 막힌 일이 셋이었다(제거 프로그램을 직접 실행하자 창이 꺼짐 · Enter 만 믿고 뜯음 ·
+        #   설정 앱에 없는 항목을 여덟 번 요구). 재설치는 곧바로 다시 까는 길이라 프로그램을 지울 까닭이 없다.
+        Write-Host '  남김: cys 프로그램 (재설치 — 지우지 않고 그대로 씁니다)'
+    } elseif ((Test-Path $UninstExe) -and $UseUninstaller) {
         Write-Host '  cys 제거 프로그램을 실행합니다. (백신이 이 행위를 막을 수 있습니다)'
         try {
             $u = Start-Process -FilePath $UninstExe -ArgumentList '/S' -PassThru -ErrorAction Stop
@@ -1265,12 +1298,17 @@ function Invoke-Purge {
     # cys 가 돌고 있으면 폴더가 지워지지 않는다 — 먼저 멈춘다.
     #   ★이름이 아니라 **자리**로 끈다(R1). 고아가 된 python3.exe 가 정확히 이 자리에서 걸렸다.
     $stillAlive = @(Stop-CysProcesses)
-    if ($stillAlive.Count -gt 0 -and -not $script:SkipCysDir) {
+    if ($stillAlive.Count -gt 0 -and -not $script:SkipCysDir -and -not $KeepApp) {
         Write-Host ('  [주의] cys 자리에서 아직 ' + $stillAlive.Count + '개가 돌고 있습니다 — 폴더가 안 지워질 수 있습니다.')
         Write-AliveProcs $stillAlive
     }
 
-    if (-not $script:SkipCysDir) {
+    # 재설치 길(-KeepApp) — 프로그램은 남기되 지난 편성 기록은 지운다(Get-CysStateItems 머리 주석).
+    #   프로세스를 끈 **뒤에** 지운다 — cys 가 살아 있으면 끝나면서 기록을 다시 쓸 수 있다.
+    if ($KeepApp) {
+        foreach ($s in (Get-CysStateItems)) { Drop 'cys 지난 편성 기록' $s }
+    }
+    if ((-not $script:SkipCysDir) -and (-not $KeepApp)) {
         Drop 'cys 프로그램' $CysDir
         Drop 'cys 프로그램(옛 자리)' $CysDirOld
         # 공식 제거기가 해 주던 뒷정리다. 우리가 폴더를 지운 길에서는 우리가 함께 지운다.
@@ -1287,7 +1325,9 @@ function Invoke-Purge {
     #   ⚠남긴다는 말은 **설정 앱에서 마저 지우실 수 있을 때만** 참이다. 항목이 애초에 없으면 그 문장은
     #     앞의 안내와 정면으로 어긋난다(검토 지적 채택 - 「항목이 없습니다」라고 말해 놓고
     #     「설정 앱에서 지우실 수 있게 둡니다」라고 적고 있었다).
-    if ($script:SkipCysDir -and $hasRegEntry) {
+    if ($KeepApp) {
+        if ($hasRegEntry) { Write-Host '  남김: cys 설치 목록 항목 (프로그램과 한 쌍이라 함께 둡니다)' }
+    } elseif ($script:SkipCysDir -and $hasRegEntry) {
         Write-Host '  남김: cys 설치 목록 항목 (프로그램이 남아 있어 설정 앱에서 지우실 수 있게 둡니다)'
     } else {
         Drop 'cys 설치 목록 항목' $RegKey

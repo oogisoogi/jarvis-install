@@ -64,5 +64,5 @@ if ($Scenario -eq 'av') {
 try {
     $rc = @(Step-InstallClaude)[-1]
     Write-Log ("TEST install rc=" + $rc + " JCode=" + $script:JCode)
-    if ($rc -eq 0) { $rc2 = @(Step-Login)[-1]; Write-Log ("TEST login rc=" + $rc2) }
+    if ($rc -eq 0) { Step-Login; $rc2 = $script:LoginRc; Write-Log ("TEST login rc=" + $rc2) }
 } finally { Write-Log 'TEST finally' }

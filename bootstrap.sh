@@ -385,7 +385,7 @@ help_way_lines() {   # help_way_lines <코드> — 두 번째 방법 줄들(정�
     J-NET-03)   printf '%s\n' '회사·학교 망은 바깥 서버를 막아 둔 경우가 있습니다.' '휴대폰 핫스팟 같은 다른 인터넷으로 연결하신 뒤 다시 실행해 주십시오.' ;;
     J-PATH-01)  printf '%s\n' '컴퓨터를 한 번 다시 시작하신 뒤 새 창에서 다시 실행해 주십시오.' ;;
     J-LOGIN-01) printf '%s\n' '브라우저가 뜨지 않았거나 다른 브라우저에 로그인돼 있으면,' \
-                  '설치 창에 보이는 https:// 로 시작하는 로그인 주소를 복사해' '로그인된 브라우저 주소창에 붙여넣어 주십시오.' ;;
+                  '화면에 보이는 https:// 로 시작하는 로그인 주소를 복사해' '로그인된 브라우저 주소창에 붙여넣어 주십시오.' ;;
     J-HOME-01)  printf '%s\n' '창을 닫고 새 창을 여신 뒤(남은 설정이 따라오지 않습니다)' '다시 실행해 주십시오.' ;;
     J-PERM-01)  printf '%s\n' '컴퓨터를 한 번 다시 시작하신 뒤 다시 실행해 주십시오.' '저장 공간이 3GB 이상 남았는지도 함께 봐 주십시오.' ;;
     J-DISK-01)  printf '%s\n' '휴지통을 비우시고, 설정의 저장 공간 화면에서 큰 파일을' '정리하신 뒤 다시 실행해 주십시오.' ;;
@@ -1038,7 +1038,7 @@ seed_local_bin_path() {
 # ── 하는 일 2 — 공식 설치기 호출 (멱등: 이미 있으면 건너뛴다) ─────
 step_install_claude() {
   if [ "$S1_CLAUDE_OK" = "1" ]; then
-    say "[2/10] 클로드가 이미 있습니다 — 건너뜁니다 (멱등)."
+    say "[2/10] 클로드가 이미 있습니다 — 건너뜁니다."
     return 0
   fi
   if [ -n "$(command -v claude 2>/dev/null)" ]; then
@@ -1109,7 +1109,7 @@ step_login() {
     fi
   fi
   if [ "$S1_LOGGED_IN" = "1" ]; then
-    say "[3/10] 이미 로그인돼 있습니다 — 건너뜁니다 (멱등)."
+    say "[3/10] 이미 로그인돼 있습니다 — 건너뜁니다."
     return 0
   fi
   if [ "$MODE" = "dry" ]; then
@@ -1158,7 +1158,7 @@ step_login() {
   done
   say "[3/10] $((LOGIN_POLL_TIMEOUT / 60))분 동안 로그인이 확인되지 않았습니다."
   jcode "J-LOGIN-01" "로그인 승인이 시간 안에 끝나지 않았습니다"
-  next_rerun "브라우저에서 승인을 누르신 뒤 아래 「다시 하시는 법」대로 다시 실행해 주십시오."
+  next_rerun "아래 「다시 하시는 법」대로 다시 실행하시면 로그인 창이 다시 열립니다."
   return 5
 }
 
@@ -2030,7 +2030,7 @@ step_wake() {
 # ★언제 도는가 = 자비스를 깨우기 **전에** 진단 코드를 남기고 멈춘 끝. 자비스를 깨운 뒤에는 돌지 않는다
 #   (자비스가 이 창을 넘겨받으므로 두 쪽이 한 화면에 섞이지 않게).
 # ⚠JSON·재검사·스크럽은 macOS 기본 `osascript`(JavaScript)가 한다 — 깨끗한 맥에는 jq·python 이 없다.
-INSTALLER_VERSION="0.3.16"      # 보고의 installer_version · BOOTSTRAP_VERSION 은 화면 머리글 용도 그대로(보내지 않는다)
+INSTALLER_VERSION="0.3.17"      # 보고의 installer_version · BOOTSTRAP_VERSION 은 화면 머리글 용도 그대로(보내지 않는다)
 HELP_API_URL="https://jarvis-install.godmeyou.kr"
 REMOTE_HELP_NOTICE_URL="jarvis-install.godmeyou.kr/help/notice"
 # [1/10] 고지 1줄 = /help/notice 정본(page.ts)이 인용하는 문장 그대로 + 끝에 자세한 안내 자리(계약 7-1절). ⛔문안 변경 금지.

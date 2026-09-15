@@ -164,7 +164,7 @@ def checks(path):
     # D1 기각 — ReachedWake 는 깨우기가 성공한 두 자리(cys 창을 열었다 · 이 창의 자비스가 종료 코드 0)에만
     ck("ps1-wire-wake", code(src).count("$script:ReachedWake = $true") == 2 and code(wake).count("$script:ReachedWake = $true") == 2
        and re.search(r"if \(\$ref -match 'surface:'\) \{\n\s+Say \"     cys 안에서 자비스를 열었습니다[^\n]*\n(?:\s+#[^\n]*\n)*\s+\$script:ReachedWake = \$true\n", wake)
-       and ordered(wake, "$global:LASTEXITCODE = -1", "& claude --dangerously-skip-permissions $firstPrompt", "if ($global:LASTEXITCODE -eq 0) { $script:ReachedWake = $true }"),
+       and ordered(wake, "$global:LASTEXITCODE = -1", "& $fallbackExe --dangerously-skip-permissions $fallbackPrompt", "if ($global:LASTEXITCODE -eq 0) { $script:ReachedWake = $true }"),
        "깨우기 성공 뒤에만 ReachedWake 를 세우지 않는다")
     close = fn(src, "Write-ClosingNote")
     ck("ps1-wire-closing", -1 < close.find("if ($script:NoticeShown) { Invoke-RemoteHelp }") < close.find("if ($script:ShowRerun) { Show-RerunHow }"),

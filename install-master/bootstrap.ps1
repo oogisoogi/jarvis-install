@@ -77,21 +77,31 @@ $CysWinBytes    = 139840459
 $CysWinSha256   = '12c9d398b4e11b175370c6fdc7e4fd299b2e74865c5cc0f8bf891a42eaf70066'   # 릴리스 SHA256SUMS.txt 의 줄
 $CysDownloadUrl = $CysDownloadDir + $CysWinFile
 
-$LoginPollInterval = 3     # 초
-$LoginPollTimeout  = 600   # 초 (10분)
+$LoginPollInterval = 2     # 초 — 승인 프로세스가 끝난 뒤 로그인을 다시 확인하는 간격
+$LoginConfirmTries = 3     # 승인 프로세스가 끝난 뒤 몇 번 확인하고 곧바로 갈래를 정하는가(v0.3.17 · 예전 10분 폴링을 대신한다)
 # 🔴★승인 대기 구간에는 **상한이 없었다**(2026-09-11 맥 Tart 실기 · 두 OS 같은 구조).
 #   벤더의 `claude auth login` 이 코드 입력을 기다리며 **2시간 32분 동안 화면에 0바이트**를 찍고 섰다.
-#   위 10분 상한은 **그 다음 구간(폴링)**에만 있어 여기엔 닿지 않는다.
-#   ⇒ 60초마다 한 줄 말하고, 20분이면 이 기다림을 끝낸다(그 뒤는 이미 있는 J-LOGIN-01 회복 경로).
-$LoginSayInterval  = 60    # 초 — 기다리는 동안 화면에 한 줄씩 말하는 간격
-$LoginWaitTimeout  = 1200  # 초 (20분) — 승인 대기 자체의 상한 (그 뒤 폴링 10분 ⇒ 최악 30분으로 닫힌다)
+#   ⇒ 20분이면 이 기다림을 끝낸다(그 뒤는 이미 있는 J-LOGIN-01 회복 경로).
+#   v0.3.17: 로그인은 새로 뜬 창에서 한다 — 기다리는 동안 이 설치 창에는 찍지 않고 경과는 창 제목에만 적는다.
+$LoginSayInterval  = 60    # 초 — 기다리는 동안 설치 창 제목의 경과(분)를 고치는 간격
+$LoginWaitTimeout  = 1200  # 초 (20분) — 승인 대기 자체의 상한 · 벽시계로 잰다 (그 뒤 질문 1분 + 확인 3회 ⇒ 최악 약 21분으로 닫힌다)
+$LoginCheckpointSec  = 300 # 초 (5분) — 브라우저에 로그인 화면이 떴는지 한 번 묻는 자리
+$LoginStatusEverySec = 30  # 초 — 로그인 창이 살아 있는 동안 확인 명령을 부르는 간격(로그인 파일은 5초마다 본다)
+$LoginAskWaitSec     = 60  # 초 — 상한에 닿았을 때 숫자 하나를 기다리는 상한
+$LoginStatusWaitMs   = 20000 # ms — 확인 명령 한 번의 상한(벤더 도구가 멈춰도 20분 상한이 살아 있게)
 # 🔴로그인 카드(2026-09-14 워크숍 · 로그인 막힘 9건) — 승인을 두 번 누르거나 주소창 주소를 붙여넣어 코드가 무효가 됐다(사진 · 400).
-#   「코드를 복사해 붙여넣으라」 한 줄로는 어느 코드·어느 단추인지 몰랐다 ⇒ 로그인 화면을 열기 전에 한 번 · 기다리는 동안 60초마다 번호 줄 셋.
+#   「코드를 복사해 붙여넣으라」 한 줄로는 어느 코드·어느 단추인지 몰랐다 ⇒ 로그인 화면을 열기 전에 한 번.
+# 🔴v0.3.17(2026-09-15): ①첫 줄 = 유료 구독 조건(사이트와 같은 말 · 무료 계정은 승인이 끝나지 않아 20분을 그대로 섰다)
+#   ②붙여넣을 곳 = 새로 뜬 로그인 창 ③브라우저가 완료를 보이면 붙여넣지 않는다 ④브라우저가 안 열리면 그 창의 주소
+#   ⑤「Ctrl-C 를 누르시면」 대신 「기다리셔도 됩니다」 — 기다리는 동안 이 창에 되풀이하지 않는다(화면이 밀리지 않게).
 $LoginCardLines = @(
+    '     Claude 유료 구독 계정(Pro 이상)이어야 합니다 — 무료 계정으로는 로그인 승인이 끝나지 않습니다.',
     '     로그인은 이렇게 해 주십시오 (3가지만):',
     '     1) 열려 있는 Claude 탭을 모두 닫고, 브라우저에서 「승인」은 한 번만 누르십시오 (두 번 누르면 앞 코드가 무효가 됩니다).',
-    '     2) 「Authentication code」 화면에서 복사 단추로 코드만 복사하십시오 (주소창의 주소는 안 됩니다).',
-    '     3) 이 창에 마우스 오른쪽 단추를 눌러 붙여넣고 Enter 를 누르십시오 — 5분 안에.'
+    '     2) 「Authentication code」 화면이 뜰 때만 복사 단추로 코드를 복사하십시오 (주소창의 주소는 안 됩니다 · 브라우저가 완료를 보이면 붙여넣지 않으셔도 됩니다).',
+    '     3) 새로 뜬 로그인 창을 한 번 누르고, 마우스 오른쪽 단추로 붙여넣은 뒤 Enter 를 누르십시오 — 5분 안에.',
+    '     브라우저가 안 열리면: 새로 뜬 로그인 창에 보이는 https:// 주소를 복사해 브라우저 주소창에 붙여넣으십시오.',
+    '     이 설치 창은 닫지 마십시오. 기다리셔도 됩니다 — 20분 뒤 저절로 다음 안내가 나옵니다.'
 )
 
 # 설치기를 기다리는 한도. 한도가 없으면 백신 경고 창 같은 것이 떠 있는 동안 영원히 서 있게 된다.
@@ -375,6 +385,7 @@ function Write-JCode($code, $desc) {
     Say ("     진단 코드: " + $code + " — " + $desc)
     Say ("     이 코드로 찾아보실 수 있습니다: " + $HelpCodeUrl + $code)
     Write-Log ("jcode " + $code + " " + $desc)
+    Send-Progress (Get-CurrentStep) 'fail' $null $code $null   # 막힌 자리를 자동으로 알린다(fail-open)
 }
 
 # ── 연결 원인 판별 (3프로브) ──────────────────────────────────────
@@ -501,7 +512,7 @@ $HelpWays = @{
     'J-NET-03'   = @('회사·학교 망은 바깥 서버를 막아 둔 경우가 있습니다.', '휴대폰 핫스팟 같은 다른 인터넷으로 연결하신 뒤 다시 실행해 주십시오.')
     'J-RM-01'    = @('컴퓨터를 한 번 다시 시작하신 뒤(열려 있던 cys 가 완전히 닫힙니다)', '재설치 명령을 실행해 주십시오.')
     'J-PATH-01'  = @('컴퓨터를 한 번 다시 시작하신 뒤 새 창에서 다시 실행해 주십시오.')
-    'J-LOGIN-01' = @('브라우저가 뜨지 않았거나 다른 브라우저에 로그인돼 있으면,', '설치 창에 보이는 https:// 로 시작하는 로그인 주소를 복사해', '로그인된 브라우저 주소창에 붙여넣어 주십시오.')
+    'J-LOGIN-01' = @('브라우저가 뜨지 않았거나 다른 브라우저에 로그인돼 있으면,', '화면에 보이는 https:// 로 시작하는 로그인 주소를 복사해', '로그인된 브라우저 주소창에 붙여넣어 주십시오.')
     'J-LOGIN-02' = @('브라우저 창을 모두 닫으신 뒤 다시 실행해 주십시오.', '승인은 한 번만 누르시고 코드만 복사해 붙여넣어 주십시오.')
     'J-HOME-01'  = @('창을 닫고 새 창을 여신 뒤(남은 설정이 따라오지 않습니다)', '다시 실행해 주십시오.')
     'J-PERM-01'  = @('컴퓨터를 한 번 다시 시작하신 뒤 다시 실행해 주십시오.', '저장 공간이 3GB 이상 남았는지도 함께 봐 주십시오.')
@@ -683,10 +694,22 @@ function Write-ClosingNote {
         $script:ShowRerun = $true
         # 🔴본문 try/finally 에 catch 가 없어 오류 문구는 화면에만 나가고 기록 파일엔 한 줄도 안 남았다(2026-09-14 3건).
         #   마지막 오류를 적는다 — 끝난 원인이 아닐 수 있고, Ctrl-C 중단은 여기에 안 잡힌다.
-        if ($Error.Count -gt 0) {
-            $why = (($Error[0] | Out-String) -replace '\s+', ' ').Trim()
-            Write-Log ('unexpected end: last error = ' + $Error[0].Exception.GetType().FullName + ' - ' + $why.Substring(0, [Math]::Min(300, $why.Length)))
+        # 🔴v0.3.17 — 조용히 넘긴 확인(-ErrorAction SilentlyContinue)의 오류도 여기에 쌓인다. 그 줄을 원인처럼 적어 오진을 불렀다
+        #   (2026-09-15 · 로그인 확인 중에 끝난 실행에 「cys 를 찾지 못했다」가 적혔다 — 그것은 [1/10] 의 정상 확인이었다).
+        #   ⇒ 그런 줄은 빼고 적는다. 남은 것이 없으면 「오류 기록 없음」이라고 적는다 — Ctrl-C 중단 같은 끝일 수 있다. 원인은 단정하지 않는다.
+        #   ⚠try/catch 로 잡아 넘긴 오류는 여기서 가를 수 없어 남는다(교차 검토 지적) — 그래서 이름표가 「참고 · 끝난 원인이 아닐 수 있음」이다.
+        $quietErr = @($Error | Where-Object { $_.InvocationInfo -and ([string]$_.InvocationInfo.Line -match '-(ErrorAction|EA)\s+(SilentlyContinue|Ignore)') })
+        $loudErr  = @($Error | Where-Object { -not ($_.InvocationInfo -and ([string]$_.InvocationInfo.Line -match '-(ErrorAction|EA)\s+(SilentlyContinue|Ignore)')) })
+        if ($loudErr.Count -gt 0) {
+            $e0 = $loudErr[0]
+            $why = (($e0 | Out-String) -replace '\s+', ' ').Trim()
+            $etype = if ($e0.Exception) { $e0.Exception.GetType().FullName } else { $e0.GetType().FullName }
+            Write-Log ('unexpected end: last error (참고 · 끝난 원인이 아닐 수 있음) = ' + $etype + ' - ' + $why.Substring(0, [Math]::Min(300, $why.Length)))
+        } else {
+            Write-Log 'unexpected end: no error recorded (Ctrl-C 중단 같은 끝일 수 있음)'
         }
+        if ($quietErr.Count -gt 0) { Write-Log ('unexpected end: skipped ' + $quietErr.Count + ' quietly handled check error(s)') }
+        if ($script:LoginStage) { Write-Log ('unexpected end: last login stage = ' + $script:LoginStage) }
         # 코드가 비면 원격 해결(Invoke-RemoteHelp)이 보고를 보내지 않는다 ⇒ 설치 모드·깨우기 전의 끝만 「분류 못 함」으로 채운다.
         if ((-not $script:JCode) -and ($Mode -eq 'full') -and (-not $script:ReachedWake)) { $script:JCode = 'J-UNK-00'; Write-Log 'jcode J-UNK-00 unexpected end' }
     }
@@ -721,6 +744,9 @@ function Write-ClosingNote {
         Say '  기록 파일은 아직 만들어지지 않았습니다 — 이 화면을 사진으로 남겨 주십시오.'
     }
     # 원격 해결 — 막혀 멈춘 끝이면 여기서 진단을 보내고 창을 연 채 운영팀을 기다린다([1/10] 고지를 보여 드린 실행만).
+    # 🔴v0.3.17 — 원격 해결은 창을 최대 2시간 붙든다. 그 **앞에도** 「다시 하시는 법」을 한 번 보여 준다 — 기다리지 않고 바로 다시 해 볼 수 있게.
+    #   맨 끝의 한 번은 그대로 둔다(사람이 마지막으로 보는 화면에 명령이 있어야 복사할 수 있다). 조건은 원격 해결이 실제로 도는 관문과 같다.
+    if ($script:NoticeShown -and $script:ShowRerun -and $script:JCode -and ($Mode -eq 'full') -and (-not $script:ReachedWake)) { Show-RerunHow }
     if ($script:NoticeShown) { Invoke-RemoteHelp }
     # 담당자 안내를 보인 끝에서 자동 전달을 못 했으면(미동의·전송 실패·원격 해결 안 돎) 사진을 부탁드린다
     if ($script:HelpStage3 -and -not $script:HelpSentSaid) { Say $HelpSentNoLine }
@@ -757,7 +783,7 @@ function Set-NextStepRerun($text) {
 function Show-RerunHow {
     Say ''
     Say '  == 다시 하시는 법 (이대로 따라 하시면 됩니다) =='
-    Say '   1) 시작 단추를 누르고 powershell 이라고 치신 뒤 [Windows PowerShell] 을 여십시오.'
+    Say '   1) ⊞ 윈도우 키(키보드 왼쪽 아래, Ctrl과 Alt 사이)를 누르고 powershell 이라고 치신 뒤 [Windows PowerShell] 을 여십시오.'
     Say '   2) 아래 명령을 처음부터 끝까지 마우스로 끌어 선택한 뒤 Ctrl+C 를 누르십시오.'
     Say '   3) 그 창을 한 번 누르고 마우스 오른쪽 단추를 눌러 붙여넣은 뒤 Enter 를 누르십시오.'
     Say ''
@@ -1548,7 +1574,7 @@ function Install-ClaudeDirect {
 
 # ── 하는 일 2 — 공식 설치기 호출 (멱등: 이미 있으면 건너뛴다) ─────
 function Step-InstallClaude {
-    if ($script:ClaudeOk) { Say '[2/10] 클로드가 이미 있습니다 — 건너뜁니다 (멱등).'; return 0 }
+    if ($script:ClaudeOk) { Say '[2/10] 클로드가 이미 있습니다 — 건너뜁니다.'; return 0 }
     if (Get-Command claude -ErrorAction SilentlyContinue) {
         Say "[2/10] 이 컴퓨터의 클로드가 낡았습니다. 최신판을 설치합니다."
     }
@@ -1590,6 +1616,7 @@ function Step-InstallClaude {
             # 🔴[int] 는 반올림이다 — 1분 30초가 「2분 30초」로 찍혀 시간이 뒤죽박죽이었다(2026-09-14 사진). 버림으로 센다.
             $mm = [int][math]::Floor($waitedMs / 60000); $ss = [int][math]::Floor($waitedMs / 1000) % 60
             Say ("     아직 설치 중입니다 (" + $mm + "분 " + $ss + "초 지남 · 최대 " + [int]($waitCap / 60000) + "분). 작업 표시줄에 백신 창이 떠 있는지 확인해 주십시오 — 「파일 전송」이나 [실행] 을 누르시면 이어집니다.")
+            Send-Progress '2/10' 'wait' ([int]($waitedMs / 1000)) $null $null
             # 백신 창으로 보이는 창 제목이 떠 있으면 그 이름을 그대로 적는다(읽기만 · 바뀌었을 때만)
             $av = @(Get-AvWindowTitles)
             if (($av.Count -gt 0) -and ($av[0] -cne $avShown)) {
@@ -1680,7 +1707,154 @@ function Step-InstallClaude {
 }
 
 # ── 하는 일 3 — 로그인 유도 + 완료 감지 ───────────────────────────
+# 🔴v0.3.17(2026-09-15) — 로그인은 **새로 뜬 창**에서 한다. 설치 창은 그 창을 지켜보기만 한다.
+#   왜: 벤더 로그인 화면(주소·코드 입력 칸)이 우리 안내문과 같은 창에 섞였다 — 60초마다 끼어드는 안내가 코드 칸을 밀어 올렸을 수 있다(추론 · 실측 아님).
+#   붙여넣을 창도 「이 창」이라고만 적혀 있었다. 워크숍 로그인 막힘 9건(2026-09-14)에서 현장에 통한 처방은 「클로드를 따로 실행해 로그인」이었다.
+#   ⚠옛 방식의 표준입출력 가로채기는 원인이 아니었다(동료 판정 2026-09-15 · 표본 3건 모두 벤더 도구가 20분 내내 살아 있었다) — 새 창의 근거는 화면 분리와 붙여넣을 창 하나다.
+#   ⇒ 벤더 화면을 온전히 보이게 떼어 내고, 붙여넣을 창을 하나(새로 뜬 로그인 창)로 정한다. 설치 창은 조용히 기다리고 경과는 창 제목에만 적는다.
+#   완료 판정 = 로그인 확인 명령(auth status)의 답 + 로그인 파일(.credentials.json)이 이번에 생겼거나 고쳐졌는가.
+#   ⚠새 창이 실제로 어떻게 보이는지(주소가 찍히는가 · 창이 저절로 닫히는가)는 윈도우 실기로만 잰다 — 흉내 시험은 판정·상한·기록만 잰다.
+$script:LoginRc = 0
+$script:LoginStage = ''
+function Set-LoginStage([string]$s) {
+    # 어디서 끝났는지를 기록 끝부분(원격 보고에 실린다)에서 바로 가를 수 있게 단계 표지를 남긴다
+    $script:LoginStage = $s
+    Write-Log ('login stage: ' + $s)
+}
+# 로그인 파일 — 옮기기 단계(아래 · 같은 자리)와 같은 경로. 내용은 읽지 않는다(시각·크기만).
+function Get-LoginCredStamp {
+    $fi = New-Object System.IO.FileInfo ([System.IO.Path]::Combine($env:USERPROFILE, '.claude', '.credentials.json'))
+    if (-not $fi.Exists) { return @{ Exists = $false; Ticks = [long]0; Length = [long]0 } }
+    return @{ Exists = $true; Ticks = [long]$fi.LastWriteTimeUtc.Ticks; Length = [long]$fi.Length }
+}
+# 「있다」가 아니라 「이번에 생겼거나 고쳐졌다」로 본다 — 예전 로그인이 남긴 파일로 성공을 선언하지 않는다.
+#   ⚠크기 하한 100바이트 = 토큰이 든 파일은 수백 바이트다. 빈 껍데기(「{}」)가 쓰였을 때 성공으로 읽지 않기 위한 선이다.
+function Test-LoginCredFresh($before) {
+    $now = Get-LoginCredStamp
+    if ((-not $now.Exists) -or ($now.Length -lt 100)) { return $false }
+    if (-not $before.Exists) { return $true }
+    return ($now.Ticks -ne $before.Ticks)
+}
+# 판정 — 확인 명령이 답하면 그 답이 이긴다(「아니다」라고 답하면 파일이 새로 생겨도 아니다).
+#   답을 받지 못했을 때(명령이 없어졌거나 답의 모양이 바뀌었을 때)만 파일로 판정한다 — 확인 명령은 벤더 문서에 없어 언제든 바뀔 수 있다.
+function Resolve-LoginDone([string]$authText, $credBefore) {
+    if ($authText -match '"loggedIn"\s*:\s*true') { return 'status' }
+    if ($authText -match '"loggedIn"\s*:\s*false') { return '' }
+    if (Test-LoginCredFresh $credBefore) { return 'file' }
+    return ''
+}
+# 🔴확인 명령 한 번에도 상한을 건다(교차 검토 지적 채택 2026-09-15) — 상한 없이 부르면 벤더 도구가 멈추는 순간
+#   이 창의 20분 상한까지 함께 멈춘다(창이 살아 있는 동안에도 부르게 되면서 생긴 자리다).
+#   ⇒ 따로 띄워 출력은 임시 파일로 받고 상한에 닿으면 끈다. 못 띄우면 던진다(부르는 쪽이 「실행 실패」로 센다) · 상한이면 빈 답(= 답 없음).
+function Get-LoginStatusText($exe) {
+    $out = [System.IO.Path]::GetTempFileName()
+    $err = [System.IO.Path]::GetTempFileName()
+    $p = $null
+    try {
+        $p = Start-Process -FilePath $exe -ArgumentList 'auth','status' -NoNewWindow -PassThru -RedirectStandardOutput $out -RedirectStandardError $err -ErrorAction Stop
+        if (-not $p.WaitForExit($LoginStatusWaitMs)) {
+            try { $p.Kill() } catch { }
+            # 끈 뒤 끝나기를 잠깐 기다린다 — 출력 파일을 쥔 채 지우러 가지 않게(교차 검토 두 번째 지적).
+            #   ⚠상한 없는 WaitForExit() 로 기다리면 끄기가 안 먹힌 경우 이 자리가 다시 상한 없는 대기가 된다 ⇒ 2초로 묶는다.
+            try { [void]$p.WaitForExit(2000) } catch { }
+            Write-Log ('login status timeout ' + [int]($LoginStatusWaitMs / 1000) + 's: killed')
+            return ''
+        }
+        return [System.IO.File]::ReadAllText($out)
+    } finally {
+        if ($p) { try { $p.Dispose() } catch { } }
+        Remove-Item -LiteralPath $out, $err -Force -ErrorAction SilentlyContinue
+    }
+}
+# 구독 종류만 떼어 적는다(다음 워크숍 준비 자료) — 같은 답에 든 이메일·조직 이름은 적지 않는다.
+function Get-LoginSubscription([string]$authText) {
+    if ($authText -match '"subscriptionType"\s*:\s*"([A-Za-z0-9_-]{1,32})"') { return $Matches[1] }
+    return 'unknown'
+}
+# 승인 프로세스가 끝나면(스스로든 상한이든) 몇 초 간격으로 몇 번만 묻고 곧바로 갈래를 정한다.
+#   🔴예전에는 여기서 10분을 더 기다렸다 — 승인 프로세스가 이미 끝났으면 그 뒤에 로그인이 될 길이 없어 헛 대기였다(2026-09-15 표본 · 실제 11분).
+function Confirm-LoginAfterExit($exe, $credBefore) {
+    $fails = 0
+    for ($i = 1; $i -le $LoginConfirmTries; $i++) {
+        $auth = ''
+        try { $auth = Get-LoginStatusText $exe } catch {
+            $auth = ''
+            $fails++
+            $why = (($_ | Out-String) -replace '\s+', ' ').Trim()
+            Write-Log ('login poll failed ' + $fails + ': ' + $_.Exception.GetType().FullName + ' - ' + $why.Substring(0, [Math]::Min(300, $why.Length)))
+        }
+        $by = Resolve-LoginDone $auth $credBefore
+        if ($by) { return @{ By = $by; Auth = $auth; Fails = $fails; Note = ('로그인 됨 · ' + $i + '번째 확인 · 판정 ' + $by) } }
+        if ($i -lt $LoginConfirmTries) { Start-Sleep -Seconds $LoginPollInterval }
+    }
+    return @{ By = ''; Auth = ''; Fails = $fails; Note = ('로그인 안 됨 · 확인 ' + $LoginConfirmTries + '회 · 그 가운데 실행 실패 ' + $fails + '회') }
+}
+# 상한에 닿은 실패에서만 묻는다 — 성공한 사람에게는 손이 하나도 늘지 않는다. 답은 분류 표지로만 적는다(개인정보 아님).
+$LoginAnswerTags = @{ '1' = 'browser-not-opened'; '2' = 'no-approval-screen'; '3' = 'approved-code-rejected'; 'enter' = 'unknown'; 'timeout' = 'no-answer'; 'no-input' = 'no-console-input' }
+# 질문 전에 이 설치 창에 쌓여 있던 글자 수 — 코드를 로그인 창이 아니라 이 창에 붙여넣었는지 가르는 표지(글자 자체는 읽고 버린다 · 적지 않는다)
+function Get-LoginStrayKeyCount {
+    $n = 0
+    try { while ([Console]::KeyAvailable -and ($n -lt 10000)) { [void][Console]::ReadKey($true); $n++ } } catch { return -1 }
+    return $n
+}
+function Read-LoginFailKey([int]$waitSec) {
+    try {
+        $sw = [System.Diagnostics.Stopwatch]::StartNew()
+        while ($sw.Elapsed.TotalSeconds -lt $waitSec) {
+            if ([Console]::KeyAvailable) {
+                $k = [Console]::ReadKey($true)
+                if ([string]$k.KeyChar -match '^[123]$') { return [string]$k.KeyChar }
+                if ($k.Key -eq [ConsoleKey]::Enter) { return 'enter' }
+            } else {
+                Start-Sleep -Milliseconds 200
+            }
+        }
+        return 'timeout'
+    } catch { return 'no-input' }
+}
+function Invoke-LoginFailQuestion {
+    $stray = Get-LoginStrayKeyCount
+    Say '     로그인이 시간 안에 끝나지 않았습니다. 어땠는지 숫자 하나만 눌러 주십시오 (안 누르셔도 1분 뒤 다음으로 갑니다):'
+    Say '       1 = 브라우저가 열리지 않았다'
+    Say '       2 = 브라우저는 열렸지만 승인 화면이 안 나왔다 (구독 안내가 나왔다)'
+    Say '       3 = 승인하고 코드도 붙여넣었는데 안 됐다'
+    Say '       Enter = 잘 모르겠다'
+    $key = Read-LoginFailKey $LoginAskWaitSec
+    $tag = [string]$LoginAnswerTags[$key]
+    if (-not $tag) { $tag = 'unknown' }
+    Write-Log ('login fail answer: ' + $tag + ' (key=' + $key + ') · stray keys before question=' + $stray)
+    if ($key -match '^[123]$') { Say ('     ' + $key + ' 번으로 적었습니다.') }
+    return @{ Answer = $tag; Keys = $stray }
+}
+# 로그인 성공 — 두 자리(창이 살아 있을 때 · 창이 끝난 뒤)가 같은 일을 하게 한 자리에서 한다.
+function Complete-LoginSuccess([string]$by, [string]$authText, [string]$where) {
+    Set-LoginStage ('done by ' + $by + ' ' + $where)
+    Write-Log ('login subscription: ' + (Get-LoginSubscription $authText))
+    # 🔴코드를 로그인 창이 아니라 이 설치 창에 붙여넣었으면 그 글자가 입력 버퍼에 남아 다음 단계(자비스 첫 화면)로 흘러간다
+    #   (교차 검토 지적에서 파생 · 2026-09-15) ⇒ 여기서 비우고 글자 수만 적는다(글자 자체는 적지 않는다).
+    $stray = Get-LoginStrayKeyCount
+    if ($stray -gt 0) { Write-Log ('login stray keys in installer window cleared=' + $stray) }
+    $script:LoggedIn = $true
+    Say '[3/10] 로그인 확인했습니다.'
+}
+# 로그인 단계에서 본 것 — 기록 파일과 환경 보고(원격 해결이 보내는 본문)에 같은 줄을 남긴다. 코드·주소·계정 원문은 없다.
+function Add-LoginReport($info) {
+    $lines = @(
+        ('로그인 창: ' + $info.Win),
+        ('승인 프로세스: ' + $info.Proc),
+        ('다시 열기: ' + $info.Reopen),
+        ('끝난 뒤 확인: ' + $info.Confirm),
+        ('상한에서 받은 답: ' + $info.Answer),
+        ('질문 전 설치 창에 쌓인 글자 수: ' + $info.Keys)
+    )
+    foreach ($l in $lines) { Write-Log ('login report: ' + $l) }
+    Add-ReportLines (@('', '## [3/10] 로그인 단계에서 본 것') + @($lines | ForEach-Object { '- ' + $_ }))
+}
+
+# ⚠이 함수는 값을 돌려주지 않는다 — 결과는 $script:LoginRc 에 둔다(부르는 쪽이 반환값을 받으면 안 된다).
+#   🔴받으면 이 함수 안에서 실행한 벤더 명령의 출력이 화면이 아니라 그 변수로 빨려 들어가, 이 창에서 로그인할 때 코드 입력 칸이 안 뜬다(about_Return · 2026-09-15 규명).
 function Step-Login {
+    $script:LoginRc = 0
     # 🔴[1/10] 의 로그인 판정은 **클로드가 없던 시점**의 것이다 — 그 자리에서는 물어볼 상대가 없어
     #   unknown 으로 적고 지나간다. 그런데 [2/10] 에서 방금 클로드를 깔았다.
     #   ⇒ 브라우저를 열기 전에 **한 번 다시 본다.**
@@ -1688,125 +1862,182 @@ function Step-Login {
     #   (화면에 「남김: 로그인」), 판정만 옛것이라 [3/10] 이 로그인 화면을 다시 열었다.
     #   ★첫 설치에서는 이 줄이 아무 일도 하지 않는다. 어긋나는 것은 지우고 다시 까는 길 하나뿐이다.
     #   ⚠능력 확인을 먼저 통과할 때만 묻는다 — 낡은 판본에서 auth status 는 질문으로 나간다.
+    # 🔴이름이 아니라 [2/10] 이 확정한 전체 경로로 부른다(2026-09-14) — 승인과 확인이 같은 파일을 묻게. 못 찾으면 종전대로 이름.
+    #   (2026-09-15 · 아래 재판정도 같은 경로·같은 상한으로 묻게 되어 여기로 올렸다)
+    $claudeExe = @(Get-Command claude -CommandType Application -ErrorAction SilentlyContinue)[0].Source
+    if (-not $claudeExe) { $claudeExe = 'claude' }
     if ((-not $script:LoggedIn) -and (Get-Command claude -ErrorAction SilentlyContinue) -and (Test-ClaudeAuthCmd)) {
-        $reauth = (& claude auth status 2>$null) -join "`n"
+        # 🔴이 재판정에도 확인 명령 한 번의 상한을 건다(2026-09-15 · 흉내 status-hang 적색 규명) — 여기서 상한 없이 부르면
+        #   확인 명령이 멈추는 순간 로그인 카드도 20분 상한도 오기 전에 설치 창이 선다(기록 한 줄 없이).
+        #   못 띄우거나 상한이면 답 없음 = 종전의 「로그인 안 됨」 갈래로 그대로 간다.
+        $reauth = ''
+        try { $reauth = Get-LoginStatusText $claudeExe } catch { $reauth = '' }
         if ($reauth -match '"loggedIn"\s*:\s*true') { $script:LoggedIn = $true }
     }
-    if ($script:LoggedIn) { Say '[3/10] 이미 로그인돼 있습니다 — 건너뜁니다 (멱등).'; return 0 }
-    if ($Mode -eq 'dry')  { Say "[3/10] (dry-run) 폴링하지 않았습니다. 간격 $LoginPollInterval 초 · 상한 $LoginPollTimeout 초 · 승인 대기 상한 $LoginWaitTimeout 초($LoginSayInterval 초마다 안내)."; return 0 }
+    if ($script:LoggedIn) { Say '[3/10] 이미 로그인돼 있습니다 — 건너뜁니다.'; return }
+    if ($Mode -eq 'dry')  { Say "[3/10] (dry-run) 로그인 창을 열지 않았습니다. 승인 대기 상한 $LoginWaitTimeout 초(벽시계) · 끝난 뒤 확인 $LoginConfirmTries 회($LoginPollInterval 초 간격) · $LoginCheckpointSec 초에 한 번 점검."; return }
 
     if (-not (Test-ClaudeAuthCmd)) {
         Say '[3/10] 이 판본의 클로드는 로그인 확인 명령을 모릅니다. 판올림이 먼저 필요합니다.'
         Say '     아래 「다시 하시는 법」대로 다시 실행하시면 판올림부터 이어서 갑니다.'
         $script:ShowRerun = $true
-        return 6
+        $script:LoginRc = 6
+        return
     }
     Human '벤더' '로그인 승인 클릭 — 클로드 회사 화면에서만 할 수 있다(우리가 대신 못 누른다)'
     Say '[3/10] 지금 로그인 화면을 엽니다. 브라우저가 뜨면 승인을 눌러 주십시오.'
     foreach ($ln in $LoginCardLines) { Say $ln }
-    Say "     기다리는 동안 $LoginSayInterval 초마다 한 줄씩 알려 드리고, $([int]($LoginWaitTimeout / 60))분이 지나면 이 기다림을 끝냅니다."
-    # ⛔승인 프로세스는 **이 창을 그대로 쓴다**(-NoNewWindow) — 사람이 코드를 붙여넣어야 하므로
-    #   입력을 뺏으면 안 된다. 우리는 기다리기만 하고 **입력을 읽지 않는다**.
-    # ★상한에 닿으면 그 프로세스를 끝낸다 = 사람이 Ctrl-C 를 누른 것과 같은 결과 ⇒ 아래 폴링과
-    #   J-LOGIN-01 회복 경로로 그대로 흘러간다(맥과 같은 모양 · 새 길을 내지 않는다).
-    # 🔴**앞에서 `Start-Sleep` 로 도는 고리를 두지 않는다**(검토 지적 채택 2026-09-11).
-    #   그 고리는 이 창의 입력을 자식과 **함께 쥐고** 있어 붙여넣은 코드가 샐 수 있다.
-    #   ⇒ 기다림을 `WaitForExit(ms)` 로 바꾼다 — 이것은 **커널 대기**라 콘솔을 건드리지 않는다.
-    #     자식이 이 창의 입력을 **온전히** 갖는다(경합 0).
-    #   ⚠검토 의견은 「별 스레드/타이머(Register-ObjectEvent)」를 제시했다. 같은 성질을 더 적은 장치로
-    #     얻을 수 있어 이 모양을 골랐다 — 타이머는 **다른 runspace** 로 상태를 넘겨야 하고 여기서
-    #     실기로 재 볼 길이 없다(윈 러너는 과금 정지). **검토 의견과 다른 선택이므로 그대로 적어 둔다.**
-    # 🔴이름이 아니라 [2/10] 이 확정한 전체 경로로 부른다(2026-09-14) — 승인과 폴링이 같은 파일을 묻게. 못 찾으면 종전대로 이름.
-    $claudeExe = @(Get-Command claude -CommandType Application -ErrorAction SilentlyContinue)[0].Source
-    if (-not $claudeExe) { $claudeExe = 'claude' }
-    # ★승인 창이 상한 전에 스스로 끝났는데 로그인이 안 됐으면 = 코드가 받아들여지지 않은 것(J-LOGIN-02 · 2026-09-14 워크숍 4건)
-    #   ⇒ 10분 폴링을 기다리지 않고 로그인 화면을 **한 번만** 더 연다(현장에서 통한 처방 「claude 를 다시 실행해 로그인」을 안에 둔 것).
-    #   폴링은 승인 창이 살아 있을 때만 뜻이 있다. 두 번째도 같으면 종전 길(폴링 → J-LOGIN-01)로 간다 — 다시 열기는 1회로 닫힌다.
-    $reopened = $false
-    while ($true) {
-        $loginProc = $null
-        $timedOut = $false
-        try { $loginProc = Start-Process -FilePath $claudeExe -ArgumentList 'auth','login' -NoNewWindow -PassThru -ErrorAction Stop } catch { $loginProc = $null }
-        if ($null -eq $loginProc) {
-            # 다시 여는 자리에서 못 띄웠으면 폴링으로 넘어간다(없는 명령을 앞에서 부르면 설치가 통째로 끝난다)
-            if ($reopened) { Write-Log 'login reopen: could not start - go to polling'; break }
-            # 🔴폴백에서 **파이프를 쓰지 않는다**(검토 지적 채택 2026-09-11). `| Out-Host` 는 stdout 을 파이프로 바꿔
-            #   벤더 도구의 「대화 중인가」 판정을 깨뜨리고, 그러면 **코드 입력 칸 자체가 안 뜬다.**
-            #   기다림 안내는 못 하더라도 **길은 막지 않는다** — 안내가 없는 것보다 못 까는 것이 나쁘다.
-            & claude auth login
-        } else {
+    # ★기다림은 `WaitForExit(ms)` 로 한다 — 커널 대기라 이 창의 입력을 건드리지 않는다(검토 지적 채택 2026-09-11 · 새 창에서도 그대로 둔다).
+    # ★상한에 닿으면 그 창을 끝낸다 = 사람이 창을 닫은 것과 같은 결과 ⇒ 아래 확인과 J-LOGIN-01 회복 경로로 그대로 흘러간다.
+    # ★$claudeExe(전체 경로)는 이 함수 첫머리에서 정했다 — 재판정·승인·확인이 같은 파일을 묻는다.
+    $info = @{ Win = '새 창'; Proc = '-'; Reopen = '안 했다'; Confirm = '-'; Answer = '묻지 않음(상한에 닿지 않았다)'; Keys = '-' }
+    $c = @{ By = ''; Auth = ''; Fails = 0; Note = '-' }
+    $oldTitle = $null
+    try { $oldTitle = $Host.UI.RawUI.WindowTitle } catch { $oldTitle = $null }
+    try {
+        # ★승인 창이 상한 전에 스스로 끝났는데 로그인이 안 됐으면 = 코드가 받아들여지지 않은 것(J-LOGIN-02 · 2026-09-14 워크숍 4건)
+        #   ⇒ 로그인 화면을 **한 번만** 더 연다(현장에서 통한 처방 「claude 를 다시 실행해 로그인」을 안에 둔 것). 두 번째도 같으면 J-LOGIN-01 로 간다.
+        $reopened = $false
+        while ($true) {
+            $credBefore = Get-LoginCredStamp
+            $loginProc = $null
+            $timedOut = $false
             $w = 0
-            # WaitForExit 는 ms 를 받고, 끝났으면 $true 를 준다. 콘솔을 읽지 않는다.
-            while (-not $loginProc.WaitForExit(5000)) {
-                $w += 5
-                if ($w -ge $LoginWaitTimeout) {
-                    $timedOut = $true
-                    [Console]::Error.WriteLine("     $([int]($LoginWaitTimeout / 60))분 동안 승인이 오지 않아 이 기다림을 끝냅니다.")
-                    # 🔴위 안내는 화면(stderr)에만 가서 기록 파일에 한 줄도 안 남았다 — 20분 상한이 작동했는지 기록으로 못 갈랐다(2026-09-14 57분·26분 대기 2건).
-                    Write-Log ('login wait timeout ' + [int]($LoginWaitTimeout / 60) + 'min: CloseMainWindow')
-                    # 🔴바로 `Kill()` 하지 않는다(검토 지적 채택 2026-09-11) — 잠금 파일·임시 파일을 정리할 틈을 준다.
-                    #   맥이 INT → (안 되면) TERM 인 것과 **같은 순서**다: 부드럽게 한 번, 그래도 안 되면 세게.
-                    try { [void]$loginProc.CloseMainWindow() } catch { }
-                    if (-not $loginProc.WaitForExit(3000)) {
-                        try { $loginProc.Kill() } catch { }
-                        [Console]::Error.WriteLine('     (승인 창이 바로 닫히지 않아 한 번 더 끝냈습니다)')
-                        Write-Log ('login wait timeout: Kill - exited=' + $loginProc.HasExited)
-                    } else {
-                        Write-Log 'login wait timeout: closed without Kill'
+            # ★새 창으로 띄운다(-NoNewWindow 를 쓰지 않는다) — 벤더 화면이 이 창의 안내문과 섞이지 않고, 붙여넣을 창이 하나로 정해진다.
+            try { $loginProc = Start-Process -FilePath $claudeExe -ArgumentList 'auth','login' -PassThru -ErrorAction Stop } catch { $loginProc = $null }
+            if ($null -eq $loginProc) {
+                # 다시 여는 자리에서 못 띄웠으면 확인으로 넘어간다(없는 명령을 앞에서 부르면 설치가 통째로 끝난다)
+                if ($reopened) { Write-Log 'login reopen: could not start - go to confirm'; break }
+                # 🔴새 창을 못 띄우면 이 창에서 한다. **파이프를 쓰지 않는다**(검토 지적 채택 2026-09-11) — `| Out-Host` 는 stdout 을 파이프로 바꿔
+                #   벤더 도구의 「대화 중인가」 판정을 깨뜨리고, 그러면 **코드 입력 칸 자체가 안 뜬다.** 부르는 쪽도 반환값을 받지 않는다(함수 머리 주석).
+                $info.Win = '이 창(새 창을 띄우지 못했다)'
+                Set-LoginStage 'inline'
+                Say '     새 창을 띄우지 못해 이 창에서 로그인합니다 — 코드는 이 창에 붙여넣으십시오.'
+                $sw = [System.Diagnostics.Stopwatch]::StartNew()
+                & claude auth login
+                $w = [int]$sw.Elapsed.TotalSeconds
+                $info.Proc = ('이 창에서 끝남 · 종료 코드 ' + $LASTEXITCODE + ' · ' + $w + '초')
+                Write-Log ('login proc exit=' + $LASTEXITCODE + ' after ' + $w + 's (inline)')
+            } else {
+                # 핸들을 먼저 한 번 잡아 둔다 — 윈도우 PowerShell 5.1 에서 핸들을 안 잡은 채 끝난 프로세스는 종료 코드가 비어 읽히는 사례가 보고돼 있다(커뮤니티 보고 · 실기 확인 항목).
+                try { [void]$loginProc.Handle } catch { }
+                Set-LoginStage ('wait (new window · pid ' + $loginProc.Id + ')')
+                $sw = [System.Diagnostics.Stopwatch]::StartNew()
+                $checkpointSaid = $false
+                $nextStatus = $LoginStatusEverySec
+                $nextTitle = 0
+                $nextProgress = 0
+                # WaitForExit 는 ms 를 받고, 끝났으면 $true 를 준다. 콘솔을 읽지 않는다.
+                while (-not $loginProc.WaitForExit(5000)) {
+                    # 🔴상한은 **벽시계**로 잰다 — 쉰 초를 더해 가면 확인 명령에 든 시간이 빠져 「최대 20분」이 거짓이 된다(2026-09-15 표본 · 10분 표시가 실제 11분).
+                    $w = [int]$sw.Elapsed.TotalSeconds
+                    # 창이 살아 있는 동안에도 로그인이 끝났는지 본다 — 파일은 5초마다(싸다) · 확인 명령은 파일이 새로 생겼을 때와 30초마다.
+                    #   확인 명령은 이 설치 창에서 돈다 — 로그인 창의 입력에는 닿지 않는다.
+                    $authNow = ''
+                    $doneBy = ''
+                    if ((Test-LoginCredFresh $credBefore) -or ($w -ge $nextStatus)) {
+                        $nextStatus = $w + $LoginStatusEverySec
+                        try { $authNow = Get-LoginStatusText $claudeExe } catch { $authNow = '' }
+                        $doneBy = Resolve-LoginDone $authNow $credBefore
                     }
-                    break
+                    if ($doneBy) {
+                        # 로그인은 끝났는데 창이 남아 있다 — 우리가 닫아 준다(부드럽게 한 번, 안 되면 끝낸다).
+                        try { [void]$loginProc.CloseMainWindow() } catch { }
+                        if (-not $loginProc.WaitForExit(3000)) { try { $loginProc.Kill() } catch { } }
+                        Write-Log ('login window closed after login - exited=' + $loginProc.HasExited)
+                        Complete-LoginSuccess $doneBy $authNow ('while window open after ' + $w + 's')
+                        return
+                    }
+                    if ($w -ge $LoginWaitTimeout) {
+                        $timedOut = $true
+                        [Console]::Error.WriteLine("     $([int]($LoginWaitTimeout / 60))분 동안 승인이 오지 않아 이 기다림을 끝냅니다.")
+                        # 🔴위 안내는 화면(stderr)에만 가서 기록 파일에 한 줄도 안 남았다 — 20분 상한이 작동했는지 기록으로 못 갈랐다(2026-09-14 57분·26분 대기 2건).
+                        Write-Log ('login wait timeout ' + [int]($LoginWaitTimeout / 60) + 'min: CloseMainWindow')
+                        # 🔴바로 `Kill()` 하지 않는다(검토 지적 채택 2026-09-11) — 잠금 파일·임시 파일을 정리할 틈을 준다.
+                        #   맥이 INT → (안 되면) TERM 인 것과 **같은 순서**다: 부드럽게 한 번, 그래도 안 되면 세게.
+                        try { [void]$loginProc.CloseMainWindow() } catch { }
+                        if (-not $loginProc.WaitForExit(3000)) {
+                            try { $loginProc.Kill() } catch { }
+                            [Console]::Error.WriteLine('     (승인 창이 바로 닫히지 않아 한 번 더 끝냈습니다)')
+                            Write-Log ('login wait timeout: Kill - exited=' + $loginProc.HasExited)
+                        } else {
+                            Write-Log 'login wait timeout: closed without Kill'
+                        }
+                        break
+                    }
+                    # 한 번만 묻는다 — 브라우저가 안 열린 사람은 여기서 스스로 풀 수 있다(주소는 로그인 창에 있다).
+                    if ((-not $checkpointSaid) -and ($w -ge $LoginCheckpointSec)) {
+                        $checkpointSaid = $true
+                        Say '     [5분 점검] 브라우저에 로그인 화면이 떴습니까? 안 떴으면 새로 뜬 로그인 창에 보이는 https:// 주소를 복사해 브라우저 주소창에 붙여넣으십시오.'
+                        Write-Log 'login checkpoint shown'
+                    }
+                    # 기다리는 동안 이 창에는 찍지 않는다 — 경과는 창 제목에만(60초마다).
+                    if ($w -ge $nextTitle) {
+                        $nextTitle = $w + $LoginSayInterval
+                        try { $Host.UI.RawUI.WindowTitle = ('자비스 설치 — 로그인을 기다리는 중 ' + [int]($w / 60) + '분 · 로그인은 새로 뜬 창에서') } catch { }
+                    }
+                    # 60초마다 대기 진행을 알린다(계약 3절 · 서버 쪽이 정체를 알아본다).
+                    if ($w -ge $nextProgress) {
+                        $nextProgress = $w + 60
+                        Send-Progress '3/10' 'wait' $w $null $null
+                    }
+                    # 5분마다 로그인 창을 한 장 찍어 둔다(최대 4 · 계약 3절 · 원인 분류용 · 보고가 열리면 첨부).
+                    if (($script:LoginCapCount -lt 4) -and ($w -ge (($script:LoginCapCount + 1) * $LoginCheckpointSec))) {
+                        $script:LoginCapCount++
+                        $jpg = Get-LoginWindowJpeg $loginProc
+                        if ($jpg) {
+                            $capf = Join-Path $JarvisHome ('login-cap-' + $script:LoginCapCount + '.jpg')
+                            try { [System.IO.File]::WriteAllBytes($capf, $jpg); $script:LoginCapFiles += $capf; Write-Log ('login window capture ' + $script:LoginCapCount + ' saved') } catch { }
+                        } else { Write-Log ('login window capture ' + $script:LoginCapCount + ' skipped (창을 못 찍음)') }
+                    }
                 }
-                if (($w % $LoginSayInterval) -eq 0) {
-                    foreach ($ln in @($LoginCardLines | Select-Object -Skip 1)) { [Console]::Error.WriteLine($ln) }
-                    [Console]::Error.WriteLine("     (기다린 지 $([int]($w / 60))분 · 창을 닫거나 Ctrl-C 를 누르시면 다시 하는 법을 안내합니다)")
+                $w = [int]$sw.Elapsed.TotalSeconds
+                $ec = '?'
+                try { $ec = [string]$loginProc.ExitCode } catch { $ec = '?' }
+                if ($timedOut) { $info.Proc = ('상한 ' + [int]($LoginWaitTimeout / 60) + '분에 닿아 끝냈다 · 종료 코드 ' + $ec + ' · ' + $w + '초') }
+                else { $info.Proc = ('스스로 끝났다 · 종료 코드 ' + $ec + ' · ' + $w + '초') }
+                Write-Log ('login proc exit=' + $ec + ' after ' + $w + 's' + $(if ($timedOut) { ' (cap)' } else { ' (self)' }))
+                if ($timedOut) {
+                    Set-LoginStage 'question'
+                    $ans = Invoke-LoginFailQuestion
+                    $info.Answer = $ans.Answer
+                    $info.Keys = $ans.Keys
                 }
             }
-            if ((-not $timedOut) -and (-not $reopened)) {
-                $early = ''
-                try { $early = (& $claudeExe auth status 2>$null) -join "`n" } catch { $early = '' }
-                if ($early -notmatch '"loggedIn"\s*:\s*true') {
+            Set-LoginStage 'confirm'
+            $c = Confirm-LoginAfterExit $claudeExe $credBefore
+            $info.Confirm = $c.Note
+            if ($c.By) {
+                Complete-LoginSuccess $c.By $c.Auth 'after window ended'
+                return
+            }
+            if ($null -ne $loginProc) {
+                if ((-not $timedOut) -and (-not $reopened)) {
                     Write-Log ('login ended early after ' + $w + 's without login')
+                    Set-LoginStage 'reopen'
                     Say '[3/10] 로그인 코드가 받아들여지지 않은 것으로 보입니다 — 로그인 화면을 한 번 더 엽니다.'
                     Write-JCode 'J-LOGIN-02' '로그인 코드 입력이 받아들여지지 않았습니다(로그인 화면을 한 번 더 엽니다)'
                     # 이 코드는 끝의 코드가 아니다 — 다시 연 로그인이 되면 성공 끝이다. 화면·기록에만 남기고 칸은 비운다.
                     $script:JCode = ''
                     foreach ($ln in $LoginCardLines) { Say $ln }
+                    $info.Reopen = '1회 했다'
                     $reopened = $true
                     continue
                 }
             }
+            break
         }
-        break
+        Set-LoginStage 'fail'
+        if ($c.Fails -ge $LoginConfirmTries) { Say '[3/10] 로그인 확인 명령이 한 번도 실행되지 못했습니다(까닭은 기록 파일에 적었습니다).' }
+        else { Say '[3/10] 로그인이 확인되지 않았습니다.' }
+        Add-LoginReport $info
+        Write-JCode 'J-LOGIN-01' '로그인 승인이 시간 안에 끝나지 않았습니다'
+        Set-NextStepRerun '아래 「다시 하시는 법」대로 다시 실행하시면 로그인 창이 다시 열립니다.'
+        $script:LoginRc = 5
+        return
+    } finally {
+        if ($null -ne $oldTitle) { try { $Host.UI.RawUI.WindowTitle = $oldTitle } catch { } }
     }
-    Say "     승인이 끝났는지 확인합니다. 최대 $([int]($LoginPollTimeout / 60))분까지 기다립니다."
-    $waited = 0
-    $pollFail = 0
-    while ($waited -lt $LoginPollTimeout) {
-        # 🔴한 번의 실행 실패가 설치를 끝내지 않게 한다(2026-09-14 도움 채널 3건). 본문 try/finally 에 catch 가 없어
-        #   여기서 던지면 폴링 결과 한 줄 없이 끝맺음으로 갔다. 까닭은 기록 파일에 · 5번 연속이면 J-LOGIN-01 로 간다.
-        try {
-            $auth = (& $claudeExe auth status 2>$null) -join "`n"
-            $pollFail = 0
-        } catch {
-            $auth = ''
-            $pollFail++
-            $why = (($_ | Out-String) -replace '\s+', ' ').Trim()
-            Write-Log ('login poll failed ' + $pollFail + ': ' + $_.Exception.GetType().FullName + ' - ' + $why.Substring(0, [Math]::Min(300, $why.Length)))
-            if ($pollFail -ge 5) { break }
-        }
-        if ($auth -match '"loggedIn"\s*:\s*true') {
-            $script:LoggedIn = $true
-            Say '[3/10] 로그인 확인했습니다.'
-            return 0
-        }
-        Start-Sleep -Seconds $LoginPollInterval
-        $waited += $LoginPollInterval
-    }
-    if ($pollFail -ge 5) { Say '[3/10] 로그인 확인 명령이 5번 연속 실행되지 못했습니다(까닭은 기록 파일에 적었습니다).' }
-    else { Say "[3/10] $([int]($LoginPollTimeout / 60))분 동안 로그인이 확인되지 않았습니다." }
-    Write-JCode 'J-LOGIN-01' '로그인 승인이 시간 안에 끝나지 않았습니다'
-    Set-NextStepRerun '브라우저에서 승인을 누르신 뒤 아래 「다시 하시는 법」대로 다시 실행해 주십시오.'
-    return 5
 }
 
 # ── 하는 일 4 — 자비스 기동 (지침 파일 + 첫 지시 주입) ───────
@@ -2466,6 +2697,12 @@ function Step-PrepareAccount {
     $cli = if ($script:CysCli) { $script:CysCli } else { 'cys' }
     Say '[8/10] 이 계정에 자리를 잡습니다.'
     Invoke-Logged 'init-pack' $cli @('init-pack') | Out-Null
+    # 🔴2026-09-15 개정(윈 2차 재설치 실기) — 사전 설정·로그인 이어 두기를 **cys 를 켜기 전에** 한다.
+    #   cys 가 켜지는 순간 지난 편성 기록이 있으면 동료 좌석이 곧바로 뜬다. 그 좌석들이 읽는 자리가 전용 자리(~\.cys\claude)인데,
+    #   앞 판은 켠 **뒤에** 심었다 ⇒ 셋 다 첫 실행 질문(테마 고르기)·로그인 방법 고르기 앞에 섰다. 떠 있는 좌석은 뒤에 심은 것을 다시 읽지 않는다.
+    #   전용 자리는 바로 위 init-pack 이 만든다. 시드는 자가진단 결과와 관계가 없다(2026-09-10 개정) — 갈림길보다 앞이기만 하면 된다.
+    Set-AllProfiles | Out-Null
+    Copy-LoginToIsolated | Out-Null
     $daemonRc = Invoke-Logged 'daemon install' $cli @('daemon', 'install')
     # ★등록됐는지는 **작업을 직접 보고** 정한다(위 Test-CysAutoStart 의 까닭). 팩이 찍은 줄도,
     #   우리 추정도 아니다. 이 값 하나로 아래 문구가 갈린다 — 그래야 두 줄이 서로 모순되지 않는다.
@@ -2545,12 +2782,12 @@ function Step-PrepareAccount {
     # 통과 기준은 실패 0 이다. 주의는 성한 컴퓨터에도 나온다.
     # 판정 못 한 항목은 「됐다」로 세지 않는다 — 몇 개인지 그대로 알린다.
     # 자리를 잡으면서 **자비스 전용 설정 자리**가 새로 생긴다. 자비스가 부를 동료들은 그 자리로 뜨므로
-    # 사전 설정을 여기서 한 번 더 심는다 — 안 그러면 동료들이 첫 실행 질문 앞에서 멈춰 선다(실측).
+    # 사전 설정을 심는다 — 안 그러면 동료들이 첫 실행 질문 앞에서 멈춰 선다(실측).
     # 🔴2026-09-10 개정 — 앞 판은 이 두 줄이 **자가진단 실패 갈래보다 뒤**에 있었다. 그래서 자가진단이
     #   한 가지라도 못 통과하면 전용 자리에 사전 설정이 **영영 안 심겼고**, 그 뒤 자비스가 부른 동료
     #   좌석들이 전부 첫 실행 질문(폴더 신뢰) 앞에 섰다. ★자가진단 결과와 시드는 아무 관계가 없다 —
     #   자리는 이미 생겼고, 심는 것은 실패해도 잃을 것이 없다. ⇒ 갈림길 **앞**으로 옮긴다.
-    Set-AllProfiles | Out-Null
+    # 🔴2026-09-15 — 두 줄(Set-AllProfiles · Copy-LoginToIsolated)은 더 앞, 이 단계 맨 앞(init-pack 바로 뒤 · cys 켜기 전)으로 옮겼다. 그 자리 주석 참조.
     if ($script:TrustJournalFailed) {
         Say ('[8/10] 홈 폴더 신뢰 기록을 남기지 못했습니다 — ' + (Get-TrustRollbackWords) + ' 여기서 멈춥니다.')
         $script:JCode = 'J-PERM-01'
@@ -2558,13 +2795,38 @@ function Step-PrepareAccount {
         $script:ShowRerun = $true
         return 8
     }
-    Copy-LoginToIsolated | Out-Null
-    if ($bad -gt 0) {
+    # 🔴v0.3.18 — 막는 기준은 자가진단의 **총 실패 수가 아니라 자비스 창(cys 좌석)을 여는 데 필요한 항목**이다(2026-09-15 윈 2·3차 재설치 실기).
+    #   cys 를 한 번이라도 돌린 기기에서는 좌석과 무관한 항목(런타임 git 폴더의 목록 대조 — git 첫 실행이 만든 파일)이 실패 1 을 냈고,
+    #   앞 판은 그 1 을 「계정 준비가 끝나지 않음」으로 올려 [9/10] 이 cys 안 대신 이 창에서 자비스를 띄웠다 — 그 자비스가 창을 차지해
+    #   [10/10] 이 영영 나오지 않고 동료도 서지 않았다(재설치 기기 전부가 이 결말 · 1차 깨끗한 기계는 실패 0 이라 드러나지 않았다).
+    #   ⇒ 아래 목록의 항목이 실패일 때만 막는다. 나머지 실패는 「주의」로 알리고 이어 간다. 데몬이 답하는지는 위에서 따로 잰다(ping).
+    #   목록 = cys v0.14.36 자가진단 항목 가운데 좌석이 서는 데 쓰이는 것: 팩 판본 · 팩 상태 · 설치 목록 · 각성 훅.
+    #   ⚠항목 줄을 하나도 못 읽으면(문안이 바뀐 경우) 목록으로 가를 수 없다 — 앞 판대로 실패 수 전체로 막는다(모르는 채 통과시키지 않는다).
+    #   ⚠요약의 실패 수보다 읽은 실패 줄이 적으면, 못 읽은 만큼은 막는 쪽으로 센다.
+    $SeatFatalItems = @('pack-version', 'pack-state', 'install-manifest', 'hook')
+    $items = [regex]::Matches($doc, '(?m)^\s*\[(OK|WARN|FAIL|SKIP)\s*\]\s+(\S+)')
+    $fatal = @(); $minor = @()
+    foreach ($it in $items) {
+        if ($it.Groups[1].Value -ne 'FAIL') { continue }
+        $name = $it.Groups[2].Value
+        if ($SeatFatalItems -contains $name) { $fatal += $name } else { $minor += $name }
+    }
+    if ($items.Count -gt 0) { $seatBad = $fatal.Count } else { $seatBad = $bad }
+    $unread = $bad - ($fatal.Count + $minor.Count)
+    if (($items.Count -gt 0) -and ($unread -gt 0)) { $seatBad += $unread }
+    Write-Log ('doctor seat judgment: items=' + $items.Count + ' fail=' + $bad + ' fatal=' + ($fatal -join ',') + ' minor=' + ($minor -join ',') + ' unread=' + [Math]::Max(0, $unread) + ' block=' + $seatBad)
+    if ($seatBad -gt 0) {
         Say "[8/10] 자가진단에서 $bad 가지가 통과하지 못했습니다."
+        if ($fatal.Count -gt 0) { Say ('     자비스 창을 여는 데 필요한 항목: ' + ($fatal -join ', ')) }
         Say '     아래 자비스가 무엇이 걸렸는지 사람 말로 알려 드립니다.'
         return 8
     }
     if ([int]$nSkip -gt 0) { Say "     ($nSkip 가지는 이 컴퓨터에서 판정할 수 없는 항목입니다 — 고장이 아닙니다.)" }
+    if ($minor.Count -gt 0) {
+        Say ('     주의: 자가진단 ' + $minor.Count + ' 가지가 통과하지 못했습니다 (' + ($minor -join ', ') + ') — 자비스 창을 여는 데 쓰는 항목이 아니라서 이어 갑니다.')
+        Say '[8/10] 자리를 잡았습니다 (자비스 창에 필요한 항목 실패 0).'
+        return 0
+    }
     Say '[8/10] 자리를 잡았습니다 (실패 0).'
     return 0
 }
@@ -2604,7 +2866,23 @@ function Step-Wake {
     } elseif (Get-Command $cli -ErrorAction SilentlyContinue) {
         # 이 파일은 우리가 쓰고 우리가 부른다. 안에서는 따옴표를 마음껏 쓸 수 있다 —
         # 벗겨질 자리(다른 프로그램의 인자)를 지나지 않기 때문이다.
-        $wakeBody = "& claude --dangerously-skip-permissions '$firstPrompt'"
+        # 🔴첫 각성은 자동이다(2026-09-15 결정 · 사람이 치던 「너는 마스터다」 한마디를 없앤다).
+        #   선언은 **자비스를 띄울 때 넘기는 첫 프롬프트의 첫 줄**에 싣는다.
+        #   ⛔창에 글을 밀어 넣는 길(cys send)은 쓰지 않는다 — 자비스가 그것을 기계 배달로 보고 동료를 부르지 않는다
+        #     (2026-09-05 4회차 실측). 첫 프롬프트는 배달 기록에 없어 선언으로 읽힌다(팩 v0.14.36 판정기 2026-09-15 실측).
+        #   ★선언은 문장에 섞지 않고 **그 자체 한 줄**로 둔다 — 둘째 줄이 종전 지침 읽기다.
+        #   ★우리말은 이 파일(BOM) 안에만 있다 — 여는 명령(다른 프로그램의 인자)에는 여전히 한 글자도 없다.
+        #   이것이 닿았는지는 여기서 단정하지 않는다 — [10/10] 이 동료 자리가 서는지로 잰다.
+        $wakePrompt = $FleetTrigger + "`n" + $firstPrompt
+        # 경로에 작은따옴표가 있으면(사용자 이름 등) 문자열이 거기서 닫혀 wake.ps1 이 안 돈다 ⇒ 두 번 써서 글자로 남긴다(2026-09-15 검토 지적 채택).
+        $wakeQuoted = $wakePrompt -replace "'", "''"
+        # claude 가 .cmd 래퍼로 풀리면 cmd.exe 가 인자 속 줄바꿈에서 명령을 끊는다 ⇒ 실행 파일(.exe)을 먼저 고르고, 없으면 종전대로 이름으로 부른다.
+        #   (제안된 「claude.ps1 로 고정」은 기각 — 공식 설치본에는 .ps1 이 없어 정상 경로가 깨진다.)
+        $wakeBody = @(
+            "`$c = @(Get-Command claude -CommandType Application -ErrorAction SilentlyContinue | Where-Object { `$_.Extension -eq '.exe' })[0]",
+            "`$exe = if (`$c) { `$c.Source } else { 'claude' }",
+            "& `$exe --dangerously-skip-permissions '$wakeQuoted'"
+        ) -join "`r`n"
         try {
             # 5.1 이 우리말을 안 깨뜨리려면 이 파일에는 BOM 이 있어야 한다(.ps1 은 우리 자신과 같은 규칙).
             $enc = New-Object System.Text.UTF8Encoding($true)
@@ -2674,7 +2952,13 @@ function Step-Wake {
         # 깨우기가 **성공한 뒤에만**(자비스가 떠서 정상으로 끝났다 = 종료 코드 0) 원격 해결을 막는다 — 못 떴으면 원격 해결이 돈다(검토 지적 · D1 기각)
         #   앞 명령의 종료 코드가 남아 있으면 「성공」으로 읽힌다 ⇒ 부르기 전에 비운다
         $global:LASTEXITCODE = -1
-        & claude --dangerously-skip-permissions $firstPrompt
+        # 🔴2026-09-15 개정(윈 2차 재설치 실기) — 이 창에서 띄울 때도 선언을 첫 줄로 함께 넘긴다(cys 안에서 여는 wake.ps1 과 같은 두 줄).
+        #   앞 판은 지침 읽기 한 줄만 넘겨, 이 길로 온 자비스에게는 「너는 마스터다」가 없었다.
+        #   claude 가 .cmd 래퍼로 풀리면 cmd.exe 가 인자 속 줄바꿈에서 명령을 끊는다 ⇒ wake.ps1 과 같이 실행 파일(.exe)을 먼저 고른다.
+        $fallbackPrompt = $FleetTrigger + "`n" + $firstPrompt
+        $fallbackExe = @(Get-Command claude -CommandType Application -ErrorAction SilentlyContinue | Where-Object { $_.Extension -eq '.exe' })[0]
+        $fallbackExe = if ($fallbackExe) { $fallbackExe.Source } else { 'claude' }
+        & $fallbackExe --dangerously-skip-permissions $fallbackPrompt
         if ($global:LASTEXITCODE -eq 0) { $script:ReachedWake = $true }
     } catch {
         Say "[9/10] 자비스를 띄우지 못했습니다: $($_.Exception.Message)"
@@ -2687,15 +2971,19 @@ function Step-Wake {
 }
 
 # ── 하는 일 10 — 첫 함대 부르기 ───────────────────────────────────
-# 자비스는 사람이 「너는 마스터다」라고 말해야 깨어나 동료를 부른다. 그 말을 우리가 대신 넣는다.
-# 우리가 하는 일 = ⑴어디에 무엇을 칠지 크게 알려 주고 ⑵칠 때까지 기다리고 ⑶선 자리를 확인해 준다.
+# 자비스는 「너는 마스터다」라는 말을 들어야 깨어나 동료를 부른다.
+# 🔴2026-09-15 결정 — 그 말을 사람이 치지 않는다. [9/10] 이 자비스를 띄울 때 첫 프롬프트의 첫 줄로 함께 넘긴다.
+#   (09-05 판의 「사람이 직접 친다」 부탁은 폐지됐다 · 사용자가 편해야 한다가 최고 원칙이다.)
+# 우리가 하는 일 = ⑴동료 자리가 서는지 **실제로 보고**(최대 4분) ⑵서면 「깨어났습니다」 ⑶안 서면 그때만 사람에게 부탁한다.
+#   ★「보냈다」로 성공을 말하지 않는다 — 자식 좌석(cso·worker)이 선 것이 곧 선언이 들어갔다는 증거다.
+#     안 섰는데 「깨어났습니다」라고 하면 사용자는 창을 닫고 자비스는 영영 혼자 남는다.
 $FleetTrigger = '너는 마스터다'
-# ⛔이 문장을 우리가 대신 넣지 않는다. 자비스에는 「사람이 직접 친 선언만 팀을 부른다」는 장치가
-#   있고(기계가 넣은 것은 알아보고 거절한다 — 2026-09-05 실측), 그 장치는 옳다.
-#   기계가 대신 치는 길을 뚫으면 남이 몰래 팀을 부리는 길도 함께 열린다.
-#   그래서 우리는 **부탁만 하고 기다린다.** 사람 손 한 번이 늘지만 그 한 번이 이 장치의 값이다.
 $FleetRoles   = @('master', 'cso', 'worker')   # 이 기계에서 세울 수 있는 역할(리뷰어 둘은 고르기 나름)
-$FleetWaitTries = 72   # 5초 × 72 = 6분. 사람이 창을 찾아 한 문장 치기에 넉넉한 시간.
+$FleetPollSec   = 5    # 자리 목록을 몇 초마다 보는가(시험이 줄여 쓴다)
+$FleetAwakeTries = 48  # 5초 × 48 = 240초(4분). 사람 손 없이 동료가 서기를 기다리는 상한.
+#   🔴90초였다가 올렸다(2026-09-15 윈 실기) — 자비스의 첫 턴(지침 읽기 + 점검)이 1분 13초 넘게 걸려, 90초가 먼저 끝나
+#     폴백 카드가 뜬 뒤에 사람이 아무것도 안 쳤는데 함대가 섰다(카드는 순수 오발 · 손 계수가 거짓으로 늘었다).
+$FleetWaitTries = 72   # 5초 × 72 = 6분. (자동이 안 닿았을 때) 사람이 창을 찾아 한 문장 치기에 넉넉한 시간.
 # 🔴🔴**이전 설치의 좌석을 이번 선언으로 세지 않는다**(2차 검토 N2 확정 2026-09-10).
 #   앞 판은 전역 목록에서 **역할 이름만** 셌다. 그러면 지난 설치의 master·cso·worker 가 아직 살아
 #   있는 기계에서는 사람이 **아무 선언도 하지 않았는데** 첫 폴링에 세 역할이 다 차서
@@ -2741,12 +3029,15 @@ function Get-LiveRoles {
     foreach ($ln in ($out -split "`n")) {
         if (-not $ln) { continue }
         $mid = [regex]::Match($ln, 'surface:\d+')
+        # 자리 번호가 없는 줄(경고·오류 글 — 목록 조회는 오류 출력도 섞어 받는다)은 자리가 아니다 ⇒ 역할 글자를 찾지 않는다(2026-09-15 검토 지적 채택).
+        if (-not $mid.Success) { continue }
         # 기준선에 있던 자리는 **이번 설치의 것이 아니다** — 세지 않는다.
-        if ($mid.Success -and ($script:BaselineSurfaces -contains $mid.Value)) { continue }
+        if ($script:BaselineSurfaces -contains $mid.Value) { continue }
         foreach ($r in $FleetRoles) {
             if ($live -contains $r) { continue }
             # 목록의 role 칸은 role=master · role=worker-2 처럼 나온다. 앞부분이 맞으면 그 역할로 센다.
-            if ($ln -match ("role=" + [regex]::Escape($r) + "(\s|-|$)")) { $live += $r }
+            # 칸 경계(줄 머리·탭·공백) 뒤의 role= 만 센다 — 낱말 속에 붙은 「role=」 글자는 세지 않는다.
+            if ($ln -match ("(^|\s)role=" + [regex]::Escape($r) + "(\s|-|$)")) { $live += $r }
         }
     }
     return $live
@@ -2764,6 +3055,18 @@ function Get-LiveRoles {
 function Test-DeclarationSeen($live) {
     foreach ($r in @($live)) { if ($r -ne 'master') { return $true } }
     return $false
+}
+# 기다리는 동안 설치 창에 친 글자는 콘솔 입력 버퍼에 쌓였다가, 설치가 끝나면 PowerShell 이 명령으로 읽는다
+#   (예: 카드를 보고 이 창에 「너는 마스터다」+Enter) ⇒ [10/10] 을 떠나기 전에 비우고 개수만 적는다(2026-09-15 검토 지적 채택 · [3/10] 성공 때와 같은 함수).
+# 끝났다고 적는다 — 적지 않으면 끝맺음(Write-ClosingNote)이 「예상 못 한 끝」으로 읽고 「다시 실행」 안내를 인쇄한다
+#   (2026-09-15 윈 실기: 「함대가 섰습니다」 바로 뒤에 「다음에 할 일: 다시 실행」이 나왔다). 성공 두 자리(자동 · 카드 뒤)에서 부른다.
+function Set-FleetFinished {
+    $script:NextStep = '없습니다 — 설치가 끝났습니다. 이 창을 닫으셔도 됩니다.'
+    $script:ShowRerun = $false
+}
+function Clear-FleetStrayKeys {
+    $n = Get-LoginStrayKeyCount
+    Write-Log ('fleet stray keys in installer window cleared=' + $n)
 }
 function Step-Fleet {
     param([string]$SurfaceRef)
@@ -2784,7 +3087,37 @@ function Step-Fleet {
         Say '     그 뒤 자비스에게 「동료들 다 섰어?」라고 물어보시면 자비스가 직접 확인해 알려 드립니다.'
         return 10
     }
-    Human '자비스' '이 한마디만 사람이 칩니다 — cys 창에서 직접 쳐 주십시오(안전장치)'
+    # ── 자동 각성 확인(사람 손 0) — 선언은 [9/10] 이 첫 프롬프트로 이미 넘겼다 ──
+    Say '[10/10] 자비스가 깨어나 동료들을 부르는지 지켜봅니다 (최대 4분 · 사람이 하실 일은 없습니다).'
+    Write-Log "fleet: auto awaken - watching child seats in $SurfaceRef (cap $($FleetAwakeTries * $FleetPollSec)s)"
+    $live = @()
+    for ($i = 0; $i -lt $FleetAwakeTries; $i++) {
+        Start-Sleep -Seconds $FleetPollSec
+        $live = @(Get-LiveRoles $cli)
+        if ($live.Count -ge $FleetRoles.Count) { break }
+    }
+    # ★성공의 근거 = 자식 좌석. 우리가 연 master 자리는 근거가 못 된다(아래 Test-DeclarationSeen 머리 주석).
+    if (Test-DeclarationSeen $live) {
+        Write-Log ('fleet awaken: auto - seats=' + ($live -join ','))
+        Send-Progress '10/10' 'end' $null 'awaken:auto' $null   # 자동 각성 성공(master 병합 연결 2026-09-15)
+        $missing = @($FleetRoles | Where-Object { $live -notcontains $_ })
+        if ($missing.Count -eq 0) {
+            Say ("[10/10] 함대가 섰습니다: " + ($live -join ' · '))
+        } else {
+            Say ("[10/10] 선 자리 = " + ($live -join ' · ') + ' · 남은 자리(' + ($missing -join ' · ') + ')는 자비스가 이어서 세웁니다.')
+            Write-Log ("fleet missing at awaken: " + ($missing -join ','))
+        }
+        Say ''
+        Say '   자비스가 깨어났습니다 — 이제 설치 창을 닫으셔도 됩니다.'
+        Set-FleetFinished
+        Clear-FleetStrayKeys
+        return 0
+    }
+    # 상한 안에 동료 자리가 하나도 안 섰다 = 자동 각성이 닿지 않았다(기술적 실패) ⇒ **그때만** 사람에게 부탁한다.
+    #   ⚠원인을 단정하지 않는다 — 우리가 아는 것은 「상한 안에 안 섰다」뿐이다(카드 뒤에 저절로 서는 일도 실기에서 있었다).
+    Write-Log "fleet awaken: no child seat within $($FleetAwakeTries * $FleetPollSec)s -> manual fallback card"
+    Send-Progress '10/10' 'info' $null 'awaken:manual-fallback' $null   # 자동 각성 미도달 → 사람 카드(master 병합 연결 2026-09-15)
+    Human '자비스' '자비스가 저절로 깨어나지 않아 한마디만 부탁드립니다 — cys 창에서 쳐 주십시오'
     Say ''
     Say '   ┌─────────────────────────────────────────────┐'
     Say ("   │   cys 창(제목 jarvis)에 이렇게 쳐 주십시오:  │")
@@ -2794,13 +3127,12 @@ function Step-Fleet {
     Say '   └─────────────────────────────────────────────┘'
     Say ''
     Say '   그 한마디를 들으면 자비스가 동료들을 부릅니다. 여기서 기다리다가 다 서면 알려 드립니다.'
-    Say '   (직접 치셔야 합니다 — 프로그램이 대신 친 말은 자비스가 알아보고 거절합니다. 안전장치입니다.)'
     Write-Log "fleet: waiting for owner declaration in $SurfaceRef"
     $live = @()
     $waited = 0
     for ($i = 0; $i -lt $FleetWaitTries; $i++) {
-        Start-Sleep -Seconds 5
-        $waited += 5
+        Start-Sleep -Seconds $FleetPollSec
+        $waited += $FleetPollSec
         $live = @(Get-LiveRoles $cli)
         if ($live.Count -ge $FleetRoles.Count) { break }
         # 오래 걸리면 얼마나 더 기다리는지 알려 준다 — 말없이 멈춰 있는 것처럼 보이지 않게.
@@ -2811,7 +3143,7 @@ function Step-Fleet {
         #     (선언이 role 등록을 낳는다). 그 뒤로는 사람에게 시킬 일이 없다.
         #   ⚠새 프로브를 만들지 않는다 — 이미 5초마다 부르는 `cys list` 의 답을 그대로 읽는다.
         if (($i -gt 0) -and (($i % 12) -eq 0)) {
-            $mins = "$([int]($waited / 60))분 지남 · 최대 $([int](($FleetWaitTries * 5) / 60))분"
+            $mins = "$([int]($waited / 60))분 지남 · 최대 $([int](($FleetWaitTries * $FleetPollSec) / 60))분"
             if (Test-DeclarationSeen $live) {
                 Say ("   자비스가 동료들을 부르는 중입니다. 그대로 기다려 주십시오 ($mins).")
                 Say ("     선 자리 = " + ($live -join ' · ') + '  (사람이 하실 일은 없습니다)')
@@ -2823,6 +3155,10 @@ function Step-Fleet {
     $missing = @($FleetRoles | Where-Object { $live -notcontains $_ })
     if ($missing.Count -eq 0) {
         Say ("[10/10] 함대가 섰습니다: " + ($live -join ' · '))
+        # 카드 뒤에 선 함대도 성공이다 — 기록 줄이 없으면 로그만 보는 사람은 폴백에서 끝난 줄로 읽는다(2026-09-15 실기 로그).
+        Write-Log ('fleet awaken: success after fallback card - seats=' + ($live -join ','))
+        Set-FleetFinished
+        Clear-FleetStrayKeys
         return 0
     }
     # 성공보다 이 문구가 중요하다 — 무엇이 없어서 못 섰는지를 그대로 말한다.
@@ -2837,6 +3173,7 @@ function Step-Fleet {
         Say '     치셨는데도 서지 않았다면 cys 창의 자비스에게 물어보십시오 — 무엇이 걸렸는지 사람 말로 알려 줍니다.'
     }
     Write-Log ("fleet missing: " + ($missing -join ','))
+    Clear-FleetStrayKeys
     return 10
 }
 
@@ -2850,7 +3187,7 @@ function Step-Fleet {
 #   글자 칸은 `\z` 로 끝을 못박아 다시 만든다. 이름·글자·판본 비교는 대소문자를 가르는 -ceq·-cmatch·-ccontains 만 쓴다.
 # ⚠PowerShell 은 `'true' -eq $true` 를 참으로 본다 ⇒ 칸마다 **형(type)을 먼저** 본다.
 # ⚠이 절은 맥에서 PowerShell 없이 **정적 검사 + 맥판과의 대조**로만 증명했다 — 윈도우 실기가 필요한 축은 내부 문서.
-$InstallerVersion       = '0.3.16'   # 보고의 installer_version · $BootstrapVersion 은 화면 머리글 용도 그대로(보내지 않는다)
+$InstallerVersion       = '0.3.17'   # 보고의 installer_version · $BootstrapVersion 은 화면 머리글 용도 그대로(보내지 않는다)
 $HelpApiUrl             = 'https://jarvis-install.godmeyou.kr'
 $RemoteHelpNoticeUrl    = 'jarvis-install.godmeyou.kr/help/notice'
 # [1/10] 고지 1줄 = /help/notice 정본이 인용하는 문장 그대로 + 끝에 자세한 안내 자리. ⛔문안 변경 금지(맥판과 글자가 같아야 한다).
@@ -3118,6 +3455,8 @@ function Invoke-RemoteHelpHttp($Method, $Path, $Body) {
     try { [Net.ServicePointManager]::SecurityProtocol = [Net.ServicePointManager]::SecurityProtocol -bor [Net.SecurityProtocolType]::Tls12 } catch { }
     $headers = @{}
     if ($script:RhClientToken -and ($Path -like '*/ack' -or $Path -like '*/close')) { $headers['x-help-client'] = $script:RhClientToken }
+    # 첨부도 같은 출처 헤더가 필요하다 — 보고를 연 설치기만 그 보고에 자료를 더할 수 있다(계약 1절).
+    if ($script:RhClientToken -and ($Path -like '*/attach')) { $headers['x-help-client'] = $script:RhClientToken }
     $request = @{ Uri = ($HelpApiUrl + $Path); Method = $Method; UseBasicParsing = $true; TimeoutSec = 20; Headers = $headers; ErrorAction = 'Stop' }
     if ($null -ne $Body) {
         $request['Body'] = [System.Text.Encoding]::UTF8.GetBytes([string]$Body)
@@ -3736,6 +4075,7 @@ function Invoke-RemoteHelp {
             $script:RhOpen = $true
             # 다음 실행이 「이전 보고」를 말할 수 있게 보고 번호를 남긴다(열린 원격 해결을 닫는 표시 뒤 — 여기서 넘어져도 닫힌다)
             Save-HelpLastReport
+            Send-FailAttachments   # 보고가 열린 직후 진단 자료를 붙인다(계약 3절 · 각각 fail-open)
             # 엔진이 정상으로 끝날 때도 닫기를 한 번 보낸다(계약 7-7) — 아래 finally 가 먼저 닫으면 등록을 풀어 두 번 보내지 않는다.
             #   이 동작은 따로 도는 자리라 이 파일의 함수를 못 본다 ⇒ 주소·토큰을 넘겨 직접 부른다.
             try {
@@ -3765,6 +4105,220 @@ function Invoke-RemoteHelp {
             Remove-Job -Job $exitHook -Force -ErrorAction SilentlyContinue
         }
     }
+}
+
+# ══ 진행 자동 전송·진단 자료 자동 수집 (계약 v1 2026-09-15 · 이미 있는 흐름에 더하기만 한다) ══════════
+#   원칙(계약 1절) = fail-open: 전송 실패·서버 장애·시간 초과(각 요청 3초)는 설치 진행을 절대 막지 않는다(경고 한 줄만).
+#   두 갈래를 한 서버(web-install)와 나눠 쓴다:
+#     · 진행 전송  POST /api/progress   — 토큰 없음(보고 전 [1/10]부터 나가므로) · 본문 8KB · 단계 시작/끝/대기/실패/살핌
+#     · 자료 첨부  POST /api/help/<id>/attach — 보고가 열린 뒤에만(x-help-client 헤더) · 항목 900KB · 보고당 10건까지
+$ProgressUrl        = $HelpApiUrl + '/api/progress'
+$ProgressTimeoutSec = 3                                   # 요청 하나의 상한(계약 1절)
+$InstallIdFile      = Join-Path $JarvisHome 'install-id'  # 첫 실행에 만든 무작위 번호 · 기기·재시도 사슬을 잇는다(계약 1절)
+$TranscriptFile     = Join-Path $JarvisHome 'transcript.txt'
+$AttachMaxBytes     = 900 * 1024                          # 항목 하나의 상한(계약 2절)
+# 첫 화면 고지 = 서버 정본 문안(web-install 의 NOTICE_TEXT)과 글자까지 같다(계약 2절 「정본 1곳」 · 서버 응답의 notice 필드와도 같은 문장).
+$ProgressNotice = '설치 도우미는 진행 상황(단계·경과·판본·백신 이름·브라우저)을 자동으로 보내고, 막히면 설치 창 글자·기록 파일·화면 캡처를 함께 보내 운영 자비스가 원격으로 해결합니다. 로그인 이름·이메일·토큰은 글에서 지우며, 화면 캡처는 운영팀만 30일 동안 봅니다. 창을 닫으면 멈춥니다.'
+$script:InstallId      = ''
+$script:ProgressWarned = $false     # 전송 실패 경고는 실행당 한 번만 기록한다(fail-open)
+$script:TranscriptOn   = $false
+$script:LoginCapCount  = 0          # 로그인 대기 중 창 캡처 수(최대 4 · 계약 3절)
+$script:LoginCapFiles  = @()        # 찍어 둔 로그인 창 캡처 파일 — 보고가 열리면 첨부한다
+
+function Get-InstallId {
+    # 첫 실행에 무작위 번호를 만들어 두고 이후 재사용한다(영숫자·_·- 8~36자 · 서버 허용 범위).
+    if ($script:InstallId) { return $script:InstallId }
+    $id = ''
+    try {
+        if (Test-Path -LiteralPath $InstallIdFile) {
+            $first = @(Get-Content -LiteralPath $InstallIdFile -TotalCount 1 -ErrorAction Stop)
+            if ($first.Count -gt 0 -and $null -ne $first[0]) { $id = ([string]$first[0]).Trim() }
+        }
+    } catch { $id = '' }
+    if ($id -notmatch '\A[0-9A-Za-z_-]{8,36}\z') {
+        $bytes = New-Object byte[] 32
+        try { ([System.Security.Cryptography.RandomNumberGenerator]::Create()).GetBytes($bytes) } catch { (New-Object System.Random).NextBytes($bytes) }
+        $id = ([Convert]::ToBase64String($bytes) -replace '[^0-9A-Za-z]', '')
+        if ($id.Length -gt 24) { $id = $id.Substring(0, 24) }
+        try { Write-TextNoBom $InstallIdFile ($id + "`r`n") } catch { }
+    }
+    $script:InstallId = $id
+    return $id
+}
+
+function Send-Progress($step, $ev, $elapsed, $detail, $envInfo) {
+    # 진행 한 줄을 서버로 보낸다. fail-open — 무슨 일이 있어도 설치를 막지 않는다(계약 1절).
+    if ($Mode -ne 'full') { return }
+    if ($env:JARVIS_NO_PROGRESS -eq '1') { return }   # 흉내 시험이 실제 서버로 나가지 않게 하는 레버(사람이 쓰는 길이 아니다)
+    $url = if ($env:JARVIS_PROGRESS_URL) { $env:JARVIS_PROGRESS_URL } else { $ProgressUrl }
+    try {
+        $fields = [ordered]@{
+            install_id        = (Get-InstallId)
+            installer_version = $InstallerVersion
+            os                = 'win'
+            step              = $step
+            event             = $ev
+            at                = (Get-Date -Format o)
+        }
+        if ($null -ne $elapsed) { $fields['elapsed_s'] = [int]$elapsed }
+        if ($detail)            { $fields['detail']    = [string]$detail }
+        if ($null -ne $envInfo) { $fields['env']       = $envInfo }
+        $body = ($fields | ConvertTo-Json -Compress -Depth 4)
+        $ProgressPreference = 'SilentlyContinue'
+        try { [Net.ServicePointManager]::SecurityProtocol = [Net.ServicePointManager]::SecurityProtocol -bor [Net.SecurityProtocolType]::Tls12 } catch { }
+        [void](Invoke-WebRequest -Uri $url -Method POST `
+            -Body ([System.Text.Encoding]::UTF8.GetBytes($body)) `
+            -ContentType 'application/json; charset=utf-8' -UseBasicParsing `
+            -TimeoutSec $ProgressTimeoutSec -ErrorAction Stop)
+    } catch {
+        if (-not $script:ProgressWarned) {
+            $script:ProgressWarned = $true
+            Write-Log ('progress send failed (fail-open) - ' + $_.Exception.Message)
+        }
+    }
+}
+
+function Get-CurrentStep {
+    # 지금까지 화면에 찍힌 마지막 [n/10] — 실패 전송이 「어느 단계에서 막혔나」를 싣게 한다.
+    for ($i = $script:StepLog.Count - 1; $i -ge 0; $i--) {
+        if ([string]$script:StepLog[$i] -match '\[([0-9]{1,2}/[0-9]{1,2})\]') { return $Matches[1] }
+    }
+    return '0/10'
+}
+
+function Get-InstallEnv {
+    # 살핌(info) 이벤트에 싣는 환경 값 — 계약 2절 의 env 칸. 못 읽는 값은 넣지 않는다(fail-open).
+    $e = @{}
+    try { $cv = (& claude --version 2>$null | Select-Object -First 1); if ($cv) { $e['claude_ver'] = [string]$cv } } catch { }
+    try { if ($script:CysCli) { $vv = (& $script:CysCli --version 2>$null | Select-Object -First 1); if ($vv) { $e['cys_ver'] = [string]$vv } } } catch { }
+    try { $e['win_build'] = [string]([System.Environment]::OSVersion.Version.Build) } catch { }
+    try { $e['ps_ver'] = [string]$PSVersionTable.PSVersion } catch { }
+    try { $e['admin'] = [bool]$script:IsAdmin } catch { }
+    try {
+        $av = @(Get-CimInstance -Namespace 'root/SecurityCenter2' -ClassName AntiVirusProduct -ErrorAction Stop | ForEach-Object { $_.displayName } | Where-Object { $_ })
+        if ($av.Count -gt 0) { $e['av'] = ($av -join ', ') } else { $e['av'] = '미상' }
+    } catch { $e['av'] = '미상' }
+    try {
+        $prog = (Get-ItemProperty -Path 'HKCU:\Software\Microsoft\Windows\Shell\Associations\UrlAssociations\https\UserChoice' -ErrorAction Stop).ProgId
+        if ($prog) { $e['browser'] = [string]$prog }
+    } catch { }
+    return $e
+}
+
+# ── 화면·창 그림 (윈도우 전용 · 못 찍으면 $null 이라 첨부만 빠지고 설치는 이어간다) ──
+function Resize-Bitmap($bmp, $maxW) {
+    if ($bmp.Width -le $maxW) { return $bmp.Clone() }
+    $w = $maxW; $h = [int]($bmp.Height * ($maxW / $bmp.Width))
+    $out = New-Object System.Drawing.Bitmap($w, $h)
+    $g = [System.Drawing.Graphics]::FromImage($out)
+    try {
+        $g.InterpolationMode = [System.Drawing.Drawing2D.InterpolationMode]::HighQualityBicubic
+        $g.DrawImage($bmp, 0, 0, $w, $h)
+    } finally { $g.Dispose() }
+    return $out
+}
+function ConvertTo-Jpeg($image, $quality) {
+    $codec = [System.Drawing.Imaging.ImageCodecInfo]::GetImageEncoders() | Where-Object { $_.MimeType -eq 'image/jpeg' } | Select-Object -First 1
+    $prm = New-Object System.Drawing.Imaging.EncoderParameters(1)
+    $prm.Param[0] = New-Object System.Drawing.Imaging.EncoderParameter([System.Drawing.Imaging.Encoder]::Quality, [long]$quality)
+    $ms = New-Object System.IO.MemoryStream
+    try { $image.Save($ms, $codec, $prm); return $ms.ToArray() } finally { $ms.Dispose(); $prm.Dispose() }
+}
+function Get-ScreenJpeg {
+    # 화면 전체 → JPEG(가로 1280px · 품질 60). 계약 3절 ③.
+    try {
+        Add-Type -AssemblyName System.Drawing -ErrorAction Stop
+        Add-Type -AssemblyName System.Windows.Forms -ErrorAction Stop
+        $b = [System.Windows.Forms.SystemInformation]::VirtualScreen
+        $shot = New-Object System.Drawing.Bitmap($b.Width, $b.Height)
+        $g = [System.Drawing.Graphics]::FromImage($shot)
+        try { $g.CopyFromScreen($b.Location, [System.Drawing.Point]::Empty, $b.Size) } finally { $g.Dispose() }
+        $small = Resize-Bitmap $shot 1280
+        $shot.Dispose()
+        $bytes = ConvertTo-Jpeg $small 60
+        $small.Dispose()
+        return $bytes
+    } catch { return $null }
+}
+function Get-LoginWindowJpeg($proc) {
+    # 살아 있는 로그인 창 하나 → JPEG(계약 3절 ④ · PrintWindow). 없으면 $null(생략 기록).
+    if ($null -eq $proc) { return $null }
+    try {
+        $h = [IntPtr]::Zero
+        try { $h = $proc.MainWindowHandle } catch { $h = [IntPtr]::Zero }
+        if ($h -eq [IntPtr]::Zero) { return $null }
+        Add-Type -AssemblyName System.Drawing -ErrorAction Stop
+        if (-not ([System.Management.Automation.PSTypeName]'Jarvis.Win').Type) {
+            Add-Type -Namespace Jarvis -Name Win -ErrorAction Stop -MemberDefinition @'
+[System.Runtime.InteropServices.DllImport("user32.dll")] public static extern bool PrintWindow(System.IntPtr hwnd, System.IntPtr hdc, uint flags);
+[System.Runtime.InteropServices.DllImport("user32.dll")] public static extern bool GetWindowRect(System.IntPtr hwnd, out RECT r);
+public struct RECT { public int Left; public int Top; public int Right; public int Bottom; }
+'@
+        }
+        $r = New-Object Jarvis.Win+RECT
+        if (-not [Jarvis.Win]::GetWindowRect($h, [ref]$r)) { return $null }
+        $w = $r.Right - $r.Left; $ht = $r.Bottom - $r.Top
+        if ($w -le 0 -or $ht -le 0) { return $null }
+        $bmp = New-Object System.Drawing.Bitmap($w, $ht)
+        $g = [System.Drawing.Graphics]::FromImage($bmp)
+        try {
+            $hdc = $g.GetHdc()
+            try { [void][Jarvis.Win]::PrintWindow($h, $hdc, 2) } finally { $g.ReleaseHdc($hdc) }
+        } finally { $g.Dispose() }
+        $small = Resize-Bitmap $bmp 1280
+        $bmp.Dispose()
+        $bytes = ConvertTo-Jpeg $small 60
+        $small.Dispose()
+        return $bytes
+    } catch { return $null }
+}
+
+# ── 첨부 (보고가 열린 뒤에만 · 각각 실패해도 다음으로 · 계약 3절 순서) ──
+function Get-FileBytesCapped($path, $max) {
+    try {
+        if (-not (Test-Path -LiteralPath $path)) { return $null }
+        $bytes = [System.IO.File]::ReadAllBytes($path)
+        if ($bytes.Length -le $max) { return $bytes }
+        # 기록·화면 글자는 끝이 중요하다 — 끝에서 $max 바이트만 남긴다.
+        $tail = New-Object byte[] $max
+        [Array]::Copy($bytes, ($bytes.Length - $max), $tail, 0, $max)
+        return $tail
+    } catch { return $null }
+}
+function Get-ProcTreeBytes {
+    try {
+        $tree = @(Get-ProcTree $PID)
+        $lines = @('# 실행 중인 프로그램(뿌리 ' + $PID + ')')
+        foreach ($t in $tree) { $lines += (('  ' * [int]$t.Depth) + [string]$t.Id + ' ' + [string]$t.Name) }
+        return [System.Text.Encoding]::UTF8.GetBytes(($lines -join "`r`n"))
+    } catch { return $null }
+}
+function Send-Attachment($kind, $filename, $bytes) {
+    # 돌려주는 것 = $true 보냈다. 보고가 없으면(x-help-client 없음) 아무것도 안 한다.
+    if (-not $script:RhId) { return $false }
+    if ($null -eq $bytes -or $bytes.Length -eq 0) { Write-Log ('attach skip (empty): ' + $kind); return $false }
+    if ($bytes.Length -gt $AttachMaxBytes) { Write-Log ('attach skip (' + $bytes.Length + 'B > cap): ' + $kind); return $false }
+    try {
+        $fields = [ordered]@{ kind = $kind; filename = $filename; content_b64 = [Convert]::ToBase64String($bytes) }
+        $r = Invoke-RemoteHelpHttp 'POST' ('/api/help/' + $script:RhId + '/attach') ($fields | ConvertTo-Json -Compress)
+        if ($r.Code -eq 201) { Write-Log ('attach ok: ' + $kind + ' ' + $bytes.Length + 'B'); return $true }
+        Write-Log ('attach failed (' + $r.Code + '): ' + $kind); return $false
+    } catch { Write-Log ('attach error (fail-open): ' + $kind + ' - ' + $_.Exception.Message); return $false }
+}
+function Send-FailAttachments {
+    # 보고가 열린 직후 부른다 — 계약 3절 순서 · 각각 fail-open. 로그인 창 그림은 대기 중 찍어 둔 것을 쓴다.
+    if (-not $script:RhId) { return }
+    [void](Send-Attachment 'log_full' 'bootstrap.log' (Get-FileBytesCapped $LogFile $AttachMaxBytes))
+    if ($script:TranscriptOn) { try { Stop-Transcript | Out-Null } catch { }; $script:TranscriptOn = $false }
+    [void](Send-Attachment 'console_text' 'transcript.txt' (Get-FileBytesCapped $TranscriptFile $AttachMaxBytes))
+    [void](Send-Attachment 'screen_png' 'screen.jpg' (Get-ScreenJpeg))
+    if ($script:LoginCapFiles.Count -gt 0) {
+        foreach ($f in $script:LoginCapFiles) { [void](Send-Attachment 'login_window_png' (Split-Path -Leaf $f) (Get-FileBytesCapped $f $AttachMaxBytes)) }
+    } else {
+        Write-Log 'attach: login window capture 없음(로그인 창이 살아 있지 않았거나 못 찍었다)'
+    }
+    [void](Send-Attachment 'proc_tree' 'proc-tree.txt' (Get-ProcTreeBytes))
+    [void](Send-Attachment 'env_full' 'env-report.md' (Get-FileBytesCapped $ReportFile $AttachMaxBytes))
 }
 
 # 시험이 이 파일을 「함수 묶음」으로만 읽는 문(맥판 JARVIS_LIB_ONLY 과 같은 자리·같은 까닭).
@@ -3854,14 +4408,23 @@ try {
         }
     }
 
+    if ($Mode -eq 'full') {
+        [void](Get-InstallId)   # 이 실행의 설치 번호를 자리에 만들어 둔다(기기·재시도 사슬)
+        # 설치 창의 글자를 통째로 파일에 담는다 — 막혔을 때 그 파일을 진단 자료로 붙인다(계약 3절 ②).
+        try { Start-Transcript -LiteralPath $TranscriptFile -Force -ErrorAction Stop | Out-Null; $script:TranscriptOn = $true } catch { }
+    }
     Say "=== 자비스 설치 도우미 $BootstrapVersion (모드: $Mode) ==="
     Show-PrevRunNote
     Say '[1/10] 이 컴퓨터를 살펴봅니다.'
     Say ('     ' + $RemoteHelpNotice)
     $script:NoticeShown = $true
+    Say ('     ' + $ProgressNotice)   # 첫 화면 고지 = 서버 정본 문안(계약 2절 · 정본 1곳)
+    Send-Progress '1/10' 'start' $null $null $null
     Invoke-DetectStage1
     Invoke-DetectStage2
     Write-Report
+    Send-Progress '1/10' 'end' $null $null $null
+    Send-Progress '1/10' 'info' $null $null (Get-InstallEnv)   # 환경 전체(계약 3절 · [1/10] 뒤 info)
 
     if ($Mode -eq 'detect') {
         Say '감지만 하고 끝냅니다.'
@@ -3870,27 +4433,34 @@ try {
         exit 0
     }
 
-    $rc = Step-InstallClaude; if ($rc -ne 0) { exit $rc }
-    $rc = Step-Login;         if ($rc -ne 0) { exit $rc }
+    Send-Progress '2/10' 'start' $null $null $null
+    $rc = Step-InstallClaude; Send-Progress '2/10' 'end' $null ('rc=' + $rc) $null; if ($rc -ne 0) { exit $rc }
+    Send-Progress '3/10' 'start' $null $null $null
+    Step-Login; $rc = $script:LoginRc; if ($rc -ne 0) { exit $rc }   # 반환값을 받지 않는다(Step-Login 머리 주석 · v0.3.17)
+    Send-Progress '3/10' 'end' $null ('rc=' + $script:LoginRc) $null
 
     $Rows.Clear()
     Invoke-DetectStage1
     Invoke-DetectStage2
     Write-Report        # 기동 직전 값으로 보고를 갱신한다
 
-    $rc = Step-Prepare; if ($rc -ne 0) { exit $rc }
+    Send-Progress '4/10' 'start' $null $null $null
+    $rc = Step-Prepare; Send-Progress '4/10' 'end' $null ('rc=' + $rc) $null; if ($rc -ne 0) { exit $rc }
 
     # 여기서부터는 한 단이 막혀도 멈추지 않는다.
     # 앞 단계(클로드 설치·로그인·자비스 준비)는 이미 성립했고, 막힌 자리를 사람에게 설명해 주는 것이
     # 그 다음으로 할 수 있는 가장 쓸모 있는 일이기 때문이다. 막힌 단을 적어 두고 자비스를 깨운다.
     foreach ($st in @(
-        @{ Name = 'cys 설치 파일 받기'; Fn = { Step-DownloadCys } },
-        @{ Name = 'cys 설치';           Fn = { Step-InstallCys } },
-        @{ Name = 'cys 확인';           Fn = { Step-VerifyCys } },
-        @{ Name = '계정 준비';          Fn = { Step-PrepareAccount } })) {
+        @{ Name = 'cys 설치 파일 받기'; Step = '5/10'; Fn = { Step-DownloadCys } },
+        @{ Name = 'cys 설치';           Step = '6/10'; Fn = { Step-InstallCys } },
+        @{ Name = 'cys 확인';           Step = '7/10'; Fn = { Step-VerifyCys } },
+        @{ Name = '계정 준비';          Step = '8/10'; Fn = { Step-PrepareAccount } })) {
+        Send-Progress $st.Step 'start' $null $null $null
+        $stepSw = [System.Diagnostics.Stopwatch]::StartNew()
         # 함수가 화면 말고 출력 스트림에 무언가를 흘리면 반환값이 배열이 된다(이 파일 위쪽의 같은 함정).
         # 그러면 성공한 단계도 막힌 것으로 읽힌다 ⇒ 마지막 값 하나만 종료 코드로 본다.
         $rc = @(& $st.Fn)[-1]
+        Send-Progress $st.Step 'end' ([int]$stepSw.Elapsed.TotalSeconds) ('rc=' + $rc) $null
         if ($rc -ne 0) { $script:BlockedStep = $st.Name; break }
     }
 

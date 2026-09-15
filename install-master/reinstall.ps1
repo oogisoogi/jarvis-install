@@ -2,7 +2,7 @@
 #
 # 무엇을 하는가
 #   1) 이 컴퓨터의 상태를 살펴 목록으로 보여 준다
-#   2) 확인을 받고 지운다 (설치 도우미가 놓은 것만)
+#   2) 묻지 않고 지운다 (설치 도우미가 놓은 것만 · cys 프로그램은 지우지 않고 그대로 쓴다)
 #   3) 최신 설치 도우미를 새로 받아 처음부터 다시 돌린다
 #
 # 쓰는 법 — 창에 이 한 줄을 붙여넣으십시오 (명령 프롬프트 창에서도 같습니다)
@@ -37,7 +37,7 @@ powershell -NoProfile -ExecutionPolicy Bypass -Command "irm https://jarvis.godme
 function Show-RerunHow {
     Write-Host ''
     Write-Host '  == 다시 하시는 법 (이대로 따라 하시면 됩니다) =='
-    Write-Host '   1) 시작 단추를 누르고 powershell 이라고 치신 뒤 [Windows PowerShell] 을 여십시오.'
+    Write-Host '   1) ⊞ 윈도우 키(키보드 왼쪽 아래, Ctrl과 Alt 사이)를 누르고 powershell 이라고 치신 뒤 [Windows PowerShell] 을 여십시오.'
     Write-Host '   2) 아래 명령을 처음부터 끝까지 마우스로 끌어 선택한 뒤 Ctrl+C 를 누르십시오.'
     Write-Host '   3) 그 창을 한 번 누르고 마우스 오른쪽 단추를 눌러 붙여넣은 뒤 Enter 를 누르십시오.'
     Write-Host ''
@@ -79,15 +79,19 @@ if (-not (Invoke-DownloadWithRetry ($Base + '/reset-clean.ps1') $ResetFile '지�
 }
 
 if ($List) {
-    powershell -ExecutionPolicy Bypass -File $ResetFile -List
+    powershell -ExecutionPolicy Bypass -File $ResetFile -List -KeepApp
     Write-Host ''
     Write-Host '(보기만 했습니다. 아무것도 지우지 않았고, 설치도 하지 않았습니다.)'
     exit 0
 }
 
 # ── 2단 · 지운다 ──────────────────────────────────────────────────
-# 목록을 보여 주고 한 번 묻는 일은 지우는 도구가 한다. 여기서 두 번 묻지 않는다.
-powershell -ExecutionPolicy Bypass -File $ResetFile
+# ★사람 손 0 — 재설치는 지우자마자 다시 까는 길이다. 그래서 두 가지를 넘긴다.
+#   -KeepApp : cys 프로그램은 지우지 않는다(설치 도우미가 [6/10] 에서 이미 깔린 프로그램을 그대로 쓴다).
+#              지우는 길에서 제거 프로그램 · 설정 앱 · Enter 를 사람에게 요구하던 자리가 통째로 없어진다.
+#   -Yes     : 「지웁니다」 입력 · Enter 확인 · 다시 해 보기 질문을 묻지 않는다. 이 한 줄을 붙여넣은 것이 곧 그 뜻이다.
+#   막히면 지우는 도구가 [남음] 과 종료 코드로 말하고, 아래에서 재설치로 넘어가지 않는다(종전과 같다).
+powershell -ExecutionPolicy Bypass -File $ResetFile -KeepApp -Yes
 $resetRc = $LASTEXITCODE
 
 if ($resetRc -eq 1) {

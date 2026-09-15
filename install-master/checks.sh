@@ -3,6 +3,7 @@
 # ⛔이 파일은 「좋은 코드인가」를 재지 않는다. **되돌리면 적색이 되는 성질**만 재라.
 #   (각 축은 뮤테이션 시험으로 적색을 확인했다 — 수정표 참조)
 # 쓰는 법: bash install-master/checks.sh [대상디렉터리]   · rc 0 = 전건 통과
+export JARVIS_NO_PROGRESS=1   # 🔴흉내·검사는 라이브 서버로 진행 이벤트를 보내지 않는다(2026-09-15 15:49 master 게이트 실행이 라이브 progress에 가짜 4건을 남긴 사고 · Send-Progress의 레버)
 set -u
 DIR="${1:-$(cd "$(dirname "$0")" && pwd)}"
 SH="$DIR/bootstrap.sh"
@@ -437,7 +438,7 @@ codegrep "$PS" 'ref -match .surface:'; ck "[9] 세션이 실제로 열렸는지 
 # 판정 앞에 항상 참인 갈래를 끼우면 확인이 무력해진다 — 그런 갈래는 이 스크립트에 있을 이유가 없다.
 no_code "$PS" 'if \(\$(true|false)\)'; ck "[판정] 항상 참/거짓인 갈래가 없다" $? "판정을 우회하는 갈래가 들어왔다"
 no_code "$SH" 'if (true|false); then'; ck "[판정] sh 도 같음" $? "같음"
-codegrep "$PS" 'dangerously-skip-permissions \$firstPrompt'; ck "[9] 열리지 않으면 이 창에서 띄운다" $? "폴백이 없어 길이 끊긴다"
+codegrep "$PS" 'dangerously-skip-permissions \$fallbackPrompt'; ck "[9] 열리지 않으면 이 창에서 띄운다" $? "폴백이 없어 길이 끊긴다"
 awk '/function Step-DownloadCys/{a=NR} /function Step-Wake/{b=NR} END{exit !(a&&b&&a<b)}' "$PS"; ck "[5~9] 단계 순서가 코드에 있다" $? "-"
 
 echo "== 백신 차단 대응 (2026-09-05 실측 · 우회하지 않고 알아보게 한다) =="
@@ -723,14 +724,29 @@ codegrep "$SH" 'seed_all_profiles'; ck "[8] sh 도 두 번 심는다" $? "같음
 # 글자 모양 질문의 열쇠는 .claude.json 이 아니라 settings.json 에 있다(맥 실물 대조)
 codegrep "$PS" "NotePropertyName theme"; ck "[4] 글자 모양 질문을 미리 넘긴다" $? "동료가 「Choose the text style」에서 선다"
 codegrep "$SH" 'plutil -replace theme'; ck "[4] sh 도 같음" $? "같음"
-# [10] — 트리거는 인자가 아니라 사람이 치는 길로 넣는다
-# 🔴이 두 축은 방향이 뒤집혔다(2026-09-05 09:4x · 운영자 결정 B).
-#   기계가 선언을 대신 치면 자비스의 안전장치가 알아보고 거절한다 — 그 장치는 옳고, 우리가 뚫지 않는다.
-#   그러므로 재는 것은 「보내는가」가 아니라 **「보내지 않는가」**다.
-no_code "$PS" 'send .*(--queued|\$FleetTrigger)'; ck "[10] 선언을 기계가 대신 치지 않는다" $? "안전장치를 우회하는 길이 들어왔다"
+# [10] — 선언을 어느 길로 넣는가
+# 🔴2026-09-05 09:4x 결정 B = 사람이 친다(창에 밀어 넣은 선언은 자비스가 기계 배달로 보고 거절했다 — 4회차 실측).
+# 🔴2026-09-15 결정 = 윈 첫 각성 자동. 선언은 [9/10] 이 넘기는 첫 프롬프트의 첫 줄이다.
+#   ★「창에 밀어 넣지 않는다」 축은 그대로 참이어야 한다 — 그 길은 여전히 거절되는 길이라, 보냈다고 믿는 순간 거짓 성공이 된다.
+#   맥(sh)은 이번 변경 범위 밖이라 종전(사람이 친다) 그대로다.
+no_code "$PS" 'send .*(--queued|\$FleetTrigger)'; ck "[10] 선언을 창에 밀어 넣지 않는다(그 길은 기계 배달로 거절된다)" $? "거절되는 길이 들어왔다 — 동료가 안 서는데 보냈다고 믿게 된다"
 no_code "$SH" 'send .*(--queued|\$FLEET_TRIGGER)'; ck "[10] sh 도 같음" $? "같음"
-codegrep "$PS" '직접 치셔야 합니다'; ck "[10] 사람이 쳐야 한다고 말한다" $? "왜 기다리는지 모른 채 멈춰 있는 화면이 된다"
-codegrep "$SH" '직접 치셔야 합니다'; ck "[10] sh 도 같음" $? "같음"
+codegrep "$PS" 'wakePrompt = \$FleetTrigger \+'; ck "[10] 윈은 선언을 첫 프롬프트의 첫 줄로 넘긴다(사람 손 0 · 2026-09-15)" $? "사람이 치던 한마디가 되살아났다"
+codegrep "$PS" 'if \(Test-DeclarationSeen \$live\) \{' && codegrep "$PS" '자비스가 깨어났습니다 — 이제 설치 창을 닫으셔도 됩니다'
+ck "[10] 윈은 동료 자리가 선 것을 보고서야 「깨어났습니다」라고 말한다" $? "보냈다는 것만으로 성공을 말한다"
+no_code "$PS" '안전장치입니다|\(안전장치\)'; rc=$?; w="$GREP_WHY"
+ck "[10] 윈 화면에 안전장치 설명이 없다(2026-09-15 결정)" "$rc" "(${w})"
+codegrep "$PS" '\$FleetAwakeTries = [0-9]'; ck "[10] 윈 자동 각성 확인에 상한이 있다" $? "동료가 안 서면 끝없이 지켜본다"
+codegrep "$PS" '\$FleetAwakeTries = 48 '; ck "[10] 윈 자동 관측 상한 240초(자비스 첫 턴보다 길게 · 2026-09-15 윈 실기)" $? "상한이 첫 턴보다 짧으면 카드가 오발해 손 계수가 거짓으로 는다"
+count_or_fail "$PS" '^[[:space:]]*Set-FleetFinished$'; rc=$?; n="$COUNT_N"; w="$(why_or_count)"
+[ "$rc" -eq 0 ] && [ "$n" -ge 2 ]
+ck "[10] 윈 성공 두 자리(자동 · 카드 뒤) 모두 끝났다고 적는다(2026-09-15 윈 실기)" $? "끝맺음이 성공 뒤에 「다시 실행」을 인쇄한다($w)"
+codegrep "$PS" "wakeQuoted = \\\$wakePrompt -replace"; ck "[10] 윈 wake.ps1 은 경로의 작은따옴표를 두 번 써서 넘긴다(검토 Q1)" $? "이름에 작은따옴표가 든 계정에서 wake.ps1 이 안 돈다"
+codegrep "$PS" "Extension -eq '\.exe'"; ck "[10] 윈 wake.ps1 은 claude 실행 파일(.exe)을 먼저 고른다(검토 Q1)" $? ".cmd 래퍼로 풀리면 cmd.exe 가 두 줄 프롬프트를 끊는다"
+count_or_fail "$PS" '^[[:space:]]*Clear-FleetStrayKeys$'; rc=$?; n="$COUNT_N"; w="$(why_or_count)"
+[ "$rc" -eq 0 ] && [ "$n" -ge 3 ]
+ck "[10] 윈 [10/10] 은 기다린 뒤 떠나는 세 자리 모두에서 설치 창 입력 버퍼를 비운다(검토 Q3)" $? "창에 친 글자가 설치 뒤 PowerShell 명령으로 실행된다($w)"
+codegrep "$SH" '직접 치셔야 합니다'; ck "[10] sh 는 사람이 쳐야 한다고 말한다(맥은 범위 밖 · 종전 그대로)" $? "왜 기다리는지 모른 채 멈춰 있는 화면이 된다"
 codegrep "$PS" '\$FleetWaitTries = [0-9]'; ck "[10] 기다리는 상한이 있다" $? "영원히 기다린다"
 codegrep "$SH" 'FLEET_WAIT_TRIES'; ck "[10] sh 도 같음" $? "같음"
 codegrep "$PS" '기다리는 중입니다'; ck "[10] 기다리는 동안 살아 있다고 말한다" $? "멈춘 것처럼 보인다"
@@ -1484,6 +1500,9 @@ codegrep "$SH" 'case "\$JARVIS_HOME" in'; ck "[R4] 맥이 작업 폴더와 홈�
 # ★자가진단 결과와 씨앗은 아무 관계가 없다 — 실패 갈래보다 **앞**에서 심어야 한다
 awk '/Set-AllProfiles \| Out-Null/{if(!a)a=NR} /자가진단에서 \$bad 가지가/{b=NR} END{exit !(a&&b&&a<b)}' "$PS"
 ck "[R4] 전용 자리 씨앗이 자가진단 실패 갈래보다 먼저" $? "자가진단이 한 가지라도 못 통과하면 씨앗이 영영 안 심긴다"
+# ★씨앗·로그인 이어 두기는 cys 를 켜기 **전**이다 — cys 는 켜지자마자 지난 편성 기록으로 동료 좌석을 되살리고, 떠 있는 좌석은 뒤에 심은 것을 안 읽는다(2026-09-15 윈 2차 재설치)
+awk '/^function Step-PrepareAccount/{f=1} f&&/^function Step-Wake/{f=0} f&&/^[[:space:]]*Set-AllProfiles \| Out-Null/{if(!s)s=NR} f&&/^[[:space:]]*Copy-LoginToIsolated \| Out-Null/{if(!c)c=NR} f&&/Invoke-Logged .daemon install./{if(!d)d=NR} f&&/Start-Process -FilePath \$sideCar/{if(!p)p=NR} END{exit !(s&&c&&d&&p&&s<d&&c<d&&s<p&&c<p)}' "$PS"
+ck "[8] 씨앗·로그인 이어 두기가 cys 켜기(상시 가동 등록·프로그램 직접 열기)보다 먼저" $? "켜지는 순간 되살아난 동료 좌석이 첫 실행 질문·로그인 방법 고르기 앞에 선다"
 
 # ★씨앗도 제거도 **우리 칸 하나만** 다뤄야 한다 — 홈 폴더 칸에는 참가자가 쌓은 값이 함께 있다.
 #   ⛔`-Force` 로 객체째 밀어 넣거나 칸째 지우면 그 값이 조용히 사라진다(이 저장소의 규율 위반).
@@ -1832,7 +1851,8 @@ ck "[R5] 맥도 두 자리에서 쓴다" $? "한 자리만 고쳤다($w)"
 # ★공통 래퍼의 「강제」도 실제로 빠졌는가 — 자리마다 고치고 공통 자리를 안 고치면 화면은 그대로다.
 no_code "$PS" '강제: '; rc=$?; w="$GREP_WHY"; ck "[R5] 윈 화면에 「강제:」 0건" "$rc" "순화가 화면에 안 나타난다(${w})"
 no_code "$SH" '강제: '; rc=$?; w="$GREP_WHY"; ck "[R5] 맥 화면에 「강제:」 0건" "$rc" "같음(${w})"
-codegrep "$PS" '이 한마디만 사람이 칩니다'; ck "[R5] 윈 문구에서 「강제」의 어감을 뺐다" $? "자비스는 「할 일 없음」이라 적는데 이쪽은 「강제」라 적어 모순이다"
+# 🔴2026-09-15 자동 각성으로 사람 카드는 폴백으로만 남았다 — 그 폴백 문구가 부탁하는 말투인지를 잰다(앞 판 문구 「이 한마디만 사람이 칩니다」는 걷혔다).
+codegrep "$PS" '자비스가 저절로 깨어나지 않아 한마디만 부탁드립니다'; ck "[R5] 윈 문구에서 「강제」의 어감을 뺐다" $? "자비스는 「할 일 없음」이라 적는데 이쪽은 「강제」라 적어 모순이다"
 codegrep "$SH" '이 한마디만 사람이 칩니다'; ck "[R5] 맥도 같음" $? "같음"
 
 # ── ⓔ R6 자동 시작은 **작업을 직접 보고** 말한다 ────────────────
@@ -2068,8 +2088,10 @@ ck "[대기] 맥 상한은 **Ctrl-C 와 같은 결과**로 끝낸다" $? "새 �
 
 codegrep "$PS" '^\$LoginSayInterval  = 60';  ck "[대기] 윈 안내 간격 60초" $? "같음"
 codegrep "$PS" '^\$LoginWaitTimeout  = 1200'; ck "[대기] 윈 승인 대기 상한 20분" $? "같음"
-codegrep "$PS" '\-NoNewWindow \-PassThru'
-ck "[대기] 윈도 승인은 이 창을 그대로 쓴다" $? "새 창으로 띄우면 붙여넣을 자리가 갈린다"
+# ⚠v0.3.17 에서 뒤집었다 — 승인은 새로 뜬 창에서 한다(아래 v0317 절 · 그 창이 붙여넣을 유일한 자리다).
+#   옛 축(`-NoNewWindow -PassThru` 가 파일 어딘가에 있다)은 설치기 실행 자리에도 초록이라 로그인 자리를 재지도 않았다.
+no_code "$PS" "ArgumentList 'auth','login' -NoNewWindow"; rc=$?
+ck "[대기] 윈도 승인은 새 창에서 연다(이 창을 함께 쓰지 않는다)" "$rc" "(${GREP_WHY})"
 # ★윈은 앞에서 `Start-Sleep` 로 돌면 **이 창의 입력을 자식과 함께 쥔다**(붙여넣기가 샌다).
 #   `WaitForExit(ms)` 는 커널 대기라 콘솔을 건드리지 않는다.
 codegrep "$PS" 'while \(\-not \$loginProc\.WaitForExit\(5000\)\)'
@@ -2189,6 +2211,183 @@ elif [ -f "$DIR/../tests/v0316-emu-run.sh" ]; then
   ck "[v0316] 흉내 실행 시험이 전건 통과한다(설치기 멈춤·로그인 다시 열기·지난 실행·지우기)" $? "bash tests/v0316-emu-run.sh 로 자세히"
 else
   sk "[v0316] 흉내 실행 시험" "시험 파일을 못 찾았다"
+fi
+
+echo "== v0.3.17 — 로그인은 새로 뜬 창에서 (2026-09-15 로그인 막힘 표본 3건 · 워크숍 9건) =="
+# ★이 절의 축은 tests/v0317-mutate.py 뮤턴트로 붉어지는 것을 확인한다 — 축 이름 앞부분이 곧 뮤턴트의 기대값이다(이름을 바꾸면 거기도 같이).
+# 승인 프로세스는 새 창으로 띄운다 — 벤더 화면(주소·코드 칸)이 이 창의 안내와 섞이지 않고, 붙여넣을 창이 하나로 정해진다.
+codegrep "$PS" "Start-Process -FilePath \\\$claudeExe -ArgumentList 'auth','login' -PassThru -ErrorAction Stop" \
+  && no_code "$PS" "ArgumentList 'auth','login' -NoNewWindow"
+ck "[v0317] 로그인은 새 창에서 연다(-NoNewWindow 없음)" $? "승인 프로세스가 이 창을 함께 쓴다 — 벤더 화면이 안내와 섞이고 붙여넣을 창이 둘이 된다"
+# 부르는 쪽이 반환값을 받으면, 새 창을 못 띄워 이 창에서 로그인할 때 벤더 출력이 화면이 아니라 그 변수로 빨려 들어 코드 칸이 안 뜬다(about_Return).
+codegrep "$PS" '^    Step-Login; \$rc = \$script:LoginRc; if \(\$rc -ne 0\) \{ exit \$rc \}' \
+  && no_code "$PS" '=[[:space:]]*(@\()?Step-Login'
+ck "[v0317] 부르는 쪽이 로그인 결과를 반환값으로 받지 않는다" $? "받는 자리가 있다 — 이 창 로그인 때 코드 칸이 안 뜬다(${GREP_WHY})"
+n="$(awk '/^function Step-Login \{/{f=1} f&&/^}/{f=0} f' "$PS" | grep -vE '^[[:space:]]*#' | grep -cE '(^|[^[:alnum:]_$-])return[[:space:]]+[^[:space:]#}]')"
+[ "$n" = "0" ] && awk '/^function Step-Login \{/{f=1} END{exit !f}' "$PS"
+ck "[v0317] 로그인 함수는 값을 돌려주지 않는다(결과는 스크립트 변수)" $? "return 뒤에 값이 ${n:-?}곳 — 호출 자리에서 화면으로 새어 나간다"
+# 창이 살아 있는 동안에도 판정한다 — 로그인은 끝났는데 창이 안 닫히면 20분 상한까지 선다.
+awk '/while \(-not \$loginProc\.WaitForExit\(5000\)\)/{a=NR}
+     a&&!r&&/\$doneBy = Resolve-LoginDone \$authNow \$credBefore/{r=NR}
+     a&&!c&&/if \(\$w -ge \$LoginWaitTimeout\) \{/{c=NR}
+     END{exit !(a&&r>a&&c>r)}' "$PS"
+ck "[v0317] 창이 살아 있는 동안에도 로그인을 판정한다" $? "창이 안 닫히면 상한까지 기다린다"
+# 판정 차례 = 확인 명령의 「그렇다」 → 「아니다」 → (답이 없을 때만) 로그인 파일.
+awk '/^function Resolve-LoginDone/{f=1}
+     f&&!t&&/"loggedIn".*true.*return .status./{t=NR}
+     f&&!n&&/"loggedIn".*false.*return ..[[:space:]]*\}/{n=NR}
+     f&&!x&&/Test-LoginCredFresh \$credBefore.*return .file./{x=NR}
+     f&&/^}/{f=0}
+     END{exit !(t&&n>t&&x>n)}' "$PS"
+ck "[v0317] 판정은 확인 명령의 답이 먼저 · 「아니다」가 파일을 이긴다" $? "파일이 새로 생겼다는 것만으로 확인 명령의 「아니다」를 덮는다"
+codegrep "$PS" '\$now\.Ticks -ne \$before\.Ticks' && codegrep "$PS" '\$now\.Length -lt 100'
+ck "[v0317] 로그인 파일은 「이번에 생겼거나 고쳐졌다」로만 본다" $? "예전 로그인이 남긴 파일이나 빈 껍데기로 성공을 선언한다"
+# 상한은 벽시계 — 쉰 초를 더해 가면 확인 명령에 든 시간이 빠져 「최대 N분」 표시가 거짓이 된다(표본: 10분이 실제 11분).
+n="$(awk '/^function Step-Login \{/{f=1} f&&/^}/{f=0} f' "$PS" | grep -vE '^[[:space:]]*#' | grep -cE '\$w \+= [0-9]')"
+codegrep "$PS" '^                    \$w = \[int\]\$sw\.Elapsed\.TotalSeconds' && [ "$n" = "0" ]
+ck "[v0317] 상한은 벽시계로 잰다" $? "로그인 대기에서 쉰 초를 더해 간다(${n:-?}곳) · 또는 벽시계 줄이 없다"
+codegrep "$PS" '^\$LoginConfirmTries = 3 ' && no_code "$PS" '\$LoginPollTimeout'
+ck "[v0317] 창이 끝나면 몇 번만 확인한다(10분 헛 대기 없음)" $? "승인 창이 끝난 뒤에는 로그인이 될 길이 없는데 오래 기다린다(${GREP_WHY})"
+# 카드 — 첫 줄 = 유료 구독 조건(사이트 준비물 문구와 같은 말) · 붙여넣을 곳 · 브라우저가 안 열릴 때 · 완료면 붙여넣지 않음 · 기다려도 됨.
+awk '/^\$LoginCardLines = @\(/{a=NR} a&&NR==a+1&&/Claude 유료 구독 계정\(Pro 이상\)/&&/무료 계정으로는 로그인 승인이 끝나지 않습니다/{ok=1} END{exit !ok}' "$PS"
+ck "[v0317] 로그인 카드 첫 줄은 유료 구독 조건(사이트와 같은 말)" $? "무료 계정인 사람이 20분을 그대로 선다"
+codegrep "$PS" "'     3\) 새로 뜬 로그인 창을 한 번 누르고" && codegrep "$PS" '브라우저가 안 열리면: 새로 뜬 로그인 창에 보이는 https:// 주소' \
+  && codegrep "$PS" '브라우저가 완료를 보이면 붙여넣지 않으셔도 됩니다' && codegrep "$PS" '기다리셔도 됩니다 — 20분 뒤 저절로 다음 안내가 나옵니다' \
+  && no_code "$PS" '3\) 이 창에 마우스 오른쪽 단추'
+ck "[v0317] 카드가 붙여넣을 곳·브라우저가 안 열릴 때·완료면 붙여넣지 않음·기다려도 됨을 말한다" $? "카드가 옛 창 기준으로 말한다(${GREP_WHY})"
+no_code "$PS" 'LoginCardLines \| Select-Object -Skip 1' && no_code "$PS" 'Ctrl-C 를 누르시면'; rc=$?
+ck "[v0317] 기다리는 동안 설치 창에 카드를 되풀이하지 않는다" "$rc" "되풀이가 남았다(${GREP_WHY})"
+count_or_fail "$PS" '\[5분 점검\]'; n="$COUNT_N"
+[ "$n" = "1" ] && codegrep "$PS" '^                        \$checkpointSaid = \$true'
+ck "[v0317] 5분 점검은 한 번만 말한다" $? "점검 문구 ${n}곳 · 또는 한 번 말한 표시가 없다"
+count_from_or_fail 'Invoke-LoginFailQuestion' -- sh -c "grep -vE '^[[:space:]]*#' \"\$1\" | grep -v 'function Invoke-LoginFailQuestion'" _ "$PS"; n="$COUNT_N"
+awk '/^[[:space:]]*if \(\$timedOut\) \{$/{a=NR} a&&NR<=a+3&&/\$ans = Invoke-LoginFailQuestion/{ok=1} END{exit !ok}' "$PS" && [ "$n" = "1" ]
+ck "[v0317] 숫자 질문은 상한에 닿은 실패에서만 한다" $? "부르는 자리 ${n}곳 — 성공 경로에 손이 늘거나 질문이 사라졌다"
+awk '/^function Step-Login \{/{f=1} f&&!r&&/^[[:space:]]*Add-LoginReport \$info$/{r=NR} f&&!j&&/Write-JCode .J-LOGIN-01./{j=NR} f&&/^}/{f=0} END{exit !(r&&j>r)}' "$PS"
+ck "[v0317] 로그인 단계에서 본 것을 환경 보고에 싣고 J-LOGIN-01 로 끝낸다" $? "보고 절 없이 끝나 원인을 못 가른다"
+# 끝맺음 — 조용히 넘긴 확인 오류를 끝난 원인처럼 적어 오진을 불렀다(2026-09-15).
+codegrep "$PS" "Write-Log 'unexpected end: no error recorded" && no_code "$PS" "Write-Log \('unexpected end: last error = '"; rc=$?
+ck "[v0317] 끝맺음은 조용히 넘긴 확인 오류를 끝난 원인처럼 적지 않는다" "$rc" "(${GREP_WHY})"
+# 원격 해결은 창을 최대 2시간 붙든다 — 그 앞에도 「다시 하시는 법」 · 맨 끝의 한 번은 그대로.
+awk '/^function Write-ClosingNote/{f=1}
+     f&&!b&&/\{ Show-RerunHow \}/{b=NR}
+     f&&!i&&/if \(\$script:NoticeShown\) \{ Invoke-RemoteHelp \}/{i=NR}
+     f&&i&&!e&&NR>i&&/if \(\$script:ShowRerun\) \{ Show-RerunHow \}/{e=NR}
+     f&&/^}/{f=0}
+     END{exit !(b&&i&&b<i&&e>i)}' "$PS"
+ck "[v0317] 원격 해결 대기 앞에도 다시 하시는 법(맨 끝 한 번은 그대로)" $? "원격 해결이 창을 붙드는 동안 다시 실행하는 법이 화면에 없다"
+for f in "$PS" "$RESET" "$REIN_PS"; do
+  [ -f "$f" ] || continue
+  codegrep "$f" '1\) ⊞ 윈도우 키\(키보드 왼쪽 아래, Ctrl과 Alt 사이\)를 누르고 powershell' && no_code "$f" '시작 단추를 누르고'; rc=$?
+  ck "[v0317] 다시 하시는 법 첫 줄은 윈도우 키(사이트와 같은 말) · $(basename "$f")" "$rc" "(${GREP_WHY})"
+done
+codegrep "$PS" "^\\\$InstallerVersion *= '0\.3\.17'" && codegrep "$SH" '^INSTALLER_VERSION="0\.3\.17"'
+ck "[v0317] 판본 0.3.17(두 설치기)" $? "보고의 판본이 갈린다"
+# 확인 명령 한 번에도 상한 — 없으면 벤더 도구가 멈추는 순간 20분 상한까지 함께 멈춘다(이종 검토 1R 지적 채택).
+awk '/^function Get-LoginStatusText/{f=1}
+     f&&/Start-Process -FilePath \$exe -ArgumentList .auth.,.status. .*-RedirectStandardOutput/{s=1}
+     f&&/if \(-not \$p\.WaitForExit\(\$LoginStatusWaitMs\)\) \{/{w=1}
+     f&&/\$p\.Kill\(\)/{k=1}
+     f&&/^}/{f=0}
+     END{exit !(s&&w&&k)}' "$PS" && no_code "$PS" '& \$exe auth status'
+ck "[v0317] 확인 명령 한 번에도 상한이 있다" $? "확인 명령이 멈추면 20분 상한도 멈춘다(${GREP_WHY})"
+awk '/^function Complete-LoginSuccess/{f=1} f&&/\$stray = Get-LoginStrayKeyCount/{s=1} f&&/^}/{f=0} END{exit !s}' "$PS"; rc1=$?
+count_from_or_fail 'Complete-LoginSuccess' -- sh -c "grep -vE '^[[:space:]]*#' \"\$1\" | grep -v 'function Complete-LoginSuccess'" _ "$PS"; n="$COUNT_N"
+[ "$rc1" -eq 0 ] && [ "$n" = "2" ]
+ck "[v0317] 로그인 성공 때도 설치 창에 쌓인 글자를 비운다" $? "설치 창에 붙여넣은 코드가 다음 단계로 흘러간다(성공 자리 ${n}곳)"
+codegrep "$PS" "Set-NextStepRerun '아래 「다시 하시는 법」대로 다시 실행하시면 로그인 창이 다시 열립니다\.'" \
+  && codegrep "$SH" 'next_rerun "아래 「다시 하시는 법」대로 다시 실행하시면 로그인 창이 다시 열립니다\."' \
+  && grep -q "$(printf '^J-LOGIN-01\t[^\t]*\t[^\t]*\t다시 실행하시면 로그인 창이 다시 열립니다\t')" "$DIR/../tests/help-rules.tsv" \
+  && awk '/^## J-LOGIN-01/{f=1} /^## J-LOGIN-02/{f=0} f&&/^1\. 다시 실행하시면 로그인 창이 다시 열립니다/{ok=1} END{exit !ok}' "$DIR/../docs/help-codes.md" \
+  && no_code "$PS" '브라우저에서 승인을 누르신 뒤' && no_code "$SH" '브라우저에서 승인을 누르신 뒤'
+ck "[v0317] J-LOGIN-01 끝맺음은 다시 실행하면 로그인 창이 다시 열린다고 말한다(4자리 같은 말)" $? "자리마다 다른 말을 한다(${GREP_WHY})"
+if [ "${V0317_EMU_SKIP:-}" = "1" ]; then
+  sk "[v0317] 흉내 실행 시험" "V0317_EMU_SKIP=1 — 뮤턴트 러너가 끈 것(흉내 축은 그 러너가 따로 잰다)"
+elif ! command -v pwsh >/dev/null 2>&1; then
+  sk "[v0317] 흉내 실행 시험" "pwsh 가 없다"
+elif [ -f "$DIR/../tests/v0317-emu-run.sh" ]; then
+  bash "$DIR/../tests/v0317-emu-run.sh" --dir "$DIR" >/dev/null 2>&1
+  ck "[v0317] 흉내 실행 시험이 전건 통과한다(새 창 로그인 다섯 갈래·질문·끝맺음)" $? "bash tests/v0317-emu-run.sh 로 자세히"
+else
+  sk "[v0317] 흉내 실행 시험" "시험 파일을 못 찾았다"
+fi
+# ── 자동 각성(2026-09-15) — 흉내 3갈래(성공·동료 안 섬·창 못 엶) ──
+if [ "${AWAKEN_EMU_SKIP:-}" = "1" ]; then
+  sk "[awaken] 흉내 실행 시험" "AWAKEN_EMU_SKIP=1 — 뮤턴트 러너가 끈 것"
+elif ! command -v pwsh >/dev/null 2>&1; then
+  sk "[awaken] 흉내 실행 시험" "pwsh 가 없다"
+elif [ -f "$DIR/../tests/awaken-emu-run.sh" ]; then
+  bash "$DIR/../tests/awaken-emu-run.sh" --dir "$DIR" >/dev/null 2>&1
+  ck "[awaken] 흉내 실행 시험이 전건 통과한다(성공·동료 안 섬·창 못 엶)" $? "bash tests/awaken-emu-run.sh 로 자세히"
+else
+  sk "[awaken] 흉내 실행 시험" "시험 파일을 못 찾았다"
+fi
+# ── v0.3.18(2026-09-15 윈 2·3차 재설치 실기) — 흉내 갈래(⑨ 자가진단 판정 …) ──
+# ★이 축의 갈래는 tests/v0318-mutate.py 뮤턴트로 붉어지는 것을 확인한다.
+if [ "${V0318_EMU_SKIP:-}" = "1" ]; then
+  sk "[v0318] 흉내 실행 시험" "V0318_EMU_SKIP=1 — 뮤턴트 러너가 끈 것"
+elif ! command -v pwsh >/dev/null 2>&1; then
+  sk "[v0318] 흉내 실행 시험" "pwsh 가 없다"
+elif [ -f "$DIR/../tests/v0318-emu-run.sh" ]; then
+  bash "$DIR/../tests/v0318-emu-run.sh" --dir "$DIR" >/dev/null 2>&1
+  ck "[v0318] 흉내 실행 시험이 전건 통과한다(⑨ 자가진단은 자비스 창에 필요한 항목으로만 막는다)" $? "bash tests/v0318-emu-run.sh 로 자세히"
+else
+  sk "[v0318] 흉내 실행 시험" "시험 파일을 못 찾았다"
+fi
+
+echo "== 텔레메트리 — 진행 자동 전송·진단 자료 자동 수집 (계약 v1 2026-09-15 · additive) =="
+# ★이 절의 동작 축은 tests/telemetry-mutate.py 뮤턴트로 붉어지는 것을 확인한다(전송 제거·fail-open 제거·첨부 제거).
+# 진행 전송은 토큰 없이 나간다(보고 전 [1/10]부터) — 본문 필드에 token/client_token 을 넣지 않는다.
+awk '/^function Send-Progress/{f=1} f&&/token/{t=1} f&&/^}/{f=0} END{exit t}' "$PS"
+ck "[텔레메트리] 진행 전송 본문에 토큰이 없다" $? "진행 전송에 토큰을 실었다(계약 1절 — 토큰 없음)"
+# 각 요청 3초 상한(fail-open 의 짝) · 요청 하나가 설치를 오래 붙들지 않는다.
+codegrep "$PS" 'ProgressTimeoutSec = 3' && codegrep "$PS" 'TimeoutSec \$ProgressTimeoutSec'
+ck "[텔레메트리] 진행 전송에 3초 상한이 있다" $? "상한이 없으면 서버가 느릴 때 설치가 붙들린다(계약 1절)"
+# 전송 실패는 설치를 막지 않는다 — Send-Progress 는 try/catch 로 감싸고 실패는 경고 한 줄만 남긴다.
+awk '/^function Send-Progress/{f=1} f&&/^    try \{/{tr=1} f&&/^    \} catch \{/{c=1} f&&/progress send failed \(fail-open\)/{w=1} f&&/^}/{f=0} END{exit !(tr&&c&&w)}' "$PS"
+ck "[텔레메트리] 전송 실패는 설치를 막지 않는다(fail-open)" $? "try/catch·경고 줄 중 하나가 없다"
+# 설치 번호 — 첫 실행에 만들어 두고 재사용 · 영숫자·_·- 8~36자(서버 허용 범위).
+codegrep "$PS" "'install-id'" && codegrep "$PS" '8,36' && codegrep "$PS" 'return \$script:InstallId'
+ck "[텔레메트리] 설치 번호를 만들어 두고 재사용한다" $? "번호 자리·모양·재사용 검사 중 하나가 없다"
+# 첫 화면 고지 = 서버 정본 문안(계약 2절 정본 1곳) · [1/10] 에서 찍는다.
+codegrep "$PS" '^    Say \(.     . \+ \$ProgressNotice\)' \
+  && codegrep "$PS" '진행 상황\(단계·경과·판본·백신 이름·브라우저\)을 자동으로 보내고'
+ck "[텔레메트리] 첫 화면 고지가 서버 정본 문안과 같다" $? "첫 화면에 고지를 안 찍거나 문안이 다르다(계약 2절)"
+# [1/10] 뒤 살핌(info) 이벤트에 환경 전체를 싣는다.
+codegrep "$PS" "Send-Progress '1/10' 'info' \\\$null \\\$null \(Get-InstallEnv\)"
+ck "[텔레메트리] [1/10] 뒤 환경 전체를 살핌으로 보낸다" $? "info 전송이 없다(계약 3절)"
+# 막힌 자리는 자동으로 알린다 — 진단 코드를 남기는 한 자리(Write-JCode)에서 fail 을 보낸다.
+awk '/^function Write-JCode/{f=1} f&&/Send-Progress \(Get-CurrentStep\) .fail./{ok=1} f&&/^}/{f=0} END{exit !ok}' "$PS"
+ck "[텔레메트리] 막힌 자리에서 실패를 자동으로 알린다" $? "실패 전송이 없다(계약 3절)"
+# 첨부는 보고가 열린 뒤에만(출처 헤더) · 900KB 상한 · 계약 순서(log_full→console_text→screen_png→login_window_png→proc_tree→env_full).
+codegrep "$PS" "if (\\\$Path -like '\\*/attach')) { \\\$headers\['x-help-client'\] = \\\$script:RhClientToken }" \
+  || codegrep "$PS" "\\\$Path -like '\\*/attach'"
+ck "[텔레메트리] 첨부에 출처 헤더가 붙는다" $? "첨부에 x-help-client 를 안 붙인다(계약 1절)"
+codegrep "$PS" 'bytes.Length -gt \$AttachMaxBytes'
+ck "[텔레메트리] 900KB 넘는 항목은 보내지 않는다" $? "항목 상한이 없다(계약 2절)"
+awk '/^function Send-FailAttachments/{f=1}
+     f&&!a&&/Send-Attachment .log_full./{a=NR}
+     f&&!b&&/Send-Attachment .console_text./{b=NR}
+     f&&!c&&/Send-Attachment .screen_png./{c=NR}
+     f&&!d&&/login_window_png/{d=NR}
+     f&&!e&&/Send-Attachment .proc_tree./{e=NR}
+     f&&!g&&/Send-Attachment .env_full./{g=NR}
+     f&&/^}/{f=0}
+     END{exit !(a&&b>a&&c>b&&d>c&&e>d&&g>e)}' "$PS"
+ck "[텔레메트리] 첨부는 계약 순서대로 보낸다(6종)" $? "첨부 순서가 계약과 다르다(계약 3절)"
+# 보고가 열린 직후 자료를 붙인다 — 원격 해결 엔진에서 Send-FailAttachments 를 부른다.
+awk '/^function Invoke-RemoteHelp/{f=1} f&&/^            Send-FailAttachments/{ok=1} f&&/^}/{f=0} END{exit !ok}' "$PS"
+ck "[텔레메트리] 보고가 열리면 자료를 붙인다" $? "원격 해결 엔진이 첨부를 안 부른다(계약 3절)"
+# 판본(진행 전송의 installer_version) — 이미 0.3.17 축이 위에 있다. 여기서는 실제 흉내로 왕복을 잰다.
+if [ "${V0317_EMU_SKIP:-}" = "1" ]; then
+  sk "[텔레메트리] 흉내 실행 시험" "V0317_EMU_SKIP=1 — 흉내 축은 telemetry-mutate 러너가 따로 잰다"
+elif ! command -v pwsh >/dev/null 2>&1; then
+  sk "[텔레메트리] 흉내 실행 시험" "pwsh 가 없다"
+elif [ -f "$DIR/../tests/telemetry-emu-run.sh" ]; then
+  bash "$DIR/../tests/telemetry-emu-run.sh" --dir "$DIR" >/dev/null 2>&1
+  ck "[텔레메트리] 흉내 실행 시험이 전건 통과한다(전송·토큰·환경·첨부·fail-open)" $? "bash tests/telemetry-emu-run.sh 로 자세히"
+else
+  sk "[텔레메트리] 흉내 실행 시험" "시험 파일을 못 찾았다"
 fi
 
 printf '\n통과 %s · 실패 %s%s\n' "$pass" "$fail" "$([ "$skip" -gt 0 ] && printf ' · 건너뜀 %s' "$skip")"

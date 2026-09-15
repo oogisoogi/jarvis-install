@@ -33,6 +33,7 @@ $env:JARVIS_HOME = "$Sb/home/install-jarvis"
 $env:JARVIS_LIB_ONLY = '1'
 . $Src
 $env:JARVIS_LIB_ONLY = ''
-$LoginPollInterval = 1; $LoginPollTimeout = 4; $LoginSayInterval = 5; $LoginWaitTimeout = 10
-try { $rc = @(Step-Login)[-1]; Write-Log ("TEST rc=" + $rc + " JCode=" + $script:JCode + " LoggedIn=" + $script:LoggedIn) }
+$LoginPollInterval = 1; $LoginConfirmTries = 5; $LoginSayInterval = 5; $LoginWaitTimeout = 10; $LoginCheckpointSec = 9999; $LoginStatusEverySec = 1
+# v0.3.17 — Step-Login 은 값을 돌려주지 않는다(결과 = $script:LoginRc). 반환값을 받으면 이 창 로그인 때 벤더 출력이 변수로 빨려 든다.
+try { Step-Login; $rc = $script:LoginRc; Write-Log ("TEST rc=" + $rc + " JCode=" + $script:JCode + " LoggedIn=" + $script:LoggedIn) }
 finally { Write-Log 'TEST finally' }
