@@ -68,14 +68,14 @@
 
 | ID | 무엇 | 자리 | 종류 | 만드는 자리 | 근거 |
 |---|---|---|---|---|---|
-| `W-APP` | cys 프로그램 | `%LOCALAPPDATA%\cys`(+`uninstall.exe`) · 구판 `%LOCALAPPDATA%\Programs\cys` · 시작 메뉴 바로가기 `%APPDATA%\Microsoft\Windows\Start Menu\Programs\cys.lnk`(cys 설치기가 만든다 · 평소엔 공식 제거기가 지운다) | 전부 우리 것 | `[6/10]` 설치기 실행 | 코드 |
+| `W-APP` | cys 프로그램 | `%LOCALAPPDATA%\cys`(+`uninstall.exe`) · 구판 `%LOCALAPPDATA%\Programs\cys` · 시작 메뉴 바로가기 `%APPDATA%\Microsoft\Windows\Start Menu\Programs\cys.lnk`(cys 설치기가 만든다 · 평소엔 공식 제거기가 지운다) · 판 표지 `jarvis-cys-pin.json`(v0.3.18 · 설치 도우미가 cys 를 깐 뒤 그 설치 자리에 둔다 = 핀 설치 파일 지문 · 깔린 `cys.exe` 실측 지문 · 다음 실행의 「같은 판 AND 같은 지문」 건너뜀 판정용 · 설치 자리에 두는 까닭 = `-KeepApp` 재설치가 작업 폴더를 지워도 남게) | 전부 우리 것 | `[6/10]` 설치기 실행 | 코드 |
 | `W-REG` | 설치 목록 항목 | `HKCU:\Software\Microsoft\Windows\CurrentVersion\Uninstall\cys` | 전부 우리 것 | cys 설치기 | 코드 |
 | `W-DAEMON` | cys 상시 가동 등록 | 작업 스케줄러 항목 | 전부 우리 것 | `[8/10]` `cys daemon install` | 미확인 |
 | `W-CYSHOME` | cys 계정 자리 | `%USERPROFILE%\.cys\` | 전부 우리 것 | `[8/10]` `cys init-pack` | 코드 |
 | `W-CLAUDEBIN` | 클로드 실행 파일 | `%USERPROFILE%\.local\bin\claude.exe` | 전부 우리 것 | `[2/10]` 공식 설치기 · 상한에 닿으면 같은 공식 파일을 직접 받아 이 자리에 둔다(옮기는 동안만 `claude.exe.jarvis-new` · v0.3.16) | 실측 09-04 |
 | `W-JARVISHOME` | 자비스 작업 폴더 | `%JARVIS_HOME%`(없으면 `%USERPROFILE%\install-jarvis\`) · 🔴안에 **소유 표식 `.jarvis-owned`** 와 신뢰 기록 `trust-seed.tsv` 를 둔다 · 원격 해결 실행 번호 `remote-help-executed.json` · 출처 토큰 `remote-help-client-token`(본인만 읽게) · 반복 막힘 횟수 `help-attempts.json`(v0.3.15) · 클로드 직접 받기 `dl\claude-<판본>-win32-x64.exe`(받은 뒤 지운다 · v0.3.16) | 전부 우리 것 | 스크립트 첫머리 | 실측 |
 | `W-SCRIPTCOPY` | 받아 둔 설치 스크립트 | `%USERPROFILE%\install-jarvis.ps1` · 옛 자리 `%TEMP%\install-jarvis.ps1` | 전부 우리 것 | 배포 한 줄 | 실측 09-06 |
-| `W-PATH` | 실행 경로 등록 | **사용자** `Path` 환경변수의 `%USERPROFILE%\.local\bin` 조각 | **남의 파일 속 우리 줄** | `[2/10]` `Seed-LocalBinPath`(F-W18) | 코드 |
+| `W-PATH` | 실행 경로 등록 | **사용자** `Path` 환경변수의 `%USERPROFILE%\.local\bin` 조각 · cys 자리(`%LOCALAPPDATA%\cys` 등 · v0.3.18 · `-KeepApp` 이면 남김) | **남의 파일 속 우리 줄** | `[2/10]` `Seed-LocalBinPath`(F-W18) · `[7/10]` `Seed-CysPath` | 코드 |
 | `W-AGORA` | 토론장 참가 열쇠·이름 | `%USERPROFILE%\.config\agora\` · 🔴**`AGORA_HOME` 으로 옮겨 둘 수 있다**(맥과 같은 해석 — 앞 판은 윈도우만 이 값을 안 읽어 갈렸다) | **손대지 않음** — 🔴삭제 루트 안에 있어도 지우지 않는다(중첩 보존) | 🔴설치기가 만들지 않는다(v0.3.5 부터 뗐다) | 코드 + 러너 실측 |
 | `W-AGORASKILL` | 토론장 안내 가리키기 | 🔴**자리가 둘이고 운명이 다르다** — ⑴`%USERPROFILE%\.claude\skills\agora-delegate\` = **남는다** ⑵`%USERPROFILE%\.cys\claude\skills\agora-delegate\` = **`W-CYSHOME` 안**이라 함께 지워진다 | **손대지 않음**(⑴) · **`W-CYSHOME` 안**(⑵) | 🔴설치기가 만들지 않는다(v0.3.5 부터 뗐다) | 코드 |
 | `W-CLAUDEJSON` | 클로드 설정 파일의 우리 칸 | `%USERPROFILE%\.claude.json` 안의 `hasCompletedOnboarding` · `fullscreenUpsellSeenCount` · `projects."<자비스 작업 폴더>"`(백슬래시·슬래시 2형) · 🔴**`projects."%USERPROFILE%"` 아래의 `hasTrustDialogAccepted`**(백슬래시·슬래시 2형 · 2026-09-10 추가 · 그 칸 **하나만** 넣고 하나만 뺀다) | **남의 파일 속 우리 줄** | `Set-ClaudePrefs` | 코드 |

@@ -155,7 +155,7 @@ grep -q "match '(?m)^..s\*auth..s'" "$PS" || grep -q 'Test-ClaudeAuthCmd' "$PS";
 grep -q '낡음 — 판올림이 필요하다' "$SH"; ck "[F2] sh 1-2 에 「낡음」 판정값" $? "낡은 전역 설치를 ok 로 통과시킨다"
 grep -q '낡음 — 판올림이 필요하다' "$PS"; ck "[F2] ps1 1-2 에 「낡음」 판정값" $? "같음"
 grep -q 'claude auth login' "$SH"; ck "[F1] sh 가 로그인을 실제로 연다" $? "폴링만 하고 창을 안 연다(문안이 거짓)"
-grep -q 'claude auth login' "$PS"; ck "[F1] ps1 이 로그인을 실제로 연다" $? "같음"
+codegrep "$PS" "Start-LoginPipeProc -FilePath \\\$claudeExe -ArgumentList 'auth','login'"; ck "[F1] ps1 이 로그인을 실제로 연다" $? "같음(로그인 여는 줄이 코드에 없다 · 주석은 세지 않는다)"
 grep -q '판올림이 먼저 필요합니다' "$SH"; ck "[F3] sh 능력 없으면 폴링 금지" $? "낡은 판본에서 10분을 헛되이 기다린다"
 grep -q '판올림이 먼저 필요합니다' "$PS"; ck "[F3] ps1 능력 없으면 폴링 금지" $? "같음"
 c=$(grep -E '^[[:space:]]*say ' "$SH" | grep -c '\*\*'); [ "$c" -eq 0 ]; ck "[화면] sh say 에 마크다운 굵게 0" $? "터미널에 별표가 그대로 찍힌다(${c}행)"
@@ -409,9 +409,9 @@ else
 fi
 
 echo "== 단계 2 — cys 설치 대행 [5]~[9] =="
-codegrep "$PS" 'CysWinBytes    = 139840459'; ck "[5] 설치 파일 크기 핀(= 우리 v0.14.36 setup.exe)" $? "받다 끊긴 파일을 정상으로 본다"
-codegrep "$PS" "CysVersion     = '0\\.14\\.36'"; ck "[5] 윈 판본 핀 정확값(= 우리 v0.14.36)" $? "이름표만 새 판본이고 실제로 받는 판본은 옛것이다"
-codegrep "$PS" "CysWinSha256   = '12c9d398b4e11b175370c6fdc7e4fd299b2e74865c5cc0f8bf891a42eaf70066'"; ck "[5] 윈 설치 파일 sha256 정확값 핀(= 릴리스 SHA256SUMS 줄)" $? "지문이 한 글자만 틀려도 모든 설치가 지문 불일치로 멈춘다"
+codegrep "$PS" 'CysWinBytes    = 139918106'; ck "[5] 설치 파일 크기 핀(= cysr v1.0.0 setup.exe)" $? "받다 끊긴 파일을 정상으로 본다"
+codegrep "$PS" "CysVersion     = '1\\.0\\.0'"; ck "[5] 윈 판본 핀 정확값(= cysr v1.0.0)" $? "이름표만 새 판본이고 실제로 받는 판본은 옛것이다"
+codegrep "$PS" "CysWinSha256   = 'b63178db8bff46c5769092798ebf1a30f0ae0c7e0a23c750308ad0b59bef33fe'"; ck "[5] 윈 설치 파일 sha256 정확값 핀(= 릴리스 SHA256SUMS 줄)" $? "지문이 한 글자만 틀려도 모든 설치가 지문 불일치로 멈춘다"
 # ⚠2026-09-10 저장소 개명(cys-terminal → cys-ro · 운영자). 옛 주소는 301 로 이어지지만 **정본은 새 이름**이다.
 #   축도 새 이름을 요구한다 — 그러지 않으면 옛 주소가 남아도 아무도 말하지 않는다.
 codegrep "$PS" 'github.com/oogisoogi/cys-ro/releases/download/'; ck "[5] 윈 다운로드 자리 = 우리 릴리스" $? "받을 곳이 우리 릴리스가 아니다(벤더 판을 깔면 우리 수리가 안 닿는다)"
@@ -444,7 +444,9 @@ awk '/function Step-DownloadCys/{a=NR} /function Step-Wake/{b=NR} END{exit !(a&&
 echo "== 백신 차단 대응 (2026-09-05 실측 · 우회하지 않고 알아보게 한다) =="
 # 한도 없이 기다리면 경고 창 하나에 영원히 선다 — 그 상태는 사람 눈에 「멈춤」과 구분되지 않는다.
 no_code "$PS" 'Start-Process -FilePath \$dst[^;]*-Wait'; ck "[6] 설치기를 한도 없이 기다리지 않는다" $? "-Wait 로 되돌아갔다"
-codegrep "$PS" 'WaitForExit\(\$limit\)'; ck "[6] 기다리는 한도가 코드에 있다" $? "한도가 없다"
+# v0.3.18 — 한 번의 WaitForExit($limit) 를 60초 조각(대기 표지 전송)으로 나눴다. 성질(한도)은 그대로 — 조각은 남은 한도로 잘리고 조각 합이 한도에서 멈춘다.
+codegrep "$PS" 'while \(\$waitedMs -lt \$limit\) \{' && codegrep "$PS" '\$chunk = \[Math\]::Min\(60000, \$limit - \$waitedMs\)' && codegrep "$PS" 'if \(\$p\.WaitForExit\(\$chunk\)\) \{ \$exited = \$true; break \}'
+ck "[6] 기다리는 한도가 코드에 있다" $? "한도가 없다"
 codegrep "$PS" 'HasExited -and \$p.ExitCode'; ck "[6] 아직 도는 설치기의 종료 코드를 읽지 않는다" $? "끝나지 않은 프로세스에서 ExitCode 를 읽는다"
 codegrep "$PS" 'if \(\$p -and -not \$p.HasExited\)'; ck "[6] 도는 설치기 위에 또 띄우지 않는다" $? "오류만 하나 더 늘어난다"
 # 죽은 스크립트는 말을 못 한다 ⇒ 안내는 설치기를 띄우기 **전에** 나가야 한다.
@@ -1263,7 +1265,7 @@ ck "[3/10] ps1 재판정이 능력 확인을 통과할 때만 묻는다" $? "낡
 # ★재판정은 **능력 확인을 통과한 뒤에만** 묻는다 — 낡은 판본에서 auth status 는 질문으로 나간다.
 awk '/claude_has_auth_cmd; then/{p=NR} /claude auth login/{l=NR} END{exit !(p && l && p < l)}' "$SH"
 ck "[3/10] sh 재판정이 로그인 열기보다 먼저" $? "브라우저를 연 뒤에 묻는다 — 이미 늦었다"
-awk '/Test-ClaudeAuthCmd\)\) \{/{p=NR} /claude auth login/{l=NR} END{exit !(p && l && p < l)}' "$PS"
+awk '/Test-ClaudeAuthCmd\)\) \{/{p=NR} /^[[:space:]]*[^#].*Start-LoginPipeProc -FilePath/{l=NR} END{exit !(p && l && p < l)}' "$PS"
 ck "[3/10] ps1 재판정이 로그인 열기보다 먼저" $? "같음"
 
 echo "== 남의 파일을 읽는 인코딩 (러너 34209137309 이 실물에서 잡음) =="
@@ -1924,7 +1926,7 @@ ck "[핀] 최신만 두는 배포 폴더를 안 쓴다" "$rc" "옛 받을 자리
 #   갱신해야 하는 축은 갱신을 잊는 날 눈이 먼다. ⇒ 「0.14.* 가 나오는 줄 = 전부 핀 판본 줄」로 잰다.
 count_from_or_fail '0\.14\.[0-9]' -- grep -vE '^[[:space:]]*#' "$SH"; rc=$?
 nver="$COUNT_N"
-# ⚠2026-09-15 전환부터 맥 핀은 **둘**이다(저희 판 0.14.37 · 원작자 판 0.14.33 = 인텔·자산 없음). 둘 다 센다.
+# ⚠2026-09-15 전환부터 맥 핀은 **둘**이다(저희 판 · 원작자 판 0.14.33 = 인텔·자산 없음). 저희 판은 v0.3.18 에서 cysr 1.0.0 으로 올라 0.14.* 셈 밖이다(0.14.37 셈은 0 이어야 한다).
 count_from_or_fail '0\.14\.33' -- grep -vE '^[[:space:]]*#' "$SH"; rc2=$?
 npin="$COUNT_N"
 count_from_or_fail '0\.14\.37' -- grep -vE '^[[:space:]]*#' "$SH"; rc3=$?
@@ -1934,11 +1936,11 @@ ck "[핀] 설치기(맥) 코드의 판본 문자열이 전부 핀 판본이다" 
 
 # ── ⓕ-2 맥 저희 판 전환 (2026-09-15) ────────────────────────────────
 #   애플 실리콘 맥은 우리 릴리스 zip 을 받아 풀어 넣는다. 인텔·자산 없음만 원작자 판으로 간다.
-codegrep "$SH" 'CYS_FORK_VERSION="0\.14\.37"'; ck "[전환] 맥 저희 판 판본 핀" $? "판본 핀이 없다"
+codegrep "$SH" 'CYS_FORK_VERSION="1\.0\.0"'; ck "[전환] 맥 저희 판 판본 핀" $? "판본 핀이 없다"
 codegrep "$SH" 'CYS_FORK_DIR="https://github\.com/oogisoogi/cys-ro/releases/download/v'; ck "[전환] 저희 판은 판본이 박힌 우리 릴리스 자리에서 받는다" $? "다른 자리를 가리킨다"
-codegrep "$SH" 'CYS_FORK_BYTES=471513671'; ck "[전환] 저희 판 크기 핀" $? "크기가 안 맞아 매번 멈춘다"
-codegrep "$SH" 'CYS_FORK_SHA256="1d8e56e3db6fa83f258f9f57edc9503b96025ead3fa9cf766abb65ec3af3b5db"'; ck "[전환] 저희 판 지문 핀" $? "크기만 같은 다른 파일이 통과한다"
-codegrep "$SH" 'CYS_FORK_CDHASH="6d463ebdafb87a185b95c963f769d16abc968590"'; ck "[전환] 저희 판 CDHash 핀" $? "깔린 판을 판별할 값이 없다"
+codegrep "$SH" 'CYS_FORK_BYTES=471657674'; ck "[전환] 저희 판 크기 핀" $? "크기가 안 맞아 매번 멈춘다"
+codegrep "$SH" 'CYS_FORK_SHA256="408b4defc0c673912965fcf799156f17362ed895b76fae21fc377ae1dbd6a10a"'; ck "[전환] 저희 판 지문 핀" $? "크기만 같은 다른 파일이 통과한다"
+codegrep "$SH" 'CYS_FORK_CDHASH="84fda923e275eef4adfc81f74e52fab896ec5d9a"'; ck "[전환] 저희 판 CDHash 핀" $? "깔린 판을 판별할 값이 없다"
 # 칩 갈래: arm64 만 저희 판, 그 밖은 원작자 판(intel 사유) — 순서까지 본다.
 awk '/^if \[ "\$\(uname -m\)" = "arm64" \]; then$/{f=1} f&&/^  cys_use_fork_pin$/{a=NR} f&&/^else$/{e=NR} f&&/cys_use_vendor_pin; CYS_VENDOR_WHY="intel"/{b=NR} f&&/^fi$/{exit} END{exit !(a&&e&&b&&a<e&&e<b)}' "$SH"
 ck "[전환] 애플 실리콘만 저희 판 · 인텔은 원작자 판" $? "칩 갈래가 뒤집히거나 사라졌다"
@@ -2135,7 +2137,7 @@ no_code "$PS" "ArgumentList 'auth','login' -NoNewWindow"; rc=$?
 ck "[대기] 윈도 승인은 새 창에서 연다(이 창을 함께 쓰지 않는다)" "$rc" "(${GREP_WHY})"
 # ★윈은 앞에서 `Start-Sleep` 로 돌면 **이 창의 입력을 자식과 함께 쥔다**(붙여넣기가 샌다).
 #   `WaitForExit(ms)` 는 커널 대기라 콘솔을 건드리지 않는다.
-codegrep "$PS" 'while \(\-not \$loginProc\.WaitForExit\(5000\)\)'
+codegrep "$PS" 'while \(\-not \$loginProc\.WaitForExit\(\$LoginTickMs\)\)'
 ck "[대기] 윈이 콘솔을 안 건드리며 기다린다" $? "앞에서 자면 입력을 자식과 다툰다"
 no_code "$PS" 'Out-Host'; rc=$?
 ck "[대기] 윈 승인 갈래에 파이프가 없다" "$rc" "파이프는 「대화 중인가」 판정을 깨 코드 칸이 안 뜬다(${GREP_WHY})"
@@ -2257,9 +2259,14 @@ fi
 echo "== v0.3.17 — 로그인은 새로 뜬 창에서 (2026-09-15 로그인 막힘 표본 3건 · 워크숍 9건) =="
 # ★이 절의 축은 tests/v0317-mutate.py 뮤턴트로 붉어지는 것을 확인한다 — 축 이름 앞부분이 곧 뮤턴트의 기대값이다(이름을 바꾸면 거기도 같이).
 # 승인 프로세스는 새 창으로 띄운다 — 벤더 화면(주소·코드 칸)이 이 창의 안내와 섞이지 않고, 붙여넣을 창이 하나로 정해진다.
-codegrep "$PS" "Start-Process -FilePath \\\$claudeExe -ArgumentList 'auth','login' -PassThru -ErrorAction Stop" \
+# 🔴2026-09-15 윈도우 샌드박스 첫 실제 로그인 — 설치기가 띄운 새 창은 키 입력을 받지 못했다 ⇒ 로그인 입력은 설치기가 쥐고, 복사된 코드를 설치기가 한 줄로 넣는다.
+awk '/^function Start-LoginPipeProc/{f=1} f&&/RedirectStandardInput = \$true/{r=1} f&&/UseShellExecute = \$false/{u=1} f&&/^}/{f=0} END{exit !(r&&u)}' "$PS" \
+  && codegrep "$PS" "Start-LoginPipeProc -FilePath \\\$claudeExe -ArgumentList 'auth','login'" \
+  && no_code "$PS" "Start-Process -FilePath \\\$claudeExe -ArgumentList 'auth','login'" \
   && no_code "$PS" "ArgumentList 'auth','login' -NoNewWindow"
-ck "[v0317] 로그인은 새 창에서 연다(-NoNewWindow 없음)" $? "승인 프로세스가 이 창을 함께 쓴다 — 벤더 화면이 안내와 섞이고 붙여넣을 창이 둘이 된다"
+ck "[login-clip] 로그인 입력은 설치기가 쥔다(복사된 코드를 설치기가 넣는다)" $? "로그인 프로세스를 입력 없이 띄운다 — 그 창이 키 입력을 못 받으면 코드가 들어갈 길이 없다(${GREP_WHY})"
+no_code "$PS" '(Write-Log|Say|Add-ReportLines).*\$(clip|clip0|typed)([^A-Za-z0-9_]|$)'; rc=$?
+ck "[login-clip] 복사된 내용·붙여넣은 글자를 기록·화면·보고에 적지 않는다" "$rc" "(${GREP_WHY})"
 # 부르는 쪽이 반환값을 받으면, 새 창을 못 띄워 이 창에서 로그인할 때 벤더 출력이 화면이 아니라 그 변수로 빨려 들어 코드 칸이 안 뜬다(about_Return).
 codegrep "$PS" '^    Step-Login; \$rc = \$script:LoginRc; if \(\$rc -ne 0\) \{ exit \$rc \}' \
   && no_code "$PS" '=[[:space:]]*(@\()?Step-Login'
@@ -2268,7 +2275,7 @@ n="$(awk '/^function Step-Login \{/{f=1} f&&/^}/{f=0} f' "$PS" | grep -vE '^[[:s
 [ "$n" = "0" ] && awk '/^function Step-Login \{/{f=1} END{exit !f}' "$PS"
 ck "[v0317] 로그인 함수는 값을 돌려주지 않는다(결과는 스크립트 변수)" $? "return 뒤에 값이 ${n:-?}곳 — 호출 자리에서 화면으로 새어 나간다"
 # 창이 살아 있는 동안에도 판정한다 — 로그인은 끝났는데 창이 안 닫히면 20분 상한까지 선다.
-awk '/while \(-not \$loginProc\.WaitForExit\(5000\)\)/{a=NR}
+awk '/while \(-not \$loginProc\.WaitForExit\(\$LoginTickMs\)\)/{a=NR}
      a&&!r&&/\$doneBy = Resolve-LoginDone \$authNow \$credBefore/{r=NR}
      a&&!c&&/if \(\$w -ge \$LoginWaitTimeout\) \{/{c=NR}
      END{exit !(a&&r>a&&c>r)}' "$PS"
@@ -2292,10 +2299,12 @@ ck "[v0317] 창이 끝나면 몇 번만 확인한다(10분 헛 대기 없음)" $
 # 카드 — 첫 줄 = 유료 구독 조건(사이트 준비물 문구와 같은 말) · 붙여넣을 곳 · 브라우저가 안 열릴 때 · 완료면 붙여넣지 않음 · 기다려도 됨.
 awk '/^\$LoginCardLines = @\(/{a=NR} a&&NR==a+1&&/Claude 유료 구독 계정\(Pro 이상\)/&&/무료 계정으로는 로그인 승인이 끝나지 않습니다/{ok=1} END{exit !ok}' "$PS"
 ck "[v0317] 로그인 카드 첫 줄은 유료 구독 조건(사이트와 같은 말)" $? "무료 계정인 사람이 20분을 그대로 선다"
-codegrep "$PS" "'     3\) 새로 뜬 로그인 창을 한 번 누르고" && codegrep "$PS" '브라우저가 안 열리면: 새로 뜬 로그인 창에 보이는 https:// 주소' \
-  && codegrep "$PS" '브라우저가 완료를 보이면 붙여넣지 않으셔도 됩니다' && codegrep "$PS" '기다리셔도 됩니다 — 20분 뒤 저절로 다음 안내가 나옵니다' \
-  && no_code "$PS" '3\) 이 창에 마우스 오른쪽 단추'
-ck "[v0317] 카드가 붙여넣을 곳·브라우저가 안 열릴 때·완료면 붙여넣지 않음·기다려도 됨을 말한다" $? "카드가 옛 창 기준으로 말한다(${GREP_WHY})"
+codegrep "$PS" "'     2\) 「Authentication code」 화면이 뜨면 복사 단추로 코드를 복사만 하십시오" \
+  && codegrep "$PS" "'     3\) 「코드를 로그인에 넣었습니다」가 안 나오면: 이 설치 창을 한 번 누르고" \
+  && codegrep "$PS" "Say '     복사하신 코드를 로그인에 넣었습니다" \
+  && codegrep "$PS" '브라우저가 안 열리면: 이 설치 창에 보이는 https:// 주소' && codegrep "$PS" '기다리셔도 됩니다 — 20분 뒤 저절로 다음 안내가 나옵니다' \
+  && no_code "$PS" '새로 뜬 로그인 창'
+ck "[login-clip] 카드는 복사만·안 되면 설치 창에 붙여넣기·주소는 설치 창에·기다려도 됨을 말한다" $? "카드가 옛 창 기준으로 말한다(${GREP_WHY})"
 no_code "$PS" 'LoginCardLines \| Select-Object -Skip 1' && no_code "$PS" 'Ctrl-C 를 누르시면'; rc=$?
 ck "[v0317] 기다리는 동안 설치 창에 카드를 되풀이하지 않는다" "$rc" "되풀이가 남았다(${GREP_WHY})"
 count_or_fail "$PS" '\[5분 점검\]'; n="$COUNT_N"
@@ -2322,8 +2331,8 @@ for f in "$PS" "$RESET" "$REIN_PS"; do
   codegrep "$f" '1\) ⊞ 윈도우 키\(키보드 왼쪽 아래, Ctrl과 Alt 사이\)를 누르고 powershell' && no_code "$f" '시작 단추를 누르고'; rc=$?
   ck "[v0317] 다시 하시는 법 첫 줄은 윈도우 키(사이트와 같은 말) · $(basename "$f")" "$rc" "(${GREP_WHY})"
 done
-codegrep "$PS" "^\\\$InstallerVersion *= '0\.3\.17'" && codegrep "$SH" '^INSTALLER_VERSION="0\.3\.17"'
-ck "[v0317] 판본 0.3.17(두 설치기)" $? "보고의 판본이 갈린다"
+codegrep "$PS" "^\\\$InstallerVersion *= '0\.3\.18'" && codegrep "$SH" '^INSTALLER_VERSION="0\.3\.18"'
+ck "[v0318] 판본 0.3.18(두 설치기)" $? "보고의 판본이 갈린다"
 # 확인 명령 한 번에도 상한 — 없으면 벤더 도구가 멈추는 순간 20분 상한까지 함께 멈춘다(이종 검토 1R 지적 채택).
 awk '/^function Get-LoginStatusText/{f=1}
      f&&/Start-Process -FilePath \$exe -ArgumentList .auth.,.status. .*-RedirectStandardOutput/{s=1}
@@ -2375,6 +2384,18 @@ elif [ -f "$DIR/../tests/v0318-emu-run.sh" ]; then
 else
   sk "[v0318] 흉내 실행 시험" "시험 파일을 못 찾았다"
 fi
+# ── 재설치 사람 손 0(2026-09-15 · v0.3.18 에서 편입) — 실물 reinstall.ps1 → 실물 reset-clean.ps1 -KeepApp -Yes → 가짜 설치 도우미 ──
+# ★이 축의 갈래는 tests/reinstall-keepapp-mutate.py 뮤턴트로 붉어지는 것을 확인한다.
+if [ "${REINSTALL_EMU_SKIP:-}" = "1" ]; then
+  sk "[재설치] 흉내 실행 시험" "REINSTALL_EMU_SKIP=1 — 뮤턴트 러너가 끈 것"
+elif ! command -v pwsh >/dev/null 2>&1; then
+  sk "[재설치] 흉내 실행 시험" "pwsh 가 없다"
+elif [ -f "$DIR/../tests/reinstall-keepapp-emu-run.sh" ]; then
+  bash "$DIR/../tests/reinstall-keepapp-emu-run.sh" --dir "$DIR" >/dev/null 2>&1
+  ck "[재설치] 흉내 실행 시험이 전건 통과한다(묻는 자리 0 · 프로그램 남김 · 설치 도우미 도달 · 편성 기록 지움)" $? "bash tests/reinstall-keepapp-emu-run.sh 로 자세히"
+else
+  sk "[재설치] 흉내 실행 시험" "시험 파일을 못 찾았다"
+fi
 
 echo "== 텔레메트리 — 진행 자동 전송·진단 자료 자동 수집 (계약 v1 2026-09-15 · additive) =="
 # ★이 절의 동작 축은 tests/telemetry-mutate.py 뮤턴트로 붉어지는 것을 확인한다(전송 제거·fail-open 제거·첨부 제거).
@@ -2392,7 +2413,7 @@ codegrep "$PS" "'install-id'" && codegrep "$PS" '8,36' && codegrep "$PS" 'return
 ck "[텔레메트리] 설치 번호를 만들어 두고 재사용한다" $? "번호 자리·모양·재사용 검사 중 하나가 없다"
 # 첫 화면 고지 = 서버 정본 문안(계약 2절 정본 1곳) · [1/10] 에서 찍는다.
 codegrep "$PS" '^    Say \(.     . \+ \$ProgressNotice\)' \
-  && codegrep "$PS" '진행 상황\(단계·경과·판본·백신 이름·브라우저\)을 자동으로 보내고'
+  && codegrep "$PS" '설치가 진행되는 동안 단계와 시각이 자동으로 전송됩니다\. 설치가 막히면 설치 창에 표시된 글자만 보내지며, 로그인 코드·이메일·계정 이름은 가려집니다\. 보관 30일 뒤 자동 삭제됩니다\.'   # v0.3.18 새 정본(서버 df326ab)
 ck "[텔레메트리] 첫 화면 고지가 서버 정본 문안과 같다" $? "첫 화면에 고지를 안 찍거나 문안이 다르다(계약 2절)"
 # [1/10] 뒤 살핌(info) 이벤트에 환경 전체를 싣는다.
 codegrep "$PS" "Send-Progress '1/10' 'info' \\\$null \\\$null \(Get-InstallEnv\)"

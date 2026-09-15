@@ -6,14 +6,14 @@ Set-Content -Path "$Sb/scenario" -Value $Scenario -NoNewline
 # 가짜 공식 설치기 자리(pwsh 이름) — 자식 sleep 을 두고 영원히 안 끝난다
 Set-Content -Path "$Sb/bin/pwsh" -Value "#!/bin/bash`n/bin/sleep 3011 &`nwait`n" -NoNewline
 & chmod +x "$Sb/bin/pwsh"
-# 받을 파일(가짜 claude.exe) — install latest 는 시나리오에 따라 멈추거나 제자리에 둔다
+# 받을 파일(가짜 claude.exe) — install stable 는 시나리오에 따라 멈추거나 제자리에 둔다
 $fake = @'
 #!/bin/bash
 SB="__SB__"
 case "$1 $2" in
   "--version "*) echo "9.9.9 (Claude Code)"; exit 0 ;;
   "--help "*) echo "Commands:"; echo "  auth    Manage authentication"; exit 0 ;;
-  "install latest")
+  "install stable")
      if [ "$(cat "$SB/scenario")" = step5ok ]; then mkdir -p "$SB/home/.local/bin"; cp "$0" "$SB/home/.local/bin/claude.exe"; chmod +x "$SB/home/.local/bin/claude.exe"; exit 0; fi
      /bin/sleep 3022 & wait ;;
   "auth status") echo '{"loggedIn": true}'; exit 0 ;;
@@ -41,7 +41,7 @@ $ClaudeDirectInstallWaitMs = 3000; $ClaudeVersionWaitMs = 5000
 function Invoke-RestMethod {
     [CmdletBinding()] param($Uri, [switch]$UseBasicParsing, $TimeoutSec)
     Add-Content -Path "$Sb/net.log" -Value ("IRM " + $Uri)
-    if ($Uri -like '*/latest') { return "9.9.9`n" }
+    if ($Uri -like '*/stable') { return "9.9.9`n" }
     if ($Uri -like '*/manifest.json') { return [pscustomobject]@{ platforms = [pscustomobject]@{ 'win32-x64' = [pscustomobject]@{ checksum = $script:FakeSum; size = 227051168 } } } }
     throw ("unexpected " + $Uri)
 }

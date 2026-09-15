@@ -1,0 +1,119 @@
+{
+  "_readme": [
+    "박사님 결정 2026-09-15 19:5x(master#bed9bba7): 마스킹 규칙은 한 곳(서버 = src/mask.ts)에 정의하고, 설치기(S2 · 731)의",
+    "PowerShell 정규식은 이 파일에서 파생한다. '같은 입력 → 같은 출력'은 이 vectors 배열로 대조 시험된다 —",
+    "TS 쪽은 test/mask.test.ts의 'mask-vectors.json 골든 대조' 케이스가 이 파일을 직접 읽어 검증한다.",
+    "S2(PowerShell) 쪽도 이 파일을 그대로 읽어(Pester 등) 자기 -replace 구현을 같은 vectors 로 검증하는 것을 권장한다.",
+    "vectors의 input/expected 는 전부 지어낸 합성 문자열이다 — 실제 이메일·토큰·로그인 코드가 아니다.",
+    "로그인 코드 범주(login_code)는 731 의뢰 답신(master#4f48077c 2026-09-15 19:54 · claude CLI 바이너리 실측)에",
+    "근거한다: 프롬프트 레이블 'Paste code here if prompted > ' · 코드 모양 <authorization_code>#<state>(둘 다 URL-safe).",
+    "★적용 순서(중요 — 정본은 src/mask.ts 의 4단계 sentinel 방식. 이 파일의 vectors 는 '무엇이 맞는 답인가'를",
+    "규정하는 골든 케이스이고, 순서를 어떻게 구현하든 PS1 쪽도 이 vectors 를 전부 통과해야 한다):",
+    "①원문(raw)에서 harvestNames 로 이름만 뽑아 둔다(치환은 아직 안 한다) ②원문에 다섯 구조 패턴을 적용하되,",
+    "치환한 자리에는 진짜 표식(<EMAIL> 등) 대신 sentinel(다른 무엇과도 안 겹치는 임시 토큰)을 심고 무엇을",
+    "심었는지 따로 기억해 둔다 ③①의 이름을 — sentinel 이 아닌 나머지 글자에서만 — <USER> 로 치환한다",
+    "④sentinel 을 기억해 둔 진짜 표식으로 되돌린다. 왜 ②에서 sentinel 을 심는가: ③을 구조 패턴 '결과' 위에서",
+    "바로 하면(2단계 축약) 수확한 이름이 하필 구조 패턴이 보존한 접두사(C:\\Users\\ 의 'Users')나 표식 자체의",
+    "글자(<EMAIL> 의 'EMAIL')와 우연히 겹칠 때 그 결과가 다시 뭉개진다(agy 2R REVISE 2026-09-15 · mask.ts).",
+    "4가지 golden case 가 이 순서 전체를 규정한다(모두 vectors 배열에 있다 — order_dependency_1~4):",
+    "① 이름을 구조보다 먼저 지우면: USERNAME=hong + hong@example.com → '<USER>@example.com'(틀림 · wrangler",
+    "dev 스모크 발견). ② 구조 결과에서 이름을 뽑으면: USERPROFILE=C:\\Users\\hong → 'USERPROFILE=<USER>'",
+    "(틀림 · agy 1R). ③ sentinel 없이 구조 결과 위에서 이름을 치환하면: USERNAME=Users + C:\\Users\\hong\\… →",
+    "'C:\\<USER>\\<USER>\\…'(틀림 · agy 2R — 접두사 파괴). ④ 같은 이유로: USERNAME=EMAIL + hong@example.com →",
+    "'<<USER>>'(틀림 · agy 2R — 표식 파괴). 정답은 네 경우 모두 이름과 구조 결과가 서로 안 밟는 것 — 이",
+    "vectors 파일의 order_dependency_1~4 항목이 그 정답을 고정한다. PS1 포팅도 이 네 vector 를 전부 통과해야",
+    "한다(어떤 구현 방식을 쓰든 — sentinel 이 유일한 정답은 아닐 수 있으나, 이 네 결과는 불변이다)."
+  ],
+  "categories": [
+    {
+      "name": "email",
+      "placeholder": "<EMAIL>",
+      "js_regex": "/[A-Za-z0-9._%+-]{1,64}@[A-Za-z0-9-]{1,63}(?:\\.[A-Za-z0-9-]{1,63})*\\.[A-Za-z]{2,63}/g",
+      "ps1_regex": "[A-Za-z0-9._%+-]{1,64}@[A-Za-z0-9-]{1,63}(?:\\.[A-Za-z0-9-]{1,63})*\\.[A-Za-z]{2,63}",
+      "ps1_flags": "none — case-insensitive not required"
+    },
+    {
+      "name": "token",
+      "placeholder": "<TOKEN>",
+      "js_regex": "/\\bBearer\\s+[A-Za-z0-9._~+/=-]+/gi",
+      "ps1_regex": "(?i)\\bBearer\\s+[A-Za-z0-9._~+/=-]+"
+    },
+    {
+      "name": "token",
+      "placeholder": "<TOKEN>",
+      "js_regex": "/\\bsk-[A-Za-z0-9_-]{8,}/g",
+      "ps1_regex": "\\bsk-[A-Za-z0-9_-]{8,}",
+      "ps1_flags": "none — case-sensitive, the sk- prefix is always lowercase"
+    },
+    {
+      "name": "login_code",
+      "placeholder": "<LOGIN_CODE>",
+      "note": "claude CLI 로그인 붙여넣기 코드의 모양 자체(레이블 없이도 잡는다). confidence: high(731 회신 근거·합성 시험만 존재).",
+      "js_regex": "/\\b[A-Za-z0-9_-]{20,}#[A-Za-z0-9_-]{8,}\\b/g",
+      "ps1_regex": "\\b[A-Za-z0-9_-]{20,}#[A-Za-z0-9_-]{8,}\\b"
+    },
+    {
+      "name": "login_code",
+      "placeholder": "$1<LOGIN_CODE>",
+      "note": "claude CLI 프롬프트 레이블 앵커(2중 방어 — 코드가 위 모양과 조금 달라도 레이블 뒤 토큰은 잡는다). 레이블 문구 자체는 보존.",
+      "js_regex": "/(Paste code here if prompted\\s*>\\s*)(\\S+)/gi",
+      "ps1_regex": "(?i)(Paste code here if prompted\\s*>\\s*)(\\S+)"
+    },
+    {
+      "name": "home_account",
+      "placeholder": "$1<USER>",
+      "note": "윈도우 홈 경로 — 계정명 구간만 치환, 나머지 경로(C:\\Users\\·그 뒤)는 보존(과잉 마스킹 금지).",
+      "js_regex": "/\\b([A-Za-z]:(?:\\\\{1,2}|\\/)Users(?:\\\\{1,2}|\\/))([^\\\\/\\r\\n\"'<>|:*?]+)/gi",
+      "ps1_regex": "(?i)\\b([A-Za-z]:(?:\\\\{1,2}|/)Users(?:\\\\{1,2}|/))([^\\\\/\\r\\n\"'<>|:*?]+)"
+    },
+    {
+      "name": "home_account",
+      "placeholder": "$1<USER>",
+      "note": "맥 홈 경로 — 계정명 구간만 치환.",
+      "js_regex": "/(\\/Users\\/)([^/\\s\"'<>]+)/g",
+      "ps1_regex": "(/Users/)([^/\\s\"'<>]+)"
+    },
+    {
+      "name": "harvested_name",
+      "placeholder": "<USER>",
+      "note": "scrub.ts NAME_LINES 재사용(구조는 동일 — 하베스팅 뒤 발견된 각 이름을 <USER> 로 단일 패스 치환). 정규식 자체는 JS·PS1 동일.",
+      "js_regex": "/\\b(?:USERNAME|USERPROFILE|LOGNAME|USER|HOME)\\b[ \\t]*[=:][ \\t]*([^\\r\\n]+)|\\bwhoami\\b[ \\t]*[:=>][ \\t]*([^\\r\\n]+)|(?:^|\\n)[ \\t]*([A-Za-z][A-Za-z0-9.-]{1,63}\\\\[A-Za-z0-9._-]{2,63})[ \\t]*(?:\\r?\\n|$)/gi",
+      "ps1_regex": "(?i)\\b(?:USERNAME|USERPROFILE|LOGNAME|USER|HOME)\\b[ \\t]*[=:][ \\t]*([^\\r\\n]+)|\\bwhoami\\b[ \\t]*[:=>][ \\t]*([^\\r\\n]+)|(?:^|\\n)[ \\t]*([A-Za-z][A-Za-z0-9.-]{1,63}\\\\[A-Za-z0-9._-]{2,63})[ \\t]*(?:\\r?\\n|$)"
+    }
+  ],
+  "vectors": [
+    { "category": "email", "input": "문의: hong.gildong+test@example.co.kr 로 보내 주세요", "expected": "문의: <EMAIL> 로 보내 주세요" },
+    { "category": "token", "input": "Authorization: Bearer abcSECRET123.tok-en", "expected": "Authorization: <TOKEN>" },
+    { "category": "token", "input": "key=sk-abcdefgh12345678 저장됨", "expected": "key=<TOKEN> 저장됨" },
+    { "category": "login_code", "input": "받은 코드: aBcDeFgHiJkLmNoPqRsTuVwXyZ012345-_#AbCdEfGh12 붙여넣기 완료", "expected": "받은 코드: <LOGIN_CODE> 붙여넣기 완료" },
+    { "category": "login_code", "input": "Paste code here if prompted > xyz-not-hash-shaped-token", "expected": "Paste code here if prompted > <LOGIN_CODE>" },
+    { "category": "home_account", "input": "C:\\Users\\홍길동\\install-jarvis\\bootstrap.log 없음", "expected": "C:\\Users\\<USER>\\install-jarvis\\bootstrap.log 없음" },
+    { "category": "home_account", "input": "/Users/hong/install-jarvis/bootstrap.log 없음", "expected": "/Users/<USER>/install-jarvis/bootstrap.log 없음" },
+    { "category": "harvested_name", "input": "USERNAME=hong\n[3/10] hong 계정으로 진행 중", "expected": "USERNAME=<USER>\n[3/10] <USER> 계정으로 진행 중" },
+    { "category": "none", "input": "[5/10] 받은 파일이 사라졌습니다 · rc=1 · Windows 11 23H2 · 관리자 아님", "expected": "[5/10] 받은 파일이 사라졌습니다 · rc=1 · Windows 11 23H2 · 관리자 아님", "note": "과잉 마스킹 금지 — 네 범주에 안 걸리는 평범한 진단 문구는 원문 그대로" },
+    {
+      "category": "order_dependency_1",
+      "input": "USERNAME=hong\n문의 hong@example.com Bearer supersecrettoken123",
+      "expected": "USERNAME=<USER>\n문의 <EMAIL> <TOKEN>",
+      "note": "적용 순서 golden case 1(위 _readme 참조 · wrangler dev 스모크 발견) — 이름을 원문보다 먼저 치환하면(2단계 '이름 먼저') '<USER>@example.com' 이 나와 이 vector 가 깨진다."
+    },
+    {
+      "category": "order_dependency_2",
+      "input": "USERPROFILE=C:\\Users\\hong\n[4/10] hong 님 환영합니다",
+      "expected": "USERPROFILE=C:\\Users\\<USER>\n[4/10] <USER> 님 환영합니다",
+      "note": "적용 순서 golden case 2(위 _readme 참조 · agy 1R 발견 · mask.ts:59) — 구조 패턴을 먼저 적용한 '결과'에서 이름을 뽑으면(2단계 '구조 먼저') 'USERPROFILE=<USER>' 로 C:\\Users\\ 접두사가 사라져 이 vector 가 깨진다. 이름은 반드시 원문(raw)에서 뽑아야 한다."
+    },
+    {
+      "category": "order_dependency_3",
+      "input": "USERNAME=Users\nC:\\Users\\hong\\install-jarvis\\bootstrap.log 없음",
+      "expected": "USERNAME=<USER>\nC:\\Users\\<USER>\\install-jarvis\\bootstrap.log 없음",
+      "note": "적용 순서 golden case 3(agy 2R 발견 2026-09-15) — 계정 이름이 하필 'Users'일 때, sentinel 없이 구조 패턴 '결과' 위에서 이름을 치환하면 그 결과에 그대로 남아 있는 문자열 'Users'(C:\\Users\\ 접두사 안)까지 <USER> 로 뭉개져 'C:\\<USER>\\<USER>\\…'가 된다. 구조 패턴이 쓴 영역은 이름 치환이 못 보게 가려야 한다."
+    },
+    {
+      "category": "order_dependency_4",
+      "input": "USERNAME=EMAIL\n문의 hong@example.com",
+      "expected": "USERNAME=<USER>\n문의 <EMAIL>",
+      "note": "적용 순서 golden case 4(agy 2R 발견 2026-09-15) — 계정 이름이 하필 'EMAIL'일 때, sentinel 없이 구조 패턴이 심은 표식(<EMAIL>) 위에서 이름을 치환하면 표식 안의 문자열 'EMAIL'까지 걸려 '<<USER>>'로 표식 자체가 깨진다. 표식도 이름 치환이 못 보게 가려야 한다."
+    }
+  ]
+}

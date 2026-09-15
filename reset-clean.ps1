@@ -704,12 +704,20 @@ function Get-CysTasks {
     }
     return $ours
 }
+# 우리가 사용자 Path 에 심은 조각 — 클로드 자리(~\.local\bin)와, 프로그램까지 지울 때는 cys 자리(v0.3.18 · bootstrap Seed-CysPath).
+#   -KeepApp 이면 cys 프로그램이 남으므로 그 자리도 남긴다(남은 프로그램을 새 창에서 부를 수 있어야 한다).
+function Get-UserPathSeedDirs {
+    $d = @($ClaudeBin)
+    if (-not $KeepApp) { $d += $CysDir.TrimEnd('\'); $d += $CysDirOld.TrimEnd('\') }
+    return $d
+}
 function Test-UserPathSeed {
     $u = [Environment]::GetEnvironmentVariable('Path','User')
     if (-not $u) { return $false }
+    $seeds = @(Get-UserPathSeedDirs)
     foreach ($p in ($u -split ';')) {
         if (-not $p) { continue }
-        if ([Environment]::ExpandEnvironmentVariables($p).TrimEnd('\') -ieq $ClaudeBin) { return $true }
+        if ($seeds -contains [Environment]::ExpandEnvironmentVariables($p).TrimEnd('\')) { return $true }
     }
     return $false
 }
@@ -784,7 +792,9 @@ function Invoke-Diagnose {
     # footprint: W-CLAUDEUSER
     if (Test-Path $CysCredFile) {
         Write-Host ('  [있음] 자비스 창 전용 로그인 · ' + (Short $CysCredFile))
-        Write-Host '         ⚠이것은 위의 「cys 계정 자리」 안에 들어 있어 **함께 지워집니다.**'
+        # 🔴v0.3.18 — 화면 줄에 기호 이모지(⚠ U+26A0)를 쓰지 않는다. 윈 4차 실기(2026-09-15): Windows PowerShell 5.1 콘솔이 이 글자 뒤 칸 폭을 잘못 세어
+        #   이 절의 뒤 줄들이 「남남깁깁니니다다」로 겹쳐 찍혔다(이 글자가 없는 다른 절은 정상) — 인코딩이 아니라 글자 폭 문제다. ⇒ 글자로 쓴다.
+        Write-Host '         주의: 이것은 위의 「cys 계정 자리」 안에 들어 있어 **함께 지워집니다.**'
         Write-Host '         자비스 창에서 하신 로그인은 다시 하셔야 합니다 — 윈도우에서 하신 로그인과는 별개입니다.'
     }
     if (Test-Path $ClaudeDir) { Write-Host ('  [있음] 클로드 대화·기록 · ' + (Short $ClaudeDir) + ' (남깁니다)') }
@@ -1121,10 +1131,11 @@ function Remove-UserPathSeed {
     if (-not (Test-UserPathSeed)) { return }
     try {
         $u = [Environment]::GetEnvironmentVariable('Path','User')
+        $seeds = @(Get-UserPathSeedDirs)
         $keep = @()
         foreach ($p in ($u -split ';')) {
             if (-not $p) { continue }
-            if ([Environment]::ExpandEnvironmentVariables($p).TrimEnd('\') -ieq $ClaudeBin) { continue }
+            if ($seeds -contains [Environment]::ExpandEnvironmentVariables($p).TrimEnd('\')) { continue }
             $keep += $p
         }
         [Environment]::SetEnvironmentVariable('Path', ($keep -join ';'), 'User')

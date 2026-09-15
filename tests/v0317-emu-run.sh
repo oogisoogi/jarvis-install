@@ -10,6 +10,8 @@
 #   ⑤ 새 창을 못 띄우면 이 창에서 한다 — 벤더 출력이 화면으로 가고 결과는 스크립트 변수로 돌아온다
 #   ⑥ 끝맺음 — 조용히 넘긴 확인 오류를 끝난 원인처럼 적지 않는다
 #   ⑦ 확인 명령이 멈춰도 한 번의 상한에서 끄고 20분 상한이 밀리지 않는다(이종 검토 1R 지적)
+#   ⑧ 코드 넣기(2026-09-15 윈도우 샌드박스) — 복사된 코드를 로그인 입력에 한 줄로 넣는다 · 예전 코드·모양 아닌 내용은 안 넣는다
+#      · 같은 코드는 한 번 · 한 번 연 로그인에서 최대 3회 · 코드·복사 내용은 기록에 안 남는다(흉내 파일만 읽는다 — 진짜 클립보드 무접촉)
 #
 # 쓰는 법: bash tests/v0317-emu-run.sh [--dir <install-master 자리>]
 #   rc 0 = 전건 통과 · 1 = 실패 있음 · 2 = 잴 수 없음(pwsh 가 없다)
@@ -32,7 +34,7 @@ PS="$(cd "$DIR" && pwd)/bootstrap.ps1"
 EMU="$HERE/v0317-emu"
 BASE="$(mktemp -d -t v0317-emu)" || exit 2
 BASE="$(cd "$BASE" && pwd -P)" || exit 2
-cleanup() { pkill -f 'sleep 307[1-7]' 2>/dev/null; rm -rf "$BASE"; }
+cleanup() { pkill -f 'sleep 307[1-8]' 2>/dev/null; rm -rf "$BASE"; }
 trap cleanup EXIT
 pass=0; fail=0
 ok()  { pass=$((pass+1)); printf '  ok   %s\n' "$1"; }
@@ -45,7 +47,7 @@ cnt() { grep -cE -- "$2" "$1" 2>/dev/null; }
 left() { pgrep -f "$1" 2>/dev/null | wc -l | tr -d ' '; }
 
 echo "== v0.3.17 [3/10] 새 창 로그인 =="
-for s in slow-approve instant-return hang hang-ask file-only no-status file-not-logged stale-file status-hang inline closing-quiet closing-loud; do
+for s in slow-approve instant-return hang hang-ask file-only no-status file-not-logged stale-file status-hang inline closing-quiet closing-loud clip-inject clip-stale clip-junk clip-repeat clip-many; do
   SB="$BASE/$s"; mkdir -p "$SB"
   run_ps "$EMU/login.ps1" -Src "$PS" -Scenario "$s" -Sb "$SB" >"$SB/out.txt" 2>"$SB/err.txt"
   L="$SB/home/install-jarvis/bootstrap.log"; R="$SB/home/install-jarvis/env-report.md"
@@ -78,6 +80,8 @@ for s in slow-approve instant-return hang hang-ask file-only no-status file-not-
       has "$L" 'login fail answer: no-console-input' && has "$R" '^- 상한에서 받은 답: no-console-input'
       t $? "[무한 대기] 상한 실패에서 묻는다 — 콘솔 입력이 없으면 그 사실을 표지로 적는다" "답 표지가 없다"
       [ "$(cnt "$L" '\[5분 점검\]')" = "1" ]; t $? "[무한 대기] 5분 점검은 한 번만 말한다" "$(cnt "$L" '\[5분 점검\]')번"
+      has "$L" '스스로 푸는 법: 새 PowerShell 창을 열고 claude 를 입력해 Enter' && [ "$(cnt "$L" '스스로 푸는 법')" = "1" ]
+      t $? "[무한 대기] 로그인이 끝내 안 되면 스스로 푸는 법(새 창에서 claude 직접)을 한 번 말한다" "$(cnt "$L" '스스로 푸는 법')번"
       ! grep -q '1) 열려 있는 Claude 탭' "$SB/err.txt"; t $? "[무한 대기] 기다리는 동안 설치 창에 카드를 되풀이하지 않는다" "되풀이됐다"
       [ "$(left 'sleep 3071')" = "0" ]; t $? "[무한 대기] 끝낸 창이 남지 않는다" "남은 대기 프로세스 $(left 'sleep 3071')개"
       ;;
@@ -112,8 +116,8 @@ for s in slow-approve instant-return hang hang-ask file-only no-status file-not-
       [ "$(left 'sleep 307[67]')" = "0" ]; t $? "[확인 명령 멈춤] 멈춘 확인 명령과 창이 남지 않는다" "남은 대기 프로세스 $(left 'sleep 307[67]')개"
       ;;
     inline)
-      grep -q 'EMU-VENDOR-LOGIN-OUTPUT' "$SB/out.txt" && has "$L" 'login stage: inline' && has "$L" 'TEST rc=0 JCode= LoggedIn=True'
-      t $? "[이 창 폴백] 새 창을 못 띄우면 이 창에서 하고 벤더 출력은 화면으로 · 결과는 변수로" "폴백 줄·화면 출력·결과 중 어긋남"
+      ! grep -q 'EMU-VENDOR-LOGIN-OUTPUT' "$SB/out.txt" && [ "$calls" = "0" ] && has "$L" 'login stage: start-failed' && has "$L" 'TEST rc=5 JCode=J-LOGIN-01' && has "$L" '스스로 푸는 법'
+      t $? "[띄우기 실패] 로그인 프로세스를 못 띄우면 이 창에서 벤더 로그인을 부르지 않고 스스로 푸는 법과 함께 J-LOGIN-01" "벤더 호출 ${calls}번 · 또는 단계 표지·끝 코드·스스로 푸는 법 중 어긋남"
       ;;
     closing-quiet)
       has "$L" 'unexpected end: no error recorded' && has "$L" 'unexpected end: skipped 1 quietly handled' && ! has "$L" 'unexpected end: last error' && has "$L" 'unexpected end: last login stage = confirm'
@@ -122,6 +126,35 @@ for s in slow-approve instant-return hang hang-ask file-only no-status file-not-
     closing-loud)
       has "$L" 'unexpected end: last error \(참고 · 끝난 원인이 아닐 수 있음\) = System\.Management\.Automation\.ItemNotFoundException' && has "$L" 'unexpected end: skipped 1 quietly handled'
       t $? "[끝맺음] 조용히 넘기지 않은 오류는 「참고」 표지를 달아 적는다" "$(grep 'unexpected end' "$L" | head -3 | tr '\n' '|' | cut -c1-200)"
+      ;;
+    clip-inject)
+      lines="$(cat "$SB/lines" 2>/dev/null || echo 0)"
+      has "$L" 'TEST rc=0 JCode= LoggedIn=True' && has "$L" 'login code sent from clipboard 1 after [0-9]+s' && [ "$lines" = "1" ] && [ "$calls" = "1" ]
+      t $? "[클립보드 코드] 복사만 하면 설치기가 코드를 로그인 입력에 넣어 통과한다" "넣은 줄 ${lines} · 승인 창 ${calls}번"
+      ! grep -q 'EMUgood' "$L" "$SB/out.txt" && { [ ! -f "$R" ] || ! grep -q 'EMUgood' "$R"; }
+      t $? "[클립보드 코드] 코드 원문을 기록·화면·보고에 남기지 않는다" "코드 원문이 남았다"
+      ;;
+    clip-stale)
+      lines="$(cat "$SB/lines" 2>/dev/null || echo 0)"
+      [ "$lines" = "0" ] && has "$L" 'TEST rc=5 JCode=J-LOGIN-01' && ! has "$L" 'login code sent'
+      t $? "[클립보드 예전 코드] 로그인을 열기 전부터 복사돼 있던 코드는 넣지 않는다" "넣은 줄 ${lines}"
+      has "$R" '^- 코드 넣기: 복사된 코드 0회 · 설치 창 붙여넣기 0회'
+      t $? "[클립보드 예전 코드] 코드 넣기 횟수를 환경 보고에 싣는다" "보고에 코드 넣기 줄이 없다"
+      ;;
+    clip-junk)
+      lines="$(cat "$SB/lines" 2>/dev/null || echo 0)"
+      [ "$lines" = "0" ] && ! grep -qE 'oauth/authorize|short#code|EMUJUNK|emu-before-login' "$L" "$SB/out.txt" && { [ ! -f "$R" ] || ! grep -qE 'oauth/authorize|short#code|EMUJUNK|emu-before-login' "$R"; }
+      t $? "[클립보드 모양 아님] 코드 모양이 아닌 복사 내용은 넣지도 적지도 않는다" "넣은 줄 ${lines} · 또는 복사 내용이 남았다"
+      ;;
+    clip-repeat)
+      lines="$(cat "$SB/lines" 2>/dev/null || echo 0)"
+      [ "$lines" = "1" ] && [ "$(cnt "$L" 'login code sent from clipboard')" = "1" ]
+      t $? "[클립보드 같은 코드] 받아들여지지 않은 같은 코드는 한 번만 넣는다" "넣은 줄 ${lines}"
+      ;;
+    clip-many)
+      lines="$(cat "$SB/lines" 2>/dev/null || echo 0)"
+      [ "$lines" = "3" ]
+      t $? "[클립보드 여러 코드] 한 번 연 로그인에서 서로 다른 코드도 최대 3회만 넣는다" "넣은 줄 ${lines}"
       ;;
   esac
 done

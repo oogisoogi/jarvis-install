@@ -61,11 +61,11 @@ for s in hang5 step5ok mismatch av; do
       has "$L" 'install hold diag \(공식 설치기\): ~\\\.local\\bin\\claude\.exe: '; t $? "[hang5] claude.exe 상태 줄을 적는다" "claude.exe 줄이 없다"
       has "$L" 'install hold diag \(공식 설치기\): 공식 설치기가 받던 파일'; t $? "[hang5] 공식 설치기가 받던 파일 줄을 적는다(③/⑤ 판별)" "받던 파일 줄이 없다"
       has "$R" '^## \[2/10\] 설치가 상한에 닿았을 때 본 것'; t $? "[hang5] 같은 진단이 환경 보고(보내는 본문)에도 있다" "환경 보고에 없다"
-      [ "$(sed -n 1p "$N")" = "IRM https://downloads.claude.ai/claude-code-releases/latest" ] && [ "$(sed -n 2p "$N")" = "IRM https://downloads.claude.ai/claude-code-releases/9.9.9/manifest.json" ] && sed -n 3p "$N" | grep -q '^IWR https://downloads.claude.ai/claude-code-releases/9.9.9/win32-x64/claude.exe -> '
+      [ "$(sed -n 1p "$N")" = "IRM https://downloads.claude.ai/claude-code-releases/stable" ] && [ "$(sed -n 2p "$N")" = "IRM https://downloads.claude.ai/claude-code-releases/9.9.9/manifest.json" ] && sed -n 3p "$N" | grep -q '^IWR https://downloads.claude.ai/claude-code-releases/9.9.9/win32-x64/claude.exe -> '
       t $? "[hang5] 공식 설치기와 같은 주소를 같은 차례로 부른다(판본 → 해시 → 파일)" "부른 주소가 다르다: $(tr '\n' '|' < "$N" | cut -c1-160)"
       has "$L" 'install direct: step4 checksum ok'; t $? "[hang5] 해시를 대조했다" "대조 줄이 없다"
       has "$L" 'install hold diag \(⑤ 받은 파일로 설치\): 설치기 프로세스 번호'; t $? "[hang5] ⑤가 멈추면 그 자리의 진단을 따로 적는다" "⑤ 진단 줄이 없다"
-      has "$L" 'install direct: step5 install latest timeout'; t $? "[hang5] ⑤ 결과(상한)를 기록한다" "⑤ 결과 줄이 없다"
+      has "$L" 'install direct: step5 install stable timeout'; t $? "[hang5] ⑤ 결과(상한)를 기록한다" "⑤ 결과 줄이 없다"
       # ⚠기록 줄만 보면 옮기기(Move-Item)를 지워도 초록이었다(v0316-mutate emu-place-skip 눈멂 · 2026-09-14 22:34) — 파일 자리와 임시 파일까지 본다.
       has "$L" 'install direct: placed ~/\.local/bin/claude\.exe' && [ -f "$SB/home/.local/bin/claude.exe" ] && [ ! -e "$SB/home/.local/bin/claude.exe.jarvis-new" ]
       t $? "[hang5] 받은 파일을 제자리에 둔다" "기록 줄·제자리 파일·임시 파일(.jarvis-new) 중 어긋남: $(ls -a "$SB/home/.local/bin" 2>/dev/null | tr '\n' ' ')"
@@ -76,7 +76,7 @@ for s in hang5 step5ok mismatch av; do
       [ "$(left 'sleep 30(11|22)')" = "0" ]; t $? "[hang5] 끈 설치기의 자식이 남지 않는다" "남은 대기 프로세스 $(left 'sleep 30(11|22)')개"
       ;;
     step5ok)
-      has "$L" 'install direct: step5 install latest rc=0' && ! has "$L" 'install direct: placed'
+      has "$L" 'install direct: step5 install stable rc=0' && ! has "$L" 'install direct: placed'
       t $? "[step5ok] ⑤가 스스로 끝나면 공식 설치 결과를 그대로 쓴다(직접 두지 않는다)" "⑤ 결과를 안 썼다"
       has "$L" 'TEST install rc=0'; t $? "[step5ok] 설치가 이어진다" "rc 가 0 이 아니다"
       ;;
@@ -85,7 +85,7 @@ for s in hang5 step5ok mismatch av; do
       has "$L" 'install direct: step4 checksum mismatch' && ! has "$L" 'install direct: step5' && ! has "$L" 'install direct: placed'
       t $? "[mismatch] 해시가 틀리면 그 파일을 실행하지도 두지도 않는다" "해시가 틀린 파일을 썼다"
       has "$L" 'TEST install rc=4 JCode=J-AV-01'; t $? "[mismatch] 끝내 못 하면 J-AV-01 · 0 이 아닌 값으로 멈춘다" "멈춤 값이 틀렸다"
-      [ "$(cnt "$L" 'irm https://claude\.ai/install\.ps1 \| iex')" = "1" ]; t $? "[mismatch] 2회째부터 공식 설치기 한 줄을 직접 안내한다" "안내가 $(cnt "$L" 'irm https://claude\.ai/install\.ps1 \| iex')번"
+      [ "$(cnt "$L" '\[scriptblock\]::Create\(\(irm https://claude\.ai/install\.ps1\)\)\) stable')" = "1" ]; t $? "[mismatch] 2회째부터 공식 설치기 한 줄을 직접 안내한다" "안내가 $(cnt "$L" '\[scriptblock\]::Create\(\(irm https://claude\.ai/install\.ps1\)\)\) stable')번"
       ;;
     av)
       has "$L" '지금 떠 있는 창 가운데 백신 창으로 보이는 것: 『AhnLab V3 프로그램 실행 알림 \(V3UI\)』'; t $? "[av] 백신 창 제목이 보이면 그 이름을 그대로 화면에 적는다" "창 제목 안내가 없다"

@@ -52,6 +52,10 @@ $ReportHead = '[자비스] 환경 보고 v0'   # ④단 첫 응답의 고정 첫
 
 # ── 핀 (외부 URL은 이 두 줄이 전부다) ─────────────────────────────
 $ClaudeInstallUrl = 'https://claude.ai/install.ps1'
+# 🔴v0.3.18 — 참가자 클로드는 **stable 채널**로 깔고 그 채널에 묶는다(자동 판올림으로 참가자 화면이 수업 중에 바뀌지 않게).
+#   공식 문서(code.claude.com/docs/en/setup · 2026-09-15 확인): 설치기는 `stable` 인자를 받고 「설치 때 고른 채널이 자동 판올림의 기본값이 된다」 ·
+#   설정 열쇠 = settings.json 의 "autoUpdatesChannel": "stable"(약 1주 늦고 큰 퇴행 판을 건너뜀). ⇒ 설치 인자 + 설정 열쇠 둘 다.
+$ClaudeChannel    = 'stable'
 $CysSiteUrl       = 'https://github.com/oogisoogi/cys-ro/releases/latest'   # 손으로 받을 때의 자리 = 우리 릴리스 페이지
 
 # ── 자리 ──────────────────────────────────────────────────────────
@@ -70,11 +74,15 @@ $DlDir         = Join-Path $JarvisHome 'dl'
 # ★2026-09-09 자체 배포 전환(윈도우): 받을 곳 = 우리가 서명해 발행한 릴리스. 벤더 판을 깔면 그 뒤의
 #   업데이트도 벤더 궤도를 타서 우리 수리가 그 기계에 닿지 않는다(노트북 실기 2026-09-09).
 #   맥(bootstrap.sh)은 우리 빌드가 무서명이라 아직 벤더 dmg 그대로다.
-$CysVersion     = '0.14.36'
+# ★★릴리스 핀 자리(v0.3.18) — 다음 판(cysr 1.0.0 · 앱+팩 단일 판번)으로 올릴 때 고치는 곳은 **이 블록뿐**이다:
+#   $CysDisplayName · $CysVersion · $CysWinFile(자산 이름이 바뀌면) · $CysWinBytes · $CysWinSha256 — 값은 발행 뒤 SHA256SUMS.txt 와 대조(tests/win-pin-release.sh).
+#   화면 머리글은 이 값으로 「<이름> <판> · 설치 도우미 <설치기 판>」 을 찍는다(설치기 판 = $InstallerVersion · 별도 semver).
+$CysDisplayName = 'cysr'
+$CysVersion     = '1.0.0'
 $CysDownloadDir = "https://github.com/oogisoogi/cys-ro/releases/download/v${CysVersion}/"
 $CysWinFile     = "cys_${CysVersion}_x64-setup.exe"
-$CysWinBytes    = 139840459
-$CysWinSha256   = '12c9d398b4e11b175370c6fdc7e4fd299b2e74865c5cc0f8bf891a42eaf70066'   # 릴리스 SHA256SUMS.txt 의 줄
+$CysWinBytes    = 139918106
+$CysWinSha256   = 'b63178db8bff46c5769092798ebf1a30f0ae0c7e0a23c750308ad0b59bef33fe'   # 릴리스 SHA256SUMS.txt 의 줄
 $CysDownloadUrl = $CysDownloadDir + $CysWinFile
 
 $LoginPollInterval = 2     # 초 — 승인 프로세스가 끝난 뒤 로그인을 다시 확인하는 간격
@@ -89,6 +97,9 @@ $LoginCheckpointSec  = 300 # 초 (5분) — 브라우저에 로그인 화면이 
 $LoginStatusEverySec = 30  # 초 — 로그인 창이 살아 있는 동안 확인 명령을 부르는 간격(로그인 파일은 5초마다 본다)
 $LoginAskWaitSec     = 60  # 초 — 상한에 닿았을 때 숫자 하나를 기다리는 상한
 $LoginStatusWaitMs   = 20000 # ms — 확인 명령 한 번의 상한(벤더 도구가 멈춰도 20분 상한이 살아 있게)
+$LoginTickMs         = 2000  # ms — 로그인을 기다리는 한 바퀴(이 사이에 복사된 코드·설치 창에 붙여넣은 코드·로그인 파일을 본다)
+$LoginClipMaxSends   = 3     # 한 번 연 로그인에서 복사된 코드를 넣는 최대 횟수(같은 코드는 한 번만 · 서로 다른 코드만 센다)
+$LoginTypedMaxSends  = 3     # 한 번 연 로그인에서 설치 창에 붙여넣은 코드를 넣는 최대 횟수
 # 🔴로그인 카드(2026-09-14 워크숍 · 로그인 막힘 9건) — 승인을 두 번 누르거나 주소창 주소를 붙여넣어 코드가 무효가 됐다(사진 · 400).
 #   「코드를 복사해 붙여넣으라」 한 줄로는 어느 코드·어느 단추인지 몰랐다 ⇒ 로그인 화면을 열기 전에 한 번.
 # 🔴v0.3.17(2026-09-15): ①첫 줄 = 유료 구독 조건(사이트와 같은 말 · 무료 계정은 승인이 끝나지 않아 20분을 그대로 섰다)
@@ -98,10 +109,15 @@ $LoginCardLines = @(
     '     Claude 유료 구독 계정(Pro 이상)이어야 합니다 — 무료 계정으로는 로그인 승인이 끝나지 않습니다.',
     '     로그인은 이렇게 해 주십시오 (3가지만):',
     '     1) 열려 있는 Claude 탭을 모두 닫고, 브라우저에서 「승인」은 한 번만 누르십시오 (두 번 누르면 앞 코드가 무효가 됩니다).',
-    '     2) 「Authentication code」 화면이 뜰 때만 복사 단추로 코드를 복사하십시오 (주소창의 주소는 안 됩니다 · 브라우저가 완료를 보이면 붙여넣지 않으셔도 됩니다).',
-    '     3) 새로 뜬 로그인 창을 한 번 누르고, 마우스 오른쪽 단추로 붙여넣은 뒤 Enter 를 누르십시오 — 5분 안에.',
-    '     브라우저가 안 열리면: 새로 뜬 로그인 창에 보이는 https:// 주소를 복사해 브라우저 주소창에 붙여넣으십시오.',
+    '     2) 「Authentication code」 화면이 뜨면 복사 단추로 코드를 복사만 하십시오 — 붙여넣지 않으셔도 이 설치 창이 몇 초 안에 알아서 넣습니다 (주소창의 주소는 안 됩니다).',
+    '     3) 「코드를 로그인에 넣었습니다」가 안 나오면: 이 설치 창을 한 번 누르고 마우스 오른쪽 단추로 붙여넣은 뒤 Enter 를 누르십시오 — 5분 안에.',
+    '     브라우저가 안 열리면: 이 설치 창에 보이는 https:// 주소를 복사해 브라우저 주소창에 붙여넣으십시오.',
     '     이 설치 창은 닫지 마십시오. 기다리셔도 됩니다 — 20분 뒤 저절로 다음 안내가 나옵니다.'
+)
+# 로그인이 끝내 안 됐을 때 사람이 스스로 푸는 길(윈도우 · 2026-09-15 샌드박스에서 이 길로 로그인이 됐다)
+$LoginSelfFixLines = @(
+    '     스스로 푸는 법: 새 PowerShell 창을 열고 claude 를 입력해 Enter 를 누른 뒤, 그 창에서 로그인을 끝내 주십시오.',
+    '     로그인이 끝나면 그 창은 닫으셔도 됩니다. 그다음 아래 「다시 하시는 법」대로 다시 실행하시면 로그인은 건너뛰고 이어서 갑니다.'
 )
 
 # 설치기를 기다리는 한도. 한도가 없으면 백신 경고 창 같은 것이 떠 있는 동안 영원히 서 있게 된다.
@@ -144,7 +160,8 @@ $OutputEncoding = [System.Text.Encoding]::UTF8
 $script:PrevTail = ''
 $script:PrevRunState = ''   # 지난 실행이 어디까지 갔나 — '' 모름 · closed 끝맺음까지 · wait 원격 해결 대기 중 · answer 처방을 받은 뒤 · ended 원격 해결이 스스로 끝남
 if (Test-Path $LogFile) {
-    $prevLines = @(Get-Content $LogFile -ErrorAction SilentlyContinue | Where-Object { $_ -ne '' })
+    # 기록은 UTF-8 로 쓴다(Write-Log · v0.3.18) — 같은 글자표로 읽는다
+    $prevLines = @(Get-Content $LogFile -ErrorAction SilentlyContinue -Encoding UTF8 | Where-Object { $_ -ne '' })
     if ($prevLines.Count -gt 0) {
         $script:PrevTail = $prevLines[-1]
         # 🔴2026-09-14 워크숍 — 처방을 받고 창을 닫은 실행에도 「창이 갑자기 닫혔다(J-AV-03)」가 붙었고, 처방 500자가 첫 화면을 덮었다.
@@ -163,7 +180,12 @@ if (Test-Path $LogFile) {
 
 function Write-Log($msg) {
     $ts = Get-Date -Format 'yyyy-MM-ddTHH:mm:sszzz'
-    Add-Content -Path $LogFile -Value "$ts $msg"
+    # 🔴v0.3.18 — 글자표를 박아 적는다. Add-Content 의 기본 글자표는 Windows PowerShell 5.1 에서 시스템 ANSI(한국어 윈도우 = CP949)라
+    #   UTF-8 로 읽는 자리(첨부 전송 · 사람이 연 편집기)에서 「→」가 「��」로 깨졌다(2026-09-15 윈 실기 bootstrap.log · 두 바이트 = 두 글자).
+    #   ⇒ BOM 없는 UTF-8 로 덧붙이고, 이 파일을 읽는 두 자리(지난 실행 꼬리 · 원격 해결 보고)도 UTF-8 로 읽는다.
+    #   ⚠앞 판이 ANSI 로 적어 둔 기록은 첫 실행 한 번만 한글 줄이 깨져 읽힌다(지난 실행 상태를 「모름」으로 본다).
+    #   줄 끝은 Add-Content 와 같게 운영체제의 줄바꿈이다(윈도우 CRLF) — 이 파일을 읽는 흉내·도구의 줄 모양을 바꾸지 않는다.
+    try { [System.IO.File]::AppendAllText($LogFile, "$ts $msg" + [Environment]::NewLine, (New-Object System.Text.UTF8Encoding $false)) } catch { }
 }
 # Write-Output 을 쓰면 안 된다 — PowerShell 함수는 출력 스트림에 나간 것 전부가 반환값이라
 #   `$rc = Step-InstallClaude` 가 종료 코드가 아니라 「안내문 여러 줄 + 0」 배열을 받는다.
@@ -386,6 +408,7 @@ function Write-JCode($code, $desc) {
     Say ("     이 코드로 찾아보실 수 있습니다: " + $HelpCodeUrl + $code)
     Write-Log ("jcode " + $code + " " + $desc)
     Send-Progress (Get-CurrentStep) 'fail' $null $code $null   # 막힌 자리를 자동으로 알린다(fail-open)
+    Send-EvidenceOnce 'fail'   # v0.3.18 — 실패 증거(설치 창 끝부분 · 마스킹 뒤)
 }
 
 # ── 연결 원인 판별 (3프로브) ──────────────────────────────────────
@@ -510,10 +533,10 @@ $HelpWays = @{
     'J-NET-01'   = @('휴대폰 핫스팟 같은 다른 인터넷에 연결하신 뒤 다시 실행해 주십시오.')
     'J-NET-02'   = @('10분쯤 뒤에 다시 실행해 주십시오.', '휴대폰 핫스팟 같은 다른 인터넷으로 바꿔 보셔도 됩니다.')
     'J-NET-03'   = @('회사·학교 망은 바깥 서버를 막아 둔 경우가 있습니다.', '휴대폰 핫스팟 같은 다른 인터넷으로 연결하신 뒤 다시 실행해 주십시오.')
-    'J-RM-01'    = @('컴퓨터를 한 번 다시 시작하신 뒤(열려 있던 cys 가 완전히 닫힙니다)', '재설치 명령을 실행해 주십시오.')
+    'J-RM-01'    = @('재설치 명령을 한 번 더 실행해 주십시오.', '열려 있는 cys 는 재설치가 스스로 닫습니다.')
     'J-PATH-01'  = @('컴퓨터를 한 번 다시 시작하신 뒤 새 창에서 다시 실행해 주십시오.')
     'J-LOGIN-01' = @('브라우저가 뜨지 않았거나 다른 브라우저에 로그인돼 있으면,', '화면에 보이는 https:// 로 시작하는 로그인 주소를 복사해', '로그인된 브라우저 주소창에 붙여넣어 주십시오.')
-    'J-LOGIN-02' = @('브라우저 창을 모두 닫으신 뒤 다시 실행해 주십시오.', '승인은 한 번만 누르시고 코드만 복사해 붙여넣어 주십시오.')
+    'J-LOGIN-02' = @('브라우저 창을 모두 닫으신 뒤 다시 실행해 주십시오.', '승인은 한 번만 누르시고 코드를 복사하면 설치가 이어집니다.', '안 이어지면 설치 창을 한 번 클릭한 뒤 Ctrl+V 로 붙여넣어 주십시오.')
     'J-HOME-01'  = @('창을 닫고 새 창을 여신 뒤(남은 설정이 따라오지 않습니다)', '다시 실행해 주십시오.')
     'J-PERM-01'  = @('컴퓨터를 한 번 다시 시작하신 뒤 다시 실행해 주십시오.', '저장 공간이 3GB 이상 남았는지도 함께 봐 주십시오.')
     'J-DISK-01'  = @('휴지통을 비우시고, 설정의 저장 공간 화면에서 큰 파일을', '정리하신 뒤 다시 실행해 주십시오.')
@@ -684,6 +707,54 @@ function Save-HelpLastReport {
 #   PowerShell 에는 그 트랩이 없으므로 본문을 try/finally 로 감싸 **같은 성질**을 만든다 —
 #   모양은 다르고 보증은 같다. 어느 경로로 끝나도 이 블록을 지난다.
 $script:ClosingDone = $false
+# 🔴v0.3.18 — 조용히 넘긴 확인에서 난 오류인가를 **글자가 아니라 구문으로** 가른다.
+#   v0.3.17 은 오류가 난 줄의 글자에서 「-ErrorAction SilentlyContinue」를 찾았다. 실측(pwsh 7.6 · 2026-09-15)으로 그 필터를 빠져나간 형태 =
+#   ⑴-EA 0 ⑵-ErrorAction:SilentlyContinue ⑶여러 줄에 걸친 명령(오류의 줄 글자는 명령의 첫 줄뿐이다 · Test-CysBody 의 목록 읽기가 이 모양)
+#   ⑷2>$null · 2>&1 로 받아 둔 바깥 명령(& cys … 2>$null — cys 가 아직 없으면 「명령을 찾지 못함」이 쌓인다).
+#   ⇒ 오류가 난 자리(스크립트 · 줄 · 칸)를 감싸는 가장 작은 명령을 구문 트리에서 찾아, 그 명령의 ErrorAction 값과 오류 흐름 돌리기를 본다.
+#   ⚠구문 트리를 못 얻거나 자리를 못 찾으면 「조용하지 않음」이다 — 앞 판처럼 참고로 적는다(모르는 것을 지우지 않는다).
+$script:QuietAstCache = @{}
+function Test-QuietErrorRecord($e) {
+    $ii = $null
+    try { $ii = $e.InvocationInfo } catch { }
+    if (-not $ii) { return $false }
+    # 줄 글자 필터는 구문 트리를 못 쓸 때만 쓴다 — 한 줄에 명령이 여럿이면 다른 명령의 -EA 로 거짓 통과한다(교차 검토 1R F3).
+    $lineQuiet = ([string]$ii.Line -match '-(ErrorAction|EA)\s+(SilentlyContinue|Ignore)')
+    $file = [string]$ii.ScriptName; $ln = [int]$ii.ScriptLineNumber; $col = [int]$ii.OffsetInLine
+    if (-not $file -or $ln -le 0 -or $col -le 0) { return $lineQuiet }
+    if (-not $script:QuietAstCache.ContainsKey($file)) {
+        $ast = $null
+        try { $ast = [System.Management.Automation.Language.Parser]::ParseFile($file, [ref]$null, [ref]$null) } catch { }
+        $script:QuietAstCache[$file] = $ast
+    }
+    $ast = $script:QuietAstCache[$file]
+    if (-not $ast) { return $lineQuiet }
+    $hit = $null
+    foreach ($c in $ast.FindAll({ param($n) $n -is [System.Management.Automation.Language.CommandAst] }, $true)) {
+        $x = $c.Extent
+        $afterStart = ($ln -gt $x.StartLineNumber) -or ($ln -eq $x.StartLineNumber -and $col -ge $x.StartColumnNumber)
+        $beforeEnd  = ($ln -lt $x.EndLineNumber) -or ($ln -eq $x.EndLineNumber -and $col -le $x.EndColumnNumber)
+        if ($afterStart -and $beforeEnd -and ((-not $hit) -or ($x.Text.Length -lt $hit.Extent.Text.Length))) { $hit = $c }
+    }
+    if (-not $hit) { return $lineQuiet }
+    # 감싸는 명령을 바깥으로 올라가며 본다 — `& { … } 2>$null` 처럼 바깥 명령에서 막은 경우도 조용한 확인이다(교차 검토 1R F4).
+    for ($node = $hit; $node; $node = $node.Parent) {
+        if ($node -isnot [System.Management.Automation.Language.CommandAst]) { continue }
+        # 2>$null · *>$null · 2>&1 — 오류 흐름을 버리거나 받아 둔 명령이다
+        foreach ($r in $node.Redirections) { if ([string]$r.FromStream -in @('Error', 'All')) { return $true } }
+        $els = $node.CommandElements
+        for ($i = 0; $i -lt $els.Count; $i++) {
+            $pa = $els[$i]
+            if ($pa -isnot [System.Management.Automation.Language.CommandParameterAst]) { continue }
+            $pn = [string]$pa.ParameterName
+            if (-not (($pn -ieq 'EA') -or ($pn.Length -ge 6 -and 'ErrorAction'.StartsWith($pn, [System.StringComparison]::OrdinalIgnoreCase)))) { continue }
+            $arg = if ($pa.Argument) { $pa.Argument } elseif ($i + 1 -lt $els.Count) { $els[$i + 1] } else { $null }
+            $v = if ($arg) { ([string]$arg.Extent.Text).Trim().Trim("'", '"') } else { '' }
+            if ($v -match '^(SilentlyContinue|Ignore|0|4)$') { return $true }
+        }
+    }
+    return $false
+}
 function Write-ClosingNote {
     if ($script:ClosingDone) { return }
     $script:ClosingDone = $true
@@ -698,8 +769,9 @@ function Write-ClosingNote {
         #   (2026-09-15 · 로그인 확인 중에 끝난 실행에 「cys 를 찾지 못했다」가 적혔다 — 그것은 [1/10] 의 정상 확인이었다).
         #   ⇒ 그런 줄은 빼고 적는다. 남은 것이 없으면 「오류 기록 없음」이라고 적는다 — Ctrl-C 중단 같은 끝일 수 있다. 원인은 단정하지 않는다.
         #   ⚠try/catch 로 잡아 넘긴 오류는 여기서 가를 수 없어 남는다(교차 검토 지적) — 그래서 이름표가 「참고 · 끝난 원인이 아닐 수 있음」이다.
-        $quietErr = @($Error | Where-Object { $_.InvocationInfo -and ([string]$_.InvocationInfo.Line -match '-(ErrorAction|EA)\s+(SilentlyContinue|Ignore)') })
-        $loudErr  = @($Error | Where-Object { -not ($_.InvocationInfo -and ([string]$_.InvocationInfo.Line -match '-(ErrorAction|EA)\s+(SilentlyContinue|Ignore)')) })
+        #   🔴v0.3.18 — 가르는 일은 Test-QuietErrorRecord 가 한다(글자 필터가 놓친 네 형태 · 그 함수 머리 주석).
+        $quietErr = @($Error | Where-Object { Test-QuietErrorRecord $_ })
+        $loudErr  = @($Error | Where-Object { -not (Test-QuietErrorRecord $_) })
         if ($loudErr.Count -gt 0) {
             $e0 = $loudErr[0]
             $why = (($e0 | Out-String) -replace '\s+', ' ').Trim()
@@ -894,6 +966,72 @@ function Test-CysBody {
         }
     }
     return [pscustomobject]@{ Reg = $reg; Body = $body; Path = $path; Cli = $cli }
+}
+# 설치된 cys 의 판본 (v0.3.18) — 설치 목록의 판본 칸이 먼저, 없으면 실행 파일에 적힌 판본. 명령은 부르지 않는다(데몬을 깨울 수 있다).
+#   돌려주는 것 = '0.14.36' 모양 · 못 읽으면 ''.
+function Get-CysInstalledVersion($b) {
+    $raw = ''
+    try { if ($b.Reg -and $b.Reg.DisplayVersion) { $raw = [string]$b.Reg.DisplayVersion } } catch { }
+    if (-not $raw -and $b.Cli) { try { $raw = [string](Get-Item -LiteralPath $b.Cli -ErrorAction Stop).VersionInfo.ProductVersion } catch { } }
+    $m = [regex]::Match($raw, '\d+\.\d+\.\d+')
+    if ($m.Success) { return $m.Value }
+    return ''
+}
+
+# 🔴v0.3.18 (결정 2026-09-15 19:4x) — 「판번이 같아도 실제 내용이 바뀌었으면 업데이트해야 한다」.
+#   판번 대조만으로 건너뛰면 같은 판번으로 다시 발행한 파일(내용이 다른 빌드)이 그 기기에 영영 안 닿는다.
+#   ⇒ 건너뜀 = 「같은 판 AND 핀 지문 일치」일 때만. 설치 도우미가 cys 를 깔고 나면 설치 자리에 표지 한 장을 둔다:
+#      { 이번 핀의 설치 파일 지문 · 그때 깔린 cys.exe 의 실측 지문 }. 다음 실행은 ⑴표지의 핀 지문 = 지금 핀 ⑵지금 cys.exe 실측 지문 = 표지 값
+#      둘 다일 때만 「같은 내용」으로 본다. 표지가 없거나(다른 경로로 깐 cys · v0.3.17 이전) 못 재면 「같다고 확인 못 함」 → 다시 받아 덮어 깐다.
+#   ⚠표지는 설치 자리(프로그램 폴더)에 둔다 — 작업 폴더에 두면 재설치(-KeepApp)가 작업 폴더를 지워 매번 다시 받는다(② 건너뜀이 죽는다).
+#   돌려주는 것 = 'match' · 'no-stamp' · 'stamp-unreadable' · 'pin-changed' · 'exe-unmeasured' · 'exe-changed'
+function Get-CysPinStampPath($b) {
+    if ($b -and $b.Path) { return (Join-Path $b.Path 'jarvis-cys-pin.json') }
+    return ''
+}
+function Get-CysContentState($b) {
+    $sp = Get-CysPinStampPath $b
+    if (-not $sp -or -not (Test-Path -LiteralPath $sp)) { return 'no-stamp' }
+    $st = $null
+    try { $st = Get-Content -LiteralPath $sp -Raw -Encoding UTF8 -ErrorAction Stop | ConvertFrom-Json -ErrorAction Stop } catch { $st = $null }
+    if ($null -eq $st) { return 'stamp-unreadable' }
+    if ([string]$st.setup_sha256 -cne [string]$CysWinSha256) { return 'pin-changed' }
+    $exeSha = $null
+    if ($b.Cli) { $exeSha = Get-CysFileSha256 $b.Cli }
+    if ($null -eq $exeSha) { return 'exe-unmeasured' }
+    if ($exeSha -cne ([string]$st.exe_sha256).ToLower()) { return 'exe-changed' }
+    return 'match'
+}
+function Save-CysPinStamp($b) {
+    # 설치를 확인한 뒤에만 부른다 · 못 적어도 설치는 막지 않는다(다음 실행이 한 번 더 받을 뿐)
+    if ($Mode -eq 'dry') { return $false }
+    $sp = Get-CysPinStampPath $b
+    $exeSha = $null
+    if ($b -and $b.Cli) { $exeSha = Get-CysFileSha256 $b.Cli }
+    if (-not $sp -or ($null -eq $exeSha)) { Write-Log 'cys pin stamp: not written (cys.exe 지문을 못 쟀다)'; return $false }
+    $o = [ordered]@{ version = $CysVersion; setup_sha256 = $CysWinSha256; exe_sha256 = $exeSha; installer_version = $InstallerVersion; at = (Get-Date -Format o) }
+    try { Write-TextNoBom $sp ($o | ConvertTo-Json); Write-Log ('cys pin stamp: written v' + $CysVersion + ' exe=' + $exeSha.Substring(0, 12)); return $true }
+    catch { Write-Log ('cys pin stamp: write failed - ' + $_.Exception.Message); return $false }
+}
+
+# 🔴v0.3.18 — SmartScreen 손 1(「추가 정보 → 실행」)을 없애는 자리. 채택(2026-09-15) = 웹 표식(Zone.Identifier) 제거 · **지문 대조 통과 뒤에만**.
+#   ⛔이 함수는 지문이 핀과 같다고 확인한 줄 바로 뒤에서만 부른다 — 확인 전에 표식을 지우면 모르는 파일의 경고까지 지운다(보안 경계 = 검증이 먼저).
+#   ⚠받은 방식에 따라 표식이 아예 없을 수 있다(브라우저가 아닌 받기) — 그때는 지울 것이 없다고 기록만 한다(실기 기록으로 손 1 의 원인을 가른다).
+function Test-WebMark($path) {
+    try { return [bool](Get-Item -LiteralPath $path -Stream 'Zone.Identifier' -ErrorAction Stop) } catch { return $false }
+}
+function Clear-WebMark($path, $what) {
+    if ($Mode -eq 'dry') { return 'dry' }
+    $leaf = Split-Path -Leaf $path
+    if (-not (Test-WebMark $path)) { Write-Log ('motw: none on ' + $leaf + ' (' + $what + ')'); return 'none' }
+    try {
+        Unblock-File -LiteralPath $path -ErrorAction Stop
+        Write-Log ('motw: removed after sha256 match - ' + $leaf + ' (' + $what + ')')
+        return 'removed'
+    } catch {
+        Write-Log ('motw: remove failed - ' + $leaf + ' - ' + $_.Exception.Message)
+        return 'failed'
+    }
 }
 
 $Rows = New-Object System.Collections.ArrayList
@@ -1325,6 +1463,42 @@ function Seed-LocalBinPath {
     return $true
 }
 
+# ── 사용자 PATH 에 cys 자리를 심는다 (v0.3.18 · 2026-09-15 윈 실기) ─────
+#   🔴cys 설치기도 PATH 를 안 건드린다([7/10] 머리 주석). 설치 도우미 안에서는 전체 경로로 불러 드러나지 않았고,
+#   설치가 끝난 뒤 새 창의 자비스가 「cys」를 찾지 못했다 ⇒ Seed-LocalBinPath 와 같은 규칙으로 **사용자** PATH 에만 멱등으로 넣는다(관리자 권한 0).
+#   ⚠읽기·쓰기를 두 함수로 뺀 까닭 = 맥 흉내에는 사용자 환경변수 자리가 없다(.NET 이 무시한다) — 흉내가 이 둘만 바꿔 끼워 규칙을 잰다.
+#   ⚠지우는 쪽 = reset-clean.ps1 Remove-UserPathSeed(프로그램까지 지울 때만 · -KeepApp 이면 남긴다).
+function Get-UserPathValue { return [Environment]::GetEnvironmentVariable('Path', 'User') }
+function Set-UserPathValue($value) { [Environment]::SetEnvironmentVariable('Path', $value, 'User') }
+function Seed-CysPath($dir) {
+    if (-not $dir) { return $false }
+    $want = ([string]$dir).TrimEnd('\')
+    try {
+        $user = Get-UserPathValue
+        $have = $false
+        if ($user) {
+            foreach ($p in ($user -split ';')) {
+                if (-not $p) { continue }
+                if ([Environment]::ExpandEnvironmentVariables($p).TrimEnd('\') -ieq $want) { $have = $true; break }
+            }
+        }
+        if ($have) {
+            Write-Log 'seed-cys-path: already in User PATH'
+        } else {
+            $new = if ($user) { $user.TrimEnd(';') + ';' + $want } else { $want }
+            Set-UserPathValue $new
+            Write-Log ('seed-cys-path: added ' + (Redact $want) + ' to User PATH')
+        }
+    } catch {
+        Write-Log ('seed-cys-path: failed - ' + $_.Exception.Message)
+        return $false
+    }
+    $inProc = $false
+    foreach ($p in ($env:Path -split ';')) { if ($p -and ($p.TrimEnd('\') -ieq $want)) { $inProc = $true; break } }
+    if (-not $inProc) { $env:Path = ([string]$env:Path).TrimEnd(';') + ';' + $want }
+    return $true
+}
+
 # ── [2/10] 공식 설치기가 상한에 닿았을 때 (v0.3.16 · 2026-09-14 워크숍) ─────────────
 # 🔴그날 한 기기가 30분 동안 3회 모두 10분 상한에 닿았고 끝내 설치하지 못했다. 기록에는 「백신으로 보입니다」 한 문장만
 #   남아 무엇이 멈췄는지 갈리지 않았다 ⇒ ⑴무엇이 살아 있었는지 적고(읽기만) ⑵같은 공식 파일을 직접 받아 끝까지 간다.
@@ -1457,7 +1631,7 @@ function Install-ClaudeDirect {
     try {
         # ① 판본
         $ver = ''
-        try { $ver = ([string](Invoke-RestMethod -Uri ($ClaudeDirectBaseUrl + '/latest') -UseBasicParsing -TimeoutSec 60 -ErrorAction Stop)).Trim() } catch { $ver = '' }
+        try { $ver = ([string](Invoke-RestMethod -Uri ($ClaudeDirectBaseUrl + '/' + $ClaudeChannel) -UseBasicParsing -TimeoutSec 60 -ErrorAction Stop)).Trim() } catch { $ver = '' }
         if (-not ($ver -cmatch '\A[0-9]+\.[0-9]+\.[0-9]+(-[0-9A-Za-z.]+)?\z')) {
             Say '     공식 자리에서 판본 번호를 읽지 못했습니다.'
             Write-Log ('install direct: step1 latest unreadable (' + $ver.Length + ' chars)')
@@ -1509,7 +1683,7 @@ function Install-ClaudeDirect {
         $exe = Join-Path (Join-Path $env:USERPROFILE '.local\bin') 'claude.exe'
         $step5 = 'not-run'
         $ip = $null
-        try { $ip = Start-Process -FilePath $dl -ArgumentList 'install','latest' -NoNewWindow -PassThru -ErrorAction Stop } catch { $ip = $null; $step5 = 'start-failed' }
+        try { $ip = Start-Process -FilePath $dl -ArgumentList 'install',$ClaudeChannel -NoNewWindow -PassThru -ErrorAction Stop } catch { $ip = $null; $step5 = 'start-failed' }
         if ($null -ne $ip) {
             if (Wait-ProcBounded $ip $ClaudeDirectInstallWaitMs '받은 파일로 설치하는 중입니다') {
                 [void]$ip.WaitForExit()
@@ -1520,7 +1694,7 @@ function Install-ClaudeDirect {
                 Stop-ProcTree $ip $t5
             }
         }
-        Write-Log ('install direct: step5 install latest ' + $step5)
+        Write-Log ('install direct: step5 install ' + $ClaudeChannel + ' ' + $step5)
         # ⑤가 끝나고 파일이 제자리에 있으면 그대로 쓴다 · 아니면 받은 파일을 제자리에 둔다(옮기는 동안만 .jarvis-new)
         if (-not (($step5 -eq 'rc=0') -and (Test-Path -LiteralPath $exe))) {
             New-Item -ItemType Directory -Force -Path (Split-Path -Parent $exe) | Out-Null
@@ -1593,7 +1767,7 @@ function Step-InstallClaude {
     #     정상이라고 바로 위에서 말했고, 리다이렉트는 자식 안에서 공식 설치기가 쓰는 명령을 흔든다.
     try {
         $p = Start-Process -FilePath $psExe -NoNewWindow -PassThru -ErrorAction Stop `
-                           -ArgumentList @('-NoProfile', '-Command', "irm '$ClaudeInstallUrl' | iex")
+                           -ArgumentList @('-NoProfile', '-Command', "& ([scriptblock]::Create((irm '$ClaudeInstallUrl' -UseBasicParsing))) $ClaudeChannel")
     } catch {
         Say "[2/10] 실패: $($_.Exception.Message). 인터넷 연결을 확인해 주십시오. 아래 「다시 하시는 법」대로 다시 실행하시면 여기서부터 이어서 갑니다."
         $script:ShowRerun = $true
@@ -1617,6 +1791,7 @@ function Step-InstallClaude {
             $mm = [int][math]::Floor($waitedMs / 60000); $ss = [int][math]::Floor($waitedMs / 1000) % 60
             Say ("     아직 설치 중입니다 (" + $mm + "분 " + $ss + "초 지남 · 최대 " + [int]($waitCap / 60000) + "분). 작업 표시줄에 백신 창이 떠 있는지 확인해 주십시오 — 「파일 전송」이나 [실행] 을 누르시면 이어집니다.")
             Send-Progress '2/10' 'wait' ([int]($waitedMs / 1000)) $null $null
+            if ($waitedMs -ge 180000) { Send-EvidenceOnce 'stall' }   # v0.3.18 — 대기 3분 이상 = 정체 증거
             # 백신 창으로 보이는 창 제목이 떠 있으면 그 이름을 그대로 적는다(읽기만 · 바뀌었을 때만)
             $av = @(Get-AvWindowTitles)
             if (($av.Count -gt 0) -and ($av[0] -cne $avShown)) {
@@ -1642,7 +1817,7 @@ function Step-InstallClaude {
         if ($prevHold -ge 1) {
             # 같은 자리 2회째부터 — 현장에서 통한 처방(공식 설치기를 도우미 밖에서 직접)을 설치기가 먼저 알린다
             Say '     클로드 공식 설치기를 이 도우미 밖에서 직접 돌려 보실 수도 있습니다 — 새 PowerShell 창에 아래 한 줄을 붙여넣고 Enter:'
-            Say ('     irm ' + $ClaudeInstallUrl + ' | iex')
+            Say ('     & ([scriptblock]::Create((irm ' + $ClaudeInstallUrl + '))) ' + $ClaudeChannel)
             Say '     「Installation complete」 가 보이면 그 창을 닫고 아래 「다시 하시는 법」대로 다시 실행해 주십시오.'
         }
         Say-AntivirusHold '클로드 설치 파일 (이름이 claude 로 시작하는 파일)'
@@ -1797,6 +1972,67 @@ function Get-LoginStrayKeyCount {
     try { while ([Console]::KeyAvailable -and ($n -lt 10000)) { [void][Console]::ReadKey($true); $n++ } } catch { return -1 }
     return $n
 }
+# ── 코드 넣기 (2026-09-15 윈도우 샌드박스 첫 실제 로그인) ─────────
+# 🔴설치기가 띄운 로그인 창이 붙여넣기도 타이핑도 받지 못했다(오른쪽 단추·Ctrl+Shift+V·창 메뉴 전부 · 브라우저 주소창 타이핑은 정상).
+#   벤더 도구(2.1.272 바이너리 실측)는 코드를 화면 입력 칸이 아니라 **표준 입력의 한 줄**로 읽는다 — 「코드#state」로 갈라 둘 다 있어야 받는다.
+#   ⇒ 로그인 프로세스의 입력을 설치기가 쥐고, 사람이 브라우저에서 복사한 코드를 설치기가 그 입력에 한 줄로 넣는다(사람 손 = 승인 + 복사).
+#   ★복사된 내용은 코드 모양일 때만 쓴다 — 모양이 아닌 내용은 읽고 버린다(기록·해시 0). 코드 자체도 기록에 안 남긴다(횟수만).
+#   ★로그인을 연 순간 이미 복사돼 있던 코드(예전 시도의 코드)는 넣지 않는다 · 같은 코드는 한 번만 넣는다 · 한 번 연 로그인에서 최대 $LoginClipMaxSends 회.
+#   ★폴백 — 복사된 내용을 못 읽는 기기: 이 설치 창에 붙여넣고 Enter 를 누르면 설치기가 같은 입력으로 넘긴다(이 창의 읽기는 PowerShell 자신이 한다).
+# 문자 = 주소에 그대로 실리는 문자(영문·숫자·- . _ ~) · 「#」 은 정확히 하나. 1100자가 넘는 내용은 다듬지도 맞춰 보지도 않고 버린다(큰 복사 내용을 2초마다 다루지 않게).
+function Test-LoginCodeShape([string]$s) {
+    if (($null -eq $s) -or ($s.Length -gt 1100)) { return $false }
+    return ($s.Trim() -cmatch '^[A-Za-z0-9._~-]{16,512}#[A-Za-z0-9._~-]{16,512}$')
+}
+function Get-LoginClipText {
+    try { return [string](Get-Clipboard -Raw -ErrorAction Stop) } catch { return $null }
+}
+function Get-LoginTextHash([string]$s) {
+    if (-not $s) { return '' }
+    $sha = [System.Security.Cryptography.SHA256]::Create()
+    try { return [System.BitConverter]::ToString($sha.ComputeHash([System.Text.Encoding]::UTF8.GetBytes($s))) } finally { $sha.Dispose() }
+}
+# 로그인 프로세스를 입력을 설치기가 쥔 채로 띄운다 — 출력은 이 설치 창에 그대로 찍힌다(주소가 보인다). 못 띄우면 던진다.
+function Start-LoginPipeProc {
+    param([string]$FilePath, [string[]]$ArgumentList)
+    $psi = New-Object System.Diagnostics.ProcessStartInfo
+    $psi.FileName = $FilePath
+    $psi.Arguments = ($ArgumentList -join ' ')
+    $psi.UseShellExecute = $false
+    $psi.RedirectStandardInput = $true
+    return [System.Diagnostics.Process]::Start($psi)
+}
+function Send-LoginCode($proc, [string]$code) {
+    try {
+        if ($proc.HasExited) { return $false }
+        $proc.StandardInput.WriteLine($code.Trim())
+        $proc.StandardInput.Flush()
+        return $true
+    } catch { return $false }
+}
+# 설치 창에 쌓인 글자를 기다리지 않고 읽어, 한 줄이 끝났으면 돌려준다(아니면 $null). 글자는 화면에 * 로만 보이고 기록에 안 남는다.
+$script:LoginTypedBuf = ''
+$script:LoginTypedKeys = 0   # 설치 창에서 읽은 글자 수(보고용 · 글자 자체는 적지 않는다)
+function Read-LoginTypedLine {
+    try {
+        while ([Console]::KeyAvailable) {
+            $k = [Console]::ReadKey($true)
+            $script:LoginTypedKeys++
+            if ($k.Key -eq [ConsoleKey]::Enter) {
+                $line = $script:LoginTypedBuf
+                $script:LoginTypedBuf = ''
+                [Console]::WriteLine()
+                return $line
+            }
+            if ($k.Key -eq [ConsoleKey]::Backspace) {
+                if ($script:LoginTypedBuf.Length -gt 0) { $script:LoginTypedBuf = $script:LoginTypedBuf.Substring(0, $script:LoginTypedBuf.Length - 1); [Console]::Write("`b `b") }
+                continue
+            }
+            if (([int]$k.KeyChar -ge 32) -and ($script:LoginTypedBuf.Length -lt 1100)) { $script:LoginTypedBuf += [string]$k.KeyChar; [Console]::Write('*') }
+        }
+    } catch { }
+    return $null
+}
 function Read-LoginFailKey([int]$waitSec) {
     try {
         $sw = [System.Diagnostics.Stopwatch]::StartNew()
@@ -1843,6 +2079,7 @@ function Add-LoginReport($info) {
         ('로그인 창: ' + $info.Win),
         ('승인 프로세스: ' + $info.Proc),
         ('다시 열기: ' + $info.Reopen),
+        ('코드 넣기: ' + $info.Send),
         ('끝난 뒤 확인: ' + $info.Confirm),
         ('상한에서 받은 답: ' + $info.Answer),
         ('질문 전 설치 창에 쌓인 글자 수: ' + $info.Keys)
@@ -1890,7 +2127,7 @@ function Step-Login {
     # ★기다림은 `WaitForExit(ms)` 로 한다 — 커널 대기라 이 창의 입력을 건드리지 않는다(검토 지적 채택 2026-09-11 · 새 창에서도 그대로 둔다).
     # ★상한에 닿으면 그 창을 끝낸다 = 사람이 창을 닫은 것과 같은 결과 ⇒ 아래 확인과 J-LOGIN-01 회복 경로로 그대로 흘러간다.
     # ★$claudeExe(전체 경로)는 이 함수 첫머리에서 정했다 — 재판정·승인·확인이 같은 파일을 묻는다.
-    $info = @{ Win = '새 창'; Proc = '-'; Reopen = '안 했다'; Confirm = '-'; Answer = '묻지 않음(상한에 닿지 않았다)'; Keys = '-' }
+    $info = @{ Win = '설치 창(코드는 설치기가 넣는다)'; Proc = '-'; Reopen = '안 했다'; Send = '-'; Confirm = '-'; Answer = '묻지 않음(상한에 닿지 않았다)'; Keys = '-' }
     $c = @{ By = ''; Auth = ''; Fails = 0; Note = '-' }
     $oldTitle = $null
     try { $oldTitle = $Host.UI.RawUI.WindowTitle } catch { $oldTitle = $null }
@@ -1903,34 +2140,72 @@ function Step-Login {
             $loginProc = $null
             $timedOut = $false
             $w = 0
-            # ★새 창으로 띄운다(-NoNewWindow 를 쓰지 않는다) — 벤더 화면이 이 창의 안내문과 섞이지 않고, 붙여넣을 창이 하나로 정해진다.
-            try { $loginProc = Start-Process -FilePath $claudeExe -ArgumentList 'auth','login' -PassThru -ErrorAction Stop } catch { $loginProc = $null }
+            # ★입력을 설치기가 쥔 자식으로 띄운다(위 「코드 넣기」) — 새로 뜬 창은 키 입력을 받지 못했다(2026-09-15 샌드박스). 사람은 복사만 한다.
+            try { $loginProc = Start-LoginPipeProc -FilePath $claudeExe -ArgumentList 'auth','login' } catch { $loginProc = $null }
             if ($null -eq $loginProc) {
                 # 다시 여는 자리에서 못 띄웠으면 확인으로 넘어간다(없는 명령을 앞에서 부르면 설치가 통째로 끝난다)
                 if ($reopened) { Write-Log 'login reopen: could not start - go to confirm'; break }
-                # 🔴새 창을 못 띄우면 이 창에서 한다. **파이프를 쓰지 않는다**(검토 지적 채택 2026-09-11) — `| Out-Host` 는 stdout 을 파이프로 바꿔
-                #   벤더 도구의 「대화 중인가」 판정을 깨뜨리고, 그러면 **코드 입력 칸 자체가 안 뜬다.** 부르는 쪽도 반환값을 받지 않는다(함수 머리 주석).
-                $info.Win = '이 창(새 창을 띄우지 못했다)'
-                Set-LoginStage 'inline'
-                Say '     새 창을 띄우지 못해 이 창에서 로그인합니다 — 코드는 이 창에 붙여넣으십시오.'
-                $sw = [System.Diagnostics.Stopwatch]::StartNew()
-                & claude auth login
-                $w = [int]$sw.Elapsed.TotalSeconds
-                $info.Proc = ('이 창에서 끝남 · 종료 코드 ' + $LASTEXITCODE + ' · ' + $w + '초')
-                Write-Log ('login proc exit=' + $LASTEXITCODE + ' after ' + $w + 's (inline)')
+                # 🔴로그인 프로세스를 못 띄우면 이 창에서 벤더 로그인을 부르지 않는다(이종 검토 2회차 채택 2026-09-15).
+                #   그 길은 벤더가 윈도우 콘솔에서 코드를 읽는 경로라 샌드박스에서 입력을 못 받았고, 동기 호출이라 20분 상한도 걸리지 않았다.
+                #   ⇒ 곧바로 확인 → 실패 끝맺음(스스로 푸는 법: 새 PowerShell 창에서 claude 직접 로그인 → 다시 실행)으로 간다.
+                $info.Win = '띄우지 못했다'
+                $info.Proc = '띄우지 못했다'
+                Set-LoginStage 'start-failed'
+                Write-Log 'login proc: could not start'
+                Say '[3/10] 로그인 프로그램을 띄우지 못했습니다.'
             } else {
                 # 핸들을 먼저 한 번 잡아 둔다 — 윈도우 PowerShell 5.1 에서 핸들을 안 잡은 채 끝난 프로세스는 종료 코드가 비어 읽히는 사례가 보고돼 있다(커뮤니티 보고 · 실기 확인 항목).
                 try { [void]$loginProc.Handle } catch { }
-                Set-LoginStage ('wait (new window · pid ' + $loginProc.Id + ')')
+                Set-LoginStage ('wait (installer-fed · pid ' + $loginProc.Id + ')')
                 $sw = [System.Diagnostics.Stopwatch]::StartNew()
                 $checkpointSaid = $false
                 $nextStatus = $LoginStatusEverySec
                 $nextTitle = 0
                 $nextProgress = 0
+                # 로그인을 연 순간 이미 복사돼 있던 코드는 기준으로만 둔다(넣지 않는다) — 코드 모양일 때만 해시를 만든다.
+                $clipBase = ''
+                $clip0 = Get-LoginClipText
+                if (Test-LoginCodeShape $clip0) { $clipBase = Get-LoginTextHash $clip0.Trim() }
+                $clip0 = $null
+                $lastSent = ''
+                $clipSends = 0
+                $typedSends = 0
                 # WaitForExit 는 ms 를 받고, 끝났으면 $true 를 준다. 콘솔을 읽지 않는다.
-                while (-not $loginProc.WaitForExit(5000)) {
+                while (-not $loginProc.WaitForExit($LoginTickMs)) {
                     # 🔴상한은 **벽시계**로 잰다 — 쉰 초를 더해 가면 확인 명령에 든 시간이 빠져 「최대 20분」이 거짓이 된다(2026-09-15 표본 · 10분 표시가 실제 11분).
                     $w = [int]$sw.Elapsed.TotalSeconds
+                    # 코드 넣기 — 복사된 내용에 「코드#state」 모양이 새로 나타나면 그 한 줄을 로그인 프로세스 입력에 넣는다(위 「코드 넣기」 머리 주석).
+                    if ($clipSends -lt $LoginClipMaxSends) {
+                        $clip = Get-LoginClipText
+                        if (Test-LoginCodeShape $clip) {
+                            $clipHash = Get-LoginTextHash $clip.Trim()
+                            if (($clipHash -ne $clipBase) -and ($clipHash -ne $lastSent)) {
+                                $lastSent = $clipHash
+                                if (Send-LoginCode $loginProc $clip) {
+                                    $clipSends++
+                                    Write-Log ('login code sent from clipboard ' + $clipSends + ' after ' + $w + 's')
+                                    Say '     복사하신 코드를 로그인에 넣었습니다 — 확인을 기다립니다.'
+                                } else { Write-Log 'login code send failed (clipboard)' }
+                            }
+                        }
+                        $clip = $null
+                    }
+                    $typed = Read-LoginTypedLine
+                    if ($null -ne $typed) {
+                        if (($typedSends -lt $LoginTypedMaxSends) -and (Test-LoginCodeShape $typed)) {
+                            $lastSent = Get-LoginTextHash $typed.Trim()
+                            if (Send-LoginCode $loginProc $typed) {
+                                $typedSends++
+                                Write-Log ('login code sent from installer window ' + $typedSends + ' after ' + $w + 's')
+                                Say '     붙여넣으신 코드를 로그인에 넣었습니다 — 확인을 기다립니다.'
+                            } else { Write-Log 'login code send failed (installer window)' }
+                        } elseif ($typed.Trim()) {
+                            Write-Log 'login typed line not used (not code shape or over limit)'
+                            Say '     코드 모양이 아닙니다 — 브라우저 「Authentication code」 화면의 복사 단추로 복사한 코드만 넣어 주십시오.'
+                        }
+                        $typed = $null
+                    }
+                    $info.Send = ('복사된 코드 ' + $clipSends + '회 · 설치 창 붙여넣기 ' + $typedSends + '회 · 설치 창에서 읽은 글자 ' + $script:LoginTypedKeys)
                     # 창이 살아 있는 동안에도 로그인이 끝났는지 본다 — 파일은 5초마다(싸다) · 확인 명령은 파일이 새로 생겼을 때와 30초마다.
                     #   확인 명령은 이 설치 창에서 돈다 — 로그인 창의 입력에는 닿지 않는다.
                     $authNow = ''
@@ -1942,7 +2217,11 @@ function Step-Login {
                     }
                     if ($doneBy) {
                         # 로그인은 끝났는데 창이 남아 있다 — 우리가 닫아 준다(부드럽게 한 번, 안 되면 끝낸다).
-                        try { [void]$loginProc.CloseMainWindow() } catch { }
+                        # 🔴창 닫기 신호는 자기 창이 있을 때만 보낸다(이종 검토 지적 채택 2026-09-15) — 로그인 프로세스는 설치 창을 함께 쓰므로 자기 창이 없다.
+                        #   공유 콘솔 창에 닫기 신호가 가면 설치 창까지 닫힐 수 있다 ⇒ 창이 없으면 곧바로 3초 기다렸다 끝낸다.
+                        if ($loginProc.MainWindowHandle -ne [IntPtr]::Zero) { try { [void]$loginProc.CloseMainWindow() } catch { } }
+                        # 끝내기 전에 입력을 닫아 스스로 끝날 틈을 준다(이종 검토 2회차 · 벤더가 입력 끝을 따로 받지 않으면 3초 뒤 끝낸다).
+                        try { $loginProc.StandardInput.Close() } catch { }
                         if (-not $loginProc.WaitForExit(3000)) { try { $loginProc.Kill() } catch { } }
                         Write-Log ('login window closed after login - exited=' + $loginProc.HasExited)
                         Complete-LoginSuccess $doneBy $authNow ('while window open after ' + $w + 's')
@@ -1955,7 +2234,8 @@ function Step-Login {
                         Write-Log ('login wait timeout ' + [int]($LoginWaitTimeout / 60) + 'min: CloseMainWindow')
                         # 🔴바로 `Kill()` 하지 않는다(검토 지적 채택 2026-09-11) — 잠금 파일·임시 파일을 정리할 틈을 준다.
                         #   맥이 INT → (안 되면) TERM 인 것과 **같은 순서**다: 부드럽게 한 번, 그래도 안 되면 세게.
-                        try { [void]$loginProc.CloseMainWindow() } catch { }
+                        if ($loginProc.MainWindowHandle -ne [IntPtr]::Zero) { try { [void]$loginProc.CloseMainWindow() } catch { } }
+                        try { $loginProc.StandardInput.Close() } catch { }
                         if (-not $loginProc.WaitForExit(3000)) {
                             try { $loginProc.Kill() } catch { }
                             [Console]::Error.WriteLine('     (승인 창이 바로 닫히지 않아 한 번 더 끝냈습니다)')
@@ -1968,18 +2248,19 @@ function Step-Login {
                     # 한 번만 묻는다 — 브라우저가 안 열린 사람은 여기서 스스로 풀 수 있다(주소는 로그인 창에 있다).
                     if ((-not $checkpointSaid) -and ($w -ge $LoginCheckpointSec)) {
                         $checkpointSaid = $true
-                        Say '     [5분 점검] 브라우저에 로그인 화면이 떴습니까? 안 떴으면 새로 뜬 로그인 창에 보이는 https:// 주소를 복사해 브라우저 주소창에 붙여넣으십시오.'
+                        Say '     [5분 점검] 브라우저에 로그인 화면이 떴습니까? 안 떴으면 이 설치 창에 보이는 https:// 주소를 복사해 브라우저 주소창에 붙여넣으십시오.'
                         Write-Log 'login checkpoint shown'
                     }
                     # 기다리는 동안 이 창에는 찍지 않는다 — 경과는 창 제목에만(60초마다).
                     if ($w -ge $nextTitle) {
                         $nextTitle = $w + $LoginSayInterval
-                        try { $Host.UI.RawUI.WindowTitle = ('자비스 설치 — 로그인을 기다리는 중 ' + [int]($w / 60) + '분 · 로그인은 새로 뜬 창에서') } catch { }
+                        try { $Host.UI.RawUI.WindowTitle = ('자비스 설치 — 로그인을 기다리는 중 ' + [int]($w / 60) + '분 · 코드는 복사만 하시면 됩니다') } catch { }
                     }
                     # 60초마다 대기 진행을 알린다(계약 3절 · 서버 쪽이 정체를 알아본다).
                     if ($w -ge $nextProgress) {
                         $nextProgress = $w + 60
                         Send-Progress '3/10' 'wait' $w $null $null
+                        if ($w -ge 180) { Send-EvidenceOnce 'stall' }   # v0.3.18 — 로그인 대기 3분 이상 = 정체 증거
                     }
                     # 5분마다 로그인 창을 한 장 찍어 둔다(최대 4 · 계약 3절 · 원인 분류용 · 보고가 열리면 첨부).
                     if (($script:LoginCapCount -lt 4) -and ($w -ge (($script:LoginCapCount + 1) * $LoginCheckpointSec))) {
@@ -2030,6 +2311,9 @@ function Step-Login {
         Set-LoginStage 'fail'
         if ($c.Fails -ge $LoginConfirmTries) { Say '[3/10] 로그인 확인 명령이 한 번도 실행되지 못했습니다(까닭은 기록 파일에 적었습니다).' }
         else { Say '[3/10] 로그인이 확인되지 않았습니다.' }
+        # 🔴사람이 스스로 푸는 길(2026-09-15 윈도우 샌드박스 실증) — 새 PowerShell 창에서 claude 를 직접 실행하면 입력·로그인이 정상이었다.
+        #   다시 실행하면 [3/10] 이 로그인을 다시 판정해 건너뛴다(Step-Login 첫머리 재판정).
+        foreach ($ln in $LoginSelfFixLines) { Say $ln }
         Add-LoginReport $info
         Write-JCode 'J-LOGIN-01' '로그인 승인이 시간 안에 끝나지 않았습니다'
         Set-NextStepRerun '아래 「다시 하시는 법」대로 다시 실행하시면 로그인 창이 다시 열립니다.'
@@ -2240,6 +2524,8 @@ function Set-ClaudeSettings {
         else { $o = [pscustomobject]@{} }
         $o | Add-Member -NotePropertyName skipDangerousModePermissionPrompt -NotePropertyValue $true -Force
         $o | Add-Member -NotePropertyName remoteControlAtStartup -NotePropertyValue $false -Force
+        # v0.3.18 — 자동 판올림 채널을 stable 로 묶는다(설치 인자와 같은 값 · 위 $ClaudeChannel 주석)
+        $o | Add-Member -NotePropertyName autoUpdatesChannel -NotePropertyValue $ClaudeChannel -Force
         # 글자 모양 질문(「Choose the text style」)은 이 파일의 열쇠로 넘긴다 —
         # 같은 질문의 열쇠가 다른 파일(.claude.json)에 있는 줄 알았던 것이 자식 노드가 멈춘 까닭이다.
         if (-not $o.PSObject.Properties['theme']) {
@@ -2437,12 +2723,25 @@ function Step-Prepare {
 # ── 하는 일 5 — cys 설치 파일 받기 ────────────────────────────────
 # 완료 판정 = 파일이 있고 크기가 정확히 맞는가. 크기가 다르면 받다 끊긴 것이다.
 function Step-DownloadCys {
+    # 🔴v0.3.18 — 같은 판이 이미 깔려 있으면 132MB 를 받지 않는다([6/10] 이 어차피 건너뛴다 · 2026-09-15 윈 재설치 실기).
+    #   판본을 못 읽을 때도 받지 않는다 — [6/10] 이 그때 있는 것을 그대로 쓰기 때문이다(Step-InstallCys 와 같은 갈래).
+    $b0 = Test-CysBody
+    if ($b0.Body) {
+        $have0 = Get-CysInstalledVersion $b0
+        if ($have0 -eq $CysVersion) {
+            # v0.3.18 — 같은 판번이어도 내용(핀 지문)이 같다고 확인될 때만 건너뛴다(Get-CysContentState 주석).
+            $cs0 = Get-CysContentState $b0
+            if ($cs0 -eq 'match') { Say "[5/10] 같은 판(v$CysVersion)의 cys 가 이미 설치돼 있습니다 (지문 확인) — 받지 않고 건너뜁니다."; return 0 }
+            Write-Log ('cys same version content ' + $cs0 + ' - download again')
+            Say "[5/10] 같은 판(v$CysVersion)이지만 깔린 파일이 이번 판 파일과 같은지 확인되지 않습니다 — 다시 받아 덮어 설치합니다."
+        } elseif (-not $have0) { Say '[5/10] 설치된 cys 의 판본을 읽지 못해 있는 것을 그대로 씁니다 — 받지 않고 건너뜁니다.'; return 0 } else { Say "[5/10] 설치된 cys 는 v$have0 입니다 — v$CysVersion 을 받아 덮어 설치합니다." }
+    }
     New-Item -ItemType Directory -Force -Path $DlDir | Out-Null
     $dst = Join-Path $DlDir $CysWinFile
     if ((Test-Path $dst) -and ((Get-Item $dst).Length -eq $CysWinBytes)) {
         # 크기만 보고 건너뛰면 같은 크기의 다른 파일이 재실행 경로로 들어온다(검토 지적 2026-09-09) — 지문까지 본다.
         $have = Get-CysFileSha256 $dst
-        if ($have -eq $CysWinSha256) { Say '[5/10] 설치 파일이 이미 있습니다 (지문 확인) — 건너뜁니다.'; return 0 }
+        if ($have -eq $CysWinSha256) { [void](Clear-WebMark $dst 'cys setup'); Say '[5/10] 설치 파일이 이미 있습니다 (지문 확인) — 건너뜁니다.'; return 0 }
         if ($null -eq $have) { Say '[5/10] 남아 있던 설치 파일의 지문을 재지 못했습니다 — 확인 없이 쓰지 않고 다시 받습니다.' }
         else { Say '[5/10] 남아 있던 설치 파일의 지문이 다릅니다 — 버리고 다시 받습니다.' }
         # dry-run 은 아무것도 지우지 않는다(2차 검토 지적) — 지울 것이 있다는 사실만 말한다.
@@ -2535,7 +2834,7 @@ function Step-DownloadCys {
             if (Test-Path $dst) { Remove-Item $dst -Force -ErrorAction SilentlyContinue }
             return 5
         }
-        if ($hash -eq $CysWinSha256) { Say "[5/10] 받았습니다 (원 = oogisoogi/cys-ro v$CysVersion · 크기·지문 확인 완료)."; return 0 }
+        if ($hash -eq $CysWinSha256) { [void](Clear-WebMark $dst 'cys setup'); Say "[5/10] 받았습니다 (원 = oogisoogi/cys-ro v$CysVersion · 크기·지문 확인 완료)."; return 0 }
         Say "[5/10] 지문이 맞지 않습니다 (받은 것 $($hash.Substring(0,12))… · 기대 $($CysWinSha256.Substring(0,12))…). 이 파일은 쓰지 않습니다."
         Write-JCode 'J-DL-04' '설치 파일 지문 불일치'
         if (Test-Path $dst) { Remove-Item $dst -Force -ErrorAction SilentlyContinue }
@@ -2554,7 +2853,27 @@ function Step-DownloadCys {
 # 조용히 설치하는 방법은 설치기 종류에 따라 다르고 아직 확인되지 않았다 — 후보를 차례로 시도하고,
 # 모두 실패하면 설치 창을 띄워 사람이 진행하게 한다.
 function Step-InstallCys {
-    if ((Test-CysBody).Body) { Say '[6/10] cys 가 이미 설치돼 있습니다 — 건너뜁니다.'; return 0 }
+    # 🔴v0.3.18 — 「몸통이 있다」만 보고 건너뛰지 않는다. 판본을 견줘 다르면 조용한 설치(/S)로 덮어 깐다(2026-09-15 · 재설치가 옛 판을 남긴 결함).
+    #   ⚠판본을 못 읽으면 있는 것을 그대로 쓴다(앞 판과 같은 동작) — 모르는 채 덮어 깔다 멀쩡한 설치를 흔들지 않는다.
+    #   ⚠덮어 깔기가 안 되면 쓰시던 판으로 이어 간다 — 옛 판이 남는 것이 설치 전체가 멈추는 것보다 낫다(설치 창을 사람에게 띄우지도 않는다).
+    $upgradeFrom = ''
+    $refresh = ''   # v0.3.18 — 같은 판번을 핀 파일로 덮어 까는 까닭(Get-CysContentState 값) · 빈 글자 = 해당 없음
+    $b0 = Test-CysBody
+    if ($b0.Body) {
+        $have0 = Get-CysInstalledVersion $b0
+        if ($have0 -eq $CysVersion) {
+            $cs0 = Get-CysContentState $b0
+            if ($cs0 -eq 'match') { Say "[6/10] cys 가 이미 설치돼 있습니다 (v$have0 · 지문 확인) — 건너뜁니다."; return 0 }
+            $refresh = $cs0
+            $upgradeFrom = $have0
+            Write-Log ('cys refresh same version ' + $have0 + ' (' + $cs0 + ')')
+        }
+        if (-not $have0) { Say '[6/10] cys 가 이미 설치돼 있습니다 — 판본을 읽지 못해 있는 것을 그대로 씁니다.'; Write-Log 'cys installed version unknown - keep'; return 0 }
+        if (-not $refresh) {
+            $upgradeFrom = $have0
+            Write-Log ('cys upgrade ' + $have0 + ' -> ' + $CysVersion)
+        }
+    }
     if ($Mode -eq 'dry') { Say '[6/10] (dry-run) 설치기를 실행하지 않았습니다.'; return 0 }
     $dst = Join-Path $DlDir $CysWinFile
     if (-not (Test-Path $dst)) { Say '[6/10] 설치 파일이 없습니다.'; return 6 }
@@ -2587,7 +2906,7 @@ function Step-InstallCys {
     }
 
     Human 'OS' '설치 파일 실행 확인 — 처음 보는 프로그램이라 경고 창이 뜰 수 있습니다'
-    Say '[6/10] cys 를 설치합니다.'
+    if ($refresh) { Say "[6/10] 같은 판(v$CysVersion)을 이번 판 파일로 덮어 설치합니다 (깔린 파일이 이번 판과 같다고 확인되지 않았습니다)." } elseif ($upgradeFrom) { Say "[6/10] cys 를 v$upgradeFrom 에서 v$CysVersion 으로 덮어 설치합니다." } else { Say '[6/10] cys 를 설치합니다.' }
     Say '     파랗게 「Windows에서 PC를 보호했습니다」 창이 뜨면 [추가 정보] → [실행] 을 눌러 주십시오.'
     Say '     이 창은 서명되지 않은 프로그램에 뜨는 것이며 공식 안내에도 적혀 있습니다.'
     # 안내는 설치기를 띄우기 「전에」 해야 한다 — 백신이 이 창을 종료시키면 뒤에 적은 말은 나오지 못한다.
@@ -2601,13 +2920,25 @@ function Step-InstallCys {
     # 이 설치기는 NSIS 로 만들어졌다. 조용한 설치 스위치는 /S 하나다.
     # 그것이 안 되면 설치 창을 띄워 사람이 진행한다.
     foreach ($sw in @('/S', '')) {
+        # 덮어 깔 때는 조용한 설치(/S) 하나만 — 설치 창을 사람에게 띄우지 않는다(이 함수 머리 주석).
+        if ($upgradeFrom -and $sw -eq '') { break }
         try {
             if ($sw -eq '') { Say '     조용한 설치가 되지 않아 설치 창을 띄웁니다. 창의 안내대로 [다음]을 눌러 주십시오.' }
             # -Wait 를 쓰지 않는다: 한도 없이 기다리면 경고 창 하나에 영원히 서 있게 된다.
             $p = if ($sw -eq '') { Start-Process -FilePath $dst -PassThru -ErrorAction Stop }
                  else { Start-Process -FilePath $dst -ArgumentList $sw -PassThru -ErrorAction Stop }
             $limit = if ($sw -eq '') { $InstallGuiWaitMs } else { $InstallWaitMs }
-            if (-not $p.WaitForExit($limit)) {
+            # v0.3.18 텔레메트리 ① — 기다리는 동안 60초마다 「대기」 표지만 보낸다(글·화면은 싣지 않는다 · fail-open).
+            #   ⚠상한은 그대로다: 60초 조각의 합이 $limit 에 닿으면 멈춘다(조각마다 상한이 있어 한 번의 대기가 상한을 먹지 않는다).
+            $waitedMs = 0; $exited = $false
+            while ($waitedMs -lt $limit) {
+                $chunk = [Math]::Min(60000, $limit - $waitedMs)
+                if ($p.WaitForExit($chunk)) { $exited = $true; break }
+                $waitedMs += $chunk
+                Send-Progress '6/10' 'wait' ([int]($waitedMs / 1000)) $null $null
+                if ($waitedMs -ge 180000) { Send-EvidenceOnce 'stall' }   # 대기 3분 이상 = 정체 증거
+            }
+            if (-not $exited) {
                 Say "     설치기가 $([int]($limit / 1000))초 안에 끝나지 않았습니다. 기다리기를 멈춥니다."
                 Say '     화면에 백신 경고나 설치 창이 떠 있으면 그 화면을 알려 주십시오.'
                 # 아래 확인 고리에서 자리가 잡혔는지를 조금 더 본다.
@@ -2619,7 +2950,13 @@ function Step-InstallCys {
         }
         # 설치기가 끝나도 파일이 자리를 잡기까지 잠깐 걸릴 수 있다
         for ($i = 0; $i -lt 20; $i++) {
-            if ((Test-CysBody).Body) { Say '[6/10] 설치를 마쳤습니다.'; return 0 }
+            # 덮어 깔 때는 몸통이 처음부터 있다 — 판본이 바뀌었을 때만 마친 것이다.
+            $bNow = Test-CysBody
+            # 같은 판을 덮어 깔 때는 판번이 처음부터 같다 — 설치기가 스스로 끝나고 성공(0)을 답했을 때만 마친 것이다.
+            if ($bNow.Body -and ((-not $upgradeFrom) -or ((Get-CysInstalledVersion $bNow) -eq $CysVersion)) -and ((-not $refresh) -or ($p.HasExited -and $p.ExitCode -eq 0))) {
+                [void](Save-CysPinStamp $bNow)
+                Say '[6/10] 설치를 마쳤습니다.'; return 0
+            }
             Start-Sleep -Seconds 3
         }
         # 앞의 설치기가 아직 돌고 있으면 다음 방법으로 넘어가지 않는다.
@@ -2643,6 +2980,11 @@ function Step-InstallCys {
             Say "     (전문: $(Redact $note))"
         }
         Say '     이 방법으로는 설치되지 않았습니다. 다음 방법을 시도합니다.'
+    }
+    if ($upgradeFrom -and (Test-CysBody).Body) {
+        Say "[6/10] 새 판(v$CysVersion)을 넣지 못했습니다 — 쓰시던 v$upgradeFrom 으로 이어 갑니다."
+        Write-Log ('cys upgrade failed - continue with ' + $upgradeFrom)
+        return 0
     }
     Say '[6/10] 설치가 확인되지 않았습니다.'
     # 만든 사람이 정한 복구 순서다. 이 순서를 지키지 않으면 쓰던 것까지 잃을 수 있다.
@@ -2684,7 +3026,12 @@ function Step-VerifyCys {
         try { $ver = (Get-Item $b.Cli).VersionInfo.ProductVersion } catch { }
         if ($ver) { $script:CysCli = $b.Cli; Say '     (명령이 아직 답하지 않아 파일에 적힌 판본을 읽었습니다.)' }
     }
-    if ($ver) { Say "[7/10] cys 가 답합니다: $ver"; Say "     부르는 길: $(Redact $script:CysCli)"; return 0 }
+    if ($ver) {
+        Say "[7/10] cys 가 답합니다: $ver"; Say "     부르는 길: $(Redact $script:CysCli)"
+        # 🔴v0.3.18 — 새 창의 자비스가 이름만으로 cys 를 부를 수 있게 사용자 PATH 에 cys 자리를 넣는다(Seed-CysPath 머리 주석).
+        if ($b.Cli -and ((Split-Path $b.Cli -Leaf) -ieq 'cys.exe')) { [void](Seed-CysPath (Split-Path $b.Cli -Parent)) }
+        return 0
+    }
     Say '[7/10] 프로그램은 있는데 아직 명령으로 부를 수 없습니다. PowerShell 창을 새로 열고 아래 「다시 하시는 법」대로 다시 실행해 주십시오.'
     $script:ShowRerun = $true
     return 7
@@ -2823,7 +3170,10 @@ function Step-PrepareAccount {
     }
     if ([int]$nSkip -gt 0) { Say "     ($nSkip 가지는 이 컴퓨터에서 판정할 수 없는 항목입니다 — 고장이 아닙니다.)" }
     if ($minor.Count -gt 0) {
-        Say ('     주의: 자가진단 ' + $minor.Count + ' 가지가 통과하지 못했습니다 (' + ($minor -join ', ') + ') — 자비스 창을 여는 데 쓰는 항목이 아니라서 이어 갑니다.')
+        # 🔴v0.3.18 — 이 갈래는 「실패」가 아니다: 좌석과 무관한 항목(실기 = runtime-sanity · cys 가 품은 git 도구 폴더(runtime\git\etc)의 목록 대조)이다.
+        #   앞 문구 「통과하지 못했습니다」가 기록·보고에서 실패로 읽혀 오진을 불렀다 ⇒ 등급을 「참고」로 사실대로 적는다.
+        Say ('     참고: 자가진단 ' + $minor.Count + ' 가지는 자비스 창과 무관한 항목이라 이어 갑니다 (' + ($minor -join ', ') + ' · 고장이 아닙니다 — 설치에 영향 없음).')
+        Write-Log ('doctor minor (not a failure): ' + ($minor -join ','))
         Say '[8/10] 자리를 잡았습니다 (자비스 창에 필요한 항목 실패 0).'
         return 0
     }
@@ -3187,7 +3537,7 @@ function Step-Fleet {
 #   글자 칸은 `\z` 로 끝을 못박아 다시 만든다. 이름·글자·판본 비교는 대소문자를 가르는 -ceq·-cmatch·-ccontains 만 쓴다.
 # ⚠PowerShell 은 `'true' -eq $true` 를 참으로 본다 ⇒ 칸마다 **형(type)을 먼저** 본다.
 # ⚠이 절은 맥에서 PowerShell 없이 **정적 검사 + 맥판과의 대조**로만 증명했다 — 윈도우 실기가 필요한 축은 내부 문서.
-$InstallerVersion       = '0.3.17'   # 보고의 installer_version · $BootstrapVersion 은 화면 머리글 용도 그대로(보내지 않는다)
+$InstallerVersion       = '0.3.18'   # 보고의 installer_version · $BootstrapVersion 은 화면 머리글 용도 그대로(보내지 않는다)
 $HelpApiUrl             = 'https://jarvis-install.godmeyou.kr'
 $RemoteHelpNoticeUrl    = 'jarvis-install.godmeyou.kr/help/notice'
 # [1/10] 고지 1줄 = /help/notice 정본이 인용하는 문장 그대로 + 끝에 자세한 안내 자리. ⛔문안 변경 금지(맥판과 글자가 같아야 한다).
@@ -3950,8 +4300,8 @@ function Send-RemoteHelpReport {
     $envText = ''
     $logText = ''
     try { if (Test-Path -LiteralPath $ReportFile) { $envText = [System.IO.File]::ReadAllText($ReportFile, [System.Text.Encoding]::UTF8) } } catch { }
-    # 기록 파일은 Add-Content 기본 인코딩으로 쓰였다 — 같은 기본값으로 읽는다
-    try { if (Test-Path -LiteralPath $LogFile) { $logText = (@(Get-Content -LiteralPath $LogFile -Tail 200 -ErrorAction Stop) -join "`n") } } catch { }
+    # 기록 파일은 UTF-8 로 쓰였다(Write-Log · v0.3.18) — 같은 글자표로 읽는다
+    try { if (Test-Path -LiteralPath $LogFile) { $logText = (@(Get-Content -LiteralPath $LogFile -Tail 200 -Encoding UTF8 -ErrorAction Stop) -join "`n") } } catch { }
     # 멈춘 단계 = 이 실행이 마지막으로 찍은 [n/10]
     $step = '0/10'
     for ($i = $script:StepLog.Count - 1; $i -ge 0; $i--) {
@@ -4075,6 +4425,7 @@ function Invoke-RemoteHelp {
             $script:RhOpen = $true
             # 다음 실행이 「이전 보고」를 말할 수 있게 보고 번호를 남긴다(열린 원격 해결을 닫는 표시 뒤 — 여기서 넘어져도 닫힌다)
             Save-HelpLastReport
+            Send-EvidenceOnce 'ask'   # v0.3.18 — 도움 요청 증거(보고가 열린 순간의 설치 창 끝부분 · 마스킹 뒤)
             Send-FailAttachments   # 보고가 열린 직후 진단 자료를 붙인다(계약 3절 · 각각 fail-open)
             # 엔진이 정상으로 끝날 때도 닫기를 한 번 보낸다(계약 7-7) — 아래 finally 가 먼저 닫으면 등록을 풀어 두 번 보내지 않는다.
             #   이 동작은 따로 도는 자리라 이 파일의 함수를 못 본다 ⇒ 주소·토큰을 넘겨 직접 부른다.
@@ -4118,7 +4469,8 @@ $InstallIdFile      = Join-Path $JarvisHome 'install-id'  # 첫 실행에 만든
 $TranscriptFile     = Join-Path $JarvisHome 'transcript.txt'
 $AttachMaxBytes     = 900 * 1024                          # 항목 하나의 상한(계약 2절)
 # 첫 화면 고지 = 서버 정본 문안(web-install 의 NOTICE_TEXT)과 글자까지 같다(계약 2절 「정본 1곳」 · 서버 응답의 notice 필드와도 같은 문장).
-$ProgressNotice = '설치 도우미는 진행 상황(단계·경과·판본·백신 이름·브라우저)을 자동으로 보내고, 막히면 설치 창 글자·기록 파일·화면 캡처를 함께 보내 운영 자비스가 원격으로 해결합니다. 로그인 이름·이메일·토큰은 글에서 지우며, 화면 캡처는 운영팀만 30일 동안 봅니다. 창을 닫으면 멈춥니다.'
+# v0.3.18 — 고지 정본 1줄 교체(master 릴레이 2026-09-15 20:18 · 서버 NOTICE_TEXT 도 같은 글로 바꾼다 = 732 몫)
+$ProgressNotice = '설치가 진행되는 동안 단계와 시각이 자동으로 전송됩니다. 설치가 막히면 설치 창에 표시된 글자만 보내지며, 로그인 코드·이메일·계정 이름은 가려집니다. 보관 30일 뒤 자동 삭제됩니다.'
 $script:InstallId      = ''
 $script:ProgressWarned = $false     # 전송 실패 경고는 실행당 한 번만 기록한다(fail-open)
 $script:TranscriptOn   = $false
@@ -4146,8 +4498,9 @@ function Get-InstallId {
     return $id
 }
 
-function Send-Progress($step, $ev, $elapsed, $detail, $envInfo) {
+function Send-Progress($step, $ev, $elapsed, $detail, $envInfo, $extra) {
     # 진행 한 줄을 서버로 보낸다. fail-open — 무슨 일이 있어도 설치를 막지 않는다(계약 1절).
+    #   $extra = 추가 칸(v0.3.18 evidence 이벤트의 text·reason·masked · 진행 전송 계약의 증거 절) · 없으면 종전과 같은 본문.
     if ($Mode -ne 'full') { return }
     if ($env:JARVIS_NO_PROGRESS -eq '1') { return }   # 흉내 시험이 실제 서버로 나가지 않게 하는 레버(사람이 쓰는 길이 아니다)
     $url = if ($env:JARVIS_PROGRESS_URL) { $env:JARVIS_PROGRESS_URL } else { $ProgressUrl }
@@ -4163,6 +4516,7 @@ function Send-Progress($step, $ev, $elapsed, $detail, $envInfo) {
         if ($null -ne $elapsed) { $fields['elapsed_s'] = [int]$elapsed }
         if ($detail)            { $fields['detail']    = [string]$detail }
         if ($null -ne $envInfo) { $fields['env']       = $envInfo }
+        if ($null -ne $extra)   { foreach ($k in @($extra.Keys)) { $fields[[string]$k] = $extra[$k] } }
         $body = ($fields | ConvertTo-Json -Compress -Depth 4)
         $ProgressPreference = 'SilentlyContinue'
         try { [Net.ServicePointManager]::SecurityProtocol = [Net.ServicePointManager]::SecurityProtocol -bor [Net.SecurityProtocolType]::Tls12 } catch { }
@@ -4176,6 +4530,92 @@ function Send-Progress($step, $ev, $elapsed, $detail, $envInfo) {
             Write-Log ('progress send failed (fail-open) - ' + $_.Exception.Message)
         }
     }
+}
+
+# ══ 증거(evidence) 이벤트 — v0.3.18 (진행 전송 계약의 증거 절 · 계약 확정 2026-09-15 20:0x) ════════════════════════
+#   언제: 정체(대기 3분 이상) · 실패(진단 코드 = rc≠0) · 도움 요청(원격 해결 보고가 열림) — (이유 × 단계)마다 한 번.
+#   무엇: 설치 창 글자(Start-Transcript 파일 · 없으면 설치 기록)의 마지막 부분 · 보내기 **전에 이 기계에서 마스킹**한다(masked=true).
+#   🔴마스킹 규칙의 정본은 서버(web-install src/mask.ts)이고, 여기의 식은 그 대조표 `mask-vectors.json`(web-install 725093c ·
+#     사본 = tests/mask-vectors.json)의 ps1_regex 를 **글자 그대로** 옮긴 것이다 — 고치려면 대조표부터 고친다(시험이 식과 대조표를 글자 대조한다).
+#   ⚠서버가 받은 뒤 한 번 더 마스킹한다(이중) — 이쪽 마스킹은 「기계 밖으로 나가기 전」의 방어다.
+#   ⚠.NET 의 \b·\s 는 유니코드 기준이라 JS 와 한글 바로 옆에서 갈릴 수 있다(예: 「코드aBc…#…」 처럼 한글에 붙은 코드) — 서버 재마스킹이 받친다.
+$EvidenceMaskRules = @(
+    @('[A-Za-z0-9._%+-]{1,64}@[A-Za-z0-9-]{1,63}(?:\.[A-Za-z0-9-]{1,63})*\.[A-Za-z]{2,63}', '<EMAIL>'),
+    @('(?i)\bBearer\s+[A-Za-z0-9._~+/=-]+', '<TOKEN>'),
+    @('\bsk-[A-Za-z0-9_-]{8,}', '<TOKEN>'),
+    @('\b[A-Za-z0-9_-]{20,}#[A-Za-z0-9_-]{8,}\b', '<LOGIN_CODE>'),
+    @('(?i)(Paste code here if prompted\s*>\s*)(\S+)', '$1<LOGIN_CODE>'),
+    @('(?i)\b([A-Za-z]:(?:\\{1,2}|/)Users(?:\\{1,2}|/))([^\\/\r\n"''<>|:*?]+)', '$1<USER>'),
+    @('(/Users/)([^/\s"''<>]+)', '$1<USER>')
+)
+$EvidenceNameLines = '(?i)\b(?:USERNAME|USERPROFILE|LOGNAME|USER|HOME)\b[ \t]*[=:][ \t]*([^\r\n]+)|\bwhoami\b[ \t]*[:=>][ \t]*([^\r\n]+)|(?:^|\n)[ \t]*([A-Za-z][A-Za-z0-9.-]{1,63}\\[A-Za-z0-9._-]{2,63})[ \t]*(?:\r?\n|$)'
+$EvidenceMaxNames   = 64       # 서버 scrub.ts MAX_NAMES 와 같은 값
+$EvidenceSourceBytes = 60000   # 파일 끝에서 읽는 양
+$EvidenceTextBytes   = 32000   # 마스킹 뒤 보내는 양(요청 본문 64KB 안 · ConvertTo-Json 이 < > 를 < 로 늘려도 남는다)
+$script:EvidenceSent = @{}
+
+function Protect-EvidenceText([string]$Raw) {
+    # 순서 = 서버 maskEvidenceText 와 같다: 표시된 로그인 이름을 먼저 <USER> 로 · 그다음 구조 규칙 일곱.
+    if (-not $Raw) { return $Raw }
+    $names = New-Object System.Collections.Generic.List[string]
+    foreach ($m in [regex]::Matches($Raw, $EvidenceNameLines)) {
+        if ($names.Count -ge $EvidenceMaxNames) { break }
+        $v = ''
+        foreach ($g in 1..3) { if ($m.Groups[$g].Success) { $v = $m.Groups[$g].Value; break } }
+        $v = ($v.Trim() -replace '["'']', '')
+        if ($v.Length -ge 2 -and -not $names.Contains($v)) { $names.Add($v) }
+        $seg = (($v -split '[\\/]')[-1]).Trim()
+        if ($seg.Length -ge 2 -and $names.Count -lt $EvidenceMaxNames -and -not $names.Contains($seg)) { $names.Add($seg) }
+    }
+    # 🔴서버 정본(web-install mask.ts 8571653)의 4단계를 그대로 옮긴다 — ①이름은 원문에서 뽑아 두고(위) ②구조 규칙이 맞힌 자리에는
+    #   표식 대신 자리표(NUL M<번호> NUL)를 심고 ③이름 치환 ④자리표를 표식으로 되돌린다.
+    #   왜: 이름을 먼저 지우면 「hong@…」 이 「<USER>@…」 가 되고, 구조 결과 위에서 이름을 지우면 이름이 하필 Users·EMAIL 일 때
+    #   C:\Users\ 접두사나 <EMAIL> 표식 자체가 뭉개진다(대조표 order_dependency_1~4).
+    $sentinels = New-Object System.Collections.Generic.List[string]
+    $text = $Raw
+    foreach ($r in $EvidenceMaskRules) {
+        $ph = $r[1]
+        $text = [regex]::Replace($text, $r[0], [System.Text.RegularExpressions.MatchEvaluator]{
+            param($m)
+            $res = [regex]::Replace($ph, '\$(\d)', [System.Text.RegularExpressions.MatchEvaluator]{ param($g) $m.Groups[[int]$g.Groups[1].Value].Value })
+            $sentinels.Add($res)
+            return ([string][char]0 + 'M' + ($sentinels.Count - 1) + [string][char]0)
+        })
+    }
+    if ($names.Count -gt 0) {
+        $alt = (@($names | Sort-Object -Property Length -Descending | ForEach-Object { [regex]::Escape($_) }) -join '|')
+        $text = [regex]::Replace($text, $alt, '<USER>')
+    }
+    $text = [regex]::Replace($text, '\x00M(\d+)\x00', [System.Text.RegularExpressions.MatchEvaluator]{ param($m) $sentinels[[int]$m.Groups[1].Value] })
+    return $text
+}
+
+function Get-EvidenceText {
+    # 설치 창 글자 = Start-Transcript 파일(켜져 있을 때) · 아니면 설치 기록(화면 줄을 전부 담는다) — 끝에서 읽어 마스킹한 뒤 자른다.
+    $src = if ($script:TranscriptOn -and (Test-Path -LiteralPath $TranscriptFile)) { $TranscriptFile } else { $LogFile }
+    $bytes = Get-FileBytesCapped $src $EvidenceSourceBytes
+    if ($null -eq $bytes -or $bytes.Length -eq 0) { return '' }
+    $cut = $false
+    try { $cut = ((Get-Item -LiteralPath $src -ErrorAction Stop).Length -gt $bytes.Length) } catch { }
+    if ($bytes.Length -ge 2 -and $bytes[0] -eq 0xFF -and $bytes[1] -eq 0xFE) { $raw = [System.Text.Encoding]::Unicode.GetString($bytes, 2, $bytes.Length - 2) }
+    else { $raw = [System.Text.Encoding]::UTF8.GetString($bytes); if ($raw.Length -gt 0 -and $raw[0] -eq [char]0xFEFF) { $raw = $raw.Substring(1) } }
+    # 끝에서 잘라 읽었으면 첫 줄은 반쪽이다 — 반쪽 토큰이 규칙에 안 걸린 채 나가지 않게 버린다.
+    if ($cut) { $nl = $raw.IndexOf("`n"); if ($nl -ge 0) { $raw = $raw.Substring($nl + 1) } else { $raw = '' } }
+    $masked = Protect-EvidenceText $raw
+    return (Get-RemoteHelpTailBytes $masked $EvidenceTextBytes)
+}
+
+function Send-EvidenceOnce([string]$Reason) {
+    # fail-open · (이유 × 단계) 한 번 · 설치를 막지 않는다.
+    try {
+        $key = $Reason + '|' + (Get-CurrentStep)
+        if ($script:EvidenceSent.ContainsKey($key)) { return }
+        $script:EvidenceSent[$key] = $true
+        $t = Get-EvidenceText
+        if (-not $t) { Write-Log ('evidence skip (no text): ' + $key); return }
+        Send-Progress (Get-CurrentStep) 'evidence' $null $null $null ([ordered]@{ text = $t; reason = $Reason; masked = $true })
+        Write-Log ('evidence sent: ' + $key + ' ' + [System.Text.Encoding]::UTF8.GetByteCount($t) + 'B')
+    } catch { Write-Log ('evidence error (fail-open): ' + $_.Exception.Message) }
 }
 
 function Get-CurrentStep {
@@ -4413,7 +4853,8 @@ try {
         # 설치 창의 글자를 통째로 파일에 담는다 — 막혔을 때 그 파일을 진단 자료로 붙인다(계약 3절 ②).
         try { Start-Transcript -LiteralPath $TranscriptFile -Force -ErrorAction Stop | Out-Null; $script:TranscriptOn = $true } catch { }
     }
-    Say "=== 자비스 설치 도우미 $BootstrapVersion (모드: $Mode) ==="
+    # 머리글 앞머리 「=== 자비스 설치 도우미 」 는 지난 실행 읽기(Show-PrevRunNote)의 경계 표지다 — 앞머리는 바꾸지 않는다.
+    Say "=== 자비스 설치 도우미 — $CysDisplayName $CysVersion · 설치 도우미 $InstallerVersion (모드: $Mode) ==="
     Show-PrevRunNote
     Say '[1/10] 이 컴퓨터를 살펴봅니다.'
     Say ('     ' + $RemoteHelpNotice)

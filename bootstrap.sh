@@ -34,6 +34,9 @@ REPORT_HEAD="[자비스] 환경 보고 v0"      # 첫 응답의 고정 첫 줄 �
 
 # ── 핀 (외부 URL은 이 두 줄이 전부다) ─────────────────────────────
 CLAUDE_INSTALL_URL="https://claude.ai/install.sh"
+# v0.3.18 — 참가자 클로드는 stable 채널로 깔고 그 채널에 묶는다(윈판 $ClaudeChannel 과 같은 값 · 공식 문서 code.claude.com/docs/en/setup 2026-09-15 확인:
+#   설치기 `bash -s stable` · 설정 열쇠 settings.json "autoUpdatesChannel": "stable" — 자동 판올림으로 수업 중 화면이 바뀌지 않게).
+CLAUDE_CHANNEL="stable"
 CYS_SITE_URL="https://www.cysinsight.com/"   # 공식 안내 문서가 쓰는 주소 문자열을 그대로 따른다
 # 우리 자리(배포 한 줄이 가리키는 곳). 새 바깥 주소가 아니라 **이미 쓰고 있던 우리 주소**를 상수로 올린 것이다 —
 # 연결이 끊겼을 때 「우리 쪽인가 바깥인가」를 가르려면 우리 주소를 물어볼 수 있어야 한다.
@@ -91,14 +94,19 @@ BLOCKED_STEP=""
 #   (curl 로 받은 파일에는 격리 속성이 붙지 않지만, 붙어 있어도 지운다 — 사람이 「열기」를 누를 일이 없게.)
 #   크기·지문·CDHash 는 우리 설치본을 `ditto -c -k --keepParent` 로 묶은 그 자산에서 쟀다(2026-09-15).
 #   ⚠원작자 판으로 가는 길은 **둘뿐**이다: ⑴인텔 맥(우리 빌드는 arm64 전용) ⑵우리 자산이 404 일 때.
-CYS_FORK_VERSION="0.14.37"
+# ★★릴리스 핀 자리(v0.3.18) — 다음 판(cysr 1.0.0 · 앱+팩 단일 판번)으로 올릴 때 고치는 곳은 **이 CYS_FORK_* 블록뿐**이다:
+#   CYS_DISPLAY_NAME · CYS_FORK_VERSION · CYS_FORK_FILE(자산 이름이 바뀌면) · CYS_FORK_BYTES · CYS_FORK_SHA256 · CYS_FORK_CDHASH.
+#   ⚠맥은 판번 대조에 CDHash(설치된 프로그램의 내용 지문)를 이미 함께 쓴다 — 판번이 같아도 CDHash 가 다르면 바꿔 넣는다(step_install_cys).
+#   화면 머리글 = 「<이름> <판> · 설치 도우미 <설치기 판>」(설치기 판 = INSTALLER_VERSION · 별도 semver).
+CYS_DISPLAY_NAME="cysr"
+CYS_FORK_VERSION="1.0.0"
 CYS_FORK_DIR="https://github.com/oogisoogi/cys-ro/releases/download/v${CYS_FORK_VERSION}/"
 CYS_FORK_FILE="cys-macos-arm64-v${CYS_FORK_VERSION}.zip"
-CYS_FORK_BYTES=471513671
-CYS_FORK_SHA256="1d8e56e3db6fa83f258f9f57edc9503b96025ead3fa9cf766abb65ec3af3b5db"
+CYS_FORK_BYTES=471657674
+CYS_FORK_SHA256="408b4defc0c673912965fcf799156f17362ed895b76fae21fc377ae1dbd6a10a"
 # 설치된 프로그램이 「바로 이 판」인가를 가르는 값. 판본 숫자는 원작자 판도 같은 숫자를 쓸 수 있어서
 #   숫자만 보면 **원작자 판을 우리 판으로 읽고 건너뛴다**(어제 원작자 판을 깐 맥이 그대로 남는다).
-CYS_FORK_CDHASH="6d463ebdafb87a185b95c963f769d16abc968590"
+CYS_FORK_CDHASH="84fda923e275eef4adfc81f74e52fab896ec5d9a"
 CYS_FORK_PAGE="https://github.com/oogisoogi/cys-ro/releases/tag/v${CYS_FORK_VERSION}"
 # 원작자 판(위 두 경우에만 쓴다)
 CYS_VERSION="0.14.33"
@@ -227,7 +235,7 @@ login_waiter() {
       login_end_wait "$pidfile"
       return 0
     fi
-    tell "     브라우저의 승인 화면에서 「코드」를 복사해 이 창에 붙여넣고 Enter 를 눌러 주십시오."
+    tell "     승인 화면의 「코드」를 복사만 하시면 이 창이 알아서 넣습니다 — 안 되면 이 창을 누르고 ⌘+V 로 붙여넣고 Enter 를 눌러 주십시오."
     tell "     (기다린 지 $(( waited / 60 ))분 · 창을 닫거나 Ctrl-C 를 누르시면 다시 하는 법을 안내합니다)"
   done
 }
@@ -1078,16 +1086,16 @@ step_install_claude() {
     say "[2/10] 이 컴퓨터의 클로드가 낡았습니다($(claude --version 2>/dev/null | head -1)). 최신판을 설치합니다."
   fi
   if [ "$MODE" = "dry" ]; then
-    say "[2/10] (dry-run) 설치기를 부르지 않았습니다. 부를 줄 = curl -fsSL $CLAUDE_INSTALL_URL | bash"
+    say "[2/10] (dry-run) 설치기를 부르지 않았습니다. 부를 줄 = curl -fsSL $CLAUDE_INSTALL_URL | bash -s $CLAUDE_CHANNEL"
     return 0
   fi
   say "[2/10] 클로드 코드를 설치합니다. 글자가 주르륵 올라갑니다 — 정상입니다."
   local rc=0
-  ( set -o pipefail; curl -fsSL --max-time 600 "$CLAUDE_INSTALL_URL" | bash ) || rc=$?
+  ( set -o pipefail; curl -fsSL --max-time 600 "$CLAUDE_INSTALL_URL" | bash -s "$CLAUDE_CHANNEL" ) || rc=$?
   if [ "$rc" -ne 0 ]; then
     # 여기서 곧바로 끝내지 않는다 — 못 나가는 까닭이 잠깐일 수 있다. 원인을 갈라 말하고 기다린다.
     say "[2/10] 설치기를 받지 못했습니다 (종료 코드 $rc)."
-    if wait_for_connection "[2/10]" '( set -o pipefail; curl -fsSL --max-time 600 "$CLAUDE_INSTALL_URL" | bash )'; then
+    if wait_for_connection "[2/10]" '( set -o pipefail; curl -fsSL --max-time 600 "$CLAUDE_INSTALL_URL" | bash -s "$CLAUDE_CHANNEL" )'; then
       rc=0
     else
       next_rerun "연결이 된 뒤 아래 「다시 하시는 법」대로 다시 실행해 주십시오. 끝난 단계는 건너뛰고 이어서 갑니다."
@@ -1127,6 +1135,60 @@ step_install_claude() {
 }
 
 # ── 하는 일 3 — 로그인 유도 + 완료 감지 ───────────────────────────
+# ── 로그인 코드 자동 넣기 (v0.3.18 · 728 윈판 동형) ─────────────────────────────
+LOGIN_TICK=2              # 초 — 한 바퀴(이 사이에 이 창에 친 줄 · 복사된 코드 · 로그인 프로세스 생존을 본다)
+LOGIN_CLIP_MAX_SENDS=3    # 한 번 연 로그인에서 복사된 코드를 넣는 최대 횟수(서로 다른 코드만 센다)
+login_trim() { local s="$1"; s="${s#"${s%%[![:space:]]*}"}"; s="${s%"${s##*[![:space:]]}"}"; printf '%s' "$s"; }
+login_code_shape() {   # 윈판 Test-LoginCodeShape 와 같은 모양 · 줄 단위 grep 이 아니라 문자열 전체를 본다
+  local s="$1"
+  [ "${#s}" -le 1100 ] || return 1
+  # ⚠맥 bash 3.2 의 정규식(BSD regcomp)은 반복 상한이 255(RE_DUP_MAX)라 {16,512} 는 식 자체가 깨져 늘 거짓이다(2026-09-15 흉내 실측)
+  #   ⇒ 모양은 + 로 보고, 길이(16~512)는 두 조각을 따로 센다.
+  [[ "$s" =~ ^[A-Za-z0-9._~-]+#[A-Za-z0-9._~-]+$ ]] || return 1
+  local a="${s%%#*}" b="${s#*#}"
+  [ "${#a}" -ge 16 ] && [ "${#a}" -le 512 ] && [ "${#b}" -ge 16 ] && [ "${#b}" -le 512 ]
+}
+login_feeder() {   # login_feeder <pid 파일> — 표준 출력 = 로그인 프로세스의 입력(코드 글자는 기록에 적지 않는다)
+  local pidf="$1" base="" last="" clip="" line="" sends=0 typed=0 pid="" have_tty=0
+  ( : </dev/tty ) 2>/dev/null && have_tty=1
+  # 로그인을 열기 **전에** 이미 복사돼 있던 코드는 넣지 않는다(지난 시도의 낡은 코드 · 윈판과 같은 규칙)
+  clip="$(login_trim "$(pbpaste 2>/dev/null)")"
+  login_code_shape "$clip" && base="$clip"
+  clip=""
+  while :; do
+    pid="$(head -1 "$pidf" 2>/dev/null)"
+    if [ -n "$pid" ] && ! kill -0 "$pid" 2>/dev/null; then break; fi   # 로그인 프로세스가 끝났다 → 넣기를 멈춘다
+    [ -e "$LOGIN_WAIT_MARK" ] || break
+    if [ "$have_tty" = "1" ]; then
+      line=""
+      if IFS= read -r -t "$LOGIN_TICK" line </dev/tty 2>/dev/null; then
+        printf '%s\n' "$line" || break   # 사람이 이 창에 친 줄은 그대로 넘긴다(폴백 = 종전 붙여넣기)
+        line="$(login_trim "$line")"; login_code_shape "$line" && last="$line"
+        typed=$((typed + 1)); log "login line forwarded from terminal $typed"
+      fi
+      line=""
+    else
+      sleep "$LOGIN_TICK"
+    fi
+    if [ "$sends" -lt "$LOGIN_CLIP_MAX_SENDS" ]; then
+      clip="$(login_trim "$(pbpaste 2>/dev/null)")"
+      if login_code_shape "$clip" && [ "$clip" != "$base" ] && [ "$clip" != "$last" ]; then
+        printf '%s\n' "$clip" || break
+        last="$clip"; sends=$((sends + 1))
+        log "login code sent from clipboard $sends"
+        tell "     복사하신 코드를 로그인에 넣었습니다 — 확인을 기다립니다."
+      fi
+      clip=""
+    fi
+  done
+  log "login feeder end: clipboard $sends · terminal lines $typed"
+  return 0
+}
+login_run_fed() {   # login_run_fed <pid 파일> — 가짜 터미널 안의 로그인 프로세스 · 입력은 login_feeder
+  local pidf="$1"
+  login_feeder "$pidf" | script -q /dev/null /bin/sh -c 'echo $$ > "$0"; ps -o lstart= -p $$ >> "$0"; exec claude auth login' "$pidf"
+}
+
 step_login() {
   # 🔴[1/10] 의 로그인 판정은 **클로드가 없던 시점**의 것이다 — 그 자리에서는 물어볼 상대가 없어
   #   `unknown` 으로 적고 지나간다. 그런데 [2/10] 에서 방금 클로드를 깔았다.
@@ -1160,7 +1222,7 @@ step_login() {
   say "     로그인은 이렇게 해 주십시오 (3가지만):"
   say "     1) 열려 있는 Claude 탭을 모두 닫고, 브라우저에서 「승인」은 한 번만 누르십시오 (두 번 누르면 앞 코드가 무효가 됩니다)."
   say "     2) 「Authentication code」 화면에서 복사 단추로 코드만 복사하십시오 (주소창의 주소는 안 됩니다)."
-  say "     3) 이 창에 붙여넣고(⌘+V) Enter 를 누르십시오 — 5분 안에."
+  say "     3) 복사만 하시면 이 창이 몇 초 안에 알아서 넣습니다 — 「코드를 로그인에 넣었습니다」가 안 나오면 이 창을 한 번 누르고 ⌘+V 로 붙여넣은 뒤 Enter 를 누르십시오(5분 안에)."
   say "     기다리는 동안 $((LOGIN_SAY_INTERVAL))초마다 한 줄씩 알려 드리고, $((LOGIN_WAIT_TIMEOUT / 60))분이 지나면 이 기다림을 끝냅니다."
   LOGIN_WAIT_MARK="$JARVIS_HOME/.login-wait"
   LOGIN_PID_FILE="$JARVIS_HOME/.login-pid"
@@ -1171,7 +1233,16 @@ step_login() {
   # ★승인은 **앞에 그대로** 두되, 자기 번호와 시작 시각을 적고 나서 벤더 명령으로 **바뀐다**(exec).
   #   그래야 상한이 `pgrep` 로 다시 찾지 않고 **그 프로세스 하나만** 겨눌 수 있다.
   #   (이 셸은 3.2 라 `BASHPID` 가 없다 — 자식이 스스로 적는 것이 유일한 길이다.)
-  /bin/sh -c 'echo $$ > "$0"; ps -o lstart= -p $$ >> "$0"; exec claude auth login' "$LOGIN_PID_FILE" || true
+  # 🔴v0.3.18 — 로그인 코드를 붙여넣지 않아도 되게(728 윈판 설계 동형): 로그인 프로세스를 가짜 터미널(script) 안에 띄우고
+  #   그 입력을 설치기가 쥔다 → 복사된 코드(pbpaste)를 한 줄로 넣는다 · 사람이 이 창에 붙여넣은 줄도 그대로 넘긴다(폴백).
+  #   ⚠입력을 파이프로만 바꾸면 벤더 도구가 「터미널이 아니다」로 입력 칸을 안 띄운다 — script 가 자식에게 터미널을 준다(2026-09-15 이 맥 실측 · 자식 stdin=tty).
+  if command -v script >/dev/null 2>&1 && command -v pbpaste >/dev/null 2>&1; then
+    log "login: installer-fed (script pty · clipboard)"
+    login_run_fed "$LOGIN_PID_FILE" || true
+  else
+    log "login: plain (script 또는 pbpaste 없음)"
+    /bin/sh -c 'echo $$ > "$0"; ps -o lstart= -p $$ >> "$0"; exec claude auth login' "$LOGIN_PID_FILE" || true
+  fi
   # 끝났으면 **표적을 먼저** 치운다 — 표식보다 먼저 지워야 감시자가 겨눌 것이 없다.
   rm -f "$LOGIN_PID_FILE"
   rm -f "$LOGIN_WAIT_MARK"
@@ -1283,7 +1354,9 @@ seed_claude_settings() {
     || plutil -insert skipDangerousModePermissionPrompt -bool true "$sf" >/dev/null 2>&1
   plutil -replace remoteControlAtStartup -bool false "$sf" >/dev/null 2>&1 \
     || plutil -insert remoteControlAtStartup -bool false "$sf" >/dev/null 2>&1
-  log "seed: $(redact "$sf") theme·skipDangerousModePermissionPrompt·remoteControlAtStartup"
+  plutil -replace autoUpdatesChannel -string "$CLAUDE_CHANNEL" "$sf" >/dev/null 2>&1 \
+    || plutil -insert autoUpdatesChannel -string "$CLAUDE_CHANNEL" "$sf" >/dev/null 2>&1
+  log "seed: $(redact "$sf") theme·skipDangerousModePermissionPrompt·remoteControlAtStartup·autoUpdatesChannel=$CLAUDE_CHANNEL"
   return 0
 }
 
@@ -2231,7 +2304,7 @@ step_wake() {
 # ★언제 도는가 = 자비스를 깨우기 **전에** 진단 코드를 남기고 멈춘 끝. 자비스를 깨운 뒤에는 돌지 않는다
 #   (자비스가 이 창을 넘겨받으므로 두 쪽이 한 화면에 섞이지 않게).
 # ⚠JSON·재검사·스크럽은 macOS 기본 `osascript`(JavaScript)가 한다 — 깨끗한 맥에는 jq·python 이 없다.
-INSTALLER_VERSION="0.3.17"      # 보고의 installer_version · BOOTSTRAP_VERSION 은 화면 머리글 용도 그대로(보내지 않는다)
+INSTALLER_VERSION="0.3.18"      # 보고의 installer_version · BOOTSTRAP_VERSION 은 화면 머리글 용도 그대로(보내지 않는다)
 HELP_API_URL="https://jarvis-install.godmeyou.kr"
 REMOTE_HELP_NOTICE_URL="jarvis-install.godmeyou.kr/help/notice"
 # [1/10] 고지 1줄 = /help/notice 정본(page.ts)이 인용하는 문장 그대로 + 끝에 자세한 안내 자리(계약 7-1절). ⛔문안 변경 금지.
@@ -3192,7 +3265,7 @@ remote_help_on_signal() {
 [ "${JARVIS_LIB_ONLY:-}" = "1" ] && { return 0 2>/dev/null || exit 0; }
 
 # ── 본문 ──────────────────────────────────────────────────────────
-say "=== 자비스 설치 도우미 $BOOTSTRAP_VERSION (모드: $MODE) ==="
+say "=== 자비스 설치 도우미 — ${CYS_DISPLAY_NAME} ${CYS_PIN_VERSION} · 설치 도우미 ${INSTALLER_VERSION} (모드: $MODE) ==="
 say "[1/10] 이 컴퓨터를 살펴봅니다."
 say "     $REMOTE_HELP_NOTICE"
 NOTICE_SHOWN=1
