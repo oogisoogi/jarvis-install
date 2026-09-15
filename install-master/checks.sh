@@ -1924,10 +1924,51 @@ ck "[핀] 최신만 두는 배포 폴더를 안 쓴다" "$rc" "옛 받을 자리
 #   갱신해야 하는 축은 갱신을 잊는 날 눈이 먼다. ⇒ 「0.14.* 가 나오는 줄 = 전부 핀 판본 줄」로 잰다.
 count_from_or_fail '0\.14\.[0-9]' -- grep -vE '^[[:space:]]*#' "$SH"; rc=$?
 nver="$COUNT_N"
+# ⚠2026-09-15 전환부터 맥 핀은 **둘**이다(저희 판 0.14.37 · 원작자 판 0.14.33 = 인텔·자산 없음). 둘 다 센다.
 count_from_or_fail '0\.14\.33' -- grep -vE '^[[:space:]]*#' "$SH"; rc2=$?
 npin="$COUNT_N"
+count_from_or_fail '0\.14\.37' -- grep -vE '^[[:space:]]*#' "$SH"; rc3=$?
+npin=$((npin + COUNT_N)); [ "$rc3" -eq 0 ] || rc2=$rc3
 [ "$rc" -eq 0 ] && [ "$rc2" -eq 0 ] && [ "$npin" -gt 0 ] && [ "$nver" -eq "$npin" ]
 ck "[핀] 설치기(맥) 코드의 판본 문자열이 전부 핀 판본이다" $? "옛 판본 문자열이 코드에 남았다(0.14.* ${nver}줄 · 핀 ${npin}줄)"
+
+# ── ⓕ-2 맥 저희 판 전환 (2026-09-15) ────────────────────────────────
+#   애플 실리콘 맥은 우리 릴리스 zip 을 받아 풀어 넣는다. 인텔·자산 없음만 원작자 판으로 간다.
+codegrep "$SH" 'CYS_FORK_VERSION="0\.14\.37"'; ck "[전환] 맥 저희 판 판본 핀" $? "판본 핀이 없다"
+codegrep "$SH" 'CYS_FORK_DIR="https://github\.com/oogisoogi/cys-ro/releases/download/v'; ck "[전환] 저희 판은 판본이 박힌 우리 릴리스 자리에서 받는다" $? "다른 자리를 가리킨다"
+codegrep "$SH" 'CYS_FORK_BYTES=471513671'; ck "[전환] 저희 판 크기 핀" $? "크기가 안 맞아 매번 멈춘다"
+codegrep "$SH" 'CYS_FORK_SHA256="1d8e56e3db6fa83f258f9f57edc9503b96025ead3fa9cf766abb65ec3af3b5db"'; ck "[전환] 저희 판 지문 핀" $? "크기만 같은 다른 파일이 통과한다"
+codegrep "$SH" 'CYS_FORK_CDHASH="6d463ebdafb87a185b95c963f769d16abc968590"'; ck "[전환] 저희 판 CDHash 핀" $? "깔린 판을 판별할 값이 없다"
+# 칩 갈래: arm64 만 저희 판, 그 밖은 원작자 판(intel 사유) — 순서까지 본다.
+awk '/^if \[ "\$\(uname -m\)" = "arm64" \]; then$/{f=1} f&&/^  cys_use_fork_pin$/{a=NR} f&&/^else$/{e=NR} f&&/cys_use_vendor_pin; CYS_VENDOR_WHY="intel"/{b=NR} f&&/^fi$/{exit} END{exit !(a&&e&&b&&a<e&&e<b)}' "$SH"
+ck "[전환] 애플 실리콘만 저희 판 · 인텔은 원작자 판" $? "칩 갈래가 뒤집히거나 사라졌다"
+# 저희 자산이 404 면 원작자 판으로 한 번 돌아간다(J-DL-05 보다 앞).
+awk '/^step_download_cys\(\) \{/{f=1} f&&/404\|410\)/{a=NR} f&&a&&!v&&/cys_use_vendor_pin; CYS_VENDOR_WHY="missing"/{v=NR} f&&/J-DL-05/{j=NR} f&&/^\}$/{exit} END{exit !(a&&v&&j&&a<v&&v<j)}' "$SH"
+ck "[전환] 저희 자산이 없으면 원작자 판으로 돌아간다" $? "자산이 없는 날 맥 설치가 멈춘다"
+# 이미 깔린 cys 는 「있다」가 아니라 CDHash 로 판을 보고 건너뛴다(어제 깐 원작자 판이 남지 않게).
+awk '/^step_install_cys\(\) \{/{f=1} f&&/cys_app_cdhash \/Applications\/cys\.app\)" = "\$CYS_FORK_CDHASH"/{a=NR} f&&/cys_install_from_zip "\$dst"/{b=NR} f&&/^\}$/{exit} END{exit !(a&&b&&a<b)}' "$SH"
+ck "[전환] 깔린 cys 는 판(CDHash)을 보고 건너뛴다" $? "원작자 판이 깔린 맥이 그대로 남는다"
+# 설치 순서: 격리 속성 지우기 → 서명 확인 → 옛 것 끄기 → 바꿔 넣기. 확인이 끄기보다 앞이어야 한다.
+awk '/^cys_install_from_zip\(\) \{/{f=1} f&&!x&&/^  xattr -cr "\$app"/{x=NR} f&&!c&&/codesign --verify --deep --strict "\$app"/{c=NR} f&&!k&&/^    cys_stop_old_app$/{k=NR} f&&!s&&/\/bin\/bash "\$swap" "\$app" "\$prev"/{s=NR} f&&/^\}$/{exit} END{exit !(x&&c&&k&&s&&x<c&&c<k&&k<s)}' "$SH"
+ck "[전환] 격리 지우기→서명 확인→옛 것 끄기→바꿔 넣기 순서" $? "확인 전에 돌던 cys 를 끄거나 격리 속성이 남는다"
+# 옛 것 끄기는 실행 파일 자리로만 고른다(명령줄 축 금지 — 편집기까지 끈다).
+#   ⚠함수를 못 찾으면 적색이다(없는 함수의 「0건」은 초록이 아니다). awk 정규식(ERE)으로 센다 —
+#     앞 판은 기본 정규식 도우미에 `|` 를 넘겨 **언제나 0건**이 나왔다(뮤턴트 M61 이 눈멂으로 잡았다).
+awk '/^cys_stop_old_app\(\) \{/{f=1} f&&/pkill|pgrep|command=|args=/{bad=1} f&&/^\}$/{exit} END{exit !(f&&!bad)}' "$SH"
+ck "[전환] 옛 cys 끄기에 명령줄 축이 없다" $? "편집기가 그 경로를 열기만 해도 꺼진다(또는 함수를 못 찾았다)"
+# 재설치 길은 프로그램을 남긴다 — 두 자리(보기·지우기) 모두.
+[ "$(grep -cE '^  bash "\$RESET_FILE" --list \$KEEP_APP_ARG$|^bash "\$RESET_FILE" \$KEEP_APP_ARG$' "$REIN_SH")" -eq 2 ] \
+  && grep -qE '^\[ "\$\(uname -m\)" = "arm64" \] && KEEP_APP_ARG="--keep-app"$' "$REIN_SH"
+ck "[전환] 맥 재설치가 지우개에 --keep-app 을 넘긴다(두 자리)" $? "재설치마다 470MB 를 다시 받는다"
+# 인텔은 남기지 않는다 — 원작자 판 경로는 「있으면 건너뛴다」라서 옛 판이 남는다(교차 검토 지적).
+! grep -qE '^[[:space:]]*KEEP_APP_ARG="--keep-app"' "$REIN_SH" && grep -qE 'arm64.*KEEP_APP_ARG="--keep-app"' "$REIN_SH"
+ck "[전환] 맥 재설치의 프로그램 남기기는 애플 실리콘에서만" $? "인텔 맥 재설치에서 옛 원작자 판이 그대로 남는다"
+# 넣기 실패 뒤: 반쪽을 치우고, 이번에 옮긴 옛 것만 되돌린다(교차 검토 지적).
+awk '/^[[:space:]]*cat > "\$swap" <<.EOF_SWAP.$/{f=1} f&&/moved=1$/{m=NR} f&&/^mv "\$new" "\$dst" && exit 0$/{a=NR} f&&a&&/^rm -rf "\$dst"$/{r=NR} f&&r&&/^\[ "\$moved" = "1" \] && \[ -e "\$prev" \] && mv "\$prev" "\$dst"$/{b=NR} f&&/^EOF_SWAP$/{exit} END{exit !(m&&a&&r&&b&&m<a&&a<r&&r<b)}' "$SH"
+ck "[전환] 넣기 실패 뒤 반쪽을 치우고 이번에 옮긴 옛 것만 되돌린다" $? "반쪽이 남아 되돌리기가 막히거나 지난 보관본이 올라온다"
+codegrep "$SH" "curl -sS -L -r 0-0 -o /dev/null -w '%\{http_code\}'"; ck "[핀] 자리 물음은 받기와 같은 GET(첫 1바이트)으로 한다" $? "HEAD 로 물으면 받기는 되는 자리를 없다고 읽을 수 있다"
+awk '/^  if \[ "\$KEEP_APP" = "1" \]; then$/{k=NR} /^    drop_dir "\$CYS_APP"$/{d=NR} END{exit !(k&&d&&k<d&&d-k<=4)}' "$RESET_SH"
+ck "[전환] 맥 지우개는 --keep-app 이면 프로그램을 안 지운다" $? "프로그램 남기기 갈래가 없다"
 
 # 🔴★「그 판본이 자리에 없다」와 「연결이 끊겼다」를 **가른다**.
 #   앞 판은 둘을 한 칸에 두어, 없는 파일을 **30분씩 두 번**(NET_WAIT_TIMEOUT × for try in 1 2)

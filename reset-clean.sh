@@ -11,7 +11,7 @@
 #   bash reset-clean.sh --dry-run  지울 목록만 보여 준다 (--list 와 같다)
 #   bash reset-clean.sh --yes      묻지 않는다 (재설치 한 줄이 안에서 쓴다)
 #   bash reset-clean.sh --purge-login   로그인까지 지운다 (기본은 로그인을 남긴다)
-#
+#   bash reset-clean.sh --keep-app      cys 프로그램은 남긴다 (재설치 한 줄이 안에서 쓴다)
 # 되돌릴 수 없다.
 #
 # ★로그인은 기본으로 남긴다. 재설치 뒤 로그인 손 한 번을 아끼기 위해서다.
@@ -20,12 +20,13 @@
 #   그것은 `--purge-login` 을 일부러 붙였을 때만 한다.
 set -u
 
-MODE="run"; ASSUME_YES=0; PURGE_LOGIN=0
+MODE="run"; ASSUME_YES=0; PURGE_LOGIN=0; KEEP_APP=0
 for a in "$@"; do
   case "$a" in
     --list|--dry-run) MODE="list" ;;
     --yes|-y)         ASSUME_YES=1 ;;
     --purge-login)    PURGE_LOGIN=1 ;;
+    --keep-app)       KEEP_APP=1 ;;
     -h|--help)        sed -n '1,25p' "$0"; exit 0 ;;
   esac
 done
@@ -402,7 +403,16 @@ diagnose() {
   FOUND=0
   say "=== 이 컴퓨터의 상태 ==="
   # footprint: M-APP
-  [ -d "$CYS_APP" ]; row $? 'cys 프로그램' "$CYS_APP"
+  if [ "$KEEP_APP" = "1" ]; then
+    # 재설치 길 — 프로그램은 남긴다(윈도우 -KeepApp 과 같다). 다시 깔 때 설치 도우미가 판을 확인해
+    #   이번 판이면 그대로 쓰고, 아니면 이번 판으로 바꿔 넣는다 — 그래서 여기서 지울 까닭이 없다.
+    #   ⚠실행 상태(~/.local/state/cys)는 아래에서 **통째로** 지운다 — 맥은 윈도우와 달리 그 자리가
+    #     프로그램 폴더 밖에 따로 있어서, 지난 편성 기록만 골라낼 필요 없이 전부 비울 수 있다.
+    [ -d "$CYS_APP" ] && say "  [있음] cys 프로그램 · $CYS_APP (남깁니다 — 다시 깔 때 판을 확인해 그대로 쓰거나 바꿉니다)" \
+                      || say "  [없음] cys 프로그램 · $CYS_APP"
+  else
+    [ -d "$CYS_APP" ]; row $? 'cys 프로그램' "$CYS_APP"
+  fi
   # footprint: M-DAEMON
   [ -f "$HOME/Library/LaunchAgents/com.cysjavis.cysd.plist" ]; row $? 'cys 상시 가동 등록' "$HOME/Library/LaunchAgents/com.cysjavis.cysd.plist"
   # footprint: M-CYSHOME
@@ -1012,7 +1022,11 @@ purge() {
   strip_hooks "$HOME/.claude/settings.json"
 
   # footprint: M-APP
-  drop_dir "$CYS_APP"
+  if [ "$KEEP_APP" = "1" ]; then
+    say "  [남김] cys 프로그램 · $CYS_APP (다시 깔 때 판을 확인해 그대로 쓰거나 바꿉니다)"
+  else
+    drop_dir "$CYS_APP"
+  fi
   # 🔴cys 계정 자리를 지우기 **전에** 토론장 안내 파일을 밖으로 옮겨 둔다(검토 지적 채택 2026-09-09).
   #   까닭: `~/.cys/claude/skills/agora-delegate` 는 cys 설치의 일부라 cys 와 함께 사라지는 것이 맞다.
   #   그런데 그대로 두면 다시 깐 뒤 「아고라에 참가해」가 **안 먹는 공백**이 생긴다 — 참가 열쇠는

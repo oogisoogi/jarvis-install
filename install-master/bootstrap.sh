@@ -82,16 +82,49 @@ BLOCKED_STEP=""
 #     ⚠대라고 한 기준선은 0.14.30 이었는데 **그 파일을 이제 못 받는다**(위 404) ⇒ 0.14.27 로 잡았고
 #       그 사실을 여기 적는다. 못 잰 것을 잰 것처럼 적지 않는다.
 #   ⚠윈도우(bootstrap.ps1)는 2026-09-09부터 **우리 릴리스**를 받는다(우리 빌드가 서명돼 있다).
-#     맥은 우리 빌드가 무서명이라 아직 벤더 dmg 그대로다 — 두 OS 가 갈리는 것이 지금은 의도다.
+#
+# 🔴★2026-09-15 전환 — 애플 실리콘 맥도 **우리 릴리스**(oogisoogi/cys-ro)를 받는다.
+#   까닭: 윈도우만 우리 빌드이고 맥은 원작자 판(0.14.33)이라, 같은 날 같은 방에서 두 OS 참가자가
+#   **서로 다른 cys** 를 쓰고 있었다(맥 참가자가 판본을 헷갈린 사례가 있었다).
+#   우리 맥 빌드는 유료 공증 없이 **자체 서명(cys-local)** 이다. 그래서 원작자 dmg 의 설치 도우미를 쓰지 않고
+#   **zip 받기 → 풀기 → 격리 속성 지우기 → 서명 무결성 확인 → 한 번에 바꿔 넣기** 로 깐다.
+#   (curl 로 받은 파일에는 격리 속성이 붙지 않지만, 붙어 있어도 지운다 — 사람이 「열기」를 누를 일이 없게.)
+#   크기·지문·CDHash 는 우리 설치본을 `ditto -c -k --keepParent` 로 묶은 그 자산에서 쟀다(2026-09-15).
+#   ⚠원작자 판으로 가는 길은 **둘뿐**이다: ⑴인텔 맥(우리 빌드는 arm64 전용) ⑵우리 자산이 404 일 때.
+CYS_FORK_VERSION="0.14.37"
+CYS_FORK_DIR="https://github.com/oogisoogi/cys-ro/releases/download/v${CYS_FORK_VERSION}/"
+CYS_FORK_FILE="cys-macos-arm64-v${CYS_FORK_VERSION}.zip"
+CYS_FORK_BYTES=471513671
+CYS_FORK_SHA256="1d8e56e3db6fa83f258f9f57edc9503b96025ead3fa9cf766abb65ec3af3b5db"
+# 설치된 프로그램이 「바로 이 판」인가를 가르는 값. 판본 숫자는 원작자 판도 같은 숫자를 쓸 수 있어서
+#   숫자만 보면 **원작자 판을 우리 판으로 읽고 건너뛴다**(어제 원작자 판을 깐 맥이 그대로 남는다).
+CYS_FORK_CDHASH="6d463ebdafb87a185b95c963f769d16abc968590"
+CYS_FORK_PAGE="https://github.com/oogisoogi/cys-ro/releases/tag/v${CYS_FORK_VERSION}"
+# 원작자 판(위 두 경우에만 쓴다)
 CYS_VERSION="0.14.33"
 CYS_DOWNLOAD_DIR="https://github.com/idoforgod/cys-terminal/releases/download/v${CYS_VERSION}/"
-case "$(uname -m)" in
-  arm64) CYS_MAC_FILE="cys_${CYS_VERSION}_aarch64.dmg"; CYS_MAC_BYTES=272977882
-         CYS_MAC_SHA256="3919ce1cad7ac834584951190420f92d6ba86b3a2343451829e784aadf3153df" ;;
-  *)     CYS_MAC_FILE="cys_${CYS_VERSION}_x64.dmg";     CYS_MAC_BYTES=269923933
-         CYS_MAC_SHA256="7ec9e557f9185d03416f949341f5b7b4dc3367aaf72206e754c736d4e7395153" ;;
-esac
-CYS_DOWNLOAD_URL="${CYS_DOWNLOAD_DIR}${CYS_MAC_FILE}"
+cys_use_vendor_pin() {
+  CYS_KIND="vendor"; CYS_PIN_VERSION="$CYS_VERSION"; CYS_MANUAL_URL="$CYS_SITE_URL"
+  case "$(uname -m)" in
+    arm64) CYS_MAC_FILE="cys_${CYS_VERSION}_aarch64.dmg"; CYS_MAC_BYTES=272977882
+           CYS_MAC_SHA256="3919ce1cad7ac834584951190420f92d6ba86b3a2343451829e784aadf3153df" ;;
+    *)     CYS_MAC_FILE="cys_${CYS_VERSION}_x64.dmg";     CYS_MAC_BYTES=269923933
+           CYS_MAC_SHA256="7ec9e557f9185d03416f949341f5b7b4dc3367aaf72206e754c736d4e7395153" ;;
+  esac
+  CYS_DOWNLOAD_URL="${CYS_DOWNLOAD_DIR}${CYS_MAC_FILE}"
+}
+cys_use_fork_pin() {
+  CYS_KIND="fork"; CYS_PIN_VERSION="$CYS_FORK_VERSION"; CYS_MANUAL_URL="$CYS_FORK_PAGE"
+  CYS_MAC_FILE="$CYS_FORK_FILE"; CYS_MAC_BYTES="$CYS_FORK_BYTES"; CYS_MAC_SHA256="$CYS_FORK_SHA256"
+  CYS_DOWNLOAD_URL="${CYS_FORK_DIR}${CYS_MAC_FILE}"
+}
+# 원작자 판으로 간 까닭(intel · missing) — 사람에게 한 번 말하고 기록에 남긴다.
+CYS_VENDOR_WHY=""
+if [ "$(uname -m)" = "arm64" ]; then
+  cys_use_fork_pin
+else
+  cys_use_vendor_pin; CYS_VENDOR_WHY="intel"
+fi
 
 LOGIN_POLL_INTERVAL=3      # 초
 LOGIN_POLL_TIMEOUT=600     # 초 (10분)
@@ -1447,9 +1480,11 @@ step_prepare() {
 #   ★왜 있는가: 「그 파일이 자리에 없다」와 「연결이 끊겼다」는 **다른 일**인데 앞 판은 둘을 한 칸에
 #   두었다 — 그래서 벤더가 옛 판본 dmg 를 내린 날부터 사람은 **없는 파일을 30분씩 두 번 기다린 뒤에야**
 #   실패를 봤다(2026-09-11 라이브 실사고). 기다려서 생기는 파일이 아니다.
+#   ★HEAD(`-I`)가 아니라 **첫 1바이트만 받는 GET**(`-r 0-0`)으로 묻는다 — 받는 동작과 같은 방식으로 물어야
+#   「받기는 되는데 물음에는 404」 같은 갈림이 없다(2026-09-15 GitHub 릴리스 자산의 HEAD 404 제보 · 있으면 206).
 cys_http_code() {
   local c
-  c="$(curl -sSI -L -o /dev/null -w '%{http_code}' --max-time 60 "$1" 2>/dev/null)"
+  c="$(curl -sS -L -r 0-0 -o /dev/null -w '%{http_code}' --max-time 60 "$1" 2>/dev/null)"
   [ -n "$c" ] || c="000"
   printf '%s' "$c"
 }
@@ -1473,6 +1508,9 @@ cys_file_sha256() {
 step_download_cys() {
   mkdir -p "$DL_DIR"
   local dst got try code have fresh
+  if [ "$CYS_VENDOR_WHY" = "intel" ]; then
+    say "[5/10] 이 맥은 인텔 칩입니다 — 원작자 공식 판(${CYS_VERSION})을 받습니다(저희 판은 애플 실리콘 맥 전용입니다)."
+  fi
   dst="$DL_DIR/$CYS_MAC_FILE"
   if [ -f "$dst" ] && [ "$(wc -c < "$dst" | tr -d ' ')" = "$CYS_MAC_BYTES" ]; then
     # 크기만 보고 건너뛰면 **같은 크기의 다른 파일**이 재실행 경로로 들어온다 — 지문까지 본다
@@ -1510,7 +1548,7 @@ step_download_cys() {
   fi
   for try in 1 2; do
     rm -f "$dst"
-    say "[5/10] cys 설치 파일을 받습니다 (약 260MB · 잠시 걸립니다)."
+    say "[5/10] cys 설치 파일을 받습니다 (약 $((CYS_MAC_BYTES / 1000000))MB · 잠시 걸립니다)."
     if ! curl -fsSL --max-time 900 "$CYS_DOWNLOAD_URL" -o "$dst"; then
       # 🔴먼저 **까닭을 가른다**. 받을 자리가 「그런 파일 없다」고 답했으면 기다릴 일이 아니다.
       #   ⚠**404·410 만** 이 갈래다. 5xx(자리는 살아 있는데 잠시 탈이 난 것)도, 물어보지도 못한
@@ -1519,6 +1557,15 @@ step_download_cys() {
       case "$code" in
         404|410)
           rm -f "$dst"
+          # ★저희 판 자산이 없으면 **원작자 공식 판으로 한 번만** 돌아간다(그 판도 없으면 아래 J-DL-05).
+          #   멈추지 않고 설치를 끝내는 쪽을 고른다 — 원작자 판도 자비스가 돈다(2026-09-14 워크숍까지 쓰던 판).
+          if [ "$CYS_KIND" = "fork" ]; then
+            say "[5/10] 저희 판을 받을 자리에 파일이 없습니다 (응답 $code) — 원작자 공식 판(${CYS_VERSION})으로 받습니다."
+            log "fork asset missing ($code): $CYS_DOWNLOAD_URL -> vendor pin"
+            cys_use_vendor_pin; CYS_VENDOR_WHY="missing"
+            step_download_cys
+            return $?
+          fi
           say "[5/10] 받을 자리에 그 판본이 없습니다 (응답 $code)."
           say "     받으려던 곳 = $CYS_DOWNLOAD_URL"
           jcode "J-DL-05" "받을 자리에 그 판본이 없습니다"
@@ -1568,7 +1615,7 @@ step_download_cys() {
   # 두 번 다 실패했으면 반쯤 받은 파일을 남기지 않는다 — 다음 실행이 그것을 온전한 것으로 볼 수 있다.
   rm -f "$dst"
   say "[5/10] 설치 파일을 온전히 받지 못했습니다."
-  say "     공식 페이지에서 직접 받으실 수 있습니다: $CYS_SITE_URL"
+  say "     공식 페이지에서 직접 받으실 수 있습니다: $CYS_MANUAL_URL"
   say "     받을 파일 이름 = $CYS_MAC_FILE"
   return 5
 }
@@ -1607,18 +1654,160 @@ cys_dmg_remount() {
   [ -n "$CYS_DMG_MNT" ] && [ -d "$CYS_DMG_MNT" ]
 }
 
+# 설치된 프로그램의 CDHash(서명이 가리키는 내용 지문). 못 읽으면 빈 문자열 — 부르는 쪽이 「다르다」로 받는다.
+cys_app_cdhash() {
+  codesign -dvvv "$1" 2>&1 | sed -n 's/^CDHash=//p' | head -1
+}
+
 step_install_cys() {
+  local dst swap_note=""
   if [ -d /Applications/cys.app ]; then
-    say "[6/10] cys 가 이미 설치돼 있습니다 — 건너뜁니다."
-    return 0
+    if [ "$CYS_KIND" != "fork" ]; then
+      say "[6/10] cys 가 이미 설치돼 있습니다 — 건너뜁니다."
+      return 0
+    fi
+    # 🔴저희 판을 받는 맥에서는 「있다」로 건너뛰지 않는다 — **어느 판이 있는가**를 본다.
+    #   어제까지 깐 원작자 판이 그대로 남으면 이 전환이 그 맥에서는 일어나지 않는다.
+    if [ "$(cys_app_cdhash /Applications/cys.app)" = "$CYS_FORK_CDHASH" ]; then
+      say "[6/10] cys 가 이미 설치돼 있습니다 (판본 ${CYS_FORK_VERSION} 확인) — 건너뜁니다."
+      return 0
+    fi
+    swap_note="설치돼 있는 cys 가 이번 판(${CYS_FORK_VERSION})이 아니어서 이번 판으로 바꿔 넣습니다."
   fi
-  local dst core src rc
   if [ "$MODE" = "dry" ]; then
-    say "[6/10] (dry-run) 설치 파일을 열지 않았습니다."
+    say "[6/10] (dry-run) 설치 파일을 열지 않았습니다.${swap_note:+ ($swap_note — 실행하면 그렇게 합니다)}"
     return 0
   fi
   dst="$DL_DIR/$CYS_MAC_FILE"
   [ -f "$dst" ] || { say "[6/10] 설치 파일이 없습니다."; return 6; }
+  [ -n "$swap_note" ] && say "[6/10] $swap_note"
+  if [ "$CYS_KIND" = "fork" ]; then
+    cys_install_from_zip "$dst"
+    return $?
+  fi
+  cys_install_from_dmg "$dst"
+}
+
+# ── 6-가. 저희 판(zip) 설치 ─────────────────────────────────────────
+# 이 컴퓨터에서 도는 이 설치기가 **cys 창 안에서** 돌고 있는가(조상 중에 cys 프로그램이 있는가).
+#   그렇다면 옛 cys 를 끄는 순간 이 창도 함께 꺼져 반쯤 바꾼 채 멈춘다 — 그 자리에서는 바꾸지 않는다.
+cys_run_from_inside_cys() {
+  local p="$$" c i=0
+  while [ -n "$p" ] && [ "$p" -gt 1 ] 2>/dev/null && [ "$i" -lt 64 ]; do
+    c="$(ps -o comm= -p "$p" 2>/dev/null)"
+    case "$c" in /Applications/cys.app/*) return 0 ;; esac
+    p="$(ps -o ppid= -p "$p" 2>/dev/null | tr -d ' ')"
+    i=$((i+1))
+  done
+  return 1
+}
+# 바꿔 넣기 전에 옛 cys 를 끈다. ★**실행 파일의 자리**로만 고른다(명령줄을 보지 않는다) —
+#   명령줄로 고르면 그 경로를 파일 인자로 연 편집기까지 끈다(지우개가 같은 이유로 그 축을 뺐다).
+cys_stop_old_app() {
+  local sig line pid cmd left
+  launchctl bootout "gui/$(id -u)/com.cysjavis.cysd" >>"$LOG_FILE" 2>&1 || true
+  for sig in TERM KILL; do
+    while IFS= read -r line; do
+      pid="${line%% *}"; cmd="${line#* }"
+      [ -n "$pid" ] && [ "$pid" != "$$" ] || continue
+      case "$cmd" in /Applications/cys.app/*) kill "-$sig" "$pid" 2>/dev/null ;; esac
+    done <<EOF_PS
+$(ps -Ao pid=,comm= 2>/dev/null | sed 's/^[[:space:]]*//')
+EOF_PS
+    sleep 2
+  done
+  left="$(ps -Ao comm= 2>/dev/null | grep -c '^/Applications/cys\.app/')"
+  log "stop old cys: left=${left:-?}"
+}
+# 받은 zip → 풀기 → 격리 속성 지우기 → 서명·판본 확인 → 옛 것 끄기 → 한 번에 바꿔 넣기(옛 것은 한 벌 보관).
+#   ★확인을 **끄기보다 앞에** 둔다 — 새 것이 멀쩡한지 모르는 채 돌던 cys 를 끄지 않는다.
+#   ★넣기는 같은 디스크 안의 이름 바꾸기(mv)라 **반쪽 프로그램이 보이는 순간이 없다**
+#     (원작자 설치 도우미가 막으려던 「손상되었습니다」 경합이 여기서는 생기지 않는다).
+cys_install_from_zip() {
+  local zip="$1" stage app ver cdh bak prev swap rc
+  if [ -d /Applications/cys.app ] && cys_run_from_inside_cys; then
+    say "[6/10] 이 창이 cys 안에서 열려 있어 cys 를 바꿔 넣을 수 없습니다(바꾸는 동안 이 창도 꺼집니다)."
+    say "     [터미널] 앱을 새로 여시고 아래 「다시 하시는 법」대로 다시 실행해 주십시오."; SHOW_RERUN=1
+    return 6
+  fi
+  say "[6/10] cys 를 설치합니다 (풀어서 넣습니다 · 1분쯤 걸립니다)."
+  stage="$DL_DIR/cys-stage"; app="$stage/cys.app"
+  rm -rf "$stage" 2>/dev/null
+  if ! mkdir -p "$stage" || ! ditto -x -k "$zip" "$stage" >>"$LOG_FILE" 2>&1 || [ ! -d "$app/Contents" ]; then
+    rm -rf "$stage" 2>/dev/null; rm -f "$zip"
+    say "[6/10] 설치 파일을 풀지 못했습니다. 아래 「다시 하시는 법」대로 다시 실행하시면 다시 받습니다."; SHOW_RERUN=1
+    return 6
+  fi
+  # 격리 속성이 붙어 있으면 처음 열 때 확인 창이 뜬다 — 우리가 지운다(사람 손 0).
+  xattr -cr "$app" >>"$LOG_FILE" 2>&1 || true
+  ver="$(defaults read "$app/Contents/Info" CFBundleShortVersionString 2>/dev/null)"
+  cdh="$(cys_app_cdhash "$app")"
+  if ! codesign --verify --deep --strict "$app" >>"$LOG_FILE" 2>&1 \
+     || [ "$cdh" != "$CYS_FORK_CDHASH" ] || [ "$ver" != "$CYS_FORK_VERSION" ]; then
+    log "fork app check failed: ver=$ver cdhash=$cdh"
+    rm -rf "$stage" 2>/dev/null
+    say "[6/10] 받은 프로그램이 서명·판본 확인을 통과하지 못했습니다 — 설치하지 않습니다 (판본 ${ver:-모름} · 기대 ${CYS_FORK_VERSION})."
+    say "     공식 페이지에서 직접 받으실 수 있습니다: $CYS_MANUAL_URL"
+    #   ⛔받은 파일을 지우지 않는다 — 지문은 이미 맞았다. 걸린 까닭이 파일이 아니면 다시 받아도 같다.
+    return 6
+  fi
+  if [ -d /Applications/cys.app ]; then
+    say "     돌고 있는 cys 가 있으면 먼저 끕니다."
+    cys_stop_old_app
+  fi
+  bak="$JARVIS_HOME/backup"; prev="$bak/cys.app.prev"
+  mkdir -p "$bak" 2>/dev/null
+  swap="$DL_DIR/cys-swap.sh"
+  cat > "$swap" <<'EOF_SWAP'
+#!/bin/bash
+# cys-swap.sh <새 프로그램> <옛 것 둘 자리> — 옛 것을 한 벌 보관하고 새 것을 넣는다. 넣기에 실패하면 옛 것을 되돌린다.
+new="$1"; prev="$2"; dst=/Applications/cys.app; moved=0
+if [ -e "$dst" ]; then
+  rm -rf "$prev" || exit 3
+  mv "$dst" "$prev" || exit 3
+  moved=1
+  # 관리자 권한으로 옮겼으면 보관본 주인을 그 폴더 주인에게 돌려준다 — 지우개가 나중에 지울 수 있게.
+  [ "$(id -u)" = "0" ] && chown -R "$(stat -f %u "$(dirname "$prev")")" "$prev" 2>/dev/null
+fi
+mv "$new" "$dst" && exit 0
+# 넣기에 실패했다 — 디스크가 달라 복사로 넘어가다 멈췄으면 그 자리에 **반쪽**이 남는다. 그것을 먼저 치운다.
+#   (옛 것은 이미 보관 자리로 옮겨 두었으므로 이 자리에 남은 것은 새 것의 반쪽뿐이다.)
+rm -rf "$dst"
+# **이번에 우리가 옮긴 옛 것만** 되돌린다 — 지난 실행의 보관본을 새 설치 자리에 올리지 않는다.
+[ "$moved" = "1" ] && [ -e "$prev" ] && mv "$prev" "$dst"
+exit 4
+EOF_SWAP
+  if [ -w /Applications ] && { [ ! -e /Applications/cys.app ] || [ -w /Applications/cys.app ]; }; then
+    /bin/bash "$swap" "$app" "$prev" >>"$LOG_FILE" 2>&1
+    rc=$?
+  else
+    say "[6/10] 이 계정에는 프로그램 폴더에 넣을 권한이 없습니다 — 관리자 비밀번호 창을 띄웁니다."
+    say "     창이 뜨면 이 컴퓨터의 관리자 이름과 비밀번호를 넣어 주십시오. (자비스는 비밀번호를 대신 넣지 않습니다.)"
+    osascript -e 'on run argv' \
+      -e 'do shell script "/bin/bash " & quoted form of (item 1 of argv) & " " & quoted form of (item 2 of argv) & " " & quoted form of (item 3 of argv) with administrator privileges' \
+      -e 'end run' "$swap" "$app" "$prev" >>"$LOG_FILE" 2>&1
+    rc=$?
+  fi
+  rm -f "$swap"; rm -rf "$stage" 2>/dev/null
+  if [ "$rc" != "0" ]; then
+    say "[6/10] cys 를 프로그램 폴더에 넣지 못했습니다 (종료 코드 $rc)."
+    [ -d /Applications/cys.app ] && say "     전에 있던 cys 는 그 자리에 그대로 있습니다."
+    say "     자세한 내용은 기록 파일에 있습니다: $(redact "$LOG_FILE")"
+    SHOW_RERUN=1
+    return 6
+  fi
+  if [ "$(cys_app_cdhash /Applications/cys.app)" != "$CYS_FORK_CDHASH" ]; then
+    say "[6/10] 넣은 뒤 다시 확인했더니 이번 판이 아닙니다 — 설치가 확인되지 않았습니다."
+    return 6
+  fi
+  [ -d "$prev" ] && say "     전에 있던 cys 는 한 벌 남겨 두었습니다: $(redact "$prev")"
+  say "[6/10] 설치를 마쳤습니다 (판본 ${CYS_FORK_VERSION} · 서명 확인)."
+  return 0
+}
+
+# ── 6-나. 원작자 판(dmg) 설치 — 인텔 맥 · 저희 자산이 없을 때 ──────────
+cys_install_from_dmg() {
+  local dst="$1" core src rc
   say "[6/10] cys 를 설치합니다."
 
   # ⚠`-quiet` 를 주면 안 된다(위 ⑴). 사람에게 보일 필요는 없으니 화면 대신 기록 파일로만 흘린다.
@@ -1633,7 +1822,7 @@ step_install_cys() {
   src="$CYS_DMG_MNT/.support/cys.app"
   if [ ! -f "$core" ] || [ ! -d "$src/Contents" ]; then
     # 배포물의 속 모양이 바뀐 경우다. 우리가 짐작으로 복사하지 않는다 — 짐작 복사가 앞 판의 결함이었다.
-    say "[6/10] 설치 파일의 속 모양이 예상과 다릅니다. 공식 페이지에서 직접 받아 열어 주십시오: $CYS_SITE_URL"
+    say "[6/10] 설치 파일의 속 모양이 예상과 다릅니다. 공식 페이지에서 직접 받아 열어 주십시오: $CYS_MANUAL_URL"
     cys_dmg_detach
     return 6
   fi
@@ -1717,14 +1906,26 @@ step_verify_cys() {
   # 옛 자리의 링크가 끊어져 있는 경우가 실제로 있으므로, 찾은 순서대로 쓰되 답하는 것만 쓴다.
   # 프로그램 안쪽 경로는 마지막 수단이고, 우리가 링크를 새로 만들지는 않는다.
   CYS_CLI=""
+  local v
   for c in "$HOME/.local/bin/cys" "/usr/local/bin/cys" "/Applications/cys.app/Contents/MacOS/cys"; do
     [ -x "$c" ] || continue
-    ver="$(CYS_NO_AUTOSTART=1 "$c" --version 2>/dev/null | head -1)"
-    if [ -n "$ver" ]; then CYS_CLI="$c"; break; fi
+    v="$(CYS_NO_AUTOSTART=1 "$c" --version 2>/dev/null | head -1)"
+    [ -n "$v" ] || continue
+    [ -z "$CYS_CLI" ] && { CYS_CLI="$c"; ver="$v"; }
+    # 저희 판을 깐 맥에서는 **이번 판으로 답하는 길**을 고른다 — 옛 판에서 남은 연결이 먼저 답할 수 있다.
+    [ "$CYS_KIND" = "fork" ] || break
+    case "$v" in *"$CYS_FORK_VERSION"*) CYS_CLI="$c"; ver="$v"; break ;; esac
   done
   if [ -z "$CYS_CLI" ]; then
     ver="$(CYS_NO_AUTOSTART=1 cys --version 2>/dev/null | head -1)"
     [ -n "$ver" ] && CYS_CLI="cys"
+  fi
+  if [ -n "$ver" ] && [ -n "$CYS_CLI" ] && [ "$CYS_KIND" = "fork" ]; then
+    case "$ver" in *"$CYS_FORK_VERSION"*) : ;; *)
+      say "[7/10] cys 가 답하는데 이번 판(${CYS_FORK_VERSION})이 아닙니다: $ver"
+      say "     부르는 길: $(redact "$CYS_CLI") — 옛 판의 연결이 남아 있습니다. 아래 「다시 하시는 법」대로 다시 실행해 주십시오."; SHOW_RERUN=1
+      return 7 ;;
+    esac
   fi
   if [ -n "$ver" ] && [ -n "$CYS_CLI" ]; then
     say "[7/10] cys 가 답합니다: $ver"

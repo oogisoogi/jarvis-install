@@ -3,7 +3,7 @@
 #
 # 무엇을 하는가
 #   1) 이 컴퓨터의 상태를 살펴 목록으로 보여 준다
-#   2) 확인을 받고 지운다 (설치 도우미가 놓은 것만)
+#   2) 확인을 받고 지운다 (설치 도우미가 놓은 것만 · cys 프로그램은 남긴다 — 윈도우와 같다)
 #   3) 최신 설치 도우미를 새로 받아 처음부터 다시 돌린다
 #
 # 쓰는 법 — 터미널에 이 한 줄을 붙여넣으십시오
@@ -80,8 +80,15 @@ if ! download_with_retry "$RESET_URL" "$RESET_FILE" "지우는 도구"; then
   exit 2
 fi
 
+# ★--keep-app : cys 프로그램은 남긴다(윈도우 -KeepApp 과 같다) — **애플 실리콘 맥에서만**.
+#   설치 도우미가 [6/10] 에서 판(CDHash)을 확인해 이번 판이면 그대로 쓰고 아니면 바꿔 넣는다 — 471MB 를 다시 받지 않는다.
+#   ⚠인텔 맥은 원작자 판을 받는데, 그 경로는 「프로그램이 있으면 건너뛴다」라서 남기면 옛 판이 그대로 남는다
+#     (교차 검토 지적 채택 2026-09-15). 그래서 인텔은 종전처럼 프로그램까지 지우고 새로 깐다.
+KEEP_APP_ARG=""
+[ "$(uname -m)" = "arm64" ] && KEEP_APP_ARG="--keep-app"
+
 if [ "$LIST_ONLY" = "1" ]; then
-  bash "$RESET_FILE" --list
+  bash "$RESET_FILE" --list $KEEP_APP_ARG
   say ""
   say "(보기만 했습니다. 아무것도 지우지 않았고, 설치도 하지 않았습니다.)"
   exit 0
@@ -89,7 +96,7 @@ fi
 
 # ── 2단 · 지운다 ──────────────────────────────────────────────────
 # 목록을 보여 주고 한 번 묻는 일은 지우는 도구가 한다. 여기서 두 번 묻지 않는다.
-bash "$RESET_FILE"
+bash "$RESET_FILE" $KEEP_APP_ARG
 reset_rc=$?
 
 if [ "$reset_rc" = "1" ]; then
@@ -114,7 +121,11 @@ say ""
 if ! download_with_retry "$BOOTSTRAP_URL" "$BOOTSTRAP_FILE" "설치 도우미"; then
   say ""
   say "설치 도우미를 받지 못했습니다. 인터넷 연결을 확인해 주십시오."
-  say "지우기는 끝났으므로, 이 컴퓨터는 지금 「아무것도 안 깔린 상태」입니다."
+  if [ -n "$KEEP_APP_ARG" ]; then
+    say "지우기는 끝났으므로, 이 컴퓨터는 지금 「cys 프로그램만 남고 나머지는 안 깔린 상태」입니다."
+  else
+    say "지우기는 끝났으므로, 이 컴퓨터는 지금 「아무것도 안 깔린 상태」입니다."
+  fi
   show_rerun_how
   exit 3
 fi

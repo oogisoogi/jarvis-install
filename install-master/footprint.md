@@ -38,13 +38,13 @@
 
 | ID | 무엇 | 자리 | 종류 | 만드는 자리 | 근거 |
 |---|---|---|---|---|---|
-| `M-APP` | cys 프로그램 | `/Applications/cys.app` | 전부 우리 것 | `bootstrap.sh` `[6/10]`(벤더 원자 설치기 호출) | 실측 09-06 |
+| `M-APP` | cys 프로그램 | `/Applications/cys.app` | 전부 우리 것 | `bootstrap.sh` `[6/10]`(애플 실리콘 = 우리 릴리스 zip 을 풀어 한 번에 바꿔 넣기 · 인텔·자산 없음 = 원작자 원자 설치기 호출) | 실측 09-06 · zip 경로 09-15 |
 | `M-DAEMON` | cys 상시 가동 등록 | `~/Library/LaunchAgents/com.cysjavis.cysd.plist` | 전부 우리 것 | `[8/10]` `cys daemon install` | 실측 09-06 |
 | `M-CYSHOME` | cys 계정 자리(팩·설정·상태) | `~/.cys/`(`pack`·`claude`·`state`) | 전부 우리 것 | `[8/10]` `cys init-pack` (팩 460항목) | 실측 09-06 |
 | `M-CYSSTATE` | cys 실행 상태·소켓 | `~/.local/state/cys/` | 전부 우리 것 | cys 데몬이 만든다 | 실측 09-06 |
 | `M-CLAUDEBIN` | 클로드 실행 파일(지름길) | `~/.local/bin/claude` → `~/.local/share/claude/versions/<판본>` | 전부 우리 것 | `[2/10]` 공식 설치기 | 실측 09-06 |
 | `M-CLAUDESHARE` | 클로드 실물 | `~/.local/share/claude/` | 전부 우리 것 | `[2/10]` 공식 설치기 | 실측 09-06 |
-| `M-JARVISHOME` | 자비스 작업 폴더 | `~/install-jarvis/`(`bootstrap.log`·`env-report.md`·`install-directive.md`·`dl/`·`wake.sh` · 원격 해결 실행 번호 `remote-help-executed.json`(기록하는 순간만 잠금 폴더 `remote-help-executed.json.lock`) · 출처 토큰 `remote-help-client-token`(600) · 반복 막힘 횟수 `help-attempts.json`(v0.3.15)) | 전부 우리 것 | 스크립트 첫머리 `mkdir -p` | 실측 09-06 |
+| `M-JARVISHOME` | 자비스 작업 폴더 | `~/install-jarvis/`(`bootstrap.log`·`env-report.md`·`install-directive.md`·`dl/`·`wake.sh` · 원격 해결 실행 번호 `remote-help-executed.json`(기록하는 순간만 잠금 폴더 `remote-help-executed.json.lock`) · 출처 토큰 `remote-help-client-token`(600) · 반복 막힘 횟수 `help-attempts.json`(v0.3.15) · 바꿔 넣기 전 cys 보관본 `backup/cys.app.prev`(한 벌)) | 전부 우리 것 | 스크립트 첫머리 `mkdir -p` | 실측 09-06 |
 | `M-SCRIPTCOPY` | 받아 둔 설치 스크립트 | `~/install-jarvis.sh` | 전부 우리 것 | 배포 한 줄의 `curl -o` | 실측 09-06 |
 | `M-AGORA` | 토론장 참가 열쇠·이름 | `~/.config/agora/` · 🔴**`AGORA_HOME` 으로 옮겨 둘 수 있다**(윈도우도 같은 해석) | **손대지 않음** — 🔴**삭제 루트 안에 있어도 지우지 않는다**(중첩 보존) | 🔴설치기가 만들지 않는다(v0.3.5 부터 뗐다). 토론장에 따로 참가하신 분이 만든 것 | 코드 + 러너 실측 |
 | `M-AGORASKILL` | 토론장 안내 가리키기 | 🔴**자리가 둘이고 운명이 다르다** — ⑴`~/.claude/skills/agora-delegate/` = **남는다** ⑵`~/.cys/claude/skills/agora-delegate/` = **`M-CYSHOME` 안**이라 cys 계정 자리를 지울 때 **함께 지워진다** | **손대지 않음**(⑴) · **`M-CYSHOME` 안**(⑵) | 🔴설치기가 만들지 않는다(v0.3.5 부터 뗐다) | 코드 |
