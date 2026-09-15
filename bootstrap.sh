@@ -2094,6 +2094,7 @@ FLEET_BASELINE=""
 FLEET_BASELINE_OK=0
 set_fleet_baseline() {
   local out
+  CHILD_AWAKE_SINCE="$(date +%s)"   # 자식 자리 세션 기록은 이 시각 뒤에 생긴 것만 센다
   if ! out="$(CYS_NO_AUTOSTART=1 "$1" list 2>&1)"; then
     FLEET_BASELINE=""; FLEET_BASELINE_OK=0
     log "fleet baseline FAILED: cys list 가 답하지 않았다 -> 좌석 판정 안 함"
@@ -2137,82 +2138,131 @@ declaration_seen() { # declaration_seen "<live 목록>"
   done
   return 1
 }
-# ── 자식 자리 각성 검증(TICKET=installer-awaken-verify · 2026-09-15 · 윈도우판 Confirm-ChildSeats 와 같은 모양) ──
+# ── 자식 자리 각성 검증(TICKET=installer-awaken-verify · 2026-09-15 → installer-awaken-jsonl · 2026-09-16 · 윈도우판 Confirm-ChildSeats 와 같은 모양) ──
 # 🔴자리가 선 것 ≠ 자리가 깨어난 것(샌드박스 실기 3회/3회). 팩이 자식 자리를 처음 띄울 때 각성 지시를 붙여넣기로
 #   보내는데, 막 뜬 클로드가 뒤따르는 Return 을 삼켜 입력줄에 「[Pasted text #1 +529 lines]」 가 실린 채 멈춘다.
-#   ⇒ 자리마다 화면을 읽어 ⑴입력줄에 붙여넣기가 남았으면 Return 을 넣고 ⑵답을 시작했는지 다시 읽는다(최대 3회 · 자리당 60초).
+# 🔴화면을 읽어 판정하던 첫 판(09dcab0)은 거짓 양성을 냈다(2026-09-16 샌드박스 5차). ⇒ 그 자리 클로드의 세션 기록(jsonl)으로 잰다.
+#   실측(맥 2026-09-16): 세션 기록 파일은 첫 지시가 제출되는 순간에 생긴다 — 제출 전에는 파일 자체가 없다.
+#   깸(제출 확인) = 기준선 뒤에 생긴 그 자리 폴더의 세션 기록에 사용자 레코드 ≥1. 답 레코드는 요구하지 않는다.
+#   🔴installer-awaken-verify-r2(2026-09-16 샌드박스 7차): 답 레코드까지 요구하던 판(9c49720)이 이미 답을 쓰는 중인 자리를
+#     child-fail 로 찍었다 — 느린 기계에서 답 레코드는 제출 뒤 30초+ 늦게 생긴다(거짓 실패).
+#   ⇒ 사용자 레코드가 0(파일 없음 포함)이면 Return 을 넣고 5·10·20초 뒤 다시 잰다(최대 3회) · 마지막 뒤에도 0 이면 10초 유예 뒤 한 번 더(자리당 90초).
+#   ⛔사용자 레코드가 이미 있으면 Return 을 넣지 않는다 — 그 자리에서 확인으로 끝난다(비워진 입력줄의 Return 은 제안 글을 제출하는 경로다).
 #   ★재시작(phoenix) 경로는 이미 깬다 — 이 확인은 첫 설치 [10/10] 에서만 돈다.
 # ⚠맥판에는 진행 전송이 없다 — 표지(awaken:child-*)는 설치 기록에만 남는다.
-# ⚠여기서 안 재는 것: 붙여넣기가 아니라 글자 그대로 남은 지시 본문(입력줄 빈칸 안내글과 가를 방법이 없다).
+# ⚠여기서 안 재는 것: ⑴기준선 뒤 같은 폴더에서 다른 클로드 세션이 제출된 경우(그 기록도 깸으로 센다)
+#   ⑵세션 기록이 ~/.cys/claude/projects 밖에 있거나 폴더 이름·파일 안 cwd 가 둘 다 안 맞는 경우(끝까지 0 → 정직 문구 · 거짓 양성 쪽이 아니다)
 CHILD_AWAKE_ROLES='cso worker'
-CHILD_AWAKE_CAP_SEC=60
-CHILD_AWAKE_GAP_SEC=2
+CHILD_AWAKE_CAP_SEC=90
+CHILD_AWAKE_GAPS='5 10 20'   # Return 뒤 다시 재기 전 기다림
+CHILD_AWAKE_GRACE_SEC=10     # 마지막 Return 뒤에도 기록이 없을 때 한 번 더 재기 전 유예
 CHILD_AWAKE_MAX_RETRY=3
 CHILD_READ_CAP_SEC=10   # cys 한 번 부르기의 상한(맥에는 timeout 명령이 없어 perl alarm 으로 묶는다)
+CHILD_AWAKE_SINCE="$(date +%s)"   # 이 시각(초) 뒤에 생긴 세션 기록만 센다 · 기준선을 찍을 때 다시 잡는다
 cys_capped() { # cys_capped <초> <명령> <인자...>
   local cap="$1"; shift
   CYS_NO_AUTOSTART=1 perl -e 'alarm shift; exec @ARGV' "$cap" "$@" 2>/dev/null
 }
-# 클로드 입력줄 = 화면 아래쪽 가로줄 두 개 사이(새 모양 ──── · 옛 모양 ╭──╮/╰──╯) · 못 찾으면 끝 12줄.
-#   ★위쪽 대화 기록의 「[Pasted text …」 는 이미 보낸 것이다. 글자는 바이트로 적는다(로케일 무관).
-seat_input_box() {
-  perl -e 'local $/; my $s = <STDIN>; $s = "" unless defined $s; $s =~ s/\s+\z//; my @l = split /\r?\n/, $s, -1; my @r = grep { $l[$_] =~ /^\s*(?:\xe2\x95\xad|\xe2\x95\xb0)?(?:\xe2\x94\x80|\xe2\x94\x81){8,}(?:\xe2\x95\xae|\xe2\x95\xaf)?\s*$/ } 0..$#l; my ($a, $b) = @r >= 2 ? ($r[-2], $r[-1]) : (($#l > 11 ? $#l - 11 : 0), $#l); print join("\n", @l[$a..$b]), "\n" if @l;'
+# 클로드가 세션 기록 폴더 이름을 짓는 규칙 = 경로의 영숫자 아닌 글자를 하나씩 - 로(맥 실측 · 한글도 한 글자에 - 하나)
+claude_project_slug() { perl -CSA -e '$_ = shift; s/[^A-Za-z0-9]/-/g; print' "$1"; }
+born_since() { # born_since <파일> → 기준선 뒤에 생긴 파일이면 생긴 시각(초)을 찍고 rc 0
+  local b
+  b="$(/usr/bin/stat -f %B "$1" 2>/dev/null)" || return 1
+  [ -n "$b" ] && [ "$b" -ge "$CHILD_AWAKE_SINCE" ] || return 1
+  printf '%s\n' "$b"
 }
-seat_paste_residue() { printf '%s\n' "$1" | seat_input_box | LC_ALL=C grep -q '\[Pasted text'; }
-seat_answering() { # 처리 중 표지 · 각성 확인 줄 · 답 줄 머리표(⏺ · ●)
-  printf '%s\n' "$1" | LC_ALL=C grep -qE 'esc to interrupt|DIRECTIVE-ACK|^[[:space:]]*(⏺|●)'
+seat_session_file() { # seat_session_file <자리 폴더> → 그 자리의 세션 기록 경로(가장 새것) · 없으면 빈 출력
+  local cwd="$1" root="$HOME/.cys/claude/projects" f b best="" bestb=-1 needle
+  [ -d "$root" ] || return 0
+  for f in "$root/$(claude_project_slug "$cwd")"/*.jsonl; do
+    [ -f "$f" ] || continue
+    b="$(born_since "$f")" || continue
+    [ "$b" -gt "$bestb" ] && { best="$f"; bestb="$b"; }
+  done
+  if [ -z "$best" ]; then
+    # 폴더 이름 규칙이 안 맞으면 projects 아래 전체에서 파일 안 "cwd" 글자로 찾는다(규칙 추정에 기대지 않는다)
+    needle="\"cwd\":\"$(printf '%s' "$cwd" | sed 's/\\/\\\\/g; s/"/\\"/g')\""
+    for f in "$root"/*/*.jsonl; do
+      [ -f "$f" ] || continue
+      b="$(born_since "$f")" || continue
+      [ "$b" -gt "$bestb" ] || continue
+      LC_ALL=C grep -qF -- "$needle" "$f" && { best="$f"; bestb="$b"; }
+    done
+  fi
+  [ -z "$best" ] || printf '%s\n' "$best"
+  return 0
+}
+seat_session_counts() { # seat_session_counts <파일> → "사용자레코드수 답레코드수"(파일이 없으면 0 0)
+  local u=0 a=0
+  if [ -n "$1" ] && [ -f "$1" ]; then
+    u="$(LC_ALL=C grep -cF '"type":"user"' "$1" 2>/dev/null)"
+    a="$(LC_ALL=C grep -cF '"type":"assistant"' "$1" 2>/dev/null)"
+  fi
+  printf '%s %s\n' "${u:-0}" "${a:-0}"
 }
 CHILD_RETRY=0
-CHILD_TAIL=""
-confirm_child_seat() { # <명령> <역할> <자리> → rc 0 깸 확인 · 1 답 없음 (CHILD_RETRY · CHILD_TAIL)
-  local cli="$1" role="$2" ref="$3" start scr prev="" paste=0
-  CHILD_RETRY=0; CHILD_TAIL=""
+CHILD_U=0
+CHILD_A=0
+CHILD_WHY=""
+confirm_child_seat() { # <명령> <역할> <자리> <자리 폴더> → rc 0 깸 확인 · 1 답 없음 (CHILD_RETRY · CHILD_U · CHILD_A · CHILD_WHY)
+  local cli="$1" role="$2" ref="$3" cwd="$4" start counts gap graced=0
+  CHILD_RETRY=0; CHILD_U=0; CHILD_A=0; CHILD_WHY=""
+  if [ -z "$cwd" ]; then CHILD_WHY=no-cwd; return 1; fi   # 폴더를 모르면 잴 수 없다 — Return 도 넣지 않는다
   start="$(date +%s)"
   while [ $(( $(date +%s) - start )) -lt "$CHILD_AWAKE_CAP_SEC" ]; do
-    if scr="$(cys_capped "$CHILD_READ_CAP_SEC" "$cli" read-screen --surface "$ref")"; then
-      CHILD_TAIL="$scr"
-      if seat_paste_residue "$scr"; then
-        paste=1
-        [ "$CHILD_RETRY" -lt "$CHILD_AWAKE_MAX_RETRY" ] || break
-        CHILD_RETRY=$((CHILD_RETRY + 1))
-        cys_capped "$CHILD_READ_CAP_SEC" "$cli" send-key --surface "$ref" Return >/dev/null
-        log "awaken child: role=${role} seat=${ref} marker=awaken:child-retry ${CHILD_RETRY}"
-        prev="$scr"
-      elif seat_answering "$scr" || { [ "$paste" = 1 ] && [ "$scr" != "$prev" ]; }; then
-        return 0
-      else
-        prev="$scr"
-      fi
+    counts="$(seat_session_counts "$(seat_session_file "$cwd")")"
+    CHILD_U="${counts% *}"; CHILD_A="${counts#* }"
+    if [ "$CHILD_U" -ge 1 ]; then CHILD_WHY=jsonl; return 0; fi   # 제출 확인 — 답 레코드는 늦게 생긴다
+    if [ "$CHILD_RETRY" -lt "$CHILD_AWAKE_MAX_RETRY" ]; then
+      CHILD_RETRY=$((CHILD_RETRY + 1))
+      cys_capped "$CHILD_READ_CAP_SEC" "$cli" send-key --surface "$ref" Return >/dev/null
+      log "awaken child: role=${role} seat=${ref} marker=awaken:child-retry ${CHILD_RETRY}"
+      gap="$(printf '%s\n' $CHILD_AWAKE_GAPS | awk -v n="$CHILD_RETRY" 'NR <= n { g = $0 } END { print g + 0 }')"
+      sleep "$gap"
+    elif [ "$graced" = 0 ]; then
+      graced=1   # 마지막 Return 뒤 기록이 늦게 생기는 기계 — 유예 한 번 뒤 다시 잰다(Return 은 더 넣지 않는다)
+      sleep "$CHILD_AWAKE_GRACE_SEC"
+    else
+      break
     fi
-    sleep "$CHILD_AWAKE_GAP_SEC"
   done
+  CHILD_WHY=no-submit
   return 1
 }
 confirm_child_seats() { # <명령> — 새로 선 cso·worker 자리마다 깸을 확인한다(설치는 막지 않는다)
-  local cli="$1" out line sid r seats="" pair role ref
+  local cli="$1" out line sid r seen=" " seats="" role ref cwd tail tab
+  tab="$(printf '\t')"
   out="$(CYS_NO_AUTOSTART=1 "$cli" list 2>&1)"
   while IFS= read -r line; do
     sid="$(printf '%s' "$line" | grep -oE 'surface:[0-9]+' | head -1)"
     [ -n "$sid" ] || continue
     case "$FLEET_BASELINE" in *" $sid "*) continue ;; esac
     for r in $CHILD_AWAKE_ROLES; do
-      case " $seats " in *" ${r}="*) continue ;; esac
-      printf '%s' "$line" | grep -qE "(^|[[:space:]])role=${r}([[:space:]]|-|$)" && seats="$seats ${r}=${sid}"
+      case "$seen" in *" ${r} "*) continue ;; esac
+      if printf '%s' "$line" | grep -qE "(^|[[:space:]])role=${r}([[:space:]]|-|$)"; then
+        cwd="$(printf '%s\n' "$line" | awk -F'\t' 'NF >= 6 { print $NF }')"
+        seen="$seen$r "
+        seats="$seats$r$tab$sid$tab$cwd
+"
+      fi
     done
   done <<EOF_CHILD
 $out
 EOF_CHILD
-  for pair in $seats; do
-    role="${pair%%=*}"; ref="${pair#*=}"
-    if confirm_child_seat "$cli" "$role" "$ref"; then
+  while IFS="$tab" read -r role ref cwd <&3; do
+    [ -n "$role" ] || continue
+    if confirm_child_seat "$cli" "$role" "$ref" "$cwd"; then
       say "     ${role} 자리 깨움 확인"
-      log "awaken child: role=${role} seat=${ref} marker=awaken:child-verified retries=${CHILD_RETRY}"
+      log "awaken child: role=${role} seat=${ref} marker=awaken:child-verified retries=${CHILD_RETRY} evidence=jsonl u=${CHILD_U} a=${CHILD_A}"
     else
       say "     ${role} 자리는 열렸으나 아직 답이 없습니다 — 자비스가 이어서 깨웁니다(사람 손 0)"
-      log "awaken child: role=${role} seat=${ref} marker=awaken:child-fail retries=${CHILD_RETRY}"
-      log "awaken child stall tail (${role}): $(printf '%s\n' "$CHILD_TAIL" | tail -n 15 | tr '\n' '|' | cut -c1-600)"
+      log "awaken child: role=${role} seat=${ref} marker=awaken:child-fail retries=${CHILD_RETRY} why=${CHILD_WHY} u=${CHILD_U} a=${CHILD_A}"
+      tail="$(cys_capped "$CHILD_READ_CAP_SEC" "$cli" read-screen --surface "$ref")"
+      log "awaken child stall tail (${role}): $(printf '%s\n' "$tail" | tail -n 15 | tr '\n' '|' | cut -c1-600)"
     fi
-  done
+  done 3<<EOF_SEATS
+$seats
+EOF_SEATS
   return 0
 }
 step_fleet() {
@@ -2385,7 +2435,7 @@ step_wake() {
 # ★언제 도는가 = 자비스를 깨우기 **전에** 진단 코드를 남기고 멈춘 끝. 자비스를 깨운 뒤에는 돌지 않는다
 #   (자비스가 이 창을 넘겨받으므로 두 쪽이 한 화면에 섞이지 않게).
 # ⚠JSON·재검사·스크럽은 macOS 기본 `osascript`(JavaScript)가 한다 — 깨끗한 맥에는 jq·python 이 없다.
-INSTALLER_VERSION="0.3.18"      # 보고의 installer_version · BOOTSTRAP_VERSION 은 화면 머리글 용도 그대로(보내지 않는다)
+INSTALLER_VERSION="0.3.19"      # 보고의 installer_version · BOOTSTRAP_VERSION 은 화면 머리글 용도 그대로(보내지 않는다)
 HELP_API_URL="https://jarvis-install.godmeyou.kr"
 REMOTE_HELP_NOTICE_URL="jarvis-install.godmeyou.kr/help/notice"
 # [1/10] 고지 1줄 = /help/notice 정본(page.ts)이 인용하는 문장 그대로 + 끝에 자세한 안내 자리(계약 7-1절). ⛔문안 변경 금지.

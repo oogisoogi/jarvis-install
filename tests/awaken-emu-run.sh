@@ -43,7 +43,7 @@ run_ps() { perl -e 'alarm shift; exec @ARGV' 60 "$PW" -NoProfile -File "$@" </de
 has() { grep -qE -- "$2" "$1"; }
 
 echo "== [9/10]~[10/10] 자동 각성 =="
-for s in success claim-denied fallback-success no-surface child-awake paste-late child-stall; do
+for s in success claim-denied fallback-success no-surface child-awake paste-late child-stall screen-lies stale-session fallback-dir no-answer grace; do
   [ -n "$PW" ] || break
   SB="$BASE/$s"; mkdir -p "$SB"
   run_ps "$EMU/fleet.ps1" -Src "$PS" -Scenario "$s" -Sb "$SB" >"$SB/out.txt" 2>"$SB/err.txt"
@@ -55,7 +55,7 @@ for s in success claim-denied fallback-success no-surface child-awake paste-late
   ! grep -qvE '^send-key --surface surface:1[01] Return$' "$SB/sent" 2>/dev/null
   t $? "[$s] 창에 글을 밀어 넣지 않는다(cys send 0회 · send-key 는 자식 자리 Return 만)" "$(grep -vE '^send-key --surface surface:1[01] Return$' "$SB/sent" 2>/dev/null | head -2 | tr '\n' '|')"
   P="$SB/progress.jsonl"
-  nsent() { grep -cxE "send-key --surface surface:$1 Return" "$SB/sent" 2>/dev/null || true; }
+  nsent() { [ -f "$SB/sent" ] || { echo 0; return; }; grep -cxE "send-key --surface surface:$1 Return" "$SB/sent" || true; }   # 파일 없음 = 0회(msent 와 동형 · no-answer 에서 빈 문자열이 나와 거짓 실패)
   prog() { python3 - "$P" "$@" <<'PYEOF'
 import sys, json
 rows = [json.loads(l) for l in open(sys.argv[1], encoding="utf-8-sig").read().split("\n") if l.strip()] if __import__("os").path.exists(sys.argv[1]) else []
@@ -99,15 +99,15 @@ PYEOF
       t $? "[성공] 자동 관측 상한은 240초(자비스 첫 턴보다 길게 · 윈 실기)" "$(grep 'default awake cap' "$L")"
       grep -q '다음에 할 일: 없습니다 — 설치가 끝났습니다. 이 창을 닫으셔도 됩니다.' "$O" && ! has "$L" 'unexpected end'
       t $? "[성공] 끝맺음이 「설치가 끝났습니다」 · 「다시 실행」 안내를 인쇄하지 않는다" "$(grep '다음에 할 일' "$O" | head -1)"
-      # installer-awaken-verify — 붙여넣기가 실린 채 멈춘 worker 자리에 Return 한 번 → 답 시작 확인 · 이미 답한 cso 는 무동작
-      has "$L" 'awaken child: role=worker seat=surface:11 marker=awaken:child-verified retries=1$' && [ "$(nsent 11)" = "1" ] \
-        && has "$L" 'awaken child: role=cso seat=surface:10 marker=awaken:child-verified retries=0$' && [ "$(nsent 10)" = "0" ] \
+      # installer-awaken-jsonl — 세션 기록이 없는(미제출) worker 자리에 Return 한 번 → 세션 기록으로 깸 확인 · 이미 깬 cso 는 무동작
+      has "$L" 'awaken child: role=worker seat=surface:11 marker=awaken:child-verified retries=1 evidence=jsonl u=1 a=1$' && [ "$(nsent 11)" = "1" ] \
+        && has "$L" 'awaken child: role=cso seat=surface:10 marker=awaken:child-verified retries=0 evidence=jsonl u=1 a=1$' && [ "$(nsent 10)" = "0" ] \
         && grep -q '     worker 자리 깨움 확인' "$O" && grep -q '     cso 자리 깨움 확인' "$O" && ! grep -q '답이 없습니다' "$O"
-      t $? "[성공] 붙여넣기가 남은 자리에 Return 1회 → 답 시작 확인 · 이미 답한 자리는 무동작" "$(grep 'awaken child' "$L" | tr '\n' '|' | cut -c1-200) · Return 11=$(nsent 11) 10=$(nsent 10)"
+      t $? "[성공] 제출 전 자리(세션 기록 없음)에 Return 1회 → 세션 기록으로 깸 확인 · 이미 깬 자리는 무동작" "$(grep 'awaken child' "$L" | tr '\n' '|' | cut -c1-240) · Return 11=$(nsent 11) 10=$(nsent 10)"
       [ "$(prog details)" = "awaken:child-verified|awaken:child-retry 1|awaken:child-verified" ]
       t $? "[성공] 표지 = cso child-verified · worker child-retry 1 → child-verified" "$(prog details)"
-      has "$L" 'TEST default child cap=60s gap=2s retry=3$'
-      t $? "[성공] 자식 자리 확인 상한 = 자리당 60초 · 2초 간격 · 최대 3회" "$(grep 'default child cap' "$L")"
+      has "$L" 'TEST default child cap=90s gaps=5 10 20 grace=10s retry=3$'
+      t $? "[성공] 자식 자리 확인 상한 = 자리당 90초 · Return 뒤 5·10·20초 · 유예 10초 · 최대 3회" "$(grep 'default child cap' "$L")"
       ;;
     claim-denied)
       has "$L" 'fleet awaken: no child seat within' && grep -q '사람 손 #1 · 시킨 쪽: 자비스' "$O" && grep -q '너는 마스터다' "$O" \
@@ -128,23 +128,47 @@ PYEOF
       t $? "[폴백 뒤 섬] 카드 뒤에 선 함대도 성공 줄을 기록한다" "$(grep -E 'fleet' "$L" | tail -3 | tr '\n' '|' | cut -c1-200)"
       grep -q '다음에 할 일: 없습니다 — 설치가 끝났습니다. 이 창을 닫으셔도 됩니다.' "$O" && ! has "$L" 'unexpected end'
       t $? "[폴백 뒤 섬] 끝맺음이 「설치가 끝났습니다」 · 「다시 실행」 안내를 인쇄하지 않는다" "$(grep '다음에 할 일' "$O" | head -1)"
-      has "$L" 'awaken child: role=cso seat=surface:10 marker=awaken:child-verified retries=0$' && has "$L" 'awaken child: role=worker seat=surface:11 marker=awaken:child-verified retries=0$'
+      has "$L" 'awaken child: role=cso seat=surface:10 marker=awaken:child-verified retries=0 evidence=jsonl u=1 a=1$' && has "$L" 'awaken child: role=worker seat=surface:11 marker=awaken:child-verified retries=0 evidence=jsonl u=1 a=1$'
       t $? "[폴백 뒤 섬] 카드 뒤에 선 자식 자리도 깸을 확인한다" "$(grep 'awaken child' "$L" | tr '\n' '|' | cut -c1-200)"
       ;;
     child-awake)
-      has "$L" 'awaken child: role=cso seat=surface:10 marker=awaken:child-verified retries=0$' && has "$L" 'awaken child: role=worker seat=surface:11 marker=awaken:child-verified retries=0$' \
+      has "$L" 'awaken child: role=cso seat=surface:10 marker=awaken:child-verified retries=0 evidence=jsonl u=1 a=1$' && has "$L" 'awaken child: role=worker seat=surface:11 marker=awaken:child-verified retries=0 evidence=jsonl u=1 a=1$' \
         && [ ! -e "$SB/sent" ] && [ "$(prog details)" = "awaken:child-verified|awaken:child-verified" ]
       t $? "[이미 깸] 두 자식이 이미 답했으면 Return 0회 · 깸 확인 표지 2건만" "$(grep 'awaken child' "$L" | tr '\n' '|' | cut -c1-200) · sent=$(cat "$SB/sent" 2>/dev/null | tr '\n' '|') · $(prog details)"
       ;;
     paste-late)
-      has "$L" 'awaken child: role=worker seat=surface:11 marker=awaken:child-verified retries=2$' && [ "$(nsent 11)" = "2" ] && [ "$(nsent 10)" = "0" ] \
+      has "$L" 'awaken child: role=worker seat=surface:11 marker=awaken:child-verified retries=2 evidence=jsonl u=1 a=1$' && [ "$(nsent 11)" = "2" ] && [ "$(nsent 10)" = "0" ] \
         && grep -q '     worker 자리 깨움 확인' "$O"
-      t $? "[붙여넣기 늦게 풀림] 옛 모양 입력줄에서 Return 두 번째에 비워지면 깸 확인(위쪽 기록에 남은 붙여넣기는 세지 않는다)" "$(grep 'awaken child' "$L" | tr '\n' '|' | cut -c1-200) · Return 11=$(nsent 11) 10=$(nsent 10)"
+      t $? "[늦게 제출] Return 두 번째에 세션 기록이 생기면 깸 확인" "$(grep 'awaken child' "$L" | tr '\n' '|' | cut -c1-200) · Return 11=$(nsent 11) 10=$(nsent 10)"
+      ;;
+    screen-lies)
+      has "$L" 'awaken child: role=worker seat=surface:11 marker=awaken:child-fail retries=3 why=no-submit u=0 a=0$' && [ "$(nsent 11)" = "3" ] \
+        && grep -q '     worker 자리는 열렸으나 아직 답이 없습니다' "$O" && ! grep -q 'worker 자리 깨움 확인' "$O"
+      t $? "[화면 거짓] 화면이 답한 모양이어도 세션 기록이 없으면 깸 확인이라 말하지 않는다" "$(grep 'awaken child' "$L" | tr '\n' '|' | cut -c1-240) · Return=$(nsent 11)"
+      ;;
+    stale-session)
+      has "$L" 'awaken child: role=worker seat=surface:11 marker=awaken:child-verified retries=1 evidence=jsonl u=1 a=1$' && [ "$(nsent 11)" = "1" ]
+      t $? "[지난 기록] 기준선 전에 생긴 같은 폴더 세션 기록은 세지 않는다(Return 1회 뒤 새 기록으로 확인)" "$(grep 'awaken child' "$L" | tr '\n' '|' | cut -c1-240) · Return=$(nsent 11)"
+      ;;
+    fallback-dir)
+      has "$L" 'awaken child: role=worker seat=surface:11 marker=awaken:child-verified retries=1 evidence=jsonl u=1 a=1$' && [ "$(nsent 11)" = "1" ]
+      t $? "[다른 폴더] 폴더 이름 규칙이 안 맞으면 파일 안 cwd 로 찾는다" "$(grep 'awaken child' "$L" | tr '\n' '|' | cut -c1-240) · Return=$(nsent 11)"
+      ;;
+    no-answer)
+      has "$L" 'awaken child: role=worker seat=surface:11 marker=awaken:child-verified retries=0 evidence=jsonl u=1 a=0$' && [ "$(nsent 11)" = "0" ] \
+        && grep -q '     worker 자리 깨움 확인' "$O" && ! grep -q '답이 없습니다' "$O"
+      t $? "[제출만] 사용자 레코드만 있고 답 레코드가 아직 없어도 제출 확인 · Return 0회" "$(grep 'awaken child' "$L" | tr '\n' '|' | cut -c1-240) · Return=$(nsent 11)"
+      ;;
+    grace)
+      has "$L" 'awaken child: role=worker seat=surface:11 marker=awaken:child-verified retries=3 evidence=jsonl u=1 a=0$' && [ "$(nsent 11)" = "3" ] \
+        && grep -q '     worker 자리 깨움 확인' "$O" && ! grep -q '답이 없습니다' "$O" \
+        && [ "$(prog details)" = "awaken:child-verified|awaken:child-retry 1|awaken:child-retry 2|awaken:child-retry 3|awaken:child-verified" ]
+      t $? "[유예] 마지막 Return 뒤 기록이 늦게 생겨도 유예 뒤 다시 재서 제출 확인 · Return 은 3회에서 멈춘다" "$(grep 'awaken child' "$L" | tr '\n' '|' | cut -c1-240) · Return=$(nsent 11) · $(prog details)"
       ;;
     child-stall)
-      has "$L" 'awaken child: role=worker seat=surface:11 marker=awaken:child-fail retries=3$' && [ "$(nsent 11)" = "3" ] \
+      has "$L" 'awaken child: role=worker seat=surface:11 marker=awaken:child-fail retries=3 why=no-submit u=0 a=0$' && [ "$(nsent 11)" = "3" ] \
         && grep -q '     worker 자리는 열렸으나 아직 답이 없습니다 — 자비스가 이어서 깨웁니다(사람 손 0)' "$O" && ! grep -q 'worker 자리 깨움 확인' "$O"
-      t $? "[3회 실패] Return 3회 뒤에도 붙여넣기가 남으면 정직 문구 · 깸 확인이라 말하지 않는다" "$(grep 'awaken child' "$L" | tr '\n' '|' | cut -c1-200) · Return=$(nsent 11)"
+      t $? "[3회 실패] Return 3회 뒤에도 세션 기록이 없으면 정직 문구 · 깸 확인이라 말하지 않는다" "$(grep 'awaken child' "$L" | tr '\n' '|' | cut -c1-200) · Return=$(nsent 11)"
       [ "$(prog details)" = "awaken:child-verified|awaken:child-retry 1|awaken:child-retry 2|awaken:child-retry 3|awaken:child-fail" ]
       t $? "[3회 실패] 표지 = child-retry 1·2·3 → child-fail (cso 는 child-verified)" "$(prog details)"
       prog evidence
@@ -166,18 +190,19 @@ PYEOF
   esac
 done
 
-echo "== [10/10] 자식 자리 각성 검증 — 맥판(bootstrap.sh · bash · installer-awaken-verify) =="
+echo "== [10/10] 자식 자리 각성 검증 — 맥판(bootstrap.sh · bash · installer-awaken-jsonl) =="
 SHF="$(cd "$DIR" && pwd)/bootstrap.sh"
-for s in success child-awake paste-late child-stall; do
+for s in success child-awake paste-late child-stall screen-lies stale-session fallback-dir no-answer grace; do
   SB="$BASE/mac-$s"; mkdir -p "$SB/bin" "$SB/home"   # 자비스 폴더는 만들지 않는다 — 이미 있으면 lib 가 작업 폴더로 거절한다
   cp "$EMU/fake-cys.sh" "$SB/bin/cys"; chmod +x "$SB/bin/cys"
   printf '%s' "$s" > "$SB/scenario"; touch "$SB/opened"; echo 5 > "$SB/listcalls"
   cat > "$SB/run.sh" <<EOF
 . "$SHF" || exit 9
-printf 'TEST default child cap=%ss gap=%ss retry=%s\n' "\$CHILD_AWAKE_CAP_SEC" "\$CHILD_AWAKE_GAP_SEC" "\$CHILD_AWAKE_MAX_RETRY"
+printf 'TEST default child cap=%ss gaps=%s grace=%ss retry=%s\n' "\$CHILD_AWAKE_CAP_SEC" "\$CHILD_AWAKE_GAPS" "\$CHILD_AWAKE_GRACE_SEC" "\$CHILD_AWAKE_MAX_RETRY"
 FLEET_BASELINE=" surface:3 "
-CHILD_AWAKE_GAP_SEC=0
-CHILD_AWAKE_CAP_SEC=5
+CHILD_AWAKE_GAPS='0 0 0'
+CHILD_AWAKE_GRACE_SEC=2
+CHILD_AWAKE_CAP_SEC=8
 confirm_child_seats cys
 echo "TEST done rc=\$?"
 EOF
@@ -190,25 +215,59 @@ EOF
   t $? "[맥 $s] 넣는 것은 자식 자리 Return 뿐" "$(head -2 "$SB/sent" 2>/dev/null | tr '\n' '|')"
   case "$s" in
     success)
-      grep -q 'awaken child: role=worker seat=surface:11 marker=awaken:child-verified retries=1$' "$L" && [ "$(msent 11)" = "1" ] \
-        && grep -q 'awaken child: role=cso seat=surface:10 marker=awaken:child-verified retries=0$' "$L" && [ "$(msent 10)" = "0" ] \
+      grep -q 'awaken child: role=worker seat=surface:11 marker=awaken:child-verified retries=1 evidence=jsonl u=1 a=1$' "$L" && [ "$(msent 11)" = "1" ] \
+        && grep -q 'awaken child: role=cso seat=surface:10 marker=awaken:child-verified retries=0 evidence=jsonl u=1 a=1$' "$L" && [ "$(msent 10)" = "0" ] \
         && grep -q '^     worker 자리 깨움 확인$' "$O" && grep -q '^     cso 자리 깨움 확인$' "$O" && ! grep -q '답이 없습니다' "$O"
-      t $? "[맥 success] 붙여넣기가 남은 자리에 Return 1회 → 답 시작 확인 · 이미 답한 자리는 무동작" "$(grep 'awaken child' "$L" | tr '\n' '|' | cut -c1-200) · Return 11=$(msent 11)"
-      grep -q '^TEST default child cap=60s gap=2s retry=3$' "$O"
-      t $? "[맥 success] 자식 자리 확인 상한 = 자리당 60초 · 2초 간격 · 최대 3회" "$(grep 'default child' "$O")" ;;
+      t $? "[맥 success] 제출 전 자리에 Return 1회 → 세션 기록으로 깸 확인 · 이미 깬 자리는 무동작" "$(grep 'awaken child' "$L" | tr '\n' '|' | cut -c1-240) · Return 11=$(msent 11)"
+      grep -q '^TEST default child cap=90s gaps=5 10 20 grace=10s retry=3$' "$O"
+      t $? "[맥 success] 자식 자리 확인 상한 = 자리당 90초 · Return 뒤 5·10·20초 · 유예 10초 · 최대 3회" "$(grep 'default child' "$O")" ;;
     child-awake)
-      grep -q 'role=cso seat=surface:10 marker=awaken:child-verified retries=0$' "$L" && grep -q 'role=worker seat=surface:11 marker=awaken:child-verified retries=0$' "$L" && [ ! -e "$SB/sent" ]
-      t $? "[맥 child-awake] 두 자식이 이미 답했으면 Return 0회" "$(grep 'awaken child' "$L" | tr '\n' '|' | cut -c1-200)" ;;
+      grep -q 'role=cso seat=surface:10 marker=awaken:child-verified retries=0 evidence=jsonl u=1 a=1$' "$L" && grep -q 'role=worker seat=surface:11 marker=awaken:child-verified retries=0 evidence=jsonl u=1 a=1$' "$L" && [ ! -e "$SB/sent" ]
+      t $? "[맥 child-awake] 두 자식이 이미 깼으면 Return 0회" "$(grep 'awaken child' "$L" | tr '\n' '|' | cut -c1-200)" ;;
     paste-late)
-      grep -q 'role=worker seat=surface:11 marker=awaken:child-verified retries=2$' "$L" && [ "$(msent 11)" = "2" ]
-      t $? "[맥 paste-late] 옛 모양 입력줄에서 Return 두 번째에 비워지면 깸 확인" "$(grep 'awaken child' "$L" | tr '\n' '|' | cut -c1-200) · Return=$(msent 11)" ;;
+      grep -q 'role=worker seat=surface:11 marker=awaken:child-verified retries=2 evidence=jsonl u=1 a=1$' "$L" && [ "$(msent 11)" = "2" ]
+      t $? "[맥 paste-late] Return 두 번째에 세션 기록이 생기면 깸 확인" "$(grep 'awaken child' "$L" | tr '\n' '|' | cut -c1-200) · Return=$(msent 11)" ;;
     child-stall)
-      grep -q 'role=worker seat=surface:11 marker=awaken:child-fail retries=3$' "$L" && [ "$(msent 11)" = "3" ] \
+      grep -q 'role=worker seat=surface:11 marker=awaken:child-fail retries=3 why=no-submit u=0 a=0$' "$L" && [ "$(msent 11)" = "3" ] \
         && grep -q '^     worker 자리는 열렸으나 아직 답이 없습니다 — 자비스가 이어서 깨웁니다(사람 손 0)$' "$O" && ! grep -q 'worker 자리 깨움 확인' "$O" \
         && grep -q 'awaken child stall tail (worker): .*Pasted text' "$L"
-      t $? "[맥 child-stall] Return 3회 뒤에도 붙여넣기가 남으면 정직 문구 · 화면 끝부분을 기록에 남긴다" "$(grep 'awaken child' "$L" | tr '\n' '|' | cut -c1-240) · Return=$(msent 11)" ;;
+      t $? "[맥 child-stall] Return 3회 뒤에도 세션 기록이 없으면 정직 문구 · 화면 끝부분을 기록에 남긴다" "$(grep 'awaken child' "$L" | tr '\n' '|' | cut -c1-240) · Return=$(msent 11)" ;;
+    screen-lies)
+      grep -q 'role=worker seat=surface:11 marker=awaken:child-fail retries=3 why=no-submit u=0 a=0$' "$L" && [ "$(msent 11)" = "3" ] \
+        && ! grep -q 'worker 자리 깨움 확인' "$O" && grep -q '^     cso 자리 깨움 확인$' "$O"
+      t $? "[맥 screen-lies] 화면이 답한 모양이어도 세션 기록이 없으면 깸 확인이라 말하지 않는다" "$(grep 'awaken child' "$L" | tr '\n' '|' | cut -c1-240) · Return=$(msent 11)" ;;
+    stale-session)
+      grep -q 'role=worker seat=surface:11 marker=awaken:child-verified retries=1 evidence=jsonl u=1 a=1$' "$L" && [ "$(msent 11)" = "1" ]
+      t $? "[맥 stale-session] 기준선 전에 생긴 같은 폴더 세션 기록은 세지 않는다" "$(grep 'awaken child' "$L" | tr '\n' '|' | cut -c1-240) · Return=$(msent 11)" ;;
+    fallback-dir)
+      grep -q 'role=worker seat=surface:11 marker=awaken:child-verified retries=1 evidence=jsonl u=1 a=1$' "$L" && [ "$(msent 11)" = "1" ]
+      t $? "[맥 fallback-dir] 폴더 이름 규칙이 안 맞으면 파일 안 cwd 로 찾는다" "$(grep 'awaken child' "$L" | tr '\n' '|' | cut -c1-240) · Return=$(msent 11)" ;;
+    no-answer)
+      grep -q 'role=worker seat=surface:11 marker=awaken:child-verified retries=0 evidence=jsonl u=1 a=0$' "$L" && [ "$(msent 11)" = "0" ] \
+        && grep -q '^     worker 자리 깨움 확인$' "$O" && ! grep -q '답이 없습니다' "$O"
+      t $? "[맥 no-answer] 사용자 레코드만 있고 답 레코드가 아직 없어도 제출 확인 · Return 0회" "$(grep 'awaken child' "$L" | tr '\n' '|' | cut -c1-240) · Return=$(msent 11)" ;;
+    grace)
+      grep -q 'role=worker seat=surface:11 marker=awaken:child-verified retries=3 evidence=jsonl u=1 a=0$' "$L" && [ "$(msent 11)" = "3" ] \
+        && grep -q '^     worker 자리 깨움 확인$' "$O" && ! grep -q '답이 없습니다' "$O"
+      t $? "[맥 grace] 마지막 Return 뒤 기록이 늦게 생겨도 유예 뒤 다시 재서 제출 확인 · Return 은 3회에서 멈춘다" "$(grep 'awaken child' "$L" | tr '\n' '|' | cut -c1-240) · Return=$(msent 11)" ;;
   esac
 done
+# 윈 정적 축 — 콘솔 빠른 편집(QuickEdit)을 머리글 앞에서 끄고 끝맺음 뒤 되돌린다(installer-awaken-verify-r2 · 윈도우 콘솔은 흉내로 못 돈다)
+awk '/^function Disable-ConsoleQuickEdit/{d=1}
+     /-band 4294967231\)/{b++}
+     /^    Disable-ConsoleQuickEdit   # 창 클릭/{c++; cl=NR}
+     /^    Say "=== 자비스 설치 도우미 —/{hl=NR}
+     /^    try \{ Write-ClosingNote \} finally \{ Restore-ConsoleQuickEdit \}/{r++}
+     END{exit !(d && b==1 && c==1 && r==1 && hl && cl < hl && hl - cl <= 3)}' "$DIR/bootstrap.ps1"
+t $? "[윈 정적] 설치 창 빠른 편집을 머리글 앞에서 끄고(0x40 끔) 끝맺음 뒤 되돌린다" "$(grep -nE 'Disable-ConsoleQuickEdit|Restore-ConsoleQuickEdit|4294967231' "$DIR/bootstrap.ps1" | tr '\n' '|' | cut -c1-240)"
+# 윈 정적 축 — [3/10] 로그인 대기 구간에서는 빠른 편집이 켜져 있다(installer-speed-pin-0320 ⓔ' · 샌드박스 실기 적색: 꺼져 있으면 로그인 주소를 긁지 못한다)
+#   불변식 = 로그인 부르기 바로 앞 줄에서 되돌리고(0x40 켜짐) · 바로 뒷 줄에서 다시 끈다 · 로그인 카드에 긁기 폴백(Alt+Space → E → K) 1줄.
+awk '/^    Restore-ConsoleQuickEdit   # \[3\/10\]/{r=NR}
+     /^    Step-Login; \$rc = \$script:LoginRc; if \(\$rc -ne 0\) \{ exit \$rc \}/{l=NR}
+     /^    Disable-ConsoleQuickEdit   # \[3\/10\]/{d=NR}
+     /Alt\+Space → E → K/{k++}
+     END{exit !(r && l && d && l - r == 1 && d - l == 1 && k == 1)}' "$DIR/bootstrap.ps1"
+t $? "[윈 정적] 로그인 대기 구간에서는 빠른 편집을 켠다(로그인 바로 앞에서 켜고 · 바로 뒤에서 끔 · 긁기 폴백 1줄)" "$(grep -nE 'ConsoleQuickEdit|Step-Login; \$rc|Alt\+Space' "$DIR/bootstrap.ps1" | tr '\n' '|' | cut -c1-240)"
 # 부르는 자리 — 맥 [10/10] 성공·「선언은 들어갔으나 덜 섬」 두 곳 · 윈 자동 각성·카드 뒤 성공 두 곳(주석 줄 제외 세기)
 [ "$(grep -cE '^[[:space:]]+confirm_child_seats "\$cli"$' "$DIR/bootstrap.sh")" = "2" ] \
   && [ "$(grep -cE '^[[:space:]]+\[void\]\(Confirm-ChildSeats \$cli\)$' "$DIR/bootstrap.ps1")" = "2" ]

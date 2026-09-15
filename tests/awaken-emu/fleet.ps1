@@ -40,9 +40,15 @@ $env:JARVIS_LIB_ONLY = ''
 $script:CysCli = 'cys'
 # 실물 상한을 줄이기 전에 적어 둔다(시험이 상한 값 자체를 재게)
 Write-Log ("TEST default awake cap=" + ($FleetAwakeTries * $FleetPollSec) + "s")
-Write-Log ("TEST default child cap=" + $ChildAwakeCapSec + "s gap=" + $ChildAwakeGapSec + "s retry=" + $ChildAwakeMaxRetry)
+Write-Log ("TEST default child cap=" + $ChildAwakeCapSec + "s gaps=" + ($ChildAwakeGaps -join ' ') + " grace=" + $ChildAwakeGraceSec + "s retry=" + $ChildAwakeMaxRetry)
 $FleetPollSec = 0; $FleetAwakeTries = 3; $FleetWaitTries = 2
-$ChildAwakeGapSec = 0; $ChildAwakeCapSec = 5
+$ChildAwakeGaps = @(0, 0, 0); $ChildAwakeGraceSec = 2; $ChildAwakeCapSec = 8
+# 자식 자리 세션 기록(jsonl) 자리 = $env:USERPROFILE/.cys/claude/projects — 가짜 cys 가 SB/home 아래에 만든다(installer-awaken-jsonl)
+#   screen-lies    = 화면은 답한 모양인데 세션 기록이 없다(2026-09-16 샌드박스 5차 거짓 양성) → Return 3회 → child-fail
+#   stale-session  = 같은 폴더에 기준선 전 지난 설치의 깬 기록만 있다 → 세지 않고 Return 1회 → 새 기록으로 확인
+#   fallback-dir   = 폴더 이름 규칙이 안 맞는 자리에 기록이 생긴다 → 파일 안 cwd 로 찾는다
+#   no-answer      = 제출(사용자 레코드)은 됐는데 답 레코드가 아직 없다 → Return 0회 → child-verified(installer-awaken-verify-r2 · 답은 늦게 생긴다)
+#   grace          = Return 3회 뒤 1초 늦게 사용자 레코드가 생긴다 → 유예 뒤 다시 재서 child-verified(샌드박스 7차 거짓 실패의 모양)
 # 진행 전송을 가로채 파일에 적는다 — 실제 서버로는 나가지 않는다(표지·증거 칸을 글자 그대로 재려고)
 function Send-Progress($step, $ev, $elapsed, $detail, $envInfo, $extra) {
     $row = [ordered]@{ step = $step; event = $ev; detail = $detail }

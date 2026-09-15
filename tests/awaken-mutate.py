@@ -64,27 +64,70 @@ MUTANTS = [
     ("child-confirm-drop", PS,
      "        [void](Confirm-ChildSeats $cli)\n        Say ''",
      "        Say ''",
-     "[성공] 붙여넣기가 남은 자리에 Return 1회"),
-    # 윈: 입력줄 구역 대신 화면 전체에서 붙여넣기를 찾음 — 이미 보낸 기록을 멈춤으로 읽어 Return 을 계속 넣는다
-    ("box-region-drop", PS,
-     "return ((Get-SeatInputBox $Screen) -match '\\[Pasted text')",
-     "return ($Screen -match '\\[Pasted text')",
-     "[성공] 붙여넣기가 남은 자리에 Return 1회"),
-    # 윈: Return 을 넣지 않음 — 멈춘 자리를 깨우지 못한다
+     "[성공] 제출 전 자리(세션 기록 없음)에 Return 1회"),
+    # ── installer-awaken-jsonl(2026-09-16) — 판정 = 세션 기록(jsonl) · 화면 파싱 폐기 ──
+    # ── installer-awaken-verify-r2(2026-09-16) — 판정 = 사용자 레코드 ≥1(답 레코드 불요) · 유예 1회 ──
+    # 윈: 답 레코드 조건 되살림 — 제출은 됐고 답이 늦는 자리를 실패로 찍는다(샌드박스 7차 거짓 실패로 되돌림)
+    ("judge-requires-assistant", PS,
+     "        if ($c.u -ge 1) { return @{ ok = $true",
+     "        if ($c.u -ge 1 -and $c.a -ge 1) { return @{ ok = $true",
+     "[제출만] 사용자 레코드만 있고 답 레코드가 아직 없어도"),
+    # 윈: 판정을 늘 참으로 — 화면 거짓 양성과 같은 결말(세션 기록 없이 「깸 확인」)
+    ("jsonl-judge-true", PS,
+     "        if ($c.u -ge 1) { return @{ ok = $true",
+     "        if ($true) { return @{ ok = $true",
+     "[화면 거짓] 화면이 답한 모양이어도"),
+    # 윈: 유예 제거 — 마지막 Return 뒤 늦게 생긴 기록을 못 보고 실패로 찍는다
+    ("grace-drop", PS,
+     "        } elseif (-not $graced) {",
+     "        } elseif ($false) {",
+     "[유예] 마지막 Return 뒤 기록이 늦게 생겨도"),
+    # 윈: 빠른 편집 끄기 부르기 제거 — 창 클릭 한 번에 설치가 멈춘다(정적 축)
+    ("quickedit-call-drop", PS,
+     "    Disable-ConsoleQuickEdit   # 창 클릭",
+     "    # 창 클릭",
+     "[윈 정적] 설치 창 빠른 편집을"),
+    # 윈: 되돌리기 제거 — 설치가 끝난 창에서 글을 선택·복사할 수 없게 남는다(정적 축)
+    ("quickedit-restore-drop", PS,
+     "    try { Write-ClosingNote } finally { Restore-ConsoleQuickEdit }",
+     "    Write-ClosingNote",
+     "[윈 정적] 설치 창 빠른 편집을"),
+    # ── installer-speed-pin-0320 ⓔ' — 로그인 대기 구간에서는 빠른 편집 켜짐 ──
+    # 윈: 로그인 앞 되돌리기 제거 — 로그인 주소를 마우스로 긁지 못한다(샌드박스 실기 적색으로 되돌림)
+    ("quickedit-login-restore-drop", PS,
+     "    Restore-ConsoleQuickEdit   # [3/10] 로그인 대기",
+     "    # [3/10] 로그인 대기",
+     "[윈 정적] 로그인 대기 구간에서는 빠른 편집을 켠다"),
+    # 윈: 로그인 뒤 다시 끄기 제거 — 뒤 단계([4/10]~[10/10])에서 창 클릭 멈춤이 되살아난다
+    ("quickedit-login-redisable-drop", PS,
+     "    Disable-ConsoleQuickEdit   # [3/10] 로그인이 끝났다",
+     "    # [3/10] 로그인이 끝났다",
+     "[윈 정적] 로그인 대기 구간에서는 빠른 편집을 켠다"),
+    # 윈: 비트 계산을 틀리게 — 빠른 편집 비트(0x40)를 끄지 않는다(정적 축)
+    ("quickedit-mask-wrong", PS,
+     "-band 4294967231)",
+     "-band 4294967295)",
+     "[윈 정적] 설치 창 빠른 편집을"),
+    # 윈: Return 을 넣지 않음 — 제출 전 자리를 깨우지 못한다
     ("return-key-drop", PS,
-     "                [void](Invoke-CysCapped $Cli ('send-key --surface ' + $Ref + ' Return') $ChildReadCapMs)\n",
+     "            [void](Invoke-CysCapped $Cli ('send-key --surface ' + $Ref + ' Return') $ChildReadCapMs)\n",
      "",
-     "[성공] 붙여넣기가 남은 자리에 Return 1회"),
-    # 윈: 3회 상한 제거 — 멈춘 자리에 상한(60초)까지 Return 을 쏟는다
+     "[성공] 제출 전 자리(세션 기록 없음)에 Return 1회"),
+    # 윈: 3회 상한 제거 — 제출 안 된 자리에 상한(60초)까지 Return 을 쏟는다
     ("retry-cap-drop", PS,
-     "                if ($retry -ge $ChildAwakeMaxRetry) { break }\n",
+     "        if ($retry -lt $ChildAwakeMaxRetry) {",
+     "        if ($true) {",
+     "[3회 실패] Return 3회 뒤에도 세션 기록이 없으면"),
+    # 윈: 기준선 시각 거르기 제거 — 지난 설치의 기록을 이번 깸으로 센다
+    ("since-filter-drop", PS,
+     "        Where-Object { $_.CreationTimeUtc -ge $script:ChildAwakeSince } | ",
+     "        ",
+     "[지난 기록] 기준선 전에 생긴"),
+    # 윈: 파일 안 cwd 로 찾기 제거 — 폴더 이름 규칙에만 기댄다
+    ("fallback-scan-drop", PS,
+     "            foreach ($ln in (Read-SessionLines $f.FullName)) { if ($ln.Contains($needle)) { return $f.FullName } }\n",
      "",
-     "[3회 실패] Return 3회 뒤에도 붙여넣기가 남으면 정직 문구"),
-    # 윈: 답 판정을 늘 거짓으로 — 이미 깬 자리를 못 알아본다
-    ("answer-judge-drop", PS,
-     "    return (($Screen -match 'esc to interrupt|DIRECTIVE-ACK') -or ($Screen -match '(^|\\n)\\s*[⏺●]'))",
-     "    return $false",
-     "[이미 깸] 두 자식이 이미 답했으면 Return 0회"),
+     "[다른 폴더] 폴더 이름 규칙이 안 맞으면"),
     # 윈: 증거 마스킹 제거 — 자식 화면의 이름·이메일이 기계 밖으로 나간다
     ("evidence-mask-drop", PS,
      "Get-RemoteHelpTailBytes (Protect-EvidenceText $tail) $EvidenceTextBytes",
@@ -94,27 +137,52 @@ MUTANTS = [
     ("fail-phrase-lie", PS,
      "            Say ('     ' + $r + ' 자리는 열렸으나 아직 답이 없습니다 — 자비스가 이어서 깨웁니다(사람 손 0)')",
      "            Say ('     ' + $r + ' 자리 깨움 확인')",
-     "[3회 실패] Return 3회 뒤에도 붙여넣기가 남으면 정직 문구"),
+     "[3회 실패] Return 3회 뒤에도 세션 기록이 없으면"),
     # 윈: 카드 뒤 성공 자리의 확인 부르기 제거
     ("fallback-confirm-drop", PS,
      "        [void](Confirm-ChildSeats $cli)\n        Set-FleetFinished",
      "        Set-FleetFinished",
      "[폴백 뒤 섬] 카드 뒤에 선 자식 자리도 깸을 확인한다"),
-    # 맥: 입력줄 구역 대신 화면 전체
-    ("mac-box-region-drop", SH,
-     "seat_paste_residue() { printf '%s\\n' \"$1\" | seat_input_box | LC_ALL=C grep -q '\\[Pasted text'; }",
-     "seat_paste_residue() { printf '%s\\n' \"$1\" | LC_ALL=C grep -q '\\[Pasted text'; }",
-     "[맥 success] 붙여넣기가 남은 자리에 Return 1회"),
     # 맥: 3회 상한 제거
     ("mac-retry-cap-drop", SH,
-     "        [ \"$CHILD_RETRY\" -lt \"$CHILD_AWAKE_MAX_RETRY\" ] || break\n",
-     "",
-     "[맥 child-stall] Return 3회 뒤에도 붙여넣기가 남으면 정직 문구"),
+     "    if [ \"$CHILD_RETRY\" -lt \"$CHILD_AWAKE_MAX_RETRY\" ]; then\n",
+     "    if true; then\n",
+     "[맥 child-stall] Return 3회 뒤에도 세션 기록이 없으면"),
     # 맥: Return 을 넣지 않음
     ("mac-return-key-drop", SH,
-     "        cys_capped \"$CHILD_READ_CAP_SEC\" \"$cli\" send-key --surface \"$ref\" Return >/dev/null\n",
+     "      cys_capped \"$CHILD_READ_CAP_SEC\" \"$cli\" send-key --surface \"$ref\" Return >/dev/null\n",
      "",
-     "[맥 success] 붙여넣기가 남은 자리에 Return 1회"),
+     "[맥 success] 제출 전 자리에 Return 1회"),
+    # 맥: 판정을 늘 참으로 — 화면 거짓 양성과 같은 결말
+    ("mac-judge-true", SH,
+     "    if [ \"$CHILD_U\" -ge 1 ]; then CHILD_WHY=jsonl",
+     "    if true; then CHILD_WHY=jsonl",
+     "[맥 screen-lies] 화면이 답한 모양이어도"),
+    # 맥: 답 레코드 조건 되살림 — 답이 늦는 자리를 실패로 찍는다(샌드박스 7차 거짓 실패로 되돌림)
+    ("mac-judge-requires-assistant", SH,
+     "    if [ \"$CHILD_U\" -ge 1 ]; then CHILD_WHY=jsonl",
+     "    if [ \"$CHILD_U\" -ge 1 ] && [ \"$CHILD_A\" -ge 1 ]; then CHILD_WHY=jsonl",
+     "[맥 no-answer] 사용자 레코드만 있고 답 레코드가 아직 없어도"),
+    # 맥: 유예 제거
+    ("mac-grace-drop", SH,
+     "    elif [ \"$graced\" = 0 ]; then",
+     "    elif false; then",
+     "[맥 grace] 마지막 Return 뒤 기록이 늦게 생겨도"),
+    # 맥: 대기 간격을 옛 3·5·8 로 되돌림
+    ("mac-gaps-revert", SH,
+     "CHILD_AWAKE_GAPS='5 10 20'",
+     "CHILD_AWAKE_GAPS='3 5 8'",
+     "[맥 success] 자식 자리 확인 상한"),
+    # 맥: 기준선 시각 거르기 제거
+    ("mac-since-drop", SH,
+     "  [ -n \"$b\" ] && [ \"$b\" -ge \"$CHILD_AWAKE_SINCE\" ] || return 1\n",
+     "  [ -n \"$b\" ] || return 1\n",
+     "[맥 stale-session] 기준선 전에 생긴"),
+    # 맥: 파일 안 cwd 로 찾기 제거
+    ("mac-fallback-scan-drop", SH,
+     "      LC_ALL=C grep -qF -- \"$needle\" \"$f\" && { best=\"$f\"; bestb=\"$b\"; }\n",
+     "",
+     "[맥 fallback-dir] 폴더 이름 규칙이 안 맞으면"),
     # 맥: 성공 경로의 확인 부르기 제거
     ("mac-confirm-call-drop", SH,
      "    confirm_child_seats \"$cli\"\n    return 0",

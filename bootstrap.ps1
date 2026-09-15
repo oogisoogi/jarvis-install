@@ -112,6 +112,7 @@ $LoginCardLines = @(
     '     2) 「Authentication code」 화면이 뜨면 복사 단추로 코드를 복사만 하십시오 — 붙여넣지 않으셔도 이 설치 창이 몇 초 안에 알아서 넣습니다 (주소창의 주소는 안 됩니다).',
     '     3) 「코드를 로그인에 넣었습니다」가 안 나오면: 이 설치 창을 한 번 누르고 마우스 오른쪽 단추로 붙여넣은 뒤 Enter 를 누르십시오 — 5분 안에.',
     '     브라우저가 안 열리면: 이 설치 창에 보이는 https:// 주소를 복사해 브라우저 주소창에 붙여넣으십시오.',
+    '     주소를 마우스로 긁을 수 없으면: 이 설치 창에서 Alt+Space → E → K 를 누른 뒤 주소를 끌어 선택하고 Enter 를 누르십시오(복사됩니다).',
     '     이 설치 창은 닫지 마십시오. 기다리셔도 됩니다 — 20분 뒤 저절로 다음 안내가 나옵니다.'
 )
 # 로그인이 끝내 안 됐을 때 사람이 스스로 푸는 길(윈도우 · 2026-09-15 샌드박스에서 이 길로 로그인이 됐다)
@@ -3359,6 +3360,7 @@ function Set-FleetBaseline {
     param([string]$Cli)
     $script:BaselineOk = $false
     $script:BaselineSurfaces = @()
+    $script:ChildAwakeSince = [datetime]::UtcNow   # 자식 자리 세션 기록은 이 시각 뒤에 생긴 것만 센다
     try {
         $global:LASTEXITCODE = 0
         $out = (Invoke-CysProbe $Cli @('list')) -join "`n"
@@ -3418,18 +3420,28 @@ function Clear-FleetStrayKeys {
     $n = Get-LoginStrayKeyCount
     Write-Log ('fleet stray keys in installer window cleared=' + $n)
 }
-# ── 자식 자리 각성 검증(TICKET=installer-awaken-verify · 2026-09-15) ─────────────────
+# ── 자식 자리 각성 검증(TICKET=installer-awaken-verify · 2026-09-15 → installer-awaken-jsonl · 2026-09-16) ─────────
 # 🔴자리가 선 것 ≠ 자리가 깨어난 것(샌드박스 실기 3회/3회 재현). 팩이 자식 자리를 처음 띄울 때 각성 지시를
-#   붙여넣기로 보내는데, 막 뜬 클로드가 뒤따르는 Return 을 삼켜 입력줄에 「[Pasted text #1 +529 lines]」 가 실린 채
-#   영영 멈춘다 — 그런데 [10/10] 은 목록에 자리가 섰다는 이유로 「함대가 섰습니다」를 찍었다(거짓 완료).
-#   ⇒ 자리마다 화면을 실제로 읽어 ⑴입력줄에 붙여넣기가 남았으면 Return 을 넣고 ⑵답을 시작했는지 다시 읽는다.
+#   붙여넣기로 보내는데, 막 뜬 클로드가 뒤따르는 Return 을 삼켜 입력줄에 「[Pasted text #1 +529 lines]」 가 실린 채 멈춘다.
+# 🔴화면을 읽어 판정하던 첫 판(09dcab0)은 거짓 양성을 냈다(2026-09-16 샌드박스 5차: 「cso·worker 자리 깨움 확인」을 찍었는데
+#   두 자리 모두 입력줄에 붙여넣기가 그대로 = 미제출). ⇒ 화면 파싱을 버리고 **그 자리 클로드의 세션 기록(jsonl)** 으로 잰다.
+#   실측(맥 2026-09-16): 세션 기록 파일은 첫 지시가 제출되는 순간에 생긴다 — 제출 전에는 파일 자체가 없다.
+#   깸(제출 확인) = 이 설치의 기준선 뒤에 생긴 그 자리 폴더의 세션 기록에 사용자 레코드 ≥1. 답 레코드는 요구하지 않는다.
+#   🔴installer-awaken-verify-r2(2026-09-16 샌드박스 7차): 답 레코드까지 요구하던 판(9c49720)은 worker 를 child-fail 로 찍었는데
+#     같은 시각 그 자리는 이미 답을 쓰는 중이었다 — 느린 기계에서 답 레코드는 제출 뒤 30초+ 늦게 생긴다(거짓 실패).
+#   ⇒ 사용자 레코드가 0(파일 없음 포함)이면 Return 을 넣고 5·10·20초 뒤 다시 잰다(최대 3회) · 마지막 뒤에도 0 이면 10초 유예 뒤 한 번 더 잰다.
+#   ⛔사용자 레코드가 이미 있으면 Return 을 넣지 않는다 — 그 자리에서 확인으로 끝난다(비워진 입력줄의 Return 은 제안 글을 제출하는 경로다).
 #   ★재시작(phoenix) 경로는 이미 깬다 — 이 확인은 첫 설치 [10/10] 에서만 돈다(재설치·재부팅 경로 무접촉).
-# ⚠여기서 안 재는 것: 붙여넣기가 아니라 글자 그대로 남은 지시 본문(입력줄의 빈칸 안내글과 가를 방법이 없다 · 표지는 붙여넣기 하나).
+# ⚠여기서 안 재는 것: ⑴기준선 뒤 같은 폴더에서 다른 클로드 세션이 제출된 경우(그 기록도 깸으로 센다)
+#   ⑵세션 기록이 %USERPROFILE%\.cys\claude\projects 밖에 있는 경우(끝까지 0 → 정직 문구로 끝난다 · 거짓 양성 쪽이 아니다)
+#   ⑶폴더 이름 규칙이 안 맞고 파일 안 cwd 글자도 cys 목록의 폴더와 글자 그대로 다른 경우(같은 ⑵의 결말)
 $ChildAwakeRoles    = @('cso', 'worker')   # 자비스가 선언을 듣고 부르는 자리(우리가 만들지 않는다)
-$ChildAwakeCapSec   = 60      # 자리당 상한
-$ChildAwakeGapSec   = 2       # 다시 읽기 전 기다림(시험이 줄여 쓴다)
-$ChildAwakeMaxRetry = 3       # Return 을 다시 넣는 최대 횟수
-$ChildReadCapMs     = 10000   # cys 한 번 부르기의 상한 — 상한 있는 고리 안에 상한 없는 호출을 두지 않는다
+$ChildAwakeCapSec   = 90         # 자리당 상한(5+10+20+유예 10 = 45초 + cys 부르기 3회 상한 여유)
+$ChildAwakeGaps     = @(5, 10, 20) # Return 뒤 다시 재기 전 기다림(시험이 줄여 쓴다)
+$ChildAwakeGraceSec = 10         # 마지막 Return 뒤에도 기록이 없을 때 한 번 더 재기 전 유예(시험이 줄여 쓴다)
+$ChildAwakeMaxRetry = 3          # Return 을 넣는 최대 횟수
+$ChildReadCapMs     = 10000      # cys 한 번 부르기의 상한 — 상한 있는 고리 안에 상한 없는 호출을 두지 않는다
+$script:ChildAwakeSince = [datetime]::UtcNow   # 이 시각 뒤에 생긴 세션 기록만 센다(지난 설치의 기록 제외) · 기준선을 찍을 때 다시 잡는다
 function Invoke-CysCapped([string]$Cli, [string]$ArgLine, [int]$CapMs) {
     # 돌려주는 것 = 표준 출력 글자 · 상한에 닿았거나 실패면 $null(콘솔 입력을 건드리지 않는다)
     try {
@@ -3451,22 +3463,58 @@ function Invoke-CysCapped([string]$Cli, [string]$ArgLine, [int]$CapMs) {
         return $so.Result
     } catch { return $null }
 }
-function Get-SeatInputBox([string]$Screen) {
-    # 클로드 입력줄 = 화면 아래쪽 가로줄 두 개 사이(새 모양 ──── · 옛 모양 ╭──╮/╰──╯). 못 찾으면 끝 12줄.
-    #   ★위쪽 대화 기록에 남은 「[Pasted text …」 는 이미 보낸 것이다 — 입력줄 안에 있을 때만 멈춘 것으로 본다.
-    $lines = @(([string]$Screen).TrimEnd() -split "`r?`n")
-    $rules = @()
-    for ($i = 0; $i -lt $lines.Count; $i++) { if ($lines[$i] -match '^\s*[╭╰]?[─━]{8,}[╮╯]?\s*$') { $rules += $i } }
-    if ($rules.Count -ge 2) { return (($lines[$rules[-2]..$rules[-1]]) -join "`n") }
-    $from = [math]::Max(0, $lines.Count - 12)
-    return (($lines[$from..($lines.Count - 1)]) -join "`n")
+function ConvertTo-ClaudeProjectSlug([string]$Cwd) {
+    # 클로드가 세션 기록 폴더 이름을 짓는 규칙 = 경로의 영숫자 아닌 글자를 하나씩 - 로(맥 실측 · C:\Users\… → C--Users-…)
+    return ($Cwd -replace '[^A-Za-z0-9]', '-')
 }
-function Test-PasteResidue([string]$Screen) { return ((Get-SeatInputBox $Screen) -match '\[Pasted text') }
-function Test-SeatAnswering([string]$Screen) {
-    # 답을 시작했다 = 처리 중 표지 · 각성 확인 줄 · 답 줄 머리표(⏺ · 윈도우 ●)
-    return (($Screen -match 'esc to interrupt|DIRECTIVE-ACK') -or ($Screen -match '(^|\n)\s*[⏺●]'))
+function Read-SessionLines([string]$Path) {
+    # 클로드가 쓰는 중인 파일도 읽는다(공유 모드 ReadWrite·Delete) · UTF-8
+    $lines = New-Object System.Collections.Generic.List[string]
+    $fs = $null
+    try {
+        $fs = New-Object System.IO.FileStream($Path, [System.IO.FileMode]::Open, [System.IO.FileAccess]::Read, [System.IO.FileShare]'ReadWrite, Delete')
+        $sr = New-Object System.IO.StreamReader($fs, (New-Object System.Text.UTF8Encoding($false)))
+        while ($null -ne ($ln = $sr.ReadLine())) { $lines.Add($ln) }
+        $sr.Dispose()
+    } catch { } finally { if ($fs) { $fs.Dispose() } }
+    return ,$lines
+}
+function Get-NewSessionFiles([string]$Dir) {
+    # 그 폴더의 세션 기록 중 기준선 뒤에 생긴 것만 · 새것부터
+    if (-not (Test-Path -LiteralPath $Dir)) { return @() }
+    return @(Get-ChildItem -LiteralPath $Dir -Filter '*.jsonl' -File -ErrorAction SilentlyContinue |
+        Where-Object { $_.CreationTimeUtc -ge $script:ChildAwakeSince } | Sort-Object CreationTimeUtc -Descending)
+}
+function Get-SeatSessionFile([string]$Cwd) {
+    # 돌려주는 것 = 그 자리의 세션 기록 경로 · 없으면 $null
+    #   ①폴더 이름 규칙으로 찾는다 ②없으면 projects 아래 전체에서 파일 안 "cwd" 글자가 그 자리 폴더인 것을 찾는다(규칙 추정에 기대지 않는다)
+    try {
+        $root = Join-Path (Join-Path (Join-Path $env:USERPROFILE '.cys') 'claude') 'projects'
+        if (-not (Test-Path -LiteralPath $root)) { return $null }
+        $hit = @(Get-NewSessionFiles (Join-Path $root (ConvertTo-ClaudeProjectSlug $Cwd)))
+        if ($hit.Count -gt 0) { return $hit[0].FullName }
+        $needle = '"cwd":"' + $Cwd.Replace('\', '\\').Replace('"', '\"') + '"'
+        $cands = @(Get-ChildItem -LiteralPath $root -Directory -ErrorAction SilentlyContinue | ForEach-Object { Get-NewSessionFiles $_.FullName } |
+            Sort-Object CreationTimeUtc -Descending)
+        foreach ($f in $cands) {
+            foreach ($ln in (Read-SessionLines $f.FullName)) { if ($ln.Contains($needle)) { return $f.FullName } }
+        }
+    } catch { }
+    return $null
+}
+function Get-SeatSessionCounts([string]$Path) {
+    # 사용자 레코드 수 u · 답 레코드 수 a(파일이 없으면 둘 다 0)
+    $u = 0; $a = 0
+    if ($Path) {
+        foreach ($ln in (Read-SessionLines $Path)) {
+            if ($ln.Contains('"type":"user"')) { $u++ }
+            if ($ln.Contains('"type":"assistant"')) { $a++ }
+        }
+    }
+    return @{ u = $u; a = $a }
 }
 function Get-ChildSeatRefs([string]$Cli) {
+    # 돌려주는 것 = 역할 → @{ ref = 자리 번호; cwd = 자리 폴더(목록 한 줄의 마지막 칸) }
     $out = (Invoke-CysProbe $Cli @('list')) -join "`n"
     $seats = [ordered]@{}
     foreach ($ln in ($out -split "`n")) {
@@ -3475,36 +3523,37 @@ function Get-ChildSeatRefs([string]$Cli) {
         if ($script:BaselineSurfaces -contains $mid.Value) { continue }   # 지난 설치의 자리는 이번 확인 대상이 아니다
         foreach ($r in $ChildAwakeRoles) {
             if ($seats.Contains($r)) { continue }
-            if ($ln -match ("(^|\s)role=" + [regex]::Escape($r) + "(\s|-|$)")) { $seats[$r] = $mid.Value }
+            if ($ln -match ("(^|\s)role=" + [regex]::Escape($r) + "(\s|-|$)")) {
+                $cols = @($ln.TrimEnd("`r") -split "`t")
+                $cwd = if ($cols.Count -ge 6) { $cols[-1].Trim() } else { '' }
+                $seats[$r] = @{ ref = $mid.Value; cwd = $cwd }
+            }
         }
     }
     return $seats
 }
-function Confirm-ChildSeat([string]$Cli, [string]$Role, [string]$Ref) {
+function Confirm-ChildSeat([string]$Cli, [string]$Role, [string]$Ref, [string]$Cwd) {
     $sw = [System.Diagnostics.Stopwatch]::StartNew()
-    $retry = 0; $pasteSeen = $false; $prev = $null; $last = ''
+    $retry = 0; $graced = $false; $c = @{ u = 0; a = 0 }
+    if (-not $Cwd) { return @{ ok = $false; retry = 0; u = 0; a = 0; why = 'no-cwd' } }   # 폴더를 모르면 잴 수 없다 — Return 도 넣지 않는다
     while ($sw.Elapsed.TotalSeconds -lt $ChildAwakeCapSec) {
-        $scr = Invoke-CysCapped $Cli ('read-screen --surface ' + $Ref) $ChildReadCapMs
-        if ($null -ne $scr) {
-            $last = $scr
-            if (Test-PasteResidue $scr) {
-                $pasteSeen = $true
-                if ($retry -ge $ChildAwakeMaxRetry) { break }
-                $retry++
-                [void](Invoke-CysCapped $Cli ('send-key --surface ' + $Ref + ' Return') $ChildReadCapMs)
-                Write-Log ('awaken child: role=' + $Role + ' seat=' + $Ref + ' marker=awaken:child-retry ' + $retry)
-                Send-Progress '10/10' 'info' $null ('awaken:child-retry ' + $retry) $null
-                $prev = $scr
-            } elseif ((Test-SeatAnswering $scr) -or ($pasteSeen -and ($scr -ne $prev))) {
-                # 이미 깬 자리는 여기로 곧장 온다(Return 0회) · Return 뒤 입력줄이 비고 화면이 바뀐 것도 답의 시작으로 본다
-                return @{ ok = $true; retry = $retry; tail = $scr }
-            } else {
-                $prev = $scr
-            }
+        $c = Get-SeatSessionCounts (Get-SeatSessionFile $Cwd)
+        if ($c.u -ge 1) { return @{ ok = $true; retry = $retry; u = $c.u; a = $c.a; why = 'jsonl' } }   # 제출 확인 — 답 레코드는 늦게 생긴다
+        if ($retry -lt $ChildAwakeMaxRetry) {
+            $retry++
+            [void](Invoke-CysCapped $Cli ('send-key --surface ' + $Ref + ' Return') $ChildReadCapMs)
+            Write-Log ('awaken child: role=' + $Role + ' seat=' + $Ref + ' marker=awaken:child-retry ' + $retry)
+            Send-Progress '10/10' 'info' $null ('awaken:child-retry ' + $retry) $null
+            $gap = $ChildAwakeGaps[[math]::Min($retry, $ChildAwakeGaps.Count) - 1]
+            if ($gap -gt 0) { Start-Sleep -Seconds $gap }
+        } elseif (-not $graced) {
+            $graced = $true   # 마지막 Return 뒤 기록이 늦게 생기는 기계 — 유예 한 번 뒤 다시 잰다(Return 은 더 넣지 않는다)
+            if ($ChildAwakeGraceSec -gt 0) { Start-Sleep -Seconds $ChildAwakeGraceSec }
+        } else {
+            break
         }
-        if ($ChildAwakeGapSec -gt 0) { Start-Sleep -Seconds $ChildAwakeGapSec }
     }
-    return @{ ok = $false; retry = $retry; tail = $last }
+    return @{ ok = $false; retry = $retry; u = $c.u; a = $c.a; why = 'no-submit' }
 }
 function Send-ChildStallEvidence([string]$Role, [string]$Screen) {
     # fail-open · 자리마다 한 번 · 자식 자리 화면 끝부분을 이 기계에서 마스킹한 뒤 보낸다(reason=stall).
@@ -3525,18 +3574,21 @@ function Confirm-ChildSeats([string]$Cli) {
     $seats = Get-ChildSeatRefs $Cli
     $failed = 0
     foreach ($r in @($seats.Keys)) {
-        $ref = $seats[$r]
-        $res = Confirm-ChildSeat $Cli $r $ref
+        $ref = $seats[$r].ref
+        $res = Confirm-ChildSeat $Cli $r $ref $seats[$r].cwd
+        $counts = ' u=' + $res.u + ' a=' + $res.a
         if ($res.ok) {
+            # ★「깨움 확인」은 세션 기록 근거가 있을 때만 말한다
             Say ('     ' + $r + ' 자리 깨움 확인')
-            Write-Log ('awaken child: role=' + $r + ' seat=' + $ref + ' marker=awaken:child-verified retries=' + $res.retry)
+            Write-Log ('awaken child: role=' + $r + ' seat=' + $ref + ' marker=awaken:child-verified retries=' + $res.retry + ' evidence=jsonl' + $counts)
             Send-Progress '10/10' 'info' $null 'awaken:child-verified' $null
         } else {
             $failed++
             Say ('     ' + $r + ' 자리는 열렸으나 아직 답이 없습니다 — 자비스가 이어서 깨웁니다(사람 손 0)')
-            Write-Log ('awaken child: role=' + $r + ' seat=' + $ref + ' marker=awaken:child-fail retries=' + $res.retry)
+            Write-Log ('awaken child: role=' + $r + ' seat=' + $ref + ' marker=awaken:child-fail retries=' + $res.retry + ' why=' + $res.why + $counts)
             Send-Progress '10/10' 'info' $null 'awaken:child-fail' $null
-            Send-ChildStallEvidence $r $res.tail
+            $scr = Invoke-CysCapped $Cli ('read-screen --surface ' + $ref) $ChildReadCapMs
+            Send-ChildStallEvidence $r ([string]$scr)
         }
     }
     return $failed
@@ -3663,7 +3715,7 @@ function Step-Fleet {
 #   글자 칸은 `\z` 로 끝을 못박아 다시 만든다. 이름·글자·판본 비교는 대소문자를 가르는 -ceq·-cmatch·-ccontains 만 쓴다.
 # ⚠PowerShell 은 `'true' -eq $true` 를 참으로 본다 ⇒ 칸마다 **형(type)을 먼저** 본다.
 # ⚠이 절은 맥에서 PowerShell 없이 **정적 검사 + 맥판과의 대조**로만 증명했다 — 윈도우 실기가 필요한 축은 내부 문서.
-$InstallerVersion       = '0.3.18'   # 보고의 installer_version · $BootstrapVersion 은 화면 머리글 용도 그대로(보내지 않는다)
+$InstallerVersion       = '0.3.19'   # 보고의 installer_version · $BootstrapVersion 은 화면 머리글 용도 그대로(보내지 않는다)
 $HelpApiUrl             = 'https://jarvis-install.godmeyou.kr'
 $RemoteHelpNoticeUrl    = 'jarvis-install.godmeyou.kr/help/notice'
 # [1/10] 고지 1줄 = /help/notice 정본이 인용하는 문장 그대로 + 끝에 자세한 안내 자리. ⛔문안 변경 금지(맥판과 글자가 같아야 한다).
@@ -4887,6 +4939,44 @@ function Send-FailAttachments {
     [void](Send-Attachment 'env_full' 'env-report.md' (Get-FileBytesCapped $ReportFile $AttachMaxBytes))
 }
 
+# ── 콘솔 빠른 편집(QuickEdit) 끄기 (TICKET=installer-awaken-verify-r2 · 2026-09-16) ─────────
+# 🔴샌드박스 실측: 설치 창을 한 번 클릭하면 콘솔이 「선택」 모드로 들어가 출력이 멈추고, 그동안 설치가 13분 멈췄다
+#   (사람이 Esc·Enter 를 누를 때까지 화면 쓰기가 막힌다 · 창 제목 앞에 「선택」 이 붙는다).
+#   ⇒ 설치기가 도는 동안만 빠른 편집을 끄고, 끝맺음 뒤 원래 값으로 되돌린다(창을 닫지 않은 사람이 글을 복사할 수 있게).
+# ⚠fail-open — 콘솔이 아니거나(입력 리디렉트·맥 흉내) 형식 등록·호출이 실패하면 아무 일도 하지 않는다(설치는 막지 않는다).
+# ⚠여기서 안 재는 것: 맥에는 윈도우 콘솔이 없어 이 함수는 흉내로 못 돈다(정적 축만) · 윈도우 터미널(ConPTY) 창은 이 설정과 무관하다.
+$script:QuickEditSaved = $null
+function Disable-ConsoleQuickEdit {
+    try {
+        if ($env:OS -ne 'Windows_NT') { return }
+        if ([Console]::IsInputRedirected) { return }
+        if (-not ([System.Management.Automation.PSTypeName]'Jarvis.ConMode').Type) {
+            Add-Type -Namespace Jarvis -Name ConMode -ErrorAction Stop -MemberDefinition @'
+[System.Runtime.InteropServices.DllImport("kernel32.dll", SetLastError = true)] public static extern System.IntPtr GetStdHandle(int nStdHandle);
+[System.Runtime.InteropServices.DllImport("kernel32.dll", SetLastError = true)] public static extern bool GetConsoleMode(System.IntPtr hConsole, out uint mode);
+[System.Runtime.InteropServices.DllImport("kernel32.dll", SetLastError = true)] public static extern bool SetConsoleMode(System.IntPtr hConsole, uint mode);
+'@
+        }
+        $h = [Jarvis.ConMode]::GetStdHandle(-10)   # STD_INPUT_HANDLE
+        [uint32]$m = 0
+        if (-not [Jarvis.ConMode]::GetConsoleMode($h, [ref]$m)) { return }
+        if ((([int64]$m) -band 0x40) -eq 0) { return }   # ENABLE_QUICK_EDIT_MODE 가 이미 꺼져 있다
+        $new = [uint32]((([int64]$m) -bor 0x80) -band 4294967231)   # ENABLE_EXTENDED_FLAGS 켜고 0x40 끔
+        if ([Jarvis.ConMode]::SetConsoleMode($h, $new)) {
+            $script:QuickEditSaved = $m
+            Write-Log ('console quickedit off (was 0x' + ('{0:X}' -f $m) + ')')
+        }
+    } catch { try { Write-Log ('console quickedit untouched (fail-open): ' + $_.Exception.Message) } catch { } }
+}
+function Restore-ConsoleQuickEdit {
+    try {
+        if ($null -eq $script:QuickEditSaved) { return }
+        $h = [Jarvis.ConMode]::GetStdHandle(-10)
+        [void][Jarvis.ConMode]::SetConsoleMode($h, [uint32]$script:QuickEditSaved)
+        $script:QuickEditSaved = $null
+    } catch { }
+}
+
 # 시험이 이 파일을 「함수 묶음」으로만 읽는 문(맥판 JARVIS_LIB_ONLY 과 같은 자리·같은 까닭).
 #   연결 원인 판별처럼 **부르지 않으면 잴 수 없는 것**을 러너에서 재려면 이 문이 필요하다.
 #   ⚠사람이 쓰는 길이 아니다 — 설치기는 이 변수 없이 돈다(없으면 이 줄은 아무 일도 하지 않는다).
@@ -4979,6 +5069,7 @@ try {
         # 설치 창의 글자를 통째로 파일에 담는다 — 막혔을 때 그 파일을 진단 자료로 붙인다(계약 3절 ②).
         try { Start-Transcript -LiteralPath $TranscriptFile -Force -ErrorAction Stop | Out-Null; $script:TranscriptOn = $true } catch { }
     }
+    Disable-ConsoleQuickEdit   # 창 클릭 → 「선택」 모드 → 출력 정지(설치 멈춤)를 막는다 · 끝맺음 뒤 되돌린다(함수 머리 주석)
     # 머리글 앞머리 「=== 자비스 설치 도우미 」 는 지난 실행 읽기(Show-PrevRunNote)의 경계 표지다 — 앞머리는 바꾸지 않는다.
     Say "=== 자비스 설치 도우미 — $CysDisplayName $CysVersion · 설치 도우미 $InstallerVersion (모드: $Mode) ==="
     Show-PrevRunNote
@@ -5003,7 +5094,12 @@ try {
     Send-Progress '2/10' 'start' $null $null $null
     $rc = Step-InstallClaude; Send-Progress '2/10' 'end' $null ('rc=' + $rc) $null; if ($rc -ne 0) { exit $rc }
     Send-Progress '3/10' 'start' $null $null $null
+    # 🔴(installer-speed-pin-0320 ⓔ' · 샌드박스 실기 2026-09-16 적색) 빠른 편집이 꺼져 있으면 마우스로 글을 긁을 수 없다 —
+    #   브라우저가 저절로 안 열리는 기계에서 사람이 로그인 주소를 복사하지 못했다. ⇒ 로그인 대기 구간에서만 원래 값으로 켜 두고, 끝나면 다시 끈다.
+    #   (실패로 끝나 exit 하면 본문 finally 가 되돌린다 — 켜진 채로 남는 쪽이다.)
+    Restore-ConsoleQuickEdit   # [3/10] 로그인 대기 — 빠른 편집 켜짐(주소를 긁을 수 있게)
     Step-Login; $rc = $script:LoginRc; if ($rc -ne 0) { exit $rc }   # 반환값을 받지 않는다(Step-Login 머리 주석 · v0.3.17)
+    Disable-ConsoleQuickEdit   # [3/10] 로그인이 끝났다 — 다시 끈다(창 클릭 멈춤 방지)
     Send-Progress '3/10' 'end' $null ('rc=' + $script:LoginRc) $null
 
     $Rows.Clear()
@@ -5041,5 +5137,5 @@ try {
 
 } finally {
     # 어느 경로로 끝나도 이 블록을 지난다 — 맥판의 EXIT 트랩과 같은 보증이다.
-    Write-ClosingNote
+    try { Write-ClosingNote } finally { Restore-ConsoleQuickEdit }   # 끝맺음(원격 해결 대기 포함)이 끝난 뒤 빠른 편집을 되돌린다
 }
