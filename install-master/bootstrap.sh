@@ -2137,6 +2137,84 @@ declaration_seen() { # declaration_seen "<live 목록>"
   done
   return 1
 }
+# ── 자식 자리 각성 검증(TICKET=installer-awaken-verify · 2026-09-15 · 윈도우판 Confirm-ChildSeats 와 같은 모양) ──
+# 🔴자리가 선 것 ≠ 자리가 깨어난 것(샌드박스 실기 3회/3회). 팩이 자식 자리를 처음 띄울 때 각성 지시를 붙여넣기로
+#   보내는데, 막 뜬 클로드가 뒤따르는 Return 을 삼켜 입력줄에 「[Pasted text #1 +529 lines]」 가 실린 채 멈춘다.
+#   ⇒ 자리마다 화면을 읽어 ⑴입력줄에 붙여넣기가 남았으면 Return 을 넣고 ⑵답을 시작했는지 다시 읽는다(최대 3회 · 자리당 60초).
+#   ★재시작(phoenix) 경로는 이미 깬다 — 이 확인은 첫 설치 [10/10] 에서만 돈다.
+# ⚠맥판에는 진행 전송이 없다 — 표지(awaken:child-*)는 설치 기록에만 남는다.
+# ⚠여기서 안 재는 것: 붙여넣기가 아니라 글자 그대로 남은 지시 본문(입력줄 빈칸 안내글과 가를 방법이 없다).
+CHILD_AWAKE_ROLES='cso worker'
+CHILD_AWAKE_CAP_SEC=60
+CHILD_AWAKE_GAP_SEC=2
+CHILD_AWAKE_MAX_RETRY=3
+CHILD_READ_CAP_SEC=10   # cys 한 번 부르기의 상한(맥에는 timeout 명령이 없어 perl alarm 으로 묶는다)
+cys_capped() { # cys_capped <초> <명령> <인자...>
+  local cap="$1"; shift
+  CYS_NO_AUTOSTART=1 perl -e 'alarm shift; exec @ARGV' "$cap" "$@" 2>/dev/null
+}
+# 클로드 입력줄 = 화면 아래쪽 가로줄 두 개 사이(새 모양 ──── · 옛 모양 ╭──╮/╰──╯) · 못 찾으면 끝 12줄.
+#   ★위쪽 대화 기록의 「[Pasted text …」 는 이미 보낸 것이다. 글자는 바이트로 적는다(로케일 무관).
+seat_input_box() {
+  perl -e 'local $/; my $s = <STDIN>; $s = "" unless defined $s; $s =~ s/\s+\z//; my @l = split /\r?\n/, $s, -1; my @r = grep { $l[$_] =~ /^\s*(?:\xe2\x95\xad|\xe2\x95\xb0)?(?:\xe2\x94\x80|\xe2\x94\x81){8,}(?:\xe2\x95\xae|\xe2\x95\xaf)?\s*$/ } 0..$#l; my ($a, $b) = @r >= 2 ? ($r[-2], $r[-1]) : (($#l > 11 ? $#l - 11 : 0), $#l); print join("\n", @l[$a..$b]), "\n" if @l;'
+}
+seat_paste_residue() { printf '%s\n' "$1" | seat_input_box | LC_ALL=C grep -q '\[Pasted text'; }
+seat_answering() { # 처리 중 표지 · 각성 확인 줄 · 답 줄 머리표(⏺ · ●)
+  printf '%s\n' "$1" | LC_ALL=C grep -qE 'esc to interrupt|DIRECTIVE-ACK|^[[:space:]]*(⏺|●)'
+}
+CHILD_RETRY=0
+CHILD_TAIL=""
+confirm_child_seat() { # <명령> <역할> <자리> → rc 0 깸 확인 · 1 답 없음 (CHILD_RETRY · CHILD_TAIL)
+  local cli="$1" role="$2" ref="$3" start scr prev="" paste=0
+  CHILD_RETRY=0; CHILD_TAIL=""
+  start="$(date +%s)"
+  while [ $(( $(date +%s) - start )) -lt "$CHILD_AWAKE_CAP_SEC" ]; do
+    if scr="$(cys_capped "$CHILD_READ_CAP_SEC" "$cli" read-screen --surface "$ref")"; then
+      CHILD_TAIL="$scr"
+      if seat_paste_residue "$scr"; then
+        paste=1
+        [ "$CHILD_RETRY" -lt "$CHILD_AWAKE_MAX_RETRY" ] || break
+        CHILD_RETRY=$((CHILD_RETRY + 1))
+        cys_capped "$CHILD_READ_CAP_SEC" "$cli" send-key --surface "$ref" Return >/dev/null
+        log "awaken child: role=${role} seat=${ref} marker=awaken:child-retry ${CHILD_RETRY}"
+        prev="$scr"
+      elif seat_answering "$scr" || { [ "$paste" = 1 ] && [ "$scr" != "$prev" ]; }; then
+        return 0
+      else
+        prev="$scr"
+      fi
+    fi
+    sleep "$CHILD_AWAKE_GAP_SEC"
+  done
+  return 1
+}
+confirm_child_seats() { # <명령> — 새로 선 cso·worker 자리마다 깸을 확인한다(설치는 막지 않는다)
+  local cli="$1" out line sid r seats="" pair role ref
+  out="$(CYS_NO_AUTOSTART=1 "$cli" list 2>&1)"
+  while IFS= read -r line; do
+    sid="$(printf '%s' "$line" | grep -oE 'surface:[0-9]+' | head -1)"
+    [ -n "$sid" ] || continue
+    case "$FLEET_BASELINE" in *" $sid "*) continue ;; esac
+    for r in $CHILD_AWAKE_ROLES; do
+      case " $seats " in *" ${r}="*) continue ;; esac
+      printf '%s' "$line" | grep -qE "(^|[[:space:]])role=${r}([[:space:]]|-|$)" && seats="$seats ${r}=${sid}"
+    done
+  done <<EOF_CHILD
+$out
+EOF_CHILD
+  for pair in $seats; do
+    role="${pair%%=*}"; ref="${pair#*=}"
+    if confirm_child_seat "$cli" "$role" "$ref"; then
+      say "     ${role} 자리 깨움 확인"
+      log "awaken child: role=${role} seat=${ref} marker=awaken:child-verified retries=${CHILD_RETRY}"
+    else
+      say "     ${role} 자리는 열렸으나 아직 답이 없습니다 — 자비스가 이어서 깨웁니다(사람 손 0)"
+      log "awaken child: role=${role} seat=${ref} marker=awaken:child-fail retries=${CHILD_RETRY}"
+      log "awaken child stall tail (${role}): $(printf '%s\n' "$CHILD_TAIL" | tail -n 15 | tr '\n' '|' | cut -c1-600)"
+    fi
+  done
+  return 0
+}
 step_fleet() {
   local ref="$1" cli i live missing r
   cli="${CYS_CLI:-cys}"
@@ -2192,6 +2270,8 @@ step_fleet() {
   done
   if [ -z "$missing" ]; then
     say "[10/10] 함대가 섰습니다: $live"
+    # ★자리가 선 것만으로 끝내지 않는다 — 선 자식 자리가 실제로 깼는지 화면으로 확인하고, 멈췄으면 깨운다.
+    confirm_child_seats "$cli"
     return 0
   fi
   # 성공보다 이 문구가 중요하다 — 무엇이 없어서 못 섰는지를 그대로 말한다.
@@ -2201,6 +2281,7 @@ step_fleet() {
   if declaration_seen "$live"; then
     say "     자비스는 이미 깨어 있습니다(master 자리가 섰습니다) — 그 한마디는 들어갔습니다."
     say "     남은 자리는 자비스가 이어서 세웁니다. cys 창의 자비스에게 무엇이 걸렸는지 물어보십시오."
+    confirm_child_seats "$cli"
   else
     say "     아직 그 한마디를 치지 않으셨다면, cys 창에서 지금 쳐 주시면 됩니다."
     say "     치셨는데도 서지 않았다면 cys 창의 자비스에게 물어보십시오 — 무엇이 걸렸는지 사람 말로 알려 줍니다."

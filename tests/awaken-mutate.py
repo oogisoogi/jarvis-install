@@ -16,6 +16,7 @@ for _s in (sys.stdout, sys.stderr):
     except Exception: pass
 
 PS = "install-master/bootstrap.ps1"
+SH = "install-master/bootstrap.sh"
 # (이름, 파일, 찾을 것, 바꿀 것, 붉어져야 할 축 조각)
 MUTANTS = [
     # 실측 검증 제거 — 동료 자리를 안 보고 「깨어났습니다」
@@ -58,6 +59,67 @@ MUTANTS = [
      "    $script:NextStep = '없습니다 — 설치가 끝났습니다. 이 창을 닫으셔도 됩니다.'\n",
      "",
      "[성공] 끝맺음이 「설치가 끝났습니다」"),
+    # ── installer-awaken-verify(2026-09-15) — 자식 자리 각성 검증 ──
+    # 윈: 확인 부르기 제거 — 자리가 선 것만으로 끝낸다(거짓 완료로 되돌림)
+    ("child-confirm-drop", PS,
+     "        [void](Confirm-ChildSeats $cli)\n        Say ''",
+     "        Say ''",
+     "[성공] 붙여넣기가 남은 자리에 Return 1회"),
+    # 윈: 입력줄 구역 대신 화면 전체에서 붙여넣기를 찾음 — 이미 보낸 기록을 멈춤으로 읽어 Return 을 계속 넣는다
+    ("box-region-drop", PS,
+     "return ((Get-SeatInputBox $Screen) -match '\\[Pasted text')",
+     "return ($Screen -match '\\[Pasted text')",
+     "[성공] 붙여넣기가 남은 자리에 Return 1회"),
+    # 윈: Return 을 넣지 않음 — 멈춘 자리를 깨우지 못한다
+    ("return-key-drop", PS,
+     "                [void](Invoke-CysCapped $Cli ('send-key --surface ' + $Ref + ' Return') $ChildReadCapMs)\n",
+     "",
+     "[성공] 붙여넣기가 남은 자리에 Return 1회"),
+    # 윈: 3회 상한 제거 — 멈춘 자리에 상한(60초)까지 Return 을 쏟는다
+    ("retry-cap-drop", PS,
+     "                if ($retry -ge $ChildAwakeMaxRetry) { break }\n",
+     "",
+     "[3회 실패] Return 3회 뒤에도 붙여넣기가 남으면 정직 문구"),
+    # 윈: 답 판정을 늘 거짓으로 — 이미 깬 자리를 못 알아본다
+    ("answer-judge-drop", PS,
+     "    return (($Screen -match 'esc to interrupt|DIRECTIVE-ACK') -or ($Screen -match '(^|\\n)\\s*[⏺●]'))",
+     "    return $false",
+     "[이미 깸] 두 자식이 이미 답했으면 Return 0회"),
+    # 윈: 증거 마스킹 제거 — 자식 화면의 이름·이메일이 기계 밖으로 나간다
+    ("evidence-mask-drop", PS,
+     "Get-RemoteHelpTailBytes (Protect-EvidenceText $tail) $EvidenceTextBytes",
+     "Get-RemoteHelpTailBytes $tail $EvidenceTextBytes",
+     "[3회 실패] 증거 1건 = reason=stall"),
+    # 윈: 실패도 「깨움 확인」이라 말함 — 정직 문구 제거
+    ("fail-phrase-lie", PS,
+     "            Say ('     ' + $r + ' 자리는 열렸으나 아직 답이 없습니다 — 자비스가 이어서 깨웁니다(사람 손 0)')",
+     "            Say ('     ' + $r + ' 자리 깨움 확인')",
+     "[3회 실패] Return 3회 뒤에도 붙여넣기가 남으면 정직 문구"),
+    # 윈: 카드 뒤 성공 자리의 확인 부르기 제거
+    ("fallback-confirm-drop", PS,
+     "        [void](Confirm-ChildSeats $cli)\n        Set-FleetFinished",
+     "        Set-FleetFinished",
+     "[폴백 뒤 섬] 카드 뒤에 선 자식 자리도 깸을 확인한다"),
+    # 맥: 입력줄 구역 대신 화면 전체
+    ("mac-box-region-drop", SH,
+     "seat_paste_residue() { printf '%s\\n' \"$1\" | seat_input_box | LC_ALL=C grep -q '\\[Pasted text'; }",
+     "seat_paste_residue() { printf '%s\\n' \"$1\" | LC_ALL=C grep -q '\\[Pasted text'; }",
+     "[맥 success] 붙여넣기가 남은 자리에 Return 1회"),
+    # 맥: 3회 상한 제거
+    ("mac-retry-cap-drop", SH,
+     "        [ \"$CHILD_RETRY\" -lt \"$CHILD_AWAKE_MAX_RETRY\" ] || break\n",
+     "",
+     "[맥 child-stall] Return 3회 뒤에도 붙여넣기가 남으면 정직 문구"),
+    # 맥: Return 을 넣지 않음
+    ("mac-return-key-drop", SH,
+     "        cys_capped \"$CHILD_READ_CAP_SEC\" \"$cli\" send-key --surface \"$ref\" Return >/dev/null\n",
+     "",
+     "[맥 success] 붙여넣기가 남은 자리에 Return 1회"),
+    # 맥: 성공 경로의 확인 부르기 제거
+    ("mac-confirm-call-drop", SH,
+     "    confirm_child_seats \"$cli\"\n    return 0",
+     "    return 0",
+     "[맥·윈] 자식 자리 확인을 [10/10] 두 자리에서 부른다"),
     # 자동 관측 상한을 90초로 되돌림 — 자비스 첫 턴보다 짧아 카드가 오발한다(2026-09-15 윈 실기 결함 ①)
     ("cap-revert-90", PS,
      "$FleetAwakeTries = 48 ",

@@ -3418,6 +3418,129 @@ function Clear-FleetStrayKeys {
     $n = Get-LoginStrayKeyCount
     Write-Log ('fleet stray keys in installer window cleared=' + $n)
 }
+# ── 자식 자리 각성 검증(TICKET=installer-awaken-verify · 2026-09-15) ─────────────────
+# 🔴자리가 선 것 ≠ 자리가 깨어난 것(샌드박스 실기 3회/3회 재현). 팩이 자식 자리를 처음 띄울 때 각성 지시를
+#   붙여넣기로 보내는데, 막 뜬 클로드가 뒤따르는 Return 을 삼켜 입력줄에 「[Pasted text #1 +529 lines]」 가 실린 채
+#   영영 멈춘다 — 그런데 [10/10] 은 목록에 자리가 섰다는 이유로 「함대가 섰습니다」를 찍었다(거짓 완료).
+#   ⇒ 자리마다 화면을 실제로 읽어 ⑴입력줄에 붙여넣기가 남았으면 Return 을 넣고 ⑵답을 시작했는지 다시 읽는다.
+#   ★재시작(phoenix) 경로는 이미 깬다 — 이 확인은 첫 설치 [10/10] 에서만 돈다(재설치·재부팅 경로 무접촉).
+# ⚠여기서 안 재는 것: 붙여넣기가 아니라 글자 그대로 남은 지시 본문(입력줄의 빈칸 안내글과 가를 방법이 없다 · 표지는 붙여넣기 하나).
+$ChildAwakeRoles    = @('cso', 'worker')   # 자비스가 선언을 듣고 부르는 자리(우리가 만들지 않는다)
+$ChildAwakeCapSec   = 60      # 자리당 상한
+$ChildAwakeGapSec   = 2       # 다시 읽기 전 기다림(시험이 줄여 쓴다)
+$ChildAwakeMaxRetry = 3       # Return 을 다시 넣는 최대 횟수
+$ChildReadCapMs     = 10000   # cys 한 번 부르기의 상한 — 상한 있는 고리 안에 상한 없는 호출을 두지 않는다
+function Invoke-CysCapped([string]$Cli, [string]$ArgLine, [int]$CapMs) {
+    # 돌려주는 것 = 표준 출력 글자 · 상한에 닿았거나 실패면 $null(콘솔 입력을 건드리지 않는다)
+    try {
+        $psi = New-Object System.Diagnostics.ProcessStartInfo
+        $psi.FileName = $Cli
+        $psi.Arguments = $ArgLine
+        $psi.UseShellExecute = $false
+        $psi.RedirectStandardOutput = $true
+        $psi.RedirectStandardError = $true
+        $psi.StandardOutputEncoding = New-Object System.Text.UTF8Encoding($false)
+        $psi.CreateNoWindow = $true
+        $psi.EnvironmentVariables['CYS_NO_AUTOSTART'] = '1'
+        $p = [System.Diagnostics.Process]::Start($psi)
+        $so = $p.StandardOutput.ReadToEndAsync()
+        [void]$p.StandardError.ReadToEndAsync()
+        if (-not $p.WaitForExit($CapMs)) { try { $p.Kill() } catch { }; return $null }
+        if (-not $so.Wait(2000)) { return $null }
+        if ($p.ExitCode -ne 0) { return $null }
+        return $so.Result
+    } catch { return $null }
+}
+function Get-SeatInputBox([string]$Screen) {
+    # 클로드 입력줄 = 화면 아래쪽 가로줄 두 개 사이(새 모양 ──── · 옛 모양 ╭──╮/╰──╯). 못 찾으면 끝 12줄.
+    #   ★위쪽 대화 기록에 남은 「[Pasted text …」 는 이미 보낸 것이다 — 입력줄 안에 있을 때만 멈춘 것으로 본다.
+    $lines = @(([string]$Screen).TrimEnd() -split "`r?`n")
+    $rules = @()
+    for ($i = 0; $i -lt $lines.Count; $i++) { if ($lines[$i] -match '^\s*[╭╰]?[─━]{8,}[╮╯]?\s*$') { $rules += $i } }
+    if ($rules.Count -ge 2) { return (($lines[$rules[-2]..$rules[-1]]) -join "`n") }
+    $from = [math]::Max(0, $lines.Count - 12)
+    return (($lines[$from..($lines.Count - 1)]) -join "`n")
+}
+function Test-PasteResidue([string]$Screen) { return ((Get-SeatInputBox $Screen) -match '\[Pasted text') }
+function Test-SeatAnswering([string]$Screen) {
+    # 답을 시작했다 = 처리 중 표지 · 각성 확인 줄 · 답 줄 머리표(⏺ · 윈도우 ●)
+    return (($Screen -match 'esc to interrupt|DIRECTIVE-ACK') -or ($Screen -match '(^|\n)\s*[⏺●]'))
+}
+function Get-ChildSeatRefs([string]$Cli) {
+    $out = (Invoke-CysProbe $Cli @('list')) -join "`n"
+    $seats = [ordered]@{}
+    foreach ($ln in ($out -split "`n")) {
+        $mid = [regex]::Match($ln, 'surface:\d+')
+        if (-not $mid.Success) { continue }   # 자리 번호 없는 줄(경고 글)은 자리가 아니다
+        if ($script:BaselineSurfaces -contains $mid.Value) { continue }   # 지난 설치의 자리는 이번 확인 대상이 아니다
+        foreach ($r in $ChildAwakeRoles) {
+            if ($seats.Contains($r)) { continue }
+            if ($ln -match ("(^|\s)role=" + [regex]::Escape($r) + "(\s|-|$)")) { $seats[$r] = $mid.Value }
+        }
+    }
+    return $seats
+}
+function Confirm-ChildSeat([string]$Cli, [string]$Role, [string]$Ref) {
+    $sw = [System.Diagnostics.Stopwatch]::StartNew()
+    $retry = 0; $pasteSeen = $false; $prev = $null; $last = ''
+    while ($sw.Elapsed.TotalSeconds -lt $ChildAwakeCapSec) {
+        $scr = Invoke-CysCapped $Cli ('read-screen --surface ' + $Ref) $ChildReadCapMs
+        if ($null -ne $scr) {
+            $last = $scr
+            if (Test-PasteResidue $scr) {
+                $pasteSeen = $true
+                if ($retry -ge $ChildAwakeMaxRetry) { break }
+                $retry++
+                [void](Invoke-CysCapped $Cli ('send-key --surface ' + $Ref + ' Return') $ChildReadCapMs)
+                Write-Log ('awaken child: role=' + $Role + ' seat=' + $Ref + ' marker=awaken:child-retry ' + $retry)
+                Send-Progress '10/10' 'info' $null ('awaken:child-retry ' + $retry) $null
+                $prev = $scr
+            } elseif ((Test-SeatAnswering $scr) -or ($pasteSeen -and ($scr -ne $prev))) {
+                # 이미 깬 자리는 여기로 곧장 온다(Return 0회) · Return 뒤 입력줄이 비고 화면이 바뀐 것도 답의 시작으로 본다
+                return @{ ok = $true; retry = $retry; tail = $scr }
+            } else {
+                $prev = $scr
+            }
+        }
+        if ($ChildAwakeGapSec -gt 0) { Start-Sleep -Seconds $ChildAwakeGapSec }
+    }
+    return @{ ok = $false; retry = $retry; tail = $last }
+}
+function Send-ChildStallEvidence([string]$Role, [string]$Screen) {
+    # fail-open · 자리마다 한 번 · 자식 자리 화면 끝부분을 이 기계에서 마스킹한 뒤 보낸다(reason=stall).
+    try {
+        $key = 'stall-child-' + $Role + '|10/10'
+        if ($script:EvidenceSent.ContainsKey($key)) { return }
+        $script:EvidenceSent[$key] = $true
+        $lines = @(([string]$Screen).TrimEnd() -split "`r?`n")
+        $from = [math]::Max(0, $lines.Count - 40)
+        $tail = 'seat=' + $Role + "`n" + (($lines[$from..($lines.Count - 1)]) -join "`n")
+        $t = Get-RemoteHelpTailBytes (Protect-EvidenceText $tail) $EvidenceTextBytes
+        Send-Progress '10/10' 'evidence' $null $null $null ([ordered]@{ text = $t; reason = 'stall'; masked = $true })
+        Write-Log ('evidence sent: ' + $key + ' ' + [System.Text.Encoding]::UTF8.GetByteCount($t) + 'B')
+    } catch { Write-Log ('evidence error (fail-open): ' + $_.Exception.Message) }
+}
+function Confirm-ChildSeats([string]$Cli) {
+    # 돌려주는 것 = 답이 없는 자리 수(설치는 막지 않는다 — 자비스가 이어서 깨운다)
+    $seats = Get-ChildSeatRefs $Cli
+    $failed = 0
+    foreach ($r in @($seats.Keys)) {
+        $ref = $seats[$r]
+        $res = Confirm-ChildSeat $Cli $r $ref
+        if ($res.ok) {
+            Say ('     ' + $r + ' 자리 깨움 확인')
+            Write-Log ('awaken child: role=' + $r + ' seat=' + $ref + ' marker=awaken:child-verified retries=' + $res.retry)
+            Send-Progress '10/10' 'info' $null 'awaken:child-verified' $null
+        } else {
+            $failed++
+            Say ('     ' + $r + ' 자리는 열렸으나 아직 답이 없습니다 — 자비스가 이어서 깨웁니다(사람 손 0)')
+            Write-Log ('awaken child: role=' + $r + ' seat=' + $ref + ' marker=awaken:child-fail retries=' + $res.retry)
+            Send-Progress '10/10' 'info' $null 'awaken:child-fail' $null
+            Send-ChildStallEvidence $r $res.tail
+        }
+    }
+    return $failed
+}
 function Step-Fleet {
     param([string]$SurfaceRef)
     if ($Mode -eq 'dry') { Say '[10/10] (dry-run) 함대를 부르지 않았습니다.'; return 0 }
@@ -3457,6 +3580,8 @@ function Step-Fleet {
             Say ("[10/10] 선 자리 = " + ($live -join ' · ') + ' · 남은 자리(' + ($missing -join ' · ') + ')는 자비스가 이어서 세웁니다.')
             Write-Log ("fleet missing at awaken: " + ($missing -join ','))
         }
+        # ★자리가 선 것만으로 끝내지 않는다 — 선 자식 자리가 실제로 깼는지 화면으로 확인하고, 멈췄으면 깨운다.
+        [void](Confirm-ChildSeats $cli)
         Say ''
         Say '   자비스가 깨어났습니다 — 이제 설치 창을 닫으셔도 됩니다.'
         Set-FleetFinished
@@ -3507,6 +3632,7 @@ function Step-Fleet {
         Say ("[10/10] 함대가 섰습니다: " + ($live -join ' · '))
         # 카드 뒤에 선 함대도 성공이다 — 기록 줄이 없으면 로그만 보는 사람은 폴백에서 끝난 줄로 읽는다(2026-09-15 실기 로그).
         Write-Log ('fleet awaken: success after fallback card - seats=' + ($live -join ','))
+        [void](Confirm-ChildSeats $cli)
         Set-FleetFinished
         Clear-FleetStrayKeys
         return 0
