@@ -1,8 +1,8 @@
 # jarvis-install — 자비스 설치 도우미
 
-터미널에 한 줄을 붙여넣으면 설치 도우미가 컴퓨터를 살펴보고, 클로드(Claude Code)와 cys를 설치하고, cys 창 안에서 자비스를 깨웁니다. AI 자비스 워크숍 참가자용입니다.
+터미널에 한 줄을 붙여넣으면 설치 도우미가 컴퓨터를 살펴보고, 클로드(Claude Code)와 cysr을 설치하고, cysr 창 안에서 자비스를 깨웁니다. AI 자비스 워크숍 참가자용입니다.
 
-참가자 안내 페이지: https://jarvis.godmeyou.kr/install/
+참가자 안내 페이지: https://jarvis.godmeyou.kr/get/
 
 ## 윈도우
 
@@ -30,7 +30,7 @@ curl -fsSL https://jarvis.godmeyou.kr/install/bootstrap.sh -o "$HOME/install-jar
 
 1. **로그인 승인** — 브라우저가 열리면 Claude 로그인을 승인해 주십시오. 승인 후 창은 닫으셔도 됩니다.
 2. **보안 경고** — 파란 「Windows에서 PC를 보호했습니다」 창이 뜨면 **[추가 정보] → [실행]**. 서명되지 않은 프로그램에 뜨는 알려진 경고입니다.
-3. **마지막 한마디** — 설치가 끝나면 cys 창에 **jarvis**라는 창이 열립니다. 거기에 **「너는 마스터다」**라고 직접 쳐 주십시오. 이 한마디만은 설치 도우미가 대신 쳐 드릴 수 없습니다. 사람이 직접 친 말만 팀을 부르도록 안전장치가 걸려 있기 때문이며, 설치 도우미는 그 장치를 우회하지 않습니다.
+3. **끝나면 그대로** — 설치가 끝나면 cysr 창에 **jarvis**·**cso**·**worker** 세 자리가 열리고 설치 도우미가 자리마다 깨어났는지 확인합니다. 따로 치실 말은 없습니다.
 
 ## 백신이 「악성코드 차단」이라고 뜨면
 
@@ -40,7 +40,7 @@ curl -fsSL https://jarvis.godmeyou.kr/install/bootstrap.sh -o "$HOME/install-jar
 
 ## 끝났는지 확인하는 법
 
-화면에 **「함대가 섰습니다: master · cso · worker」**가 나오고, cys 창에 자비스와 동료들의 창이 열려 있으면 끝난 것입니다.
+화면에 **「함대가 섰습니다: master · cso · worker」**가 나오고, cysr 창에 자비스와 동료들의 창이 열려 있으면 끝난 것입니다.
 
 ## 삭제하고 재설치하기
 
@@ -62,7 +62,7 @@ powershell -NoProfile -ExecutionPolicy Bypass -Command "irm https://jarvis.godme
 curl -fsSL https://jarvis.godmeyou.kr/install/reinstall.sh -o "$HOME/reinstall-jarvis.sh" && bash "$HOME/reinstall-jarvis.sh"
 ```
 
-지우지 않고 무엇이 깔려 있는지만 보시려면 `reset-clean.sh --list`(맥) 또는 `reset-clean.ps1 -List`(윈도우)를 쓰십시오. 아무것도 바꾸지 않고 목록만 보여 드립니다. 윈도우에서 cys 프로그램은 설정 → 앱에서 직접 제거하셔야 합니다(스크립트가 그 화면으로 안내합니다).
+지우지 않고 무엇이 깔려 있는지만 보시려면 `reset-clean.sh --list`(맥) 또는 `reset-clean.ps1 -List`(윈도우)를 쓰십시오. 아무것도 바꾸지 않고 목록만 보여 드립니다. 윈도우에서 cysr 프로그램은 설정 → 앱에서 직접 제거하셔야 합니다(스크립트가 그 화면으로 안내합니다).
 
 계정을 바꾸고 싶으신 경우는 다른 일입니다. 창에 `claude auth logout`을 치신 뒤 다시 로그인하시면 됩니다. 다시 깔 필요는 없습니다.
 
@@ -77,7 +77,7 @@ curl -fsSL https://jarvis.godmeyou.kr/install/reinstall.sh -o "$HOME/reinstall-j
 | `reset-clean.ps1` | 윈도우 상태 진단(`-List`)·깨끗이 지우기 |
 | `reset-clean.sh` | 맥 상태 진단(`--list`)·깨끗이 지우기 |
 
-이 스크립트는 사용자 폴더 안에서만 동작하며 관리자 권한을 요구하지 않습니다. 설치는 클로드 공식 설치 경로와 cys 공식 배포 파일만 사용합니다.
+이 스크립트는 사용자 폴더 안에서만 동작하며 관리자 권한을 요구하지 않습니다. 설치는 클로드 공식 설치 경로와 cysr 배포 파일(원작 cys 기반 · 아래 참고)만 사용합니다.
 
 ## 라이선스
 
