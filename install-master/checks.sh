@@ -295,6 +295,26 @@ PYEOF
   else
     ck "[맥동등 전송] 실물 전송 러너(tests/mac-telemetry-run.sh)가 있다" 1 "파일 없음"
   fi
+  # N17(mac-parity-n17-lang · run4/run5 실측: 깨끗한 VM 마스터가 영어로 답함) — 응답 언어 1줄은 지침 파일 템플릿에만 둔다(⛔첫 프롬프트·선언 줄 무접촉).
+  #   sh write_directive · ps1 Write-Directive 안에서 도입 문장 바로 다음 줄에 정확히 1회 · 두 파일의 그 줄 바이트 동일.
+  echo "== 맥 동등화 — 지침 파일 응답 언어(N17) =="
+  local lang_txt='★상대는 우리말 사용자다 — 이 지침을 읽은 뒤의 모든 답·보고·화면 글은 우리말로 쓴다(코드·명령·파일 이름은 그대로).'
+  local lang_intro='너는 이 컴퓨터의 설치를 대신 해 주는 자비스다. 상대는 처음 설치하는 사람이다.'
+  local lang_pick='$0 == ENVIRON["LT"] && p == ENVIRON["LI"] {n++; l=$0} {p=$0} END{if(n==1) print l}'   # 글자 그대로 대조(정규식 아님 · awk -v 의 역슬래시 해석을 피한다)
+  local lang_sh lang_ps
+  lang_sh="$(mp_fn_body "$SH" write_directive | LT="$lang_txt" LI="$lang_intro" awk "$lang_pick")"
+  lang_ps="$(awk '/^function Write-Directive \{/{f=1} f{print} f&&/^}/{exit}' "$PS" | LT="$lang_txt" LI="$lang_intro" awk "$lang_pick")"
+  [ -n "$lang_sh" ] && [ -n "$lang_ps" ] && [ "$(grep -cxF -- "$lang_txt" "$SH")" = "1" ] && [ "$(grep -cxF -- "$lang_txt" "$PS")" = "1" ] \
+    && [ "$(printf '%s' "$lang_sh" | shasum -a 256)" = "$(printf '%s' "$lang_ps" | shasum -a 256)" ]
+  ck "[맥동등 N17] 지침 템플릿(sh·ps1) 둘 다 도입 문장 다음 줄에 응답 언어 1줄을 1회 담고 두 줄의 바이트가 같다" $? "sh=$([ -n "$lang_sh" ] && echo 있음 || echo 없음) ps1=$([ -n "$lang_ps" ] && echo 있음 || echo 없음) · 전체 sh $(grep -cxF -- "$lang_txt" "$SH")회 · ps1 $(grep -cxF -- "$lang_txt" "$PS")회"
+  # v0324 C2(run6 §11 실측 · master#4c9d14e3 A+C) — [10/10] 최종 카드 「남은 자리는 자비스가 이어서 세웁니다」는 팩에 그 자동 경로가 없어 거짓 약속이었다.
+  #   ⇒ 상한 소진 뒤 최종 카드(sh 선언 들어감·마스터 깸 두 갈래 · ps1 선언 들어감 갈래)는 cysr 창의 jarvis 칸에 재선언 한 줄을 다시 치라고 안내한다(설치 창 아님 명시).
+  #   ⚠대기 단계(마스터 깸)에서 선언을 치게 하지 않는 N13 은 흉내 축(master-verified-fleet-late)이 잰다 — 이 축은 최종 카드 글자만 센다.
+  echo "== 맥 동등화 — [10/10] 최종 카드 재선언 안내(v0324 C2) =="
+  local redecl='남은 자리를 다시 세우려면 cysr 창의 jarvis 칸에 『너는 마스터다.』 한 줄을 다시 쳐 주십시오(이 설치 창이 아닙니다).'
+  [ "$(grep -cF -- "    say \"     $redecl\"" "$SH")" = "1" ] && [ "$(grep -cF -- "    say \"     마스터는 깨어 있습니다. $redecl\"" "$SH")" = "1" ] \
+    && [ "$(grep -cF -- "        Say '     $redecl'" "$PS")" = "1" ] && no_code "$SH" '이어서 세웁니다|다시 치실 필요는 없습니다' && no_code "$PS" '이어서 세웁니다'
+  ck "[맥동등 v0324 C2] [10/10] 최종 카드는 cysr 창 jarvis 칸 재선언 한 줄을 안내하고(sh 2 · ps1 1) 「이어서 세웁니다」 거짓 약속이 없다" $? "sh 선언갈래 $(grep -cF -- "    say \"     $redecl\"" "$SH")회 · sh 깸갈래 $(grep -cF -- "마스터는 깨어 있습니다. $redecl" "$SH")회 · ps1 $(grep -cF -- "$redecl" "$PS")회 · ${GREP_WHY}"
 }
 if [ "${CHECKS_ONLY:-}" = "mac-parity" ]; then
   mac_parity_axes
@@ -2571,8 +2591,8 @@ for f in "$PS" "$RESET" "$REIN_PS"; do
   codegrep "$f" '1\) ⊞ 윈도우 키\(키보드 왼쪽 아래, Ctrl과 Alt 사이\)를 누르고 powershell' && no_code "$f" '시작 단추를 누르고'; rc=$?
   ck "[v0317] 다시 하시는 법 첫 줄은 윈도우 키(사이트와 같은 말) · $(basename "$f")" "$rc" "(${GREP_WHY})"
 done
-codegrep "$PS" "^\\\$InstallerVersion *= '0\.3\.23'" && codegrep "$SH" '^INSTALLER_VERSION="0\.3\.23"'
-ck "[v0322] 판본 0.3.23(두 설치기 · 한 릴리스 = 한 판번)" $? "보고의 판본이 갈린다"
+codegrep "$PS" "^\\\$InstallerVersion *= '0\.3\.24'" && codegrep "$SH" '^INSTALLER_VERSION="0\.3\.24"'
+ck "[v0322] 판본 0.3.24(두 설치기 · 한 릴리스 = 한 판번)" $? "보고의 판본이 갈린다"
 # 확인 명령 한 번에도 상한 — 없으면 벤더 도구가 멈추는 순간 20분 상한까지 함께 멈춘다(이종 검토 1R 지적 채택).
 awk '/^function Get-LoginStatusText/{f=1}
      f&&/Start-Process -FilePath \$exe -ArgumentList .auth.,.status. .*-RedirectStandardOutput/{s=1}

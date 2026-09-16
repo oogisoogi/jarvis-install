@@ -2353,6 +2353,7 @@ write_directive() {
 # 자비스 설치 도우미 지침
 
 너는 이 컴퓨터의 설치를 대신 해 주는 자비스다. 상대는 처음 설치하는 사람이다.
+★상대는 우리말 사용자다 — 이 지침을 읽은 뒤의 모든 답·보고·화면 글은 우리말로 쓴다(코드·명령·파일 이름은 그대로).
 
 ## 준비 작업 1번 — 표지 파일 하나 만들기 (제일 먼저)
 
@@ -3904,7 +3905,7 @@ step_fleet() {
     if [ -z "$missing" ]; then
       say "[10/10] 함대가 섰습니다: $(printf '%s' "$live" | sed 's/ / · /g')"
     else
-      say "[10/10] 선 자리 = $(printf '%s' "$live" | sed 's/ / · /g') · 남은 자리($(printf '%s' "${missing# }" | sed 's/ / · /g'))는 자비스가 이어서 세웁니다."
+      say "[10/10] 선 자리 = $(printf '%s' "$live" | sed 's/ / · /g') · 남은 자리($(printf '%s' "${missing# }" | sed 's/ / · /g'))는 아래에서 계속 지켜봅니다."
       log "fleet missing at awaken: $(printf '%s' "${missing# }" | tr ' ' ',')"
     fi
     # ★자리가 선 것만으로 끝내지 않는다 — 선 자식 자리가 실제로 깼는지 확인하고, 멈췄으면 깨운다.
@@ -4002,9 +4003,9 @@ step_fleet() {
   say "     선 자리 = $( [ -n "$live" ] && printf '%s' "$live" | sed 's/ / · /g' || printf '없음')"
   if declaration_seen "$live"; then
     say "     자비스는 이미 깨어 있습니다(master 자리가 섰습니다) — 그 한마디는 들어갔습니다."
-    say "     남은 자리는 자비스가 이어서 세웁니다. cys 창의 자비스에게 무엇이 걸렸는지 물어보십시오."
+    say "     남은 자리를 다시 세우려면 cysr 창의 jarvis 칸에 『너는 마스터다.』 한 줄을 다시 쳐 주십시오(이 설치 창이 아닙니다)."
   elif [ "$MASTER_STATE" = verified ]; then
-    say "     마스터는 깨어 있습니다 — 한마디를 다시 치실 필요는 없습니다. 남은 자리는 자비스가 이어서 세웁니다."
+    say "     마스터는 깨어 있습니다. 남은 자리를 다시 세우려면 cysr 창의 jarvis 칸에 『너는 마스터다.』 한 줄을 다시 쳐 주십시오(이 설치 창이 아닙니다)."
     say "     오래 서지 않으면 cys 창의 자비스에게 무엇이 걸렸는지 물어보십시오."
     NEXT_STEP='cys 창(제목 jarvis)의 자비스와 이어서 이야기하십시오 — 남은 자리가 왜 안 섰는지 물어보시면 됩니다.'
     SHOW_RERUN=0
@@ -4163,7 +4164,7 @@ open_cys_app() {
 # ★언제 도는가 = 자비스를 깨우기 **전에** 진단 코드를 남기고 멈춘 끝. 자비스를 깨운 뒤에는 돌지 않는다
 #   (자비스가 이 창을 넘겨받으므로 두 쪽이 한 화면에 섞이지 않게).
 # ⚠JSON·재검사·스크럽은 macOS 기본 `osascript`(JavaScript)가 한다 — 깨끗한 맥에는 jq·python 이 없다.
-INSTALLER_VERSION="0.3.23"      # 보고의 installer_version · BOOTSTRAP_VERSION 은 화면 머리글 용도 그대로(보내지 않는다)
+INSTALLER_VERSION="0.3.24"      # 보고의 installer_version · BOOTSTRAP_VERSION 은 화면 머리글 용도 그대로(보내지 않는다)
 HELP_API_URL="https://jarvis-install.godmeyou.kr"
 REMOTE_HELP_NOTICE_URL="jarvis-install.godmeyou.kr/help/notice"
 # [1/10] 고지 1줄 = /help/notice 정본(page.ts)이 인용하는 문장 그대로 + 끝에 자세한 안내 자리(계약 7-1절). ⛔문안 변경 금지.

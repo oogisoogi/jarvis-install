@@ -2360,6 +2360,7 @@ function Write-Directive {
 # 자비스 설치 도우미 지침
 
 너는 이 컴퓨터의 설치를 대신 해 주는 자비스다. 상대는 처음 설치하는 사람이다.
+★상대는 우리말 사용자다 — 이 지침을 읽은 뒤의 모든 답·보고·화면 글은 우리말로 쓴다(코드·명령·파일 이름은 그대로).
 
 ## 준비 작업 1번 — 표지 파일 하나 만들기 (제일 먼저)
 
@@ -3853,7 +3854,7 @@ function Step-Fleet {
         if ($missing.Count -eq 0) {
             Say ("[10/10] 함대가 섰습니다: " + ($live -join ' · '))
         } else {
-            Say ("[10/10] 선 자리 = " + ($live -join ' · ') + ' · 남은 자리(' + ($missing -join ' · ') + ')는 자비스가 이어서 세웁니다.')
+            Say ("[10/10] 선 자리 = " + ($live -join ' · ') + ' · 남은 자리(' + ($missing -join ' · ') + ')는 아래에서 계속 지켜봅니다.')
             Write-Log ("fleet missing at awaken: " + ($missing -join ','))
         }
         # ★자리가 선 것만으로 끝내지 않는다 — 선 자식 자리가 실제로 깼는지 화면으로 확인하고, 멈췄으면 깨운다.
@@ -3941,7 +3942,7 @@ function Step-Fleet {
     # ★여기서도 「아직 안 쳤다」를 단정하지 않는다 — 다만 근거는 **자식 좌석**이다(아래 함수).
     if (Test-DeclarationSeen $live) {
         Say '     자비스는 이미 깨어 있습니다(master 자리가 섰습니다) — 그 한마디는 들어갔습니다.'
-        Say '     남은 자리는 자비스가 이어서 세웁니다. cys 창의 자비스에게 무엇이 걸렸는지 물어보십시오.'
+        Say '     남은 자리를 다시 세우려면 cysr 창의 jarvis 칸에 『너는 마스터다.』 한 줄을 다시 쳐 주십시오(이 설치 창이 아닙니다).'
     } else {
         Say '     아직 그 한마디를 치지 않으셨다면, cys 창에서 지금 쳐 주시면 됩니다.'
         Say '     치셨는데도 서지 않았다면 cys 창의 자비스에게 물어보십시오 — 무엇이 걸렸는지 사람 말로 알려 줍니다.'
@@ -3961,7 +3962,7 @@ function Step-Fleet {
 #   글자 칸은 `\z` 로 끝을 못박아 다시 만든다. 이름·글자·판본 비교는 대소문자를 가르는 -ceq·-cmatch·-ccontains 만 쓴다.
 # ⚠PowerShell 은 `'true' -eq $true` 를 참으로 본다 ⇒ 칸마다 **형(type)을 먼저** 본다.
 # ⚠이 절은 맥에서 PowerShell 없이 **정적 검사 + 맥판과의 대조**로만 증명했다 — 윈도우 실기가 필요한 축은 내부 문서.
-$InstallerVersion       = '0.3.23'   # 보고의 installer_version · $BootstrapVersion 은 화면 머리글 용도 그대로(보내지 않는다)
+$InstallerVersion       = '0.3.24'   # 보고의 installer_version · $BootstrapVersion 은 화면 머리글 용도 그대로(보내지 않는다)
 $HelpApiUrl             = 'https://jarvis-install.godmeyou.kr'
 $RemoteHelpNoticeUrl    = 'jarvis-install.godmeyou.kr/help/notice'
 # [1/10] 고지 1줄 = /help/notice 정본이 인용하는 문장 그대로 + 끝에 자세한 안내 자리. ⛔문안 변경 금지(맥판과 글자가 같아야 한다).

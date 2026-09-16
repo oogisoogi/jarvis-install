@@ -445,9 +445,14 @@ PYEOF
       # N13(t4-fix · codex 새2): 마스터는 깼는데(verified) 동료 자리가 상한 안에 안 섰다 — 이미 깬 자비스에게 선언을 또 치게 하면 거짓 카드다.
       mhas 'awaken master: marker=awaken:master-verified mark=True a=1 retry=0$' && mhas 'fleet awaken: no child seat within'
       t $? "[맥 마스터 깸·동료 늦음] 전제 성립(마스터 verified · 동료 자동 관측 상한 안에 0)" "$(grep -E 'awaken master|fleet awaken' "$L" 2>/dev/null | tr '\n' '|' | cut -c1-220)"
-      grep -q '마스터는 깨어났습니다 · 동료 자리는 자비스가 세우는 중입니다' "$O" && ! grep -q '너는 마스터다' "$O" && ! grep -q '쳐 주십시오' "$O" \
+      # v0324 C2(master#4c9d14e3 A): N13 의 뜻 = 「기다리는 동안 이미 깬 마스터에게 선언을 치게 하지 마라」 ⇒ 재는 범위 = 대기 단계 출력(최종 카드 줄 앞).
+      #   상한 소진 뒤 최종 카드는 복구 국면이라 재선언 한 줄을 안내한다(아래 축) — 범위를 좁혀도 대기 카드에 선언이 새면 mac-wait-card-redecl-inject 뮤턴트가 붉힌다.
+      W="$SB/wait-stage.txt"; awk '/\[10\/10\] 아직 서지 않은 자리가 있습니다/{exit} {print}' "$O" > "$W"
+      grep -q '\[10/10\] 아직 서지 않은 자리가 있습니다' "$O" && grep -q '마스터는 깨어났습니다 · 동료 자리는 자비스가 세우는 중입니다' "$W" && ! grep -q '너는 마스터다' "$W" && ! grep -q '쳐 주십시오' "$W" \
         && ! grep -q '저절로 깨어나지 않아' "$O" && ! grep -q '사람 손 #' "$O" && mhas 'fleet: master verified - waiting for child seats without declaration card'
-      t $? "[맥 마스터 깸·동료 늦음] 카드 문구에 「너는 마스터다」·「쳐 주십시오」 없음 · 「사람이 하실 일은 없습니다」(N13)" "$(grep -nE '너는 마스터다|쳐 주십시오|깨어나지 않아|마스터는 깨어' "$O" | head -3 | tr '\n' '|' | cut -c1-240)"
+      t $? "[맥 마스터 깸·동료 늦음] 카드 문구에 「너는 마스터다」·「쳐 주십시오」 없음(대기 단계 · 최종 카드 줄 앞) · 「사람이 하실 일은 없습니다」(N13)" "$(grep -nE '너는 마스터다|쳐 주십시오|깨어나지 않아|마스터는 깨어|아직 서지 않은' "$O" | head -4 | tr '\n' '|' | cut -c1-240)"
+      grep -qF '     마스터는 깨어 있습니다. 남은 자리를 다시 세우려면 cysr 창의 jarvis 칸에 『너는 마스터다.』 한 줄을 다시 쳐 주십시오(이 설치 창이 아닙니다).' "$O" && ! grep -q '이어서 세웁니다' "$O" && ! grep -q '다시 치실 필요는 없습니다' "$O"
+      t $? "[맥 마스터 깸·동료 늦음] 상한 소진 뒤 최종 카드는 cysr 창 jarvis 칸 재선언 한 줄을 안내 · 「이어서 세웁니다」 거짓 약속 없음(v0324 C2)" "$(grep -nE '남은 자리|치실 필요' "$O" | head -3 | tr '\n' '|' | cut -c1-240)"
       grep -q '다음에 할 일: cys 창(제목 jarvis)의 자비스와 이어서 이야기하십시오' "$O" && ! grep -q '다시 하시는 법' "$O"
       t $? "[맥 마스터 깸·동료 늦음] 끝맺음이 「다시 실행」이 아니라 자비스와 이어서 이야기(N13)" "$(grep '다음에 할 일' "$O" | head -1)" ;;
   esac
