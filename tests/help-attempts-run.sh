@@ -38,7 +38,7 @@ F()    { printf '%s' "$SB/$1/install-jarvis/help-attempts.json"; }
 LOGF() { printf '%s' "$SB/$1/install-jarvis/bootstrap.log"; }
 val()  { sed -n "s/^$2=//p" "$SB/$1.out"; }
 sect() { awk '/^MARK$/{f=1;next} /^END$/{f=0} f' "$SB/$1.out"; }
-col()  { awk -F'\t' -v k="$1" -v key="$2" '$1==k && $2==key {print $3}' "$TSV"; }
+col()  { awk -F'\t' -v k="$1" -v key="$2" '$1==k && $2==key && ($4=="" || $4=="mac") {print $3}' "$TSV"; }   # 넷째 칸 OS(win·na-mac 은 맥 화면 줄이 아니다)
 exp2() {   # 2회째 블록 = 빈 줄 + stage2(<WAY> 자리에 그 코드 way · 첫 줄 「   - 」 · 다음 줄 「     」)
   local l
   printf '\n'

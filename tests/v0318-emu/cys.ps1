@@ -1,4 +1,4 @@
-# v0.3.18 흉내 (pwsh 7 · 맥) — 실물 bootstrap.ps1 을 「함수 묶음」으로 읽고 ①② 판본 · ④ 기록 글자표 · ⑤ 끝맺음 · ⑥ cys PATH 갈래를 실제로 부른다
+﻿# v0.3.18 흉내 (pwsh 7 · 맥) — 실물 bootstrap.ps1 을 「함수 묶음」으로 읽고 ①② 판본 · ④ 기록 글자표 · ⑤ 끝맺음 · ⑥ cys PATH 갈래를 실제로 부른다
 #   ①② 가짜 = 설치 여부·판본(Test-CysBody) · 받기(Invoke-WebRequest) · 설치기(Start-Process) · 기다리기(Start-Sleep) — 판정 함수(Get-CysInstalledVersion · Step-*)는 실물
 #   ④ 윈도우 PowerShell 5.1 의 「UTF-8 아닌 기본 글자표」를 $PSDefaultParameterValues 로 흉내 낸다(맥 pwsh 7 의 기본은 UTF-8 이라 그대로는 결함이 안 보인다)
 #   ⑥ 사용자 PATH 읽기·쓰기 두 함수만 바꿔 끼운다(맥 .NET 에는 사용자 환경변수 자리가 없다)
@@ -157,6 +157,15 @@ function Unblock-File { [CmdletBinding()] param([string]$LiteralPath) Add-Conten
 function Send-Progress($step, $ev, $elapsed, $detail, $envInfo, $extra) {
     Add-Content -LiteralPath "$Sb/progress.log" -Value ('PROG ' + $step + ' ' + $ev + ' ' + $elapsed)
     if ($null -ne $extra) { Add-Content -LiteralPath "$Sb/evidence.log" -Value ('EVID ' + $step + ' ' + (([pscustomobject]$extra) | ConvertTo-Json -Compress)) }
+}
+# 🔴증거 이벤트는 v0.3.20 부터 **따로 나간다**(답이 곧 그림 자리라 진행 전송과 길이 다르다).
+#   여기서도 가로채 같은 파일에 적는다 — 안 그러면 이 흉내의 증거 축 셋이 **조용히 0건**이 된다(2026-09-16 실측).
+#   돌려주는 것은 $null 이라 그림은 올리지 않는다(이 흉내는 바깥에 닿지 않는다).
+function Send-EvidenceEvent([string]$Reason, [string]$Text) {
+    $row = [ordered]@{ reason = $Reason; masked = $true }
+    if ($Text) { $row['text'] = $Text }
+    Add-Content -LiteralPath "$Sb/evidence.log" -Value ('EVID ' + (Get-CurrentStep) + ' ' + (([pscustomobject]$row) | ConvertTo-Json -Compress))
+    return $null
 }
 $script:EmuWaitCalls = 0
 function Start-Process {

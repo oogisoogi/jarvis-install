@@ -29,6 +29,7 @@ $TWays = @{}
 foreach ($TLn in [System.IO.File]::ReadAllLines((Join-Path $THere 'help-escalation.tsv'), [System.Text.Encoding]::UTF8)) {
     if (-not $TLn -or $TLn.StartsWith('#')) { continue }
     $TP = @($TLn -split "`t")
+    if ($TP.Count -eq 4 -and $TP[3] -ceq 'win') { $TP = @($TP[0], $TP[1], $TP[2]) }   # 넷째 칸 OS(win = 윈 화면 줄 · mac·na-mac 은 건너뜀)
     if ($TP.Count -ne 3) { continue }
     if ($TP[0] -ceq 'stage2') {
         $TS2 += $TP[2]

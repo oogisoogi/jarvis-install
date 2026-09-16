@@ -38,7 +38,7 @@
 
 | ID | 무엇 | 자리 | 종류 | 만드는 자리 | 근거 |
 |---|---|---|---|---|---|
-| `M-APP` | cys 프로그램 | `/Applications/cys.app` | 전부 우리 것 | `bootstrap.sh` `[6/10]`(애플 실리콘 = 우리 릴리스 zip 을 풀어 한 번에 바꿔 넣기 · 인텔·자산 없음 = 원작자 원자 설치기 호출) | 실측 09-06 · zip 경로 09-15 |
+| `M-APP` | cys 프로그램 | `/Applications/cysr.app`(애플 실리콘 · 1.0.1~) · `/Applications/cys.app`(인텔·원작자 판 · 1.0.0 이하 옛 이름) | 전부 우리 것 | `bootstrap.sh` `[6/10]`(애플 실리콘 = 우리 릴리스 zip 을 풀어 한 번에 바꿔 넣기 · 옛 이름 cys.app 은 넣은 뒤 `backup/cys.app.prev` 로 한 벌 보관 · 인텔·자산 없음 = 원작자 원자 설치기 호출) | 실측 09-06 · zip 경로 09-15 · cysr.app 09-16 |
 | `M-DAEMON` | cys 상시 가동 등록 | `~/Library/LaunchAgents/com.cysjavis.cysd.plist` | 전부 우리 것 | `[8/10]` `cys daemon install` | 실측 09-06 |
 | `M-CYSHOME` | cys 계정 자리(팩·설정·상태) | `~/.cys/`(`pack`·`claude`·`state`) | 전부 우리 것 | `[8/10]` `cys init-pack` (팩 460항목) | 실측 09-06 |
 | `M-CYSSTATE` | cys 실행 상태·소켓 | `~/.local/state/cys/` | 전부 우리 것 | cys 데몬이 만든다 | 실측 09-06 |

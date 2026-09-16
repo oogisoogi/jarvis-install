@@ -1,0 +1,197 @@
+# ps1 function ↔ bootstrap.sh 등가 대조표 (TICKET=mac-parity-t1-core · 2026-09-16 · 계약 master#92224011)
+# 칸 = ps1함수<TAB>sh함수<TAB>상태<TAB>사유 · 상태 = sh(등가 실재) | na(OS 상 해당 없음 · 사유 필수)
+# ps1 = bootstrap.ps1 @5a1cd67 · 행 순서 = ps1 파일 순서
+# ⚠「# todo」 줄 = 아직 이식하지 않은 함수(표에 행이 없으므로 checks 대조 축은 붉다 — 거짓 초록을 만들지 않으려고 상태를 지어내지 않았다)
+#   괄호 안 = 맡은 티켓 제안(T1 = 설치 단계 · T2 = 전송·증거·캡처)
+Write-Log	log	sh	같은 일(기록 파일에 시각+줄 덧붙임)
+Say	say	sh	화면+기록 같은 일 · 오류 글 즉시 캡처(ⓕ③) = say_error_text_hook(T2 9abadd2) · 단 윈판의 단계 줄 모음(StepLog)은 맥 say 에 없음
+Invoke-Logged	invoke_logged	sh	바깥 명령 출력을 화면(7칸 들여)·기록 양쪽에 · 기록 [무엇] rc=N · 부르는 자리 = [8/10] init-pack·daemon install·(무응답 때) daemon status(ps1 3094·3102·3163 같음)
+Get-CysAutoStartState	cys_autostart_state	sh	5값(yes·off·other·no·unknown) 같은 뜻 · 자리 = LaunchAgent com.cysjavis.cysd plist(cys src/launchd.rs) — ①ProgramArguments 가 우리가 깐 cysd 경로 ②RunAtLoad true ③plist Disabled·launchctl print-disabled 가 꺼짐 아님 · 못 읽으면 unknown(윈판 schtasks XML·SID 비교 자리)
+Get-AutoStartWords	cys_autostart_words	sh	5값 → 사람 말 한 자리 · 문구는 ps1 동형(작업 스케줄러 cysd → LaunchAgent com.cysjavis.cysd · 로그온 → 로그인) · 부르는 자리 = [8/10] 세 곳 + 보고서 「직접 열어 켰습니다」
+Invoke-CysProbe	cys_capped	sh	데몬을 깨우지 않는 조회 — bash 는 `CYS_NO_AUTOSTART=1 명령` 접두 인라인으로 같은 일, 함수로는 cys_capped(상한 포함)
+Write-TextNoBom	-	na	PowerShell 5.1 의 UTF-8 BOM 끼워넣기 회피 전용 — bash printf/리다이렉트는 BOM 을 안 붙임
+Human	human	sh	같은 일(사람 손 계수 + 한 줄)
+Show-PrevRunNote	show_prev_run_note	sh	지난 실행 마지막 줄·상태(closed·wait·answer·ended) 판정·J-AV-03(J_CODE 와 분리 · 보고서 「지난 실행 진단 코드」)·120자 자르기 ps1 동형 · 맥 closing_note 가 「다음에 할 일:」을 기록에도 적게 함 · 윈판의 「백신이 PowerShell 을 종료」 추정 줄은 맥에서 「창을 닫았거나 Ctrl-C」로 갈음
+Write-JCode	jcode	sh	진단 코드 화면·기록 같은 일 · 실패 진행 전송(progress_send fail)·실패 증거(evidence_once fail) 포함(T2 9abadd2 · ps1 425·426)
+Get-CysFileSha256	cys_file_sha256	sh	같은 일(shasum→openssl 폴백 · 못 재면 빈 값)
+Get-WebErrorStatus	cys_http_code	sh	HTTP 상태 코드 얻기 — 맥은 예외가 아니라 curl -w '%{http_code}' 로 같은 값을 얻음
+Test-UrlReachable	net_cause	sh	도달 판정 — net_cause 안의 curl -sS -I(-f 없음 = 403·404 도 「닿음」) 인라인
+Get-NetCause	net_cause	sh	같은 일(우리·바깥 먼저 · 둘 다 안 되면 중립 주소) · 단 윈판은 바깥에 cys 자산 주소도 넣음
+Get-NetCauseWords	net_cause_words	sh	같은 일
+Get-NetCauseCode	net_cause_code	sh	같은 일
+Wait-ForConnection	wait_for_connection	sh	같은 일(30분 상한·30초 간격·상한 뒤 진단 코드)
+Get-HelpNow	help_attempts_update,help_last_report_save	sh	+0900 모양 시각 — 맥은 date '+%Y-%m-%dT%H:%M:%S%z' 인라인으로 같은 모양
+Read-HelpAttempts	help_attempts_read	sh	같은 일(고정 모양 JSON 줄 단위 정규식)
+Save-HelpAttempts	help_attempts_write	sh	같은 일(코드 이름순 · 임시 파일 뒤 이름 바꾸기)
+Update-HelpAttempts	help_attempts_update	sh	같은 일
+Write-HelpEscalation	help_escalation_print,help_way_lines,help_is_direct	sh	같은 일(2회째 다른 방법 · 3회째 담당자)
+Save-HelpLastReport	help_last_report_save	sh	같은 일
+Test-QuietErrorRecord	-	na	PowerShell $Error 기록·ErrorAction 구문 트리 판정 전용 — bash 에는 오류 기록 모음이라는 개념이 없음
+Write-ClosingNote	closing_note	sh	끝맺음 같은 일(EXIT 트랩) · 단 윈판의 「예상 못 한 끝」 마지막 오류 기록·J-UNK-00 채우기·원격 해결 앞 다시 하는 법 1회는 맥에 없음
+Get-RerunCmd	rerun_cmd	sh	같은 일(들어온 길에 따라 명령 전체)
+Set-NextStepRerun	next_rerun	sh	같은 일
+Show-RerunHow	show_rerun_how	sh	같은 일(창 여는 법·키만 맥 것)
+Say-AntivirusHold	-	na	작업 표시줄·화면 오른쪽 아래 백신 창의 [파일 전송]/[실행] 단추 안내 = 윈도우 백신 알림 UI 전용 — 맥은 J-AV-02 자리에서 격리 안내 한 줄만 인라인
+Redact	redact	sh	같은 일(집 폴더 → ~)
+Test-ClaudeAuthCmd	claude_has_auth_cmd	sh	같은 일(claude --help 에 auth 하위명령이 있는가)
+Test-CysAgentFlag	cys_supports_agent_flag	sh	같은 일
+Get-CysVersionLine	cys_version_line	sh	같은 일
+Test-CysBody	cys_app_dir,detect_stage1	sh	cys 몸통 판정 — 맥은 설치 목록(레지스트리)이 없고 /Applications/cysr.app·cys.app 존재를 cys_app_dir·detect_stage1 이 봄
+Show-OldCysNote	note_old_cys_app	sh	같은 일(0.14.x 옛 판 한 줄 안내)
+Get-CysInstalledVersion	note_old_cys_app,cys_install_from_zip	sh	설치된 판본 읽기 — 맥은 defaults read CFBundleShortVersionString 인라인
+Get-CysPinStampPath	-	na	설치 자리 표지 파일(jarvis-cys-pin.json) 경로 — 맥은 서명 CDHash 가 설치본 자체에 박혀 있어 표지 파일이 필요 없음
+Get-CysContentState	cys_app_cdhash	sh	「같은 판번인데 내용이 같은가」 판정 — 맥은 설치본 CDHash 를 핀과 대조(step_install_cys)
+Save-CysPinStamp	-	na	표지 파일 쓰기 — 맥은 CDHash 가 설치본에 내장돼 설치 뒤 따로 적을 것이 없음
+Test-WebMark	cys_install_from_zip	sh	웹 표식 유무 — 맥 대응 개념 = com.apple.quarantine 격리 속성(xattr) · 확인 없이 xattr -cr 로 지움
+Clear-WebMark	cys_install_from_zip	sh	지문 대조 뒤 웹 표식 지우기 — 맥은 지문 확인된 zip 을 푼 뒤 xattr -cr 인라인
+Add-Row	row	sh	같은 일(감지 행 적재)
+Test-JarvisHomeIsLink	adopt_existing_home	sh	작업 폴더 자신이 이음줄인가 — [ -L ] 인라인
+Test-JarvisHomePresent	adopt_existing_home	sh	끊어진 이음줄 포함 존재 판정 — 본문 최상위 [ -e ] || [ -L ] 인라인 뒤 adopt_existing_home 으로 넘김
+Test-JarvisOwnerMark	owner_mark_ok	sh	같은 일
+Get-HomeEntries	list_home_entries	sh	같은 일(못 세면 rc 1 · 빈 목록과 구분)
+Test-OldLayout	old_layout_matches	sh	같은 일(이음줄 섞이면 지문 아님)
+Test-HumanPresent	offer_old_home_cleanup	sh	사람이 있는가 — : < /dev/tty 열어 보기 인라인
+Deny-JarvisHome	refuse_jarvis_home	sh	같은 일(J-HOME-01 · exit 3)
+Deny-CannotMakeHome	fail_make_home	sh	같은 일(J-PERM-01 · exit 3)
+New-JarvisHomeNow	make_home_now	sh	같은 일(부모 미리 · 마지막 마디 원자적 생성)
+Invoke-OldHomeCleanup	offer_old_home_cleanup	sh	같은 일(「지웁니다」 입력 시에만)
+Invoke-DetectStage1	detect_stage1	sh	같은 일(1-1~1-8 · 항목 내용은 OS 별)
+Invoke-DetectStage2	detect_stage2	sh	같은 일(2-1·2-2·2-4·2-5·2-8·2-9)
+Write-Report	write_report	sh	환경 보고 같은 일 · 단 윈판의 사람 손 계수 2줄·지나온 단계 목록·데몬 직접 켬 안내는 맥 보고서에 없음
+Seed-LocalBinPath	seed_local_bin_path	sh	~/.local/bin 을 PATH 에 멱등으로 — 맥은 셸 프로필 파일에 한 줄
+Get-UserPathValue	-	na	사용자 환경변수(레지스트리 HKCU Environment) Path 읽기 — 맥 PATH 는 셸 프로필 파일이 정함
+Set-UserPathValue	-	na	사용자 환경변수 Path 쓰기 — 맥에는 영구 사용자 환경변수 저장소가 없고 셸 프로필이 담당
+Seed-CysPath	seed_cys_path	sh	cys 자리를 새 터미널 PATH 에 멱등으로(프로필 전부 훑고 없을 때만 셸이 읽는 자리에 한 줄 · 이 프로세스 PATH 에도) · 윈판 사용자 환경변수 Path ↔ 맥 셸 프로필 · 부르는 자리 = [7/10] 이 앱 안 경로로만 답했을 때(이미 PATH 연결이 답하면 가리지 않음)
+Get-ProcTree	get_proc_tree	sh	우리가 띄운 프로세스의 자식·손자(깊이 6) 목록 = ps -axo pid,ppid,start,comm + awk 너비 우선 · 못 읽으면 빈 글(설치를 막지 않는다)
+Get-AvWindowTitles	-	na	떠 있는 창 제목에서 백신 창 찾기 — 맥에는 창 제목을 열거하는 기본 명령이 없음(SH 캡처 주석 실측: AppleEvent 시간 초과)
+Get-FileStateWords	-	na	파일 있음·크기·「잠김(FileShare.None 배타 열기)」 — 배타 잠금은 윈도우 파일 잠금 개념, 맥은 강제 잠금이 없음
+Add-ReportLines	add_report_lines	sh	환경 보고(env-report.md)에 줄 덧붙이기 · 실패하면 기록 한 줄 — 맥은 LF(윈판 CRLF)
+Write-ClaudeInstallDiag	write_claude_install_diag	sh	상한에 닿았을 때 살아 있던 자식·~/.local/bin/claude 있음·크기·공식 설치기가 받던 파일(~/.claude/downloads)을 기록과 환경 보고에 · 윈판의 「백신 창 제목」·「파일 잠김」 두 판정은 맥에 그 창·잠금 개념이 없어 옮기지 않음
+Stop-ProcTree	stop_proc_tree	sh	깊은 자식부터 끄고 마지막에 본인(우리가 띄운 설치기 나무만) · 5초 안에 끝났는지 기록 · 끄는 동안 셸의 「Killed: 9 …」 알림을 화면에서 가림
+Wait-ProcBounded	wait_proc_bounded	sh	상한 있는 대기 + 30초마다 한 줄(N분 M초 지남 · 최대 K분) · rc 0 끝남 / 1 상한
+Install-ClaudeDirect	install_claude_direct	sh	공식 install.sh 가 받는 자리(downloads.claude.ai/claude-code-releases)에서 ①판본 ②manifest 해시 ③본체 ④shasum 대조 ⑤받은 파일로 install(3분 상한 · 넘으면 진단·끄기) → 안 되면 ~/.local/bin/claude 에 .jarvis-new 거쳐 두기 → --version(90초 상한) 판정 · 플랫폼 darwin-arm64|x64(로제타면 arm64) · 실패 끝 코드 = J-NET-03(윈 J-AV-01 은 윈도우 전용) · 같은 자리 재발 시 상한 5분 줄이기(윈 J-AV-01 계수)는 맥에 없음
+Step-InstallClaude	step_install_claude	sh	같은 일([2/10] 멱등 설치·PATH·판본 확인) · 단 윈판의 설치기 상한·백신 대기 안내·직접 받기 폴백은 맥에 없음
+Set-LoginStage	set_login_stage	sh	같은 일(기록에 login stage: <표지>) · 표지 = wait (installer-fed|plain) · question · confirm · done by status after window ended · fail — 맥은 다시 열기(reopen)·창 띄우기 실패(start-failed) 갈래가 없어 그 표지도 없음
+Get-LoginCredStamp	-	na	~/.claude/.credentials.json 시각·크기 — 맥 클로드는 로그인 정보를 키체인에 두어 이 파일로 판정하지 않음
+Test-LoginCredFresh	-	na	로그인 파일이 이번에 생겼거나 고쳐졌는가 — 맥은 로그인 정보가 키체인이라 해당 파일이 없음
+Resolve-LoginDone	step_login	sh	로그인 완료 판정 — 맥은 auth status 의 loggedIn true 인라인 grep(파일 판정 갈래는 키체인이라 없음)
+Get-LoginStatusText	login_status_text	sh	auth status 한 번에 20초 상한(perl alarm) · 상한이면 빈 답+기록 · 실행 못 하면 rc 1(부르는 쪽이 실행 실패로 셈) · [3/10] 첫머리 재판정과 폴링 두 자리에서 씀
+Get-LoginSubscription	detect_stage1	sh	구독 종류만 떼어 적기 — 맥은 detect_stage1 1-3 행에서 추출(로그인 성공 직후 기록 한 줄은 없음)
+Confirm-LoginAfterExit	step_login	sh	승인 프로세스가 끝난 뒤 로그인 확인 — 맥은 3초 간격 최대 10분 폴링(윈판은 몇 번만)
+Get-LoginStrayKeyCount	login_stray_key_count	sh	질문 전에 설치 창 입력에 쌓인 글자를 읽고 버리며 수만 셈(-1 = 터미널 아님) — 맥도 로그인 프로세스가 끝난 뒤 친 글자는 설치 창에 남는다(구 na 사유 정정)
+Test-LoginCodeShape	login_code_shape	sh	같은 일(코드#state 모양 · bash 3.2 반복 상한 때문에 길이는 따로 셈)
+Get-LoginClipText	login_feeder	sh	복사된 글 읽기 — pbpaste 인라인
+Get-LoginTextHash	login_feeder	sh	같은 코드 한 번만 넣기 — 맥은 해시 대신 메모리 안 글자 비교(기록에 안 남기는 점 동일)
+Start-LoginPipeProc	login_run_fed	sh	입력을 쥔 채 로그인 프로세스 띄우기 — 맥은 script 가짜 터미널 + 파이프
+Send-LoginCode	login_feeder	sh	로그인 입력에 코드 한 줄 넣기 — printf 로 파이프에
+Read-LoginTypedLine	login_feeder	sh	설치 창에 친 줄 읽어 넘기기 — read -t </dev/tty
+Read-LoginFailKey	read_login_fail_key	sh	1·2·3·Enter 한 키를 상한(60초) 안에 받기 · 답 = 1|2|3|enter|timeout|no-input(터미널 아님) — read -s -n 1 -t 1 고리(맥 bash 3.2 는 소수 상한 불가)
+Invoke-LoginFailQuestion	login_fail_question	sh	상한(20분)에서 끝났을 때만 · 문구 네 줄·분류 표지(browser-not-opened·no-approval-screen·approved-code-rejected·unknown·no-answer·no-console-input)·기록 줄 ps1 글자 동일 · 상한 판정 = login_end_wait 가 남기는 .login-capped 표지
+Complete-LoginSuccess	step_login	sh	로그인 성공 처리 — 맥은 S1_LOGGED_IN=1 + 「로그인 확인했습니다」(구독 기록·표지는 없음)
+Add-LoginReport	add_login_report	sh	일곱 줄(로그인 창·승인 프로세스·다시 열기·코드 넣기·끝난 뒤 확인·상한에서 받은 답·쌓인 글자 수)을 기록과 환경 보고에 · 로그인 실패 끝에서만(ps1 같음) · 코드 넣기 = login_feeder 끝 기록 줄에서 셈
+Step-Login	step_login	sh	[3/10] 같은 일 · 단 윈판의 이른 끝 1회 다시 열기(J-LOGIN-02)·5분 점검 안내·실패 질문은 맥에 없음
+Write-Directive	write_directive	sh	같은 일(설치 지침 파일 놓기 · 문안은 OS 별)
+Get-ProfileTargets	profile_configs,profile_settings	sh	개인·자비스 전용 두 자리 — 맥은 설정 파일·settings 경로를 두 함수로 나눔
+Set-ClaudePrefs	seed_claude_prefs	sh	첫 실행 질문 사전 설정·홈 신뢰는 없을 때만 — 맥은 plutil · 단 윈판의 .bak-jarvis 사본·되읽기 복원은 맥에 없음
+Set-ClaudeSettings	seed_claude_settings	sh	같은 일(theme·skipDangerousModePermissionPrompt·remoteControlAtStartup·autoUpdatesChannel)
+Copy-LoginToIsolated	copy_login_to_isolated	sh	같은 일 — 맥은 파일이 아니라 키체인 항목을 복사(서비스 이름 = CLAUDE_CONFIG_DIR sha256 앞 8자 · 실측)
+Get-TrustRollbackWords	trust_rollback_words	sh	같은 일
+Undo-TrustSeed	seed_claude_prefs,trust_key_state	sh	넣은 홈 신뢰 키 되돌리고 되읽어 verified·kept·unknown — 맥은 plutil -remove 인라인 + trust_key_state
+Set-AllProfiles	seed_all_profiles,trust_set_rollback_state	sh	전 자리 사전 설정 + 기록 실패 시 되돌림 상태(나쁜 쪽 유지)
+Step-Prepare	step_prepare	sh	같은 일([4/10])
+Step-DownloadCys	step_download_cys,cys_http_code	sh	[5/10] 같은 일(크기·지문·공간·404/410) · 단 윈판의 「같은 판·같은 내용이면 받지 않음」·407 프록시 갈래는 맥에 없음(맥은 받은 뒤 [6/10] 에서 건너뜀)
+Step-InstallCys	step_install_cys,cys_install_from_zip,cys_install_from_dmg	sh	[6/10] 같은 일(설치 방식은 OS 별 — zip 원자 교체·벤더 dmg)
+Step-VerifyCys	step_verify_cys	sh	[7/10] 같은 일 · 단 윈판의 cys PATH 심기(Seed-CysPath)는 맥에 없음
+Step-PrepareAccount	step_prepare_account	sh	[8/10] 같은 일(init-pack·daemon install·ping·doctor) · 단 윈판의 앱 직접 열기 폴백·자동 시작 실측·좌석 치명 항목 분류는 맥에 없음
+Step-Wake	step_wake,cys_open_master_seat	sh	[9/10] 같은 일 · 단 윈판은 선언(너는 마스터다)을 첫 지시에 싣고 표지를 지우며, 맥은 일부러 싣지 않음(맥 실기 근거 0)
+Get-SurfaceIds	set_fleet_baseline	sh	cys list 에서 surface 번호 모으기 — 윈판에서도 부르는 자리 0 · 맥은 set_fleet_baseline 인라인
+Set-FleetBaseline	set_fleet_baseline	sh	같은 일(못 찍으면 판정 안 함)
+Get-LiveRoles	live_roles	sh	같은 일(기준선 뒤 새 자리만)
+Test-DeclarationSeen	declaration_seen	sh	같은 일
+Set-FleetFinished	set_fleet_finished	sh	같은 일(NEXT_STEP 끝남 문구 · 다시 실행 안내 끔)
+Clear-FleetStrayKeys	drain_tty_keys	sh	같은 일 — 맥 터미널도 기다리는 동안 친 글자가 셸 명령으로 읽힌다(/dev/tty 비우기)
+Invoke-CysCapped	cys_capped	sh	같은 일(상한 · CYS_NO_AUTOSTART · perl alarm)
+ConvertTo-ClaudeProjectSlug	claude_project_slug	sh	같은 일
+Read-SessionLines	seat_session_file,seat_session_counts	sh	쓰는 중인 세션 기록 읽기 — 맥은 grep 이 직접 읽음(공유 모드 열기 불필요)
+Get-NewSessionFiles	born_since,seat_session_file	sh	기준선 뒤 생긴 jsonl 만 — 맥은 stat -f %B 생성 시각
+Get-SeatSessionFile	seat_session_file	sh	같은 일(폴더 이름 규칙 → 파일 안 cwd 폴백)
+Get-SeatSessionCounts	seat_session_counts	sh	같은 일
+Get-ChildSeatRefs	confirm_child_seats	sh	새로 선 cso·worker 자리·cwd 모으기 — confirm_child_seats 앞부분 인라인
+Confirm-ChildSeat	confirm_child_seat	sh	같은 일(Return 3회·유예·90초)
+Send-ChildStallEvidence	child_stall_evidence	sh	깨지 않은 자식 자리 화면 끝 40줄 마스킹 → reason=stall 증거 · 자리마다 한 번 · 부르는 자리 = 자식 실패 뒤(ps1 3682 ↔ sh confirm_child_seats)
+Confirm-ChildSeats	confirm_child_seats	sh	같은 일 · 단 윈판의 진행 전송(awaken:child-*)은 맥에 없음
+Get-MasterMarkPath	master_mark_path	sh	같은 일
+Clear-MasterMark	clear_master_mark	sh	같은 일(기록 줄 글자 동일)
+Test-MasterMark	test_master_mark	sh	같은 일(기준선-5초 · stat -f %m)
+Get-MasterAssistantCount	master_assistant_count	sh	같은 일(자식 판정과 같은 세션 기록 읽기)
+Wait-MasterSigns	wait_master_signs	sh	같은 일(MS_MARK True|False · MS_A)
+Send-MasterRetry	send_master_retry	sh	같은 일 · 문구만 ASCII 영문(브리프 H-M2 회피) · send 실패 시 Return 0(762 D2)
+Get-MasterStateName	master_state_name	sh	같은 일(verified/no-start/unknown)
+Confirm-MasterAwake	confirm_master_awake	sh	같은 일(기록 줄 글자 동일)
+Write-MasterSay	say_master_state	sh	같은 일(화면 문구 글자 동일)
+Write-MasterRequestCard	master_request_card	sh	같은 일(카드 글자 동일)
+Get-MasterStateNow	master_state_now	sh	같은 일((recheck) 기록)
+Write-MasterUnknownCard	master_unknown_card	sh	같은 일
+Set-FleetNeedsMaster	set_fleet_needs_master	sh	같은 일
+Step-Fleet	step_fleet	sh	[10/10] 같은 일(기준선·역할 대기·자식 확인·끝 증거) · 단 윈판의 자동 각성 대기 4분·master 각성 확인은 맥에 없음(맥은 처음부터 사람 카드)
+Read-RemoteHelpStream	remote_help_http	sh	응답 본문 읽기 — 맥은 curl -o 로 파일에 받음
+Invoke-RemoteHelpHttp	remote_help_http	sh	같은 일(20초 상한 · ack·close 출처 헤더 · 000=닿지 못함) · 단 윈판의 /attach 헤더는 맥에 없음
+Get-RemoteHelpNames	remote_help_js,remote_help_report	sh	지울 로그인 이름 모으기 — 맥은 JS harvestNames(osascript) + id -un·id -F·basename $HOME
+Invoke-RemoteHelpScrub	remote_help_js	sh	이메일·토큰·집 경로·이름 지우기 — JS scrubWith
+Get-RemoteHelpTailBytes	remote_help_js	sh	UTF-8 바이트 상한 끝부분 자르기 — JS tailBytes
+Get-RemoteHelpHeadBytes	remote_help_js	sh	UTF-8 바이트 상한 앞부분 자르기 — JS headBytes
+Test-RemoteHelpSeq	remote_help_js	sh	양의 안전 정수 번호 검사 — JS positiveSeq·loadExecuted
+Test-RemoteHelpPath	remote_help_js	sh	<path> 칸 글자 검사 — JS pathOk
+Test-RemoteHelpSlot	remote_help_js	sh	칸 종류별 검사 — JS slotOk
+Test-RemoteHelpArgv	remote_help_js	sh	명령 표 재검사 — JS recheckArgv(modePoll)
+Read-RemoteHelpExecuted	remote_help_js	sh	실행 번호 파일 읽기(깨지면 null) — JS loadExecuted
+Save-RemoteHelpExecuted	remote_help_record	sh	실행 전 번호 기록 · 잠금(mkdir) · OK·ALREADY·LOCKED·FAIL
+Get-RemoteHelpCanonical	remote_help_confine	sh	링크 풀린 실제 경로 — cd -P·readlink 인라인
+Resolve-RemoteHelpPath	remote_help_confine	sh	작업 폴더 안 가두기 · path_missing·path_outside 같은 일
+Get-RemoteHelpCysPath	remote_help_cys_path	sh	같은 일(절대 경로 후보만)
+Invoke-RemoteHelpStreamRead	remote_help_launch,remote_help_open_leaf	sh	연 것을 명령에 주기 — 맥은 fd 3 으로 열어 /dev/fd/3 을 넘김
+Invoke-RemoteHelpLaunch	remote_help_launch	sh	같은 일(셸 없이 · 60초 상한 · 교체 감지)
+Send-RemoteHelpAck	remote_help_ack	sh	같은 일(ran)
+Send-RemoteHelpDecline	remote_help_ack	sh	같은 일(declined policy:<rule> · 410 이면 rc 3)
+Invoke-RemoteHelpCommand	remote_help_run_one	sh	같은 일(계약 9-4 ③~⑦)
+Show-RemoteHelpAnswer	remote_help_tick,remote_help_js	sh	처방 표시(제어 글자 제거 · 바뀐 때만) — JS modeAnswer + tick
+Show-RemoteHelpEnded	remote_help_ended	sh	같은 일
+Invoke-RemoteHelpTick	remote_help_tick	sh	폴링 한 번 처리 같은 일 · 촬영 요청 받기·처리(capture_receive·capture_requested_run) 포함(T2 · ps1 4667·4668)
+Save-RemoteHelpToken	remote_help_report	sh	출처 토큰을 본인만 읽는 파일로 — 맥은 umask 077·chmod 600 인라인(윈판은 ACL)
+Send-RemoteHelpReport	remote_help_report	sh	같은 일(보고 꾸리기·3회 재시도·번호·토큰)
+Watch-RemoteHelp	remote_help_loop	sh	같은 일(2시간 상한·20초 폴링)
+Invoke-RemoteHelp	remote_help,remote_help_on_signal	sh	원격 해결 진입·창 닫힘 시 close 같은 일 · 단 윈판의 보고 직후 증거·첨부 전송은 맥에 없음
+Get-InstallId	install_id_ensure	sh	같은 일 · $JARVIS_HOME/install-id · 모양 [0-9A-Za-z_-]{8,36} · 600 권한 · ps1 이 쓴 CRLF 도 읽음
+Send-Progress	progress_send	sh	같은 인자 순서(step·event·elapsed·detail·env) · 3초 상한 · fail-open · 여섯째 $extra 는 ps1 도 부르는 자리 0 이라 옮기지 않음
+Protect-EvidenceText	evidence_mask_line	sh	마스킹 = JS maskEvidenceText(PROGRESS_JS) · 식은 tests/mask-vectors.json 과 글자 동일 · 셸 창구가 evidence_mask_line
+Get-EvidenceText	evidence_text_file	sh	기록 끝 60000B → 잘렸으면 첫 줄 버림 → 마스킹 → 32000B(윈판 설치 창 글자 = 맥은 say 가 같은 줄을 기록에 씀)
+Send-EvidenceOnce	evidence_once	sh	같은 일 · (이유×단계) 한 번 · 글 뒤 설치 창 그림
+Get-CurrentStep	current_step	sh	같은 일(마지막 [n/10] · 맥은 기록 파일에서)
+Get-InstallEnv	progress_env_fields	sh	맥에서 채울 수 있는 칸 = claude_ver·cys_ver·mac_ver(sw_vers)·admin · win_build·ps_ver·av·browser 는 윈도우 전용 칸
+Resize-Bitmap	evidence_kind_jpeg	sh	축소·재압축 = evidence_kind_jpeg 안 sips 네 걸음 (1280,60)→(1280,40)→(960,40)→(800,30) · 1.5MB 상한(.NET 그림 객체 대신)
+ConvertTo-Jpeg	evidence_kind_jpeg	sh	JPEG 변환 = screencapture -t jpg + sips 재압축(evidence_kind_jpeg 안)
+Get-ScreenJpeg	-	na	전체 화면 캡처 — 윈판에서도 부르는 자리 0(다른 창까지 찍혀 쓰지 않기로 한 함수)이라 이식 대상 아님
+Get-LoginWindowJpeg	-	na	로그인 프로세스의 별도 창 캡처 — 맥 로그인은 설치 창 안 가짜 터미널(script)에서 돌아 따로 찍을 창이 없음
+Get-EvidenceBaseUrl	progress_url	sh	같은 일 · JARVIS_PROGRESS_URL 레버 동일
+Update-StepBaselines	step_baselines_update	sh	같은 일 · ?os=mac · 표지 not-fetched/ok:n/http:코드/empty/error/skip:* · 부르는 자리 = [1/10] start 뒤(ps1 5646)
+Test-StepSlow	step_is_slow,step_baseline_sec	sh	같은 판정(기준선 2배 초과 · 칸 없으면 거짓) · 부르는 자리 = 5~8/10 고리(ps1 5696)
+Get-WindowJpeg	evidence_kind_jpeg	sh	창 하나 JPEG = screencapture -l <창 번호> · perl alarm 10초 · ⚠화면 기록 권한 없으면 파일 없음 = 건너뜀 기록(권한을 요청하지 않는다)
+Get-InstallerWindowJpeg	evidence_window_id	sh	설치 창 번호 = 레버 JARVIS_CAPTURE_WINDOW_ID 또는 조상 프로세스의 창이 정확히 1개일 때만(CoreGraphics 창 목록)
+Get-LoginWindowJpegLive	-	na	살아 있는 로그인 창 캡처 — 맥 로그인은 설치 창 안에서 돌아 별도 창이 없음
+Get-AppWindowJpeg	evidence_window_id	sh	앱 창 번호 = 레버 또는 cys_app_dir 번들 경로와 일치하는 프로그램의 창만(ps1 「우리가 깐 자리에서 도는 것만」)
+Get-EvidenceKindJpeg	evidence_kind_jpeg	sh	종류별 분기 같은 일 · 모르는 종류 = 아무것도 안 줌 · first_pane = 건너뜀(ps1 같은 까닭)
+Send-EvidenceEvent	evidence_event_send	sh	같은 칸 순서 · → EV_SEQ·EV_TOKEN · 글이 없으면 text 칸 자체를 뺌
+Send-EvidenceImage	evidence_image_send	sh	같은 일 · 토큰은 600 머리글 파일로(명령줄에 안 보임) · 429 image_cap 이면 멈춤
+Send-EvidenceImages	evidence_images_send	sh	같은 일 · 보낸 그림은 지우고 못 보낸 그림은 작업 폴더에 남김
+Get-DefaultEvidenceKinds	evidence_images_send	sh	기본 종류 = 설치 창 하나(evidence_once 가 installer_window 로 부름) · 맥 로그인은 별도 창이 없어 login_window 없음
+Receive-CaptureRequest	capture_receive	sh	같은 일 · 모르는 종류만 건너뜀 · 서명 검사 안 함(ps1 같음)
+Invoke-CaptureRequested	capture_requested_run	sh	같은 일 · 1회성 · 부르는 자리 = 5~8/10 고리(ps1 5697)·원격 해결 폴링
+Send-CaptureEvidence	capture_evidence	sh	이유×단계 한 번 캡처 증거 · 서버 전송(머리 = 마스킹한 「[이유] 사유」 400B) · T2 가 기존 파일 전용판을 대체
+Get-PostInstallText	post_install_evidence	sh	master 화면 끝 40줄+훅 오류 수 · 마스킹 뒤 서버 증거(post-install)
+Send-PostInstallEvidence	post_install_evidence	sh	[10/10] 끝 증거 한 번 · seat=master · hook_errors · app_window 그림(권한 있을 때)
+Get-FileBytesCapped	file_tail_capped	sh	같은 일(파일 끝 N바이트)
+Get-ProcTreeBytes	proc_tree_file	sh	같은 일(ps -axo + awk 트리)
+Send-Attachment	help_attach	sh	같은 일 · remote_help_http 첨부에도 출처 머리글(ps1 4233)
+Send-FailAttachments	help_fail_attachments	sh	같은 순서 · console_text·login_window_png 는 맥에 없어 까닭 한 줄씩 기록
+Disable-ConsoleQuickEdit	-	na	윈도우 콘솔 「빠른 편집」(클릭 시 출력 정지) 끄기 — 맥 터미널에는 해당 모드가 없음
+Restore-ConsoleQuickEdit	-	na	윈도우 콘솔 빠른 편집 되돌리기 — 맥 터미널에는 해당 개념 없음

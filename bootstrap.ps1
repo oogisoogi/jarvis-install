@@ -78,11 +78,17 @@ $DlDir         = Join-Path $JarvisHome 'dl'
 #   $CysDisplayName · $CysVersion · $CysWinFile(자산 이름이 바뀌면) · $CysWinBytes · $CysWinSha256 — 값은 발행 뒤 SHA256SUMS.txt 와 대조(tests/win-pin-release.sh).
 #   화면 머리글은 이 값으로 「<이름> <판> · 설치 도우미 <설치기 판>」 을 찍는다(설치기 판 = $InstallerVersion · 별도 semver).
 $CysDisplayName = 'cysr'
-$CysVersion     = '1.0.0'
+$CysVersion     = '1.0.1'
 $CysDownloadDir = "https://github.com/oogisoogi/cys-ro/releases/download/v${CysVersion}/"
-$CysWinFile     = "cys_${CysVersion}_x64-setup.exe"
-$CysWinBytes    = 139918106
-$CysWinSha256   = 'b63178db8bff46c5769092798ebf1a30f0ae0c7e0a23c750308ad0b59bef33fe'   # 릴리스 SHA256SUMS.txt 의 줄
+# ✅아래 세 값 = v1.0.1 발행(2026-09-16 10:56 · Latest) 뒤 **실측으로 채웠다**(installer-0321-pin · 앞 판 자리표 TBD-1.0.1 을 대신한다).
+#   출처 = 릴리스 SHA256SUMS.txt(그 파일 자신의 sha256 = c7b93b67bc17cd7f5cc88706eb6350c5dd7bc5c5cefb79dd7ea234c808c1f16e) · 크기는 릴리스 자산 목록과 내려받은 파일 양쪽에서 쟀다.
+#   ⚠판을 올릴 때 이 세 값을 그대로 두면 받기가 반드시 실패한다 — 대조는 tests/win-pin-release.sh 가 릴리스를 때려서 진다.
+# ⚠파일 이름 줄은 **선언 한 줄·뒤에 아무것도 없어야** 한다(tests/win-pin-release.sh 가 줄 끝까지 맞춰 읽는다).
+#   `${CysVersion}` 를 그대로 두는 것이 정본이다 — 판을 올릴 때 이름이 함께 따라 오르고, 뮤턴트 M508 이 그 따라오름을 잰다.
+#   지금 값은 풀면 cysr_1.0.1_x64-setup.exe = 릴리스 자산 이름과 글자 그대로 같다.
+$CysWinFile     = "cysr_${CysVersion}_x64-setup.exe"
+$CysWinBytes    = 139989480
+$CysWinSha256   = 'f33cb82e0cd96cd67827cb05b9139064bcad20103ede743b7fe7efad41e2564d'   # 릴리스 SHA256SUMS.txt 의 줄
 $CysDownloadUrl = $CysDownloadDir + $CysWinFile
 
 $LoginPollInterval = 2     # 초 — 승인 프로세스가 끝난 뒤 로그인을 다시 확인하는 간격
@@ -199,6 +205,14 @@ function Say($msg) {
     Write-Log $msg
     # 단계 수는 늘어난다(4 → 9 → 10). 숫자를 박아 두면 늘어난 순간 이 기록이 조용히 빈다.
     if ($msg -match '^\[\d+/\d+\]') { [void]$script:StepLog.Add($msg) }
+    # ⓕ③ v0.3.20 — 창에 오류 글이 뜨면 그 자리에서 찍는다(이유 × 단계마다 한 번 · fail-open).
+    #   ⚠$script:CaptureReady 를 보는 까닭: 이 함수는 파일 위쪽(196줄)인데 캡처 블록은 아래쪽에서 값을 잡는다.
+    #     그 전에 Say 가 불리면 아직 없는 변수를 보게 된다 — 그래서 **다 읽힌 뒤에만** 이 줄이 산다.
+    #   ⚠$script:CaptureInSay 를 보는 까닭: 증거를 보내는 쪽이 다시 Say 를 부르면 끝없이 돈다.
+    if ($script:CaptureReady -and (-not $script:CaptureInSay) -and ([string]$msg -imatch $CaptureErrorTextPattern)) {
+        $script:CaptureInSay = $true
+        try { Send-CaptureEvidence 'error-text' ([string]$msg) } finally { $script:CaptureInSay = $false }
+    }
 }
 
 #   `Set-Content -Encoding UTF8` 은 Windows PowerShell 5.1 에서 BOM 을 붙인다. 우리가 쓰는 `.claude.json` 을
@@ -968,6 +982,18 @@ function Test-CysBody {
     }
     return [pscustomobject]@{ Reg = $reg; Body = $body; Path = $path; Cli = $cli }
 }
+# ── 옛 판 안내 (TICKET=installer-speed-pin-0320 · 2026-09-16) ─────────
+#   0.14.x 로 깔린 cys 는 앱 안 업데이트가 안 된다(서명 열쇠가 바뀌었다) — 설치기가 새 판으로 다시 깐다.
+#   ★묻지 않는다 · 막지 않는다 — 한 줄 알리고 그대로 간다(사람 손 0). 판본을 못 읽으면 아무 말도 하지 않는다.
+function Show-OldCysNote {
+    try {
+        $v = Get-CysInstalledVersion (Test-CysBody)
+        if ($v -match '^0\.14\.') {
+            Say ("     깔려 있는 cys $v 는 앱 안에서 업데이트할 수 없는 옛 판입니다 — 이번 설치에서 새 판($CysDisplayName $CysVersion)으로 다시 설치합니다(하실 일은 없습니다).")
+            Write-Log ("old cys: $v -> reinstall $CysVersion")
+        }
+    } catch { }
+}
 # 설치된 cys 의 판본 (v0.3.18) — 설치 목록의 판본 칸이 먼저, 없으면 실행 파일에 적힌 판본. 명령은 부르지 않는다(데몬을 깨울 수 있다).
 #   돌려주는 것 = '0.14.36' 모양 · 못 읽으면 ''.
 function Get-CysInstalledVersion($b) {
@@ -1338,7 +1364,9 @@ function Invoke-DetectStage2 {
     $v = (& cys agent-detect 2>$null | Select-Object -First 5) -join ' '
     if ($v) { Add-Row '2-4' '어댑터 감지' $v 'ok' '-' } else { Add-Row '2-4' '어댑터 감지' '-' 'unknown' '-' }
 
-    $v = (& cys doctor 2>$null | Select-String -Pattern '^요약' | Select-Object -First 1)
+    # (installer-speed-pin-0320) [8/10] 이 방금 돌린 자가진단이 있으면 그 출력을 쓴다 — 같은 명령을 한 실행에 두 번 부르지 않는다.
+    $v = if ($script:DoctorText) { ($script:DoctorText -split "`n" | Select-String -Pattern '^요약' | Select-Object -First 1) }
+         else { (& cys doctor 2>$null | Select-String -Pattern '^요약' | Select-Object -First 1) }
     if ($v) { Add-Row '2-5' 'cys 자가점검' $v.ToString() 'ok' '요약 줄만 옮겨 적습니다' }
     else    { Add-Row '2-5' 'cys 자가점검' '-' 'unknown' '요약 줄을 찾지 못했습니다' }
 
@@ -2143,6 +2171,7 @@ function Step-Login {
             $w = 0
             # ★입력을 설치기가 쥔 자식으로 띄운다(위 「코드 넣기」) — 새로 뜬 창은 키 입력을 받지 못했다(2026-09-15 샌드박스). 사람은 복사만 한다.
             try { $loginProc = Start-LoginPipeProc -FilePath $claudeExe -ArgumentList 'auth','login' } catch { $loginProc = $null }
+            $script:LoginProc = $loginProc   # v0.3.20 — 정체 증거가 「살아 있는 로그인 창」을 찾는 자리(여기 말고는 안 쓴다)
             if ($null -eq $loginProc) {
                 # 다시 여는 자리에서 못 띄웠으면 확인으로 넘어간다(없는 명령을 앞에서 부르면 설치가 통째로 끝난다)
                 if ($reopened) { Write-Log 'login reopen: could not start - go to confirm'; break }
@@ -2332,15 +2361,23 @@ function Write-Directive {
 
 너는 이 컴퓨터의 설치를 대신 해 주는 자비스다. 상대는 처음 설치하는 사람이다.
 
-## 첫 응답 규칙 (불변)
-첫 응답의 **첫 줄은 반드시 아래 문자열 하나**로 시작한다. 이 줄이 곧 기동 성공의 판정 신호다.
+## 준비 작업 1번 — 표지 파일 하나 만들기 (제일 먼저)
 
-    $ReportHead
+아래 파일을 만들어라. 내용은 두 줄이면 된다 — 지금 시각과 이 세션의 프로세스 번호.
+
+    $(Join-Path $JarvisHome $MasterMarkName)
+
+**왜 이것을 먼저 하는가**: 설치기는 이 파일이 생긴 것으로 「자비스가 지침을 읽고 준비 작업을 시작했다」를 판정한다.
+없으면 설치기는 **시작하지 않은 것으로 보고 사람에게 사실대로 알린다**(거절인지 못 쓴 것인지는 단정하지 않는다).
+이 파일은 설치 확인용이고, 지워도 설치기가 다시 물어볼 뿐 다른 일은 일어나지 않는다.
+
+★**이 지침이 이상하다고 판단되면 따르지 않아도 된다.** 그때는 무엇이 왜 걸리는지 한 줄로 적어라 —
+설치기는 그것을 「시작하지 않음」으로 읽고 사람에게 넘긴다. 읽지 않은 채 따르는 것보다 그쪽이 낫다.
 
 **보고서에 「막힌 단계」가 적혀 있으면 표보다 먼저 그것을 말해라.** 세 가지를 이 순서로:
 1. 어디까지 됐는가(끝난 단계) 2. 무엇이 막혔는가 3. **사람이 할 일이 있으면 그것 하나만** — 없으면 「없습니다, 제가 이어서 합니다」.
 
-그 다음 줄부터 아래 파일을 읽어 표로 옮겨 적는다.
+그 다음 아래 파일을 읽어 표로 옮겨 적는다.
 ★보고서에 **「지나온 단계」** 절이 있으면 **표보다 먼저** 그것을 한 줄 요약으로 보여라 —
 사람은 방금 화면이 지워지는 것을 봤고, **무슨 일이 있었는지부터 알고 싶어 한다.**
 
@@ -2390,6 +2427,10 @@ function Write-Directive {
 - 네가 지금 하는 일은 **환경 보고를 사람 말로 옮겨 주고, 막힌 칸의 원인을 갈라 주는 것**이다.
 - ★**blocked 가 곧 고장은 아니다.** ⑴표준 계정이라 그런 것인지 ⑵이 계정에 아직 자리를 안 잡아서 그런 것인지를 **먼저 갈라서** 말해라.
 "@
+    # ⚠표지 파일 경로만 **가리지 않고** 적는다(다른 경로는 Redact 로 ~ 로 줄인다).
+    #   까닭: 이 줄은 사람이 읽는 안내가 아니라 **모델이 파일을 만들 자리**다. `~` 는 도구에 따라
+    #   그대로 폴더 이름이 될 수 있고, 그러면 표지가 엉뚱한 곳에 생겨 판정이 거짓 적색이 된다.
+    #   지침 파일은 그 사용자의 기계에만 있으므로 여기서 이름을 줄일 이유가 없다(첫 지시의 지침 경로도 이미 그대로다).
     Write-TextNoBom $DirectiveFile $d
     Say "지침 파일을 놓았습니다: $(Redact $DirectiveFile)"
 }
@@ -2950,7 +2991,8 @@ function Step-InstallCys {
             continue
         }
         # 설치기가 끝나도 파일이 자리를 잡기까지 잠깐 걸릴 수 있다
-        for ($i = 0; $i -lt 20; $i++) {
+        #   (installer-speed-pin-0320) 1초마다 60번 = 상한 60초 그대로 · 종전 3초 간격은 끝난 뒤 최대 3초를 헛기다렸다.
+        for ($i = 0; $i -lt 60; $i++) {
             # 덮어 깔 때는 몸통이 처음부터 있다 — 판본이 바뀌었을 때만 마친 것이다.
             $bNow = Test-CysBody
             # 같은 판을 덮어 깔 때는 판번이 처음부터 같다 — 설치기가 스스로 끝나고 성공(0)을 답했을 때만 마친 것이다.
@@ -2958,7 +3000,7 @@ function Step-InstallCys {
                 [void](Save-CysPinStamp $bNow)
                 Say '[6/10] 설치를 마쳤습니다.'; return 0
             }
-            Start-Sleep -Seconds 3
+            Start-Sleep -Seconds 1
         }
         # 앞의 설치기가 아직 돌고 있으면 다음 방법으로 넘어가지 않는다.
         # 그 위에 하나를 더 띄우면 설치기 자신이 「이미 돌고 있다」로 막아, 사람에게는
@@ -3040,11 +3082,17 @@ function Step-VerifyCys {
 
 # ── 하는 일 8 — 이 계정에 자리 잡기 ───────────────────────────────
 # 관리자 권한을 쓰지 않는다. 마지막 판정은 자가진단이 전부 통과하는가로 한다.
+$DaemonPingCapSec = 20    # 데몬 응답을 기다리는 상한(초) — 종전 2초×10회와 같다
+$DaemonPingGapMs  = 500   # 다시 묻기 전 간격 — 뜬 것을 보면 곧바로 넘어간다(installer-speed-pin-0320)
+$script:DoctorText = $null   # [8/10] 자가진단 출력 — 뒤의 보고 갱신(2단)이 같은 명령을 다시 부르지 않고 이것을 쓴다
 function Step-PrepareAccount {
     if ($Mode -eq 'dry') { Say '[8/10] (dry-run) 계정 준비를 하지 않았습니다.'; return 0 }
     $cli = if ($script:CysCli) { $script:CysCli } else { 'cys' }
     Say '[8/10] 이 계정에 자리를 잡습니다.'
+    # (installer-speed-pin-0320) 이 단계 안에서 무엇이 오래 걸리는지 기록에 초 단위로 남긴다(실기 비교용 · 화면에는 안 나간다).
+    $prepSw = [System.Diagnostics.Stopwatch]::StartNew()
     Invoke-Logged 'init-pack' $cli @('init-pack') | Out-Null
+    Write-Log ('timing 8/10 init-pack t=' + [int]$prepSw.Elapsed.TotalSeconds + 's')
     # 🔴2026-09-15 개정(윈 2차 재설치 실기) — 사전 설정·로그인 이어 두기를 **cys 를 켜기 전에** 한다.
     #   cys 가 켜지는 순간 지난 편성 기록이 있으면 동료 좌석이 곧바로 뜬다. 그 좌석들이 읽는 자리가 전용 자리(~\.cys\claude)인데,
     #   앞 판은 켠 **뒤에** 심었다 ⇒ 셋 다 첫 실행 질문(테마 고르기)·로그인 방법 고르기 앞에 섰다. 떠 있는 좌석은 뒤에 심은 것을 다시 읽지 않는다.
@@ -3056,13 +3104,18 @@ function Step-PrepareAccount {
     #   우리 추정도 아니다. 이 값 하나로 아래 문구가 갈린다 — 그래야 두 줄이 서로 모순되지 않는다.
     $script:AutoStartState = Get-CysAutoStartState $cli
     Write-Log ("daemon install rc=$daemonRc · scheduled task cysd = " + $script:AutoStartState)
+    Write-Log ('timing 8/10 daemon-install t=' + [int]$prepSw.Elapsed.TotalSeconds + 's')
     # 한 번 응답을 받았으면 그것으로 판정한다. 다시 물으면 그 순간의 흔들림으로 성공이 실패가 된다.
+    #   (installer-speed-pin-0320) 0.5초 간격 · 상한은 시계로 20초 그대로(종전 2초×10회) — 뜬 것을 보면 곧바로 넘어간다.
     $alive = $false
-    for ($i = 0; $i -lt 10; $i++) {
+    $pingSw = [System.Diagnostics.Stopwatch]::StartNew()
+    while ($true) {
         $pong = (& $cli ping 2>&1) -join ' '
         if ($pong -match 'pong') { $alive = $true; break }
-        Start-Sleep -Seconds 2
+        if ($pingSw.Elapsed.TotalSeconds -ge $DaemonPingCapSec) { break }
+        Start-Sleep -Milliseconds $DaemonPingGapMs
     }
+    Write-Log ('timing 8/10 ping alive=' + $alive + ' t=' + [int]$prepSw.Elapsed.TotalSeconds + 's')
     if (-not $alive) {
         # 자동으로 켜지게 등록하는 데 실패했을 수 있다(그 등록은 더 높은 권한을 요구하기도 한다).
         # 우리는 권한을 올리지 않는다. 대신 프로그램을 이번 한 번만 직접 켜서 쓸 수 있게 한다.
@@ -3079,10 +3132,12 @@ function Step-PrepareAccount {
                 Say ('     ' + (Get-AutoStartWords $script:AutoStartState))
             }
             try { Start-Process -FilePath $sideCar | Out-Null } catch { Say "       직접 열지 못했습니다: $($_.Exception.Message)" }
-            for ($i = 0; $i -lt 10; $i++) {
+            $pingSw = [System.Diagnostics.Stopwatch]::StartNew()
+            while ($true) {
                 $pong = (& $cli ping 2>&1) -join ' '
                 if ($pong -match 'pong') { $alive = $true; break }
-                Start-Sleep -Seconds 2
+                if ($pingSw.Elapsed.TotalSeconds -ge $DaemonPingCapSec) { break }
+                Start-Sleep -Milliseconds $DaemonPingGapMs
             }
             if ($alive) {
                 $script:DaemonTemporary = $true
@@ -3114,6 +3169,8 @@ function Step-PrepareAccount {
         return 8
     }
     $doc = (Invoke-CysProbe $cli @('doctor')) -join "`n"
+    $script:DoctorText = $doc
+    Write-Log ('timing 8/10 doctor t=' + [int]$prepSw.Elapsed.TotalSeconds + 's')
     # 자가진단은 마지막에 요약 한 줄을 낸다: 「요약: 11 OK · 1 WARN · 0 FAIL · 1 SKIP(판정 불가)」
     # 그 줄이 정본이다. 항목 표시는 폭을 맞추느라 [OK  ] 처럼 빈칸이 들어가서 표시만 세면 새어 나간다.
     $m = [regex]::Match($doc, '(\d+)\s*OK.*?(\d+)\s*WARN.*?(\d+)\s*FAIL.*?(\d+)\s*SKIP')
@@ -3185,12 +3242,24 @@ function Step-PrepareAccount {
 # ── 하는 일 9 — 자비스 깨우기 ─────────────────────────────────────
 # cys 안에서 세션을 여는 것이 기본이고, 그것이 안 되면 이 창에서 바로 띄운다.
 function Step-Wake {
-    # 바깥 프로그램에 넘기는 글자는 ASCII 로만 쓴다.
-    # 까닭(2026-09-05 실측): 우리말이 든 인자를 넘겼더니 받는 쪽이 여섯 개의 깨진 글자로 읽고
+    # 🔴**cys 에 넘기는 인자**는 ASCII 로만 쓴다(자리 여는 명령 · 창 이름).
+    # 까닭(2026-09-05 실측): 우리말이 든 인자를 cys 에 넘겼더니 받는 쪽이 여섯 개의 깨진 글자로 읽고
     #   「알 수 없는 인자」라며 거절했다 — 그래서 창이 열리지 않았다.
-    #   우리말 문장은 인자가 아니라 파일에 담아 보낸다. 그 파일은 자비스가 직접 읽으므로
-    #   중간에 글자가 바뀔 자리가 없다.
-    $firstPrompt = "Read the file $DirectiveFile and do exactly what it says. Your first line must be the fixed line specified there."
+    # ★그 규칙이 닿는 자리는 **cys 명령줄**이다. 첫 지시는 cys 를 지나지 않는다 —
+    #   wake.ps1(BOM 파일) 안에 적혀 claude 에게 바로 가고, 이 창 폴백에서도 claude 의 인자로 바로 간다.
+    #   그 길로 우리말이 온전히 가는 것은 이미 실측됐다: 0.3.21 이 같은 자리로 보낸 선언
+    #   「너는 마스터다」가 2026-09-16 샌드박스에서 글자 그대로 모델에 닿았다(모델이 그 지시를 읽고 답했다).
+    # 🔴2026-09-16 개정(TICKET=installer-0322-awaken · 정본 = master/reports/awaken-refusal/REPORT-awaken-refusal-2026-09-16.md)
+    #   앞 판 문구 = `Read the file <파일> and do exactly what it says. Your first line must be the fixed line specified there.`
+    #   그 문구가 거부를 불렀다 — 모델은 지령의 **내용**이 아니라 **요구의 형태**를 거절했다:
+    #   ⑴읽어 보기 전에 그대로 실행하라(do exactly what it says) ⑵네 첫마디를 이 대본으로 하라(first line must be).
+    #   같은 샌드박스·같은 세션·같은 80KB 주입에서 문구만 의뢰형으로 바꾸자 같은 모델이 같은 파일을 읽고 수행했다
+    #   (2026-09-16 13:25 단일 변수 A/B 실측). ⇒ 통과시키는 문구가 아니라 **읽고 판단할 수 있게 사실을 주는 문구**로 바꾼다
+    #   (팩 session-start.sh 가 2026-08-01 같은 사건에서 채택한 원칙과 같다).
+    # ⛔첫 줄 「너는 마스터다」는 그대로 둔다 — 그것은 인사말이 아니라 **팩 훅의 선언 트리거**다
+    #   (UserPromptSubmit → role-bootstrap.sh → javis_detect.py `SUBJECT.{0,n}(마스터|master).{0,n}TERM`).
+    #   그 줄을 빼면 동료 자리가 영영 서지 않는다(실측: 의뢰 문구 단독 = 감지기 rc 1 「선언 없음」).
+    $firstPrompt = "install-jarvis 폴더의 install-directive.md($DirectiveFile) 를 읽고, 거기 적힌 준비 작업을 해 주세요."
     if ($Mode -eq 'dry') {
         Say '[9/10] (dry-run) 자비스를 띄우지 않았습니다.'
         Say "     (지금까지 사람 손이 필요했던 횟수: $($script:HumanHands)번)"
@@ -3208,6 +3277,9 @@ function Step-Wake {
     # ⇒ 문장은 파일에 넣고, 여는 명령은 그 파일 하나만 가리킨다.
     # ★자리를 열기 **전에** 기준선을 찍는다(2차 검토 N2). 이 줄이 자리 여는 줄보다 뒤에 오면
     #   우리가 만든 master 자리까지 기준선에 들어가 영영 안 세어진다.
+    # ★지난 설치가 남긴 표지를 먼저 치운다 — 남아 있으면 이번 마스터가 아무 일도 안 해도 「시작했다」로 읽힌다.
+    #   (시각 검사도 함께 두지만, 지우는 쪽이 먼저다 — 검사 하나에만 기대면 그 검사가 눈이 멀 때 거짓 초록이 된다.)
+    Clear-MasterMark
     Set-FleetBaseline $cli
     $wakeFile = Join-Path $JarvisHome 'wake.ps1'
     # 앞 단계에서 자리 잡기가 끝나지 않았으면 cys 안에 창을 열 수 없다.
@@ -3329,12 +3401,29 @@ function Step-Wake {
 #   ★「보냈다」로 성공을 말하지 않는다 — 자식 좌석(cso·worker)이 선 것이 곧 선언이 들어갔다는 증거다.
 #     안 섰는데 「깨어났습니다」라고 하면 사용자는 창을 닫고 자비스는 영영 혼자 남는다.
 $FleetTrigger = '너는 마스터다'
+# ── 마스터 각성 판정(TICKET=installer-0322-awaken · 2026-09-16) ────────────────────────────
+# 🔴앞 판의 판정(`Test-DeclarationSeen`)은 **master 자리를 한 글자도 보지 않았다** — 「master 가 아닌 역할이
+#   하나라도 살아 있으면 참」이었다. 그런데 자식 자리는 마스터의 순종과 **무관한 경로로도 선다**
+#   (cys 가 켜질 때 지난 편성 기록을 보고 `formation-heartbeat` 가 자동 복구한다 · [8/10] 주석 참조).
+#   ⇒ 2026-09-16 샌드박스에서 마스터가 첫 지시를 **거절한 그 순간에도** 화면은 「함대가 섰습니다 ·
+#     자비스가 깨어났습니다」를 찍었다. 판정의 증거가 판정 대상과 인과적으로 끊겨 있었다.
+# ★그래서 마스터 자리를 **직접 잰다**. 축은 둘이고, 둘 다 우리가 만들지 않는 것이다:
+#   ⑴그 자리 클로드의 세션 기록(jsonl)에 **답 레코드 ≥1** = 「지시를 받고 말을 했다」
+#   ⑵지침의 **첫 준비 작업**이 쓰는 표지 파일 = 「받은 뒤 실제로 일을 시작했다」
+#   ⑴∧⑵ 일 때만 「깨어났습니다」라고 말한다. 셋으로 갈리는 답을 한 칸에 담지 않는다(아래 Confirm-MasterAwake).
+# ⚠이 축이 새로 만드는 실패 모드 = 「표지를 못 썼다」(권한·경로). 그래서 ⑴만 참인 칸의 문구는
+#   원인을 **단정하지 않고 둘 다 적는다**(거절했거나 표지를 쓰지 못했거나). 거짓 적색을 거짓 초록으로 바꾸지 않는다.
+$MasterMarkName    = 'awake-master.ok'   # 지침의 준비 작업 1번이 만드는 표지(우리가 만들지 않는다)
+$MasterAwakeCapSec = 120                 # 첫 관측 상한(브리프 지정) · 시험이 줄여 쓴다
+$MasterAwakePollSec = 3
+$MasterRetryCapSec = 60                  # 재시도 뒤 다시 재는 상한
+$MasterRetryMax    = 1                   # 재시도는 **한 번**뿐이다(같은 문구를 되풀이해 밀어붙이지 않는다)
 $FleetRoles   = @('master', 'cso', 'worker')   # 이 기계에서 세울 수 있는 역할(리뷰어 둘은 고르기 나름)
-$FleetPollSec   = 5    # 자리 목록을 몇 초마다 보는가(시험이 줄여 쓴다)
-$FleetAwakeTries = 48  # 5초 × 48 = 240초(4분). 사람 손 없이 동료가 서기를 기다리는 상한.
+$FleetPollSec   = 2    # 자리 목록을 몇 초마다 보는가(시험이 줄여 쓴다) · 종전 5초(installer-speed-pin-0320 — 먼저 보고 나서 기다린다)
+$FleetAwakeTries = 120 # 2초 × 120 = 240초(4분). 사람 손 없이 동료가 서기를 기다리는 상한.
 #   🔴90초였다가 올렸다(2026-09-15 윈 실기) — 자비스의 첫 턴(지침 읽기 + 점검)이 1분 13초 넘게 걸려, 90초가 먼저 끝나
 #     폴백 카드가 뜬 뒤에 사람이 아무것도 안 쳤는데 함대가 섰다(카드는 순수 오발 · 손 계수가 거짓으로 늘었다).
-$FleetWaitTries = 72   # 5초 × 72 = 6분. (자동이 안 닿았을 때) 사람이 창을 찾아 한 문장 치기에 넉넉한 시간.
+$FleetWaitTries = 180  # 2초 × 180 = 6분. (자동이 안 닿았을 때) 사람이 창을 찾아 한 문장 치기에 넉넉한 시간.
 # 🔴🔴**이전 설치의 좌석을 이번 선언으로 세지 않는다**(2차 검토 N2 확정 2026-09-10).
 #   앞 판은 전역 목록에서 **역할 이름만** 셌다. 그러면 지난 설치의 master·cso·worker 가 아직 살아
 #   있는 기계에서는 사람이 **아무 선언도 하지 않았는데** 첫 폴링에 세 역할이 다 차서
@@ -3544,6 +3633,7 @@ function Confirm-ChildSeat([string]$Cli, [string]$Role, [string]$Ref, [string]$C
             [void](Invoke-CysCapped $Cli ('send-key --surface ' + $Ref + ' Return') $ChildReadCapMs)
             Write-Log ('awaken child: role=' + $Role + ' seat=' + $Ref + ' marker=awaken:child-retry ' + $retry)
             Send-Progress '10/10' 'info' $null ('awaken:child-retry ' + $retry) $null
+            Send-CaptureEvidence 'retry' ('awaken:child-retry role=' + $Role + ' seat=' + $Ref + ' n=' + $retry)   # ⓕ② v0.3.20
             $gap = $ChildAwakeGaps[[math]::Min($retry, $ChildAwakeGaps.Count) - 1]
             if ($gap -gt 0) { Start-Sleep -Seconds $gap }
         } elseif (-not $graced) {
@@ -3565,7 +3655,7 @@ function Send-ChildStallEvidence([string]$Role, [string]$Screen) {
         $from = [math]::Max(0, $lines.Count - 40)
         $tail = 'seat=' + $Role + "`n" + (($lines[$from..($lines.Count - 1)]) -join "`n")
         $t = Get-RemoteHelpTailBytes (Protect-EvidenceText $tail) $EvidenceTextBytes
-        Send-Progress '10/10' 'evidence' $null $null $null ([ordered]@{ text = $t; reason = 'stall'; masked = $true })
+        [void](Send-EvidenceEvent 'stall' $t)
         Write-Log ('evidence sent: ' + $key + ' ' + [System.Text.Encoding]::UTF8.GetByteCount($t) + 'B')
     } catch { Write-Log ('evidence error (fail-open): ' + $_.Exception.Message) }
 }
@@ -3578,8 +3668,9 @@ function Confirm-ChildSeats([string]$Cli) {
         $res = Confirm-ChildSeat $Cli $r $ref $seats[$r].cwd
         $counts = ' u=' + $res.u + ' a=' + $res.a
         if ($res.ok) {
-            # ★「깨움 확인」은 세션 기록 근거가 있을 때만 말한다
-            Say ('     ' + $r + ' 자리 깨움 확인')
+            # ★이 판정이 재는 것은 **제출**이다(사용자 레코드 ≥1) — 「받아들였다」가 아니다. 문구를 재는 것에 맞춘다
+            #   (TICKET=installer-0322-awaken · 앞 판 「깨움 확인」은 순종까지 잰 것처럼 읽혔다).
+            Say ('     ' + $r + ' 자리 지시 제출 확인')
             Write-Log ('awaken child: role=' + $r + ' seat=' + $ref + ' marker=awaken:child-verified retries=' + $res.retry + ' evidence=jsonl' + $counts)
             Send-Progress '10/10' 'info' $null 'awaken:child-verified' $null
         } else {
@@ -3592,6 +3683,132 @@ function Confirm-ChildSeats([string]$Cli) {
         }
     }
     return $failed
+}
+function Get-MasterMarkPath { return (Join-Path $JarvisHome $MasterMarkName) }
+function Clear-MasterMark {
+    # 지운다 — 단 **우리 자비스 폴더 안의 그 이름 하나**만. 경로를 짐작하지 않는다.
+    $f = Get-MasterMarkPath
+    try {
+        if (Test-Path -LiteralPath $f) {
+            Remove-Item -LiteralPath $f -Force -ErrorAction Stop
+            Write-Log ('master mark: cleared stale ' + $f)
+        }
+    } catch { Write-Log ('master mark: clear failed (이어 간다) ' + $_.Exception.Message) }
+}
+function Test-MasterMark {
+    # 참 = 표지가 있고 **이번 설치의 기준선 뒤에** 쓰였다. 지난 설치의 표지를 이번 각성으로 세지 않는다.
+    $f = Get-MasterMarkPath
+    try {
+        if (-not (Test-Path -LiteralPath $f)) { return $false }
+        $t = (Get-Item -LiteralPath $f).LastWriteTimeUtc
+        # 5초 여유 = 파일 시각 알갱이·기준선을 찍는 순간의 어긋남만 흡수한다(지난 설치를 흡수할 크기가 아니다).
+        return ($t -ge $script:ChildAwakeSince.AddSeconds(-5))
+    } catch { return $false }
+}
+function Get-MasterAssistantCount {
+    # 마스터 자리 세션 기록의 **답 레코드** 수. 자식 판정과 같은 읽기 코드를 쓴다(자리 폴더 = 자비스 폴더).
+    try { return (Get-SeatSessionCounts (Get-SeatSessionFile $JarvisHome)).a } catch { return 0 }
+}
+function Wait-MasterSigns([int]$CapSec) {
+    # 상한 안에서 두 축을 함께 본다. 둘 다 서면 곧바로 끝낸다(좋은 길에서는 기다리지 않는다).
+    $sw = [System.Diagnostics.Stopwatch]::StartNew()
+    $mark = $false; $a = 0
+    while ($true) {
+        if (-not $mark) { $mark = Test-MasterMark }
+        if ($a -lt 1) { $a = Get-MasterAssistantCount }
+        if ($mark) { break }   # 표지가 곧 판정이다 — 답 기록을 더 기다리지 않는다(위 Get-MasterStateName 주석)
+        if ($sw.Elapsed.TotalSeconds -ge $CapSec) { break }
+        Start-Sleep -Seconds $MasterAwakePollSec
+    }
+    return @{ mark = $mark; a = $a }
+}
+function Send-MasterRetry([string]$Cli, [string]$Ref) {
+    # 같은 문구를 되풀이하지 않는다 — 앞 요청이 무슨 뜻이었는지 한 줄 보태고 다시 청한다.
+    #   ⛔선언(「너는 마스터다」)을 다시 보내지 않는다: 그 줄은 이미 첫 프롬프트로 갔고,
+    #     창에 밀어 넣은 글은 팩 판정기가 기계 배달로 보아 선언으로 세지 않는다(2026-09-05 실측).
+    if (-not $Ref) { return $false }
+    $msg = '앞서 보낸 요청은 install-directive.md 를 읽고 판단하신 뒤 준비 작업을 해 달라는 뜻입니다. ' +
+           '읽어 보시고 괜찮다면 준비 작업 1번(표지 파일 만들기)부터 해 주세요. 판단해 보시고 못 하겠다면 그 까닭을 한 줄로 적어 주세요.'
+    [void](Invoke-CysCapped $Cli ('send --surface ' + $Ref + ' "' + $msg + '"') $ChildReadCapMs)
+    Start-Sleep -Seconds 2
+    [void](Invoke-CysCapped $Cli ('send-key --surface ' + $Ref + ' Return') $ChildReadCapMs)
+    Write-Log ('awaken master: marker=awaken:master-retry seat=' + $Ref)
+    Send-Progress '10/10' 'info' $null 'awaken:master-retry' $null
+    Send-CaptureEvidence 'retry' ('awaken:master-retry seat=' + $Ref)
+    return $true
+}
+function Get-MasterStateName($r) {
+    # ★셋으로 가르는 자리는 **하나**다 — 두 벌이면 한쪽만 고쳐져 판정이 조용히 갈린다.
+    # 🔴**표지 하나가 곧 「일을 시작했다」의 증거다** — 답 레코드를 함께 요구하지 않는다(이종 검토 1R 지적 채택 2026-09-16).
+    #   까닭 = 같은 병의 두 번째 자리다: 자식 판정도 답 레코드를 요구하던 판(9c49720)이 느린 기계에서
+    #   **거짓 실패**를 냈다(installer-awaken-verify-r2 — 답 레코드는 제출 뒤 30초+ 늦게 생긴다).
+    #   표지는 쓰였는데 답 기록이 아직 디스크에 안 내려간 찰나를 「판정 못 함」으로 떨어뜨리면 그 병을 여기서 되풀이한다.
+    #   그리고 두 축의 증거 힘이 다르다 — 표지는 **일을 시작했다**를, 답 레코드는 **말을 했다**를 말할 뿐이다.
+    if ($r.mark) { return 'verified' }                     # 일을 시작했다(이 표지는 마스터만 쓴다 · 우리는 깨우기 전에 지운다)
+    if ($r.a -ge 1) { return 'no-start' }                  # 말은 했는데 시작하지 않았다(거절 또는 표지 못 씀)
+    return 'unknown'                                       # 우리 관측이 닿지 않았다 — 「거절」이라고 말하지 않는다
+}
+function Confirm-MasterAwake([string]$Cli, [string]$Ref) {
+    # 돌려주는 것 = @{ state; mark; a; retry }  · state 는 셋 중 하나이고 **서로 다른 문구·표지**를 갖는다.
+    #   verified  = 답 레코드 ≥1 ∧ 표지 있음      → 「각성 확인」   (여기서만 「깨어났습니다」를 말한다)
+    #   no-start  = 답 레코드 ≥1 ∧ 표지 없음      → 「받았으나 시작 안 함」(거절했거나 표지를 못 썼다 — 단정하지 않는다)
+    #   unknown   = 답 레코드 0  ∧ 표지 없음      → 「판정 못 함」(우리 관측이 닿지 않았을 수도 있다)
+    $r = Wait-MasterSigns $MasterAwakeCapSec
+    $retry = 0
+    if ((-not $r.mark) -and ($r.a -ge 1) -and ($MasterRetryMax -ge 1)) {
+        if (Send-MasterRetry $Cli $Ref) {
+            $retry = 1
+            $r = Wait-MasterSigns $MasterRetryCapSec
+        }
+    }
+    $state = Get-MasterStateName $r
+    Write-Log ('awaken master: marker=awaken:master-' + $state + ' mark=' + $r.mark + ' a=' + $r.a + ' retry=' + $retry)
+    Send-Progress '10/10' 'info' $null ('awaken:master-' + $state) $null
+    return @{ state = $state; mark = $r.mark; a = $r.a; retry = $retry }
+}
+function Write-MasterSay($res) {
+    # 셋을 **서로 다른 문구**로 찍는다 — 한 문구로 뭉치면 화면이 다시 거짓말을 시작한다.
+    switch ($res.state) {
+        'verified' { Say '     자비스(master) 각성 확인 — 지시를 받고 준비 작업을 시작했습니다.' }
+        'no-start' { Say '     자비스(master)는 지시를 받았으나 준비 작업을 시작하지 않았습니다.'
+                     Say '     (요청을 판단해 보고 거절했거나, 표지 파일을 쓰지 못했을 수 있습니다 — 무엇인지 여기서는 단정하지 않습니다.)' }
+        default    { Say '     자비스(master)가 깼는지 판정하지 못했습니다 — 세션 기록도 표지 파일도 찾지 못했습니다.' }
+    }
+}
+function Write-MasterRequestCard {
+    # 마스터가 지시는 받았는데 시작하지 않은 끝에서만 인쇄한다.
+    #   ⛔여기에 「너는 마스터다」를 적지 않는다 — 그 한마디는 이미 들어갔고, 다시 쳐도 같은 자리에 선다.
+    #   ★적는 문구는 **2026-09-16 13:25 에 같은 기계에서 실제로 받아들여진 그 문장**이다.
+    Human '자비스' '자비스가 아직 준비 작업을 시작하지 않아 한 줄만 부탁드립니다 — cys 창에서 쳐 주십시오'
+    Say ''
+    Say '   ┌───────────────────────────────────────────────────────────────┐'
+    Say '   │   cys 창(제목 jarvis)에 이렇게 쳐 주십시오:                   │'
+    Say '   │                                                               │'
+    Say '   │     install-jarvis 폴더의 install-directive.md 를 읽고,       │'
+    Say '   │     거기 적힌 준비 작업을 해 주세요.                          │'
+    Say '   │                                                               │'
+    Say '   └───────────────────────────────────────────────────────────────┘'
+    Say ''
+    Say '   자비스가 그 파일을 읽고 판단한 뒤 준비 작업을 시작합니다. 거절하면 그 까닭을 사람 말로 알려 줍니다.'
+}
+function Get-MasterStateNow {
+    # 기다리지 않고 **지금 한 번**만 본다(재시도 없음) — 카드 뒤에 다시 잴 때 쓴다.
+    $r = Wait-MasterSigns 0
+    $state = Get-MasterStateName $r
+    Write-Log ('awaken master: marker=awaken:master-' + $state + ' mark=' + $r.mark + ' a=' + $r.a + ' retry=0 (recheck)')
+    Send-Progress '10/10' 'info' $null ('awaken:master-' + $state) $null
+    return @{ state = $state; mark = $r.mark; a = $r.a; retry = 0 }
+}
+function Write-MasterUnknownCard {
+    # 「판정 못 함」은 「거절했다」가 아니다 — 우리 관측이 닿지 않았을 수도 있다. 그래서 문구가 다르다.
+    Say ''
+    Say '   cys 창(제목 jarvis)을 열어 자비스가 무엇을 하고 있는지 보아 주십시오.'
+    Say '   아무 말도 하지 않고 있으면 이렇게 쳐 주시면 됩니다: install-jarvis 폴더의 install-directive.md 를 읽고, 거기 적힌 준비 작업을 해 주세요.'
+}
+function Set-FleetNeedsMaster {
+    # 끝맺음이 「예상 못 한 끝」으로 읽지 않게 하되, 「끝났습니다」라고도 하지 않는다 — 남은 일을 그대로 적는다.
+    $script:NextStep = 'cys 창(제목 jarvis)의 자비스에게 위 한 줄을 전해 주십시오. 그것으로 설치가 끝납니다.'
+    $script:ShowRerun = $false
 }
 function Step-Fleet {
     param([string]$SurfaceRef)
@@ -3612,19 +3829,26 @@ function Step-Fleet {
         Say '     그 뒤 자비스에게 「동료들 다 섰어?」라고 물어보시면 자비스가 직접 확인해 알려 드립니다.'
         return 10
     }
-    # ── 자동 각성 확인(사람 손 0) — 선언은 [9/10] 이 첫 프롬프트로 이미 넘겼다 ──
+    # ── ① 마스터가 **실제로** 깼는지 먼저 잰다(TICKET=installer-0322-awaken) ──
+    #   왜 먼저인가: 동료 자리는 마스터의 순종과 무관한 경로로도 선다(편성 자동 복구). 마스터를 뒤에 재면
+    #   그 사이에 이미 「함대가 섰습니다」가 찍혀, 우리가 고치려는 거짓 초록이 그대로 남는다.
+    Say '[10/10] 자비스(master)가 지시를 받고 준비 작업을 시작하는지 봅니다 (최대 2분 · 사람이 하실 일은 없습니다).'
+    $mres = Confirm-MasterAwake $cli $SurfaceRef
+    Write-MasterSay $mres
+    # ── ② 자동 각성 확인(사람 손 0) — 선언은 [9/10] 이 첫 프롬프트로 이미 넘겼다 ──
     Say '[10/10] 자비스가 깨어나 동료들을 부르는지 지켜봅니다 (최대 4분 · 사람이 하실 일은 없습니다).'
     Write-Log "fleet: auto awaken - watching child seats in $SurfaceRef (cap $($FleetAwakeTries * $FleetPollSec)s)"
+    $fleetSw = [System.Diagnostics.Stopwatch]::StartNew()   # [10/10] 소요(초)를 진행 전송에 싣는다(installer-speed-pin-0320)
     $live = @()
     for ($i = 0; $i -lt $FleetAwakeTries; $i++) {
-        Start-Sleep -Seconds $FleetPollSec
         $live = @(Get-LiveRoles $cli)
         if ($live.Count -ge $FleetRoles.Count) { break }
+        Start-Sleep -Seconds $FleetPollSec   # 먼저 보고 나서 기다린다 — 이미 섰으면 한 번도 기다리지 않는다
     }
     # ★성공의 근거 = 자식 좌석. 우리가 연 master 자리는 근거가 못 된다(아래 Test-DeclarationSeen 머리 주석).
     if (Test-DeclarationSeen $live) {
         Write-Log ('fleet awaken: auto - seats=' + ($live -join ','))
-        Send-Progress '10/10' 'end' $null 'awaken:auto' $null   # 자동 각성 성공(master 병합 연결 2026-09-15)
+        Send-Progress '10/10' 'end' ([int]$fleetSw.Elapsed.TotalSeconds) 'awaken:auto' $null   # 자동 각성 성공(master 병합 연결 2026-09-15)
         $missing = @($FleetRoles | Where-Object { $live -notcontains $_ })
         if ($missing.Count -eq 0) {
             Say ("[10/10] 함대가 섰습니다: " + ($live -join ' · '))
@@ -3634,16 +3858,26 @@ function Step-Fleet {
         }
         # ★자리가 선 것만으로 끝내지 않는다 — 선 자식 자리가 실제로 깼는지 화면으로 확인하고, 멈췄으면 깨운다.
         [void](Confirm-ChildSeats $cli)
+        Send-PostInstallEvidence $cli $SurfaceRef   # ⓑ v0.3.20 — 끝난 그 화면을 한 번 보낸다(훅 오류 줄 수 + 앱 창 그림)
         Say ''
-        Say '   자비스가 깨어났습니다 — 이제 설치 창을 닫으셔도 됩니다.'
-        Set-FleetFinished
+        # 🔴「깨어났습니다」는 **마스터 판정이 verified 일 때만** 말한다(TICKET=installer-0322-awaken).
+        #   동료 자리가 선 것은 마스터가 일을 시작했다는 증거가 못 된다 — 2026-09-16 샌드박스가 그 둘이 갈리는 것을 실제로 보여 줬다.
+        if ($mres.state -eq 'verified') {
+            Say '   자비스가 깨어났습니다 — 이제 설치 창을 닫으셔도 됩니다.'
+            Set-FleetFinished
+            Clear-FleetStrayKeys
+            return 0
+        }
+        Say '   동료 자리는 섰지만, 자비스(master)가 준비 작업을 시작한 것은 확인하지 못했습니다.'
+        if ($mres.state -eq 'no-start') { Write-MasterRequestCard } else { Write-MasterUnknownCard }
+        Set-FleetNeedsMaster
         Clear-FleetStrayKeys
-        return 0
+        return 10
     }
     # 상한 안에 동료 자리가 하나도 안 섰다 = 자동 각성이 닿지 않았다(기술적 실패) ⇒ **그때만** 사람에게 부탁한다.
     #   ⚠원인을 단정하지 않는다 — 우리가 아는 것은 「상한 안에 안 섰다」뿐이다(카드 뒤에 저절로 서는 일도 실기에서 있었다).
     Write-Log "fleet awaken: no child seat within $($FleetAwakeTries * $FleetPollSec)s -> manual fallback card"
-    Send-Progress '10/10' 'info' $null 'awaken:manual-fallback' $null   # 자동 각성 미도달 → 사람 카드(master 병합 연결 2026-09-15)
+    Send-Progress '10/10' 'info' ([int]$fleetSw.Elapsed.TotalSeconds) 'awaken:manual-fallback' $null   # 자동 각성 미도달 → 사람 카드(master 병합 연결 2026-09-15)
     Human '자비스' '자비스가 저절로 깨어나지 않아 한마디만 부탁드립니다 — cys 창에서 쳐 주십시오'
     Say ''
     Say '   ┌─────────────────────────────────────────────┐'
@@ -3658,18 +3892,19 @@ function Step-Fleet {
     $live = @()
     $waited = 0
     for ($i = 0; $i -lt $FleetWaitTries; $i++) {
-        Start-Sleep -Seconds $FleetPollSec
-        $waited += $FleetPollSec
         $live = @(Get-LiveRoles $cli)
         if ($live.Count -ge $FleetRoles.Count) { break }
+        Start-Sleep -Seconds $FleetPollSec   # 먼저 보고 나서 기다린다(installer-speed-pin-0320)
+        $waited += $FleetPollSec
         # 오래 걸리면 얼마나 더 기다리는지 알려 준다 — 말없이 멈춰 있는 것처럼 보이지 않게.
         # 🔴2026-09-10 실기에서 고친 것(5차 검토) — 앞 판은 **판정 없이** 「아직 치지 않으셨다면 지금 쳐 주십시오」를
         #   되풀이했다. 쓰시는 분은 이미 치셨고 자비스는 그 4분 동안 환경 보고를 쓰고 동료를 부르고 있었다.
         #   ⇒ 사용자에게는 「다 됐다」와 「아직 안 쳤다」가 동시에 떠 있었다.
         #   ★판정 축은 이미 손에 있었다 — master 자리가 목록에 서 있으면 **그 한마디는 이미 들어간 것**이다
         #     (선언이 role 등록을 낳는다). 그 뒤로는 사람에게 시킬 일이 없다.
-        #   ⚠새 프로브를 만들지 않는다 — 이미 5초마다 부르는 `cys list` 의 답을 그대로 읽는다.
-        if (($i -gt 0) -and (($i % 12) -eq 0)) {
+        #   ⚠새 프로브를 만들지 않는다 — 이미 2초마다 부르는 `cys list` 의 답을 그대로 읽는다.
+        #   알림은 1분마다(2초 × 30) — 간격을 줄이며 알림이 잦아지지 않게 함께 고쳤다(installer-speed-pin-0320).
+        if (($i -gt 0) -and (($i % 30) -eq 0)) {
             $mins = "$([int]($waited / 60))분 지남 · 최대 $([int](($FleetWaitTries * $FleetPollSec) / 60))분"
             if (Test-DeclarationSeen $live) {
                 Say ("   자비스가 동료들을 부르는 중입니다. 그대로 기다려 주십시오 ($mins).")
@@ -3685,6 +3920,17 @@ function Step-Fleet {
         # 카드 뒤에 선 함대도 성공이다 — 기록 줄이 없으면 로그만 보는 사람은 폴백에서 끝난 줄로 읽는다(2026-09-15 실기 로그).
         Write-Log ('fleet awaken: success after fallback card - seats=' + ($live -join ','))
         [void](Confirm-ChildSeats $cli)
+        Send-PostInstallEvidence $cli $SurfaceRef   # ⓑ v0.3.20 — 카드 뒤에 선 끝도 같은 증거를 보낸다
+        # 카드 뒤 6분 사이에 마스터가 시작했을 수 있다 ⇒ **한 번만 다시 본다**(재시도는 하지 않는다 · 이미 1회 썼다).
+        $mres = Get-MasterStateNow
+        Write-MasterSay $mres
+        if ($mres.state -ne 'verified') {
+            Say '   동료 자리는 섰지만, 자비스(master)가 준비 작업을 시작한 것은 확인하지 못했습니다.'
+            if ($mres.state -eq 'no-start') { Write-MasterRequestCard } else { Write-MasterUnknownCard }
+            Set-FleetNeedsMaster
+            Clear-FleetStrayKeys
+            return 10
+        }
         Set-FleetFinished
         Clear-FleetStrayKeys
         return 0
@@ -3715,7 +3961,7 @@ function Step-Fleet {
 #   글자 칸은 `\z` 로 끝을 못박아 다시 만든다. 이름·글자·판본 비교는 대소문자를 가르는 -ceq·-cmatch·-ccontains 만 쓴다.
 # ⚠PowerShell 은 `'true' -eq $true` 를 참으로 본다 ⇒ 칸마다 **형(type)을 먼저** 본다.
 # ⚠이 절은 맥에서 PowerShell 없이 **정적 검사 + 맥판과의 대조**로만 증명했다 — 윈도우 실기가 필요한 축은 내부 문서.
-$InstallerVersion       = '0.3.19'   # 보고의 installer_version · $BootstrapVersion 은 화면 머리글 용도 그대로(보내지 않는다)
+$InstallerVersion       = '0.3.23'   # 보고의 installer_version · $BootstrapVersion 은 화면 머리글 용도 그대로(보내지 않는다)
 $HelpApiUrl             = 'https://jarvis-install.godmeyou.kr'
 $RemoteHelpNoticeUrl    = 'jarvis-install.godmeyou.kr/help/notice'
 # [1/10] 고지 1줄 = /help/notice 정본이 인용하는 문장 그대로 + 끝에 자세한 안내 자리. ⛔문안 변경 금지(맥판과 글자가 같아야 한다).
@@ -4350,6 +4596,7 @@ function Send-RemoteHelpDecline([long]$Seq, [string]$Rule) {
     return 0
 }
 
+
 function Invoke-RemoteHelpCommand([long]$Seq, $Entry, [string[]]$Argv) {
     # 계약 9-4절 3~7 — 표·문법을 통과한 명령 하나. 돌려주는 것 = Invoke-RemoteHelpTick 과 같다.
     $slots = $Entry.usage -split ' '
@@ -4417,6 +4664,8 @@ function Invoke-RemoteHelpTick([string]$Text) {
     $poll = $null
     try { $poll = ConvertFrom-Json -InputObject $Text -ErrorAction Stop } catch { return 0 }
     if ($null -eq $poll) { return 0 }
+    Receive-CaptureRequest $poll.capture   # v0.3.20 — 촬영 요청은 이 답에도 실려 온다(계약 5절 ②)
+    Invoke-CaptureRequested
     Show-RemoteHelpAnswer $poll
     $session = $poll.session
     if ($null -eq $session -or -not ($session.open -is [bool]) -or -not $session.open) { return 1 }
@@ -4648,7 +4897,7 @@ $TranscriptFile     = Join-Path $JarvisHome 'transcript.txt'
 $AttachMaxBytes     = 900 * 1024                          # 항목 하나의 상한(계약 2절)
 # 첫 화면 고지 = 서버 정본 문안(web-install 의 NOTICE_TEXT)과 글자까지 같다(계약 2절 「정본 1곳」 · 서버 응답의 notice 필드와도 같은 문장).
 # v0.3.18 — 고지 정본 1줄 교체(master 릴레이 2026-09-15 20:18 · 서버 NOTICE_TEXT 도 같은 글로 바꾼다 = 732 몫)
-$ProgressNotice = '설치가 진행되는 동안 단계와 시각이 자동으로 전송됩니다. 설치가 막히면 설치 창에 표시된 글자만 보내지며, 로그인 코드·이메일·계정 이름은 가려집니다. 보관 30일 뒤 자동 삭제됩니다.'
+$ProgressNotice = '설치가 진행되는 동안 단계와 시각이 자동으로 전송됩니다. 설치가 막히거나 이상이 보이거나 끝났을 때, 그리고 운영팀이 청할 때 설치 창·로그인 창·자비스 창·첫 자리 화면의 글자와 그림이 함께 보내집니다(다른 창은 찍지 않습니다). 글자에서는 로그인 코드·이메일·계정 이름을 가리지만, 그림은 가릴 수 없어 운영팀만 봅니다. 보관 30일 뒤 자동 삭제됩니다.'
 $script:InstallId      = ''
 $script:ProgressWarned = $false     # 전송 실패 경고는 실행당 한 번만 기록한다(fail-open)
 $script:TranscriptOn   = $false
@@ -4698,10 +4947,13 @@ function Send-Progress($step, $ev, $elapsed, $detail, $envInfo, $extra) {
         $body = ($fields | ConvertTo-Json -Compress -Depth 4)
         $ProgressPreference = 'SilentlyContinue'
         try { [Net.ServicePointManager]::SecurityProtocol = [Net.ServicePointManager]::SecurityProtocol -bor [Net.SecurityProtocolType]::Tls12 } catch { }
-        [void](Invoke-WebRequest -Uri $url -Method POST `
+        $resp = Invoke-WebRequest -Uri $url -Method POST `
             -Body ([System.Text.Encoding]::UTF8.GetBytes($body)) `
             -ContentType 'application/json; charset=utf-8' -UseBasicParsing `
-            -TimeoutSec $ProgressTimeoutSec -ErrorAction Stop)
+            -TimeoutSec $ProgressTimeoutSec -ErrorAction Stop
+        # v0.3.20 — 운영팀이 청한 촬영은 이 답에 실려 온다(계약 5절 ① · 보고가 없어도 닿는 길 = 하트비트가 곧 수신함).
+        #   ⚠아무것도 출력 스트림에 흘리지 않는다 — 이 함수의 반환값이 부르는 쪽의 종료 코드에 섞이면 안 된다(이 파일 위쪽의 같은 함정).
+        try { Receive-CaptureRequest ((ConvertFrom-Json -InputObject ([string]$resp.Content) -ErrorAction Stop).capture) } catch { }
     } catch {
         if (-not $script:ProgressWarned) {
             $script:ProgressWarned = $true
@@ -4790,9 +5042,9 @@ function Send-EvidenceOnce([string]$Reason) {
         if ($script:EvidenceSent.ContainsKey($key)) { return }
         $script:EvidenceSent[$key] = $true
         $t = Get-EvidenceText
-        if (-not $t) { Write-Log ('evidence skip (no text): ' + $key); return }
-        Send-Progress (Get-CurrentStep) 'evidence' $null $null $null ([ordered]@{ text = $t; reason = $Reason; masked = $true })
-        Write-Log ('evidence sent: ' + $key + ' ' + [System.Text.Encoding]::UTF8.GetByteCount($t) + 'B')
+        $slot = Send-EvidenceEvent $Reason $t
+        Send-EvidenceImages $slot (Get-DefaultEvidenceKinds)   # v0.3.20 — 글자만으로는 09-16 실기의 정체를 알 수 없었다
+        Write-Log ('evidence sent: ' + $key + ' ' + [System.Text.Encoding]::UTF8.GetByteCount([string]$t) + 'B')
     } catch { Write-Log ('evidence error (fail-open): ' + $_.Exception.Message) }
 }
 
@@ -4860,19 +5112,108 @@ function Get-ScreenJpeg {
 }
 function Get-LoginWindowJpeg($proc) {
     # 살아 있는 로그인 창 하나 → JPEG(계약 3절 ④ · PrintWindow). 없으면 $null(생략 기록).
+    # 🔴v0.3.20 — 찍는 일은 Get-WindowJpeg 하나로 모았다(설치 창·앱 창과 같은 코드를 세 벌 두지 않는다).
+    #   이 함수에 남는 일은 **어느 창인가**를 고르는 것뿐이다.
     if ($null -eq $proc) { return $null }
     try {
         $h = [IntPtr]::Zero
         try { $h = $proc.MainWindowHandle } catch { $h = [IntPtr]::Zero }
         if ($h -eq [IntPtr]::Zero) { return $null }
+        return (Get-WindowJpeg $h)
+    } catch { return $null }
+}
+
+# ══ 캡처 증거 — v0.3.20 (TICKET=installer-capture-evidence · 2026-09-16) ═══════════════════════════════════
+# 왜: 2026-09-16 실기(07:1x)에서 로그인이 5분 멈췄는데 도착한 것은 **글자 증거뿐**이었고,
+#   설치가 끝난 뒤 첫 자리에 떠 있던 훅 오류 3줄은 **어떤 경로로도 오지 않았다**(사람이 손으로 찍은 사진이 유일한 근거였다).
+#   ⇒ 「사람이 사진을 안 찍어도 운영팀이 상황을 안다」가 이 블록의 목적이다.
+# 🔴🔴찍는 창은 **넷뿐**이고 전부 우리가 연 창이다 — installer_window · login_window · app_window · first_pane.
+#   ⛔**전체 화면을 찍지 마라.** 서버에는 그런 종류가 없고(400), 그림은 **가려지지 않은 채** 저장된다.
+#   ★그리고 서버는 그 그림이 정말 그 창인지 **재지 못한다** — 전체 화면을 찍어 app_window 라 이름 붙이면 그대로 저장된다.
+#     ⇒ 참가자에게 「다른 창은 찍지 않습니다」라고 약속하는 주체가 이 파일이므로 **그 약속을 지키는 코드도 여기뿐이다.**
+#     그래서 창 손잡이를 지정해 그 창만 잘라낸다(전체 화면을 찍어 좌표로 오려내면 위에 겹친 남의 창이 함께 찍힌다).
+#   Get-ScreenJpeg 함수는 남겨 두되 **부르는 자리가 0** 이고, 시험이 그 0 을 센다(지우면 「왜 안 쓰는가」가 사라진다).
+# 계약 정본 = 서버 도움 API 문서 10-2c·d·e 절 — 두 걸음으로 보낸다:
+#   ① POST /api/progress (event=evidence) → 201 이 { seq, upload_token, upload{…}, capture } 를 준다
+#   ② POST /api/progress/evidence/<seq>/image?kind=&filename= · 머리글 x-progress-upload · 본문 = 그림 바이트
+#   토큰은 한 장용이 아니다 — **60분 안에 여러 장**을 같은 토큰으로 올린다.
+# ⚠여기서 안 재는 것: 윈도우에서 PrintWindow 가 가려진 창·고DPI 에서 무엇을 담는지 · 한 장이 1.5MB 안에 들어가는지
+#   (맥에는 윈도우 콘솔이 없어 이 기계에서는 한 번도 못 찍었다 — 윈 실기 몫).
+$EvidenceImageMaxBytes    = 1572864              # 한 장 1.5MB(계약 3절 · 넘으면 413)
+$EvidenceImageCap         = 12                   # 설치당 하루 12장(계약 3절 · 넘으면 429 image_cap)
+$EvidenceImageKinds       = @('installer_window', 'login_window', 'app_window', 'first_pane')
+$EvidenceHookErrorPattern = 'Stop hook error|hook error'
+# ⓕ③ 오류 글 — 정해 준 낱말 그대로(대소문자 무관). ⚠우리 자신의 안내문에도 걸릴 수 있어 **이유마다 한 번**으로 막는다.
+$CaptureErrorTextPattern  = 'error|exception|failed|denied|not recognized'
+$script:EvidenceImageSent = 0
+$script:EvidenceImageDone = $false   # 오늘 몫을 다 썼다(429 image_cap) — 더 시도하지 않는다
+$script:CaptureSent       = @{}      # 이유|단계 → 이미 보냈다
+$script:CaptureInSay      = $false   # Say 안에서 다시 Say 로 들어가는 것을 막는다
+$script:CaptureReady      = $false   # 이 블록이 다 읽힌 뒤에만 Say 가 ⓕ③ 을 본다(파일 앞쪽 Say 호출 보호)
+$script:CaptureRequested  = $null    # 운영팀이 청한 촬영(계약 5절) — 받은 그 자리에서 쓰고 버린다
+# 단계 소요 기준선 — ⛔코드에 고정표를 두지 않는다(지어낸 숫자가 측정을 대신해 버린다 · 계약 4절).
+$script:StepBaselineSec   = @{}
+$script:StepBaselineNote  = 'not-fetched'   # not-fetched | ok:<칸수> | http:<코드> | empty | error | skip:*
+
+function Get-EvidenceBaseUrl {
+    # 진행 전송과 같은 주소를 쓴다 — 흉내가 JARVIS_PROGRESS_URL 로 바꿔치면 그림도 같은 가짜 서버로 간다.
+    if ($env:JARVIS_PROGRESS_URL) { return [string]$env:JARVIS_PROGRESS_URL }
+    return [string]$ProgressUrl
+}
+function Update-StepBaselines {
+    # [1/10] 에서 한 번 부른다. 못 받으면 표는 비어 있고 「평소의 두 배」 판정은 통째로 잠든다 — 그 사실을 기록에 남긴다.
+    if ($Mode -ne 'full') { $script:StepBaselineNote = 'skip:mode'; return }
+    if ($env:JARVIS_NO_PROGRESS -eq '1') { $script:StepBaselineNote = 'skip:no-progress'; return }
+    try {
+        $ProgressPreference = 'SilentlyContinue'
+        try { [Net.ServicePointManager]::SecurityProtocol = [Net.ServicePointManager]::SecurityProtocol -bor [Net.SecurityProtocolType]::Tls12 } catch { }
+        $u = (Get-EvidenceBaseUrl) + '/baseline?os=win'
+        $r = Invoke-WebRequest -Uri $u -Method GET -UseBasicParsing -TimeoutSec $ProgressTimeoutSec -ErrorAction Stop
+        if ([int]$r.StatusCode -ne 200) { $script:StepBaselineNote = 'http:' + [int]$r.StatusCode; return }
+        $j = ConvertFrom-Json -InputObject ([string]$r.Content) -ErrorAction Stop
+        $n = 0
+        foreach ($row in @($j.steps)) {
+            # ⛔median_elapsed_s 가 null 이면 **아직 모른다**는 뜻이다 — 내장 기본값으로 대신하지 않는다(계약 4절).
+            if ($null -eq $row) { continue }
+            $step = [string]$row.step
+            if (-not $step) { continue }
+            if ($null -eq $row.median_elapsed_s) { continue }
+            $v = 0.0
+            if (-not ([double]::TryParse([string]$row.median_elapsed_s, [ref]$v))) { continue }
+            if ($v -le 0) { continue }
+            $script:StepBaselineSec[$step] = [double]$v
+            $n++
+        }
+        $script:StepBaselineNote = $(if ($n -gt 0) { 'ok:' + $n } else { 'empty' })
+    } catch { $script:StepBaselineNote = 'error' }
+    Write-Log ('step baseline: ' + $script:StepBaselineNote + ' (빈 칸 = 그 단계 느림 촉발 꺼짐)')
+}
+function Test-StepSlow([string]$Step, [double]$Sec) {
+    # 돌려주는 것 = $true 기준선의 2배를 넘었다. ★칸이 없으면 **거짓**이다 — 「모른다」를 「빠르다」로도 「느리다」로도 읽지 않는다.
+    if (-not $script:StepBaselineSec.ContainsKey($Step)) { return $false }
+    $b = [double]$script:StepBaselineSec[$Step]
+    if ($b -le 0) { return $false }
+    return ($Sec -gt ($b * 2))
+}
+
+# ── 창 하나를 그림으로 (윈도우 전용 · 못 찍으면 $null 이라 그림만 빠지고 설치는 이어간다) ──
+function Get-WindowJpeg($h) {
+    if ($null -eq $h -or $h -eq [IntPtr]::Zero) { return $null }
+    try {
         Add-Type -AssemblyName System.Drawing -ErrorAction Stop
         if (-not ([System.Management.Automation.PSTypeName]'Jarvis.Win').Type) {
             Add-Type -Namespace Jarvis -Name Win -ErrorAction Stop -MemberDefinition @'
 [System.Runtime.InteropServices.DllImport("user32.dll")] public static extern bool PrintWindow(System.IntPtr hwnd, System.IntPtr hdc, uint flags);
 [System.Runtime.InteropServices.DllImport("user32.dll")] public static extern bool GetWindowRect(System.IntPtr hwnd, out RECT r);
+[System.Runtime.InteropServices.DllImport("user32.dll")] public static extern bool IsHungAppWindow(System.IntPtr hwnd);
+[System.Runtime.InteropServices.DllImport("kernel32.dll")] public static extern System.IntPtr GetConsoleWindow();
 public struct RECT { public int Left; public int Top; public int Right; public int Bottom; }
 '@
         }
+        # 🔴먹통 창은 건너뛴다 — PrintWindow 는 대상 창의 실타래에 **동기로** 부탁하고 기다린다.
+        #   응답을 멈춘 창이면 그 기다림이 끝나지 않아 **설치기가 통째로 멈춘다**(이종 검토 1R 지적 채택 2026-09-16).
+        #   ⚠이것으로 모든 멈춤이 사라지지는 않는다 — 부른 뒤에 먹통이 되는 창은 이 검사 뒤에 있다(잔여 · 윈 실기 몫).
+        try { if ([Jarvis.Win]::IsHungAppWindow($h)) { Write-Log 'window capture skip (창이 응답하지 않는다)'; return $null } } catch { }
         $r = New-Object Jarvis.Win+RECT
         if (-not [Jarvis.Win]::GetWindowRect($h, [ref]$r)) { return $null }
         $w = $r.Right - $r.Left; $ht = $r.Bottom - $r.Top
@@ -4883,13 +5224,232 @@ public struct RECT { public int Left; public int Top; public int Right; public i
             $hdc = $g.GetHdc()
             try { [void][Jarvis.Win]::PrintWindow($h, $hdc, 2) } finally { $g.ReleaseHdc($hdc) }
         } finally { $g.Dispose() }
-        $small = Resize-Bitmap $bmp 1280
+        # 🔴한 장 1.5MB 를 넘으면 서버가 413 으로 돌려보낸다(자르지 않는다) ⇒ **우리가 품질을 낮춰 다시 인코딩한다**.
+        #   가로도 함께 줄인다 — 품질만 낮추면 큰 화면에서 상한 안에 못 들어간다.
+        foreach ($try in @(@(1280, 60), @(1280, 40), @(960, 40), @(800, 30))) {
+            $small = Resize-Bitmap $bmp $try[0]
+            $bytes = ConvertTo-Jpeg $small $try[1]
+            $small.Dispose()
+            if ($null -ne $bytes -and $bytes.Length -le $EvidenceImageMaxBytes) { $bmp.Dispose(); return $bytes }
+        }
         $bmp.Dispose()
-        $bytes = ConvertTo-Jpeg $small 60
-        $small.Dispose()
-        return $bytes
+        Write-Log 'window capture skip (가장 낮은 품질로도 한 장 상한을 못 맞췄다)'
+        return $null
     } catch { return $null }
 }
+function Get-InstallerWindowJpeg {
+    # 설치 창 = 우리 콘솔 창 하나. ⛔전체 화면이 아니다 — 쓰시는 분의 다른 창은 담기지 않는다.
+    try {
+        if (-not ([System.Management.Automation.PSTypeName]'Jarvis.Win').Type) { [void](Get-WindowJpeg ([IntPtr]::Zero)) }
+        $h = [Jarvis.Win]::GetConsoleWindow()
+        if ($h -eq [IntPtr]::Zero) { return $null }   # 콘솔이 없다(입력 리디렉트·흉내) — 그림 없이 간다
+        return (Get-WindowJpeg $h)
+    } catch { return $null }
+}
+function Get-LoginWindowJpegLive {
+    # 살아 있는 로그인 창(대기 중일 때만 있다). 없으면 $null.
+    if (-not $script:LoginProc) { return $null }
+    try { if ($script:LoginProc.HasExited) { return $null } } catch { return $null }
+    return (Get-LoginWindowJpeg $script:LoginProc)
+}
+function Get-AppWindowJpeg {
+    # 자비스 앱 창 하나. 없으면 $null.
+    # 🔴이름만 보고 고르지 않는다 — 이름이 같은 남의 프로그램이나 쓰시는 분이 따로 띄워 둔 창이 찍힐 수 있다
+    #   (이종 검토 1R 지적 채택 2026-09-16). ⇒ **우리가 깐 자리에서 도는 것**만 찍는다.
+    #   ⚠창 손잡이를 쥐고 있다가 쓰는 길은 못 쓴다 — 보통은 상시 가동 프로그램이 앱을 띄우고 우리는 그 자리에 없다.
+    #   ⚠우리가 깐 자리를 모르면(프로그램을 못 찾은 실행) **찍지 않는다** — 모를 때는 안 찍는 쪽이 맞다.
+    try {
+        if (-not $script:CysCli) { Write-Log 'app window skip (우리가 깐 자리를 모른다)'; return $null }
+        $dir = ''
+        try { $dir = (Split-Path $script:CysCli -Parent) } catch { $dir = '' }
+        if (-not $dir) { return $null }
+        foreach ($n in @('cys-app', 'cysr', 'cys')) {
+            foreach ($p in @(Get-Process -Name $n -ErrorAction SilentlyContinue)) {
+                if ($p.MainWindowHandle -eq [IntPtr]::Zero) { continue }
+                $exe = ''
+                try { $exe = [string]$p.Path } catch { $exe = '' }
+                if (-not $exe) { continue }
+                if (-not $exe.StartsWith($dir.TrimEnd('\') + '\', [System.StringComparison]::OrdinalIgnoreCase)) { continue }
+                return (Get-WindowJpeg $p.MainWindowHandle)
+            }
+        }
+        Write-Log 'app window skip (우리가 깐 자리에서 도는 창을 못 찾았다)'
+        return $null
+    } catch { return $null }
+}
+function Get-EvidenceKindJpeg([string]$Kind) {
+    # 종류 이름 → 그림. ⛔모르는 이름에는 **아무것도 주지 않는다**(전체 화면으로 대신하는 길을 만들지 않는다).
+    # ⚠first_pane 은 이 판에서 **그림을 만들지 않는다** — 윈도우에서 첫 자리는 자비스 앱 창 **안의 한 칸**이라
+    #   따로 잘라낼 창 손잡이가 없다. 그 자리의 내용은 글자 증거(seat=master · 끝 40줄)로 보낸다.
+    #   ⇒ 없는 것을 app_window 로 이름만 바꿔 보내지 않는다(서버는 그것을 가려낼 수 없다).
+    switch ($Kind) {
+        'installer_window' { return (Get-InstallerWindowJpeg) }
+        'login_window'     { return (Get-LoginWindowJpegLive) }
+        'app_window'       { return (Get-AppWindowJpeg) }
+        'first_pane'       { Write-Log 'first_pane skip (윈도우에서는 앱 창 안의 한 칸이라 따로 찍을 창이 없다)'; return $null }
+        default            { Write-Log ('evidence image skip (모르는 종류): ' + $Kind); return $null }
+    }
+}
+
+# ── 두 걸음 보내기 (계약 2절) ─────────────────────────────────────────────
+function Send-EvidenceEvent([string]$Reason, [string]$Text) {
+    # ① 증거 이벤트. 돌려주는 것 = @{ Seq; Token } (그림 자리) 또는 $null.
+    #   ⚠글자는 **선택**이다 — 빈 글을 보내면 400 이라 아예 칸을 빼고 보낸다.
+    #   ⚠흉내는 이 함수를 갈아 끼워 줄을 파일에 적는다(그래서 진행 전송과 따로 둔다).
+    if ($Mode -ne 'full') { return $null }
+    if ($env:JARVIS_NO_PROGRESS -eq '1') { return $null }
+    try {
+        $fields = [ordered]@{
+            install_id        = (Get-InstallId)
+            installer_version = $InstallerVersion
+            os                = 'win'
+            step              = (Get-CurrentStep)
+            event             = 'evidence'
+            at                = (Get-Date -Format o)
+            reason            = $Reason
+        }
+        if ($Text) { $fields['text'] = [string]$Text; $fields['masked'] = $true }
+        $body = ($fields | ConvertTo-Json -Compress -Depth 4)
+        $ProgressPreference = 'SilentlyContinue'
+        try { [Net.ServicePointManager]::SecurityProtocol = [Net.ServicePointManager]::SecurityProtocol -bor [Net.SecurityProtocolType]::Tls12 } catch { }
+        $r = Invoke-WebRequest -Uri (Get-EvidenceBaseUrl) -Method POST `
+            -Body ([System.Text.Encoding]::UTF8.GetBytes($body)) `
+            -ContentType 'application/json; charset=utf-8' -UseBasicParsing `
+            -TimeoutSec $ProgressTimeoutSec -ErrorAction Stop
+        $j = ConvertFrom-Json -InputObject ([string]$r.Content) -ErrorAction Stop
+        Receive-CaptureRequest $j.capture   # 운영팀이 청한 촬영은 이 답에 실려 온다(계약 5절 · 하트비트가 곧 수신함)
+        if ($null -eq $j.seq -or -not $j.upload_token) { return $null }
+        return @{ Seq = [string]$j.seq; Token = [string]$j.upload_token }
+    } catch {
+        if (-not $script:ProgressWarned) {
+            $script:ProgressWarned = $true
+            Write-Log ('progress send failed (fail-open) - ' + $_.Exception.Message)
+        }
+        return $null
+    }
+}
+function Send-EvidenceImage($Slot, [string]$Kind, $Bytes) {
+    # ② 그림 한 장. 돌려주는 것 = $true 보냈다. fail-open — 무슨 일이 있어도 설치를 막지 않는다.
+    # 🔴바이트 묶음으로 못을 박는다 — 다른 함수를 거쳐 온 그림은 낱개 값들의 묶음(Object[])으로 풀려 있을 수 있고,
+    #   그대로 보내면 본문이 「숫자 글자」로 나가 길이가 어긋난다(2026-09-16 실측: 보내기가 통째로 실패했다).
+    if ($null -ne $Bytes) { $Bytes = [byte[]]$Bytes }
+    if ($null -eq $Slot -or -not $Slot.Token) { return $false }
+    if ($script:EvidenceImageDone) { return $false }
+    if ($EvidenceImageKinds -notcontains $Kind) { Write-Log ('evidence image skip (계약에 없는 종류): ' + $Kind); return $false }
+    if ($null -eq $Bytes -or $Bytes.Length -eq 0) { Write-Log ('evidence image skip (그림이 없다): ' + $Kind); return $false }
+    if ($Bytes.Length -gt $EvidenceImageMaxBytes) { Write-Log ('evidence image skip (' + $Bytes.Length + 'B > 한 장 상한): ' + $Kind); return $false }
+    if ($script:EvidenceImageSent -ge $EvidenceImageCap) { Write-Log ('evidence image skip (설치당 ' + $EvidenceImageCap + '장 상한): ' + $Kind); return $false }
+    try {
+        $ProgressPreference = 'SilentlyContinue'
+        try { [Net.ServicePointManager]::SecurityProtocol = [Net.ServicePointManager]::SecurityProtocol -bor [Net.SecurityProtocolType]::Tls12 } catch { }
+        $u = (Get-EvidenceBaseUrl) + '/evidence/' + $Slot.Seq + '/image?kind=' + $Kind + '&filename=' + $Kind + '.jpg'
+        # ⛔길이를 손으로 넣지 마라 — 보내는 쪽이 이미 넣는다. 두 번 넣으면 본문과 어긋나 보내기가 거부된다
+        #   (2026-09-16 실측 오류: content would exceed Content-Length). 계약이 요구하는 길이 머리글은 그대로 나간다.
+        $h = @{ 'x-progress-upload' = $Slot.Token }
+        [void](Invoke-WebRequest -Uri $u -Method POST -Body $Bytes -ContentType 'image/jpeg' `
+            -Headers $h -UseBasicParsing -TimeoutSec $ProgressTimeoutSec -ErrorAction Stop)
+        $script:EvidenceImageSent++
+        Write-Log ('evidence image sent: ' + $Kind + ' ' + $Bytes.Length + 'B (' + $script:EvidenceImageSent + '/' + $EvidenceImageCap + ')')
+        return $true
+    } catch {
+        # 🔴429 는 두 종류다 — 오늘 몫을 다 쓴 것(image_cap)이면 더 시도하지 않는다(재시도해도 같은 답이다).
+        $code = 0; $errText = ''
+        try { $code = [int]$_.Exception.Response.StatusCode } catch { $code = 0 }
+        try { $errText = [string]$_.ErrorDetails.Message } catch { $errText = '' }
+        if ($code -eq 429 -and $errText -match 'image_cap') {
+            $script:EvidenceImageDone = $true
+            Write-Log 'evidence image: 오늘 몫을 다 썼다(image_cap) — 이 실행에서는 더 올리지 않는다'
+        } elseif (-not $script:EvidenceImageWarned) {
+            $script:EvidenceImageWarned = $true
+            Write-Log ('evidence image failed (fail-open) ' + $code + ' - ' + $_.Exception.Message)
+        }
+        return $false
+    }
+}
+function Send-EvidenceImages($Slot, [string[]]$Kinds) {
+    foreach ($k in @($Kinds)) { [void](Send-EvidenceImage $Slot $k (Get-EvidenceKindJpeg $k)) }
+}
+function Get-DefaultEvidenceKinds {
+    # 정체·이상 징후에 함께 보내는 것 = 설치 창 + (살아 있으면) 로그인 창.
+    $kinds = @('installer_window')
+    if ($script:LoginProc) {
+        $alive = $false
+        try { $alive = -not $script:LoginProc.HasExited } catch { $alive = $false }
+        if ($alive) { $kinds += 'login_window' }
+    }
+    return ,([string[]]$kinds)
+}
+
+# ── 운영팀 촬영 요청 (계약 5절 · 받는 쪽만 만든다) ─────────────────────────
+function Receive-CaptureRequest($Req) {
+    # 받으면 그 자리에서 쓰고 버린다. ⛔받았다는 확인을 서버에 돌려주지 않고, 재시도·영속화도 만들지 않는다
+    #   (들고 있다가 어긋나는 쪽이 더 나쁘다 — 운영팀이 다시 걸면 된다). sig 는 우리가 검사하지 않는다(키가 없다).
+    if ($null -eq $Req) { return }
+    try {
+        $kinds = @(@($Req.kinds) | Where-Object { $EvidenceImageKinds -contains [string]$_ })   # 모르는 이름은 **그것만** 건너뛴다
+        if ($kinds.Count -eq 0) { Write-Log 'capture request: 찍을 수 있는 종류가 없다'; return }
+        $script:CaptureRequested = [string[]]$kinds
+        Write-Log ('capture request 받음: ' + ($kinds -join ','))
+    } catch { }
+}
+function Invoke-CaptureRequested {
+    # 받아 둔 촬영 요청이 있으면 그 자리에서 찍어 보낸다(reason=requested).
+    if ($null -eq $script:CaptureRequested) { return }
+    $kinds = $script:CaptureRequested
+    $script:CaptureRequested = $null   # 1회성
+    try {
+        $slot = Send-EvidenceEvent 'requested' ''
+        Send-EvidenceImages $slot $kinds
+        Write-Log ('capture requested 처리: ' + ($kinds -join ','))
+    } catch { Write-Log ('capture requested error (fail-open): ' + $_.Exception.Message) }
+}
+
+function Send-CaptureEvidence([string]$Reason, [string]$Detail) {
+    # ⓕ 이상 징후 촉발(slow·retry·error-text) — 글자 증거 + 그림. (이유 × 단계)마다 한 번 · fail-open.
+    try {
+        $step = Get-CurrentStep
+        $key = $Reason + '|' + $step
+        if ($script:CaptureSent.ContainsKey($key)) { return }
+        $script:CaptureSent[$key] = $true
+        $t = Get-EvidenceText
+        if ($Detail) {
+            # 🔴사유 글도 **반드시** 마스킹한다 — ⓕ③ 은 콘솔 줄을 통째로 넘기고 그 줄에는 경로·메일이 들어 있다.
+            $head = Get-RemoteHelpTailBytes (Protect-EvidenceText ('[' + $Reason + '] ' + $Detail)) 400
+            $t = $head + "`n" + [string]$t
+        }
+        $slot = Send-EvidenceEvent $Reason $t
+        Send-EvidenceImages $slot (Get-DefaultEvidenceKinds)
+        # 🔴여기도 마스킹한다 — 이 기록 파일(bootstrap.log)은 실패 때 통째로 붙여 보낸다.
+        Write-Log ('capture evidence: ' + $key + ' ' + (Protect-EvidenceText ([string]$Detail)))
+    } catch { Write-Log ('capture evidence error (fail-open): ' + $_.Exception.Message) }
+}
+
+# ── 설치 완료 뒤(post-install) 증거 — [10/10] 각성 판정 직후 한 번 ────────────────────────────
+# 왜: 09-16 실기에서 설치는 성공으로 끝났는데 **첫 자리 화면에 훅 오류 3줄이 떠 있었다.** 설치기는 그것을 본 적이 없다.
+function Get-PostInstallText([string]$Cli, [string]$Ref) {
+    # 돌려주는 것 = 마스킹·상한을 거친 글자(못 읽으면 '')
+    if (-not $Ref) { return '' }
+    $scr = Invoke-CysCapped $Cli ('read-screen --surface ' + $Ref) $ChildReadCapMs
+    if ($null -eq $scr) { return '' }
+    $lines = @(([string]$scr).TrimEnd() -split "`r?`n")
+    $from = [math]::Max(0, $lines.Count - 40)
+    $hook = @($lines | Where-Object { $_ -match $EvidenceHookErrorPattern }).Count
+    $body = 'seat=master' + "`n" + 'hook_errors=' + $hook + "`n" + (($lines[$from..($lines.Count - 1)]) -join "`n")
+    return (Get-RemoteHelpTailBytes (Protect-EvidenceText $body) $EvidenceTextBytes)
+}
+function Send-PostInstallEvidence([string]$Cli, [string]$Ref) {
+    # fail-open · 설치당 한 번 · 설치를 막지 않는다(성공 끝맺음 뒤에 부른다).
+    try {
+        $key = 'post-install|10/10'
+        if ($script:CaptureSent.ContainsKey($key)) { return }
+        $script:CaptureSent[$key] = $true
+        $t = Get-PostInstallText $Cli $Ref
+        $slot = Send-EvidenceEvent 'post-install' $t
+        Send-EvidenceImages $slot @('app_window')
+        Write-Log ('evidence sent: ' + $key + ' text=' + [System.Text.Encoding]::UTF8.GetByteCount([string]$t) + 'B')
+    } catch { Write-Log ('post-install evidence error (fail-open): ' + $_.Exception.Message) }
+}
+$script:CaptureReady = $true
 
 # ── 첨부 (보고가 열린 뒤에만 · 각각 실패해도 다음으로 · 계약 3절 순서) ──
 function Get-FileBytesCapped($path, $max) {
@@ -4929,7 +5489,12 @@ function Send-FailAttachments {
     [void](Send-Attachment 'log_full' 'bootstrap.log' (Get-FileBytesCapped $LogFile $AttachMaxBytes))
     if ($script:TranscriptOn) { try { Stop-Transcript | Out-Null } catch { }; $script:TranscriptOn = $false }
     [void](Send-Attachment 'console_text' 'transcript.txt' (Get-FileBytesCapped $TranscriptFile $AttachMaxBytes))
-    [void](Send-Attachment 'screen_png' 'screen.jpg' (Get-ScreenJpeg))
+    # 🔴v0.3.20 — 전체 화면을 붙이던 자리다. 쓰시는 분의 다른 창이 함께 나가므로 **찍는 것만 설치 창 한정**으로 바꿨다.
+    #   Get-ScreenJpeg 함수는 남겨 두되 **부르는 자리는 0** 이다(시험이 그 0 을 센다).
+    #   ⚠칸 이름(kind)은 'screen_png' 그대로 둔다 — 첨부 6종과 그 순서는 **서버 계약(3절)**이고 우리가 혼자 바꿀 자리가 아니다.
+    #     이름이 내용과 어긋나는 것은 알고 둔 것이다(서버가 계약을 손볼 때 함께 고칠 항목 · 보고서 2절에 올렸다).
+    #     파일 이름만 사실대로 바꿨다 — 받는 사람이 무엇을 보고 있는지 알 수 있게.
+    [void](Send-Attachment 'screen_png' 'installer-window.jpg' (Get-InstallerWindowJpeg))
     if ($script:LoginCapFiles.Count -gt 0) {
         foreach ($f in $script:LoginCapFiles) { [void](Send-Attachment 'login_window_png' (Split-Path -Leaf $f) (Get-FileBytesCapped $f $AttachMaxBytes)) }
     } else {
@@ -5078,9 +5643,11 @@ try {
     $script:NoticeShown = $true
     Say ('     ' + $ProgressNotice)   # 첫 화면 고지 = 서버 정본 문안(계약 2절 · 정본 1곳)
     Send-Progress '1/10' 'start' $null $null $null
+    Update-StepBaselines   # ⓕ① v0.3.20 — 단계 소요 기준선을 서버에서 한 번 받는다(못 받으면 그 축은 잠든다 · 기록 1줄)
     Invoke-DetectStage1
     Invoke-DetectStage2
     Write-Report
+    Show-OldCysNote
     Send-Progress '1/10' 'end' $null $null $null
     Send-Progress '1/10' 'info' $null $null (Get-InstallEnv)   # 환경 전체(계약 3절 · [1/10] 뒤 info)
 
@@ -5123,7 +5690,12 @@ try {
         # 함수가 화면 말고 출력 스트림에 무언가를 흘리면 반환값이 배열이 된다(이 파일 위쪽의 같은 함정).
         # 그러면 성공한 단계도 막힌 것으로 읽힌다 ⇒ 마지막 값 하나만 종료 코드로 본다.
         $rc = @(& $st.Fn)[-1]
-        Send-Progress $st.Step 'end' ([int]$stepSw.Elapsed.TotalSeconds) ('rc=' + $rc) $null
+        $stepSec = [double]$stepSw.Elapsed.TotalSeconds
+        Send-Progress $st.Step 'end' ([int]$stepSec) ('rc=' + $rc) $null
+        # ⓕ① v0.3.20 — 기준선(서버가 준 중앙값)의 2배를 넘으면 찍는다. ★표에 그 칸이 없으면 **아무 일도 하지 않는다**.
+        if (Test-StepSlow $st.Step $stepSec) { Send-CaptureEvidence 'slow' ($st.Step + ' ' + [int]$stepSec + 's > 2x ' + [int]$script:StepBaselineSec[$st.Step] + 's') }
+        Invoke-CaptureRequested   # ⓕ④ v0.3.20 — 진행 답으로 받아 둔 촬영 요청을 여기서 처리한다(1회성 · 안 오면 아무 일도 안 한다)
+        # ⓕ② v0.3.20 — 비치명 rc(여기서 안 멈추는 값)도 징후다. 멈추는 rc 는 아래 BlockedStep 이 받고 실패 증거가 따로 간다.
         if ($rc -ne 0) { $script:BlockedStep = $st.Name; break }
     }
 

@@ -1,0 +1,12 @@
+# tests/mac-install-mutate.sh --mutants 의 표 · <id>|<정규식>|<치환(빈칸=줄 지움)>|<붉어야 할 시나리오>|<기대 일치 줄 수>
+# ★앵커 = T1 벨트 커밋 b010f14 의 실물 줄. 줄이 바뀌면 NOT-APPLIED 로 실패한다(측정 실패를 초록으로 세지 않는다).
+# 실행 비트 벨트 제거 — 오늘 실물(비트 없음) 자산이 다시 안 도는 채 넘어가거나 설치되지 않는다
+belt-chmod-drop|^\s*chmod \+x "\$app/Contents/MacOS/"\* .*$|    :|nox|1
+# 실행 확인 판정을 늘 참으로 — 임시 자리·넣은 자리 두 곳의 확인이 함께 죽는다(층 방어를 겹쳐 겨눈다)
+exec-ok-always|^cys_app_exec_ok\(\) \{ .*$|cys_app_exec_ok() { return 0|dead|1
+# cys --version 실행을 지운다 — 비트만 보고 「돈다」로 친다
+version-run-drop|^(\s*)if ! out="\$\(CYS_NO_AUTOSTART=1 perl .*$|\1if ! out="cys 9.9.9"; then|dead|1
+# 판번 모양 확인을 지운다 — 무엇을 답하든(오류 문구라도) 「돈다」로 친다
+version-shape-drop|^(\s*)\*\[0-9\]\.\[0-9\]\*\) log "app exec check ok.*$|\1*) log "app exec check ok (mutant)"; return 0 ;;|mute|1
+# 두 번째 시도 한도를 첫 시도로 — 다시 받기 없이 곧바로 포기한다
+retry-drop|^(\s*)if \[ "\$attempt" -ge 2 \]; then$|\1if true; then|dead|1

@@ -98,7 +98,7 @@ for s in ver-same ver-same-pin ver-same-exe ver-same-refresh-fail ver-old ver-ol
     ver-fresh)
       [ "$r" = "r5=0 r6=0" ] && [ "$niwr" = "1" ] && [ "$nsw" = "1" ] && has "$L" '\[6/10\] 설치를 마쳤습니다'
       t $? "[① 새 기계] cys 가 없으면 종전대로 받아 설치한다" "$why"
-      [ "$nub" = "1" ] && has "$L" 'motw: removed after sha256 match - cys_[0-9.]+_x64-setup\.exe'
+      [ "$nub" = "1" ] && has "$L" 'motw: removed after sha256 match - cysr?_[0-9.]+_x64-setup\.exe'   # 1.0.1 자산 이름 = cysr_… 예정(installer-speed-pin-0320 · 발행 전 자리표 동안은 붉다)
       t $? "[MOTW 해제] 지문이 핀과 같다고 확인한 설치 파일의 웹 표식을 지운다" "$why" ;;
     ver-unknown)
       [ "$r" = "r5=0 r6=0" ] && [ "$niwr" = "0" ] && [ "$nrun" = "0" ] && has "$L" 'cys installed version unknown - keep'

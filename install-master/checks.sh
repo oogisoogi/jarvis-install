@@ -114,6 +114,195 @@ ck() { # ck <이름> <조건 rc> <근거>
   else printf '  FAIL %s  ← %s\n' "$1" "$3"; fail=$((fail+1)); fi
 }
 
+# ══ 맥 동등화 축 (TICKET=mac-parity-t3-gates · 2026-09-16 · 박사님 22:2x 「윈도우 설치기에 적용된 모든 기능을 맥에 똑같이」) ══
+# ★함수로 묶는 까닭 = 뮤턴트 하네스가 이 구역만 빠르게 돌릴 수 있게(CHECKS_ONLY=mac-parity · 전체는 몇 분 걸린다).
+#   전체 실행에서는 파일 끝에서 한 번 부른다 — 두 길이 같은 함수를 지난다(축이 둘로 갈리지 않는다).
+# ⚠각 축은 「되돌리면 붉어진다」를 tests/awaken-mutate.py 의 mp-* 뮤턴트로 잰다(검사기가 대상을 안 때리는 축 금지).
+mp_code() { grep -vE '^[[:space:]]*#' "$1"; }   # 주석 줄을 뺀 본문
+mp_fn_body() { # mp_fn_body <파일> <함수 이름> — bash 함수 정의 한 벌(이름() { … 줄머리 }) · 없으면 빈 출력
+  awk -v n="$2" 'index($0, n"() {")==1{f=1} f{print} f&&/^}/{exit}' "$1"
+}
+mac_parity_axes() {
+  echo "== 맥 동등화 — [6/10] 실행 비트 =="
+  local zb eb
+  zb="$(mp_fn_body "$SH" cys_install_from_zip)"; eb="$(mp_fn_body "$SH" cys_app_exec_ok)"
+  # ① 벨트 = 임시 자리에 푼 뒤·서명 검사 전에 실행 비트를 준다(서명은 모드를 봉인하지 않는다 — 09-16 실기 2대)
+  printf '%s\n' "$zb" | grep -vE '^[[:space:]]*#' | awk '
+    /ditto -x -k "\$zip" "\$stage"/{d=NR}
+    /^[[:space:]]*chmod \+x "\$app\/Contents\/MacOS\/"\*/{c=NR; n++}
+    /codesign --verify --deep --strict "\$app"/{v=NR}
+    END{exit !(d && c && v && n==1 && d<c && c<v)}'
+  ck "[맥동등 6/10] 실행 비트 벨트 — 풀기 뒤·서명 검사 앞에 chmod +x Contents/MacOS/* 가 한 번" $? "$(printf '%s\n' "$zb" | grep -nE 'ditto -x|chmod \+x|codesign --verify' | tr '\n' '|' | cut -c1-240)"
+  # ② 실행 확인 = 비트 둘 + cys --version 실제 실행(exec 실패 시 126) + 판번 모양
+  printf '%s\n' "$eb" | grep -vE '^[[:space:]]*#' > "${TMPDIR:-/tmp}/mp-eb.$$"
+  grep -qF '[ -x "$m/cys" ]' "${TMPDIR:-/tmp}/mp-eb.$$" && grep -qF '[ -x "$m/cysd" ]' "${TMPDIR:-/tmp}/mp-eb.$$" \
+    && grep -qF "exec @ARGV or exit 126' \"\$CYS_APP_EXEC_CAP_SEC\" \"\$m/cys\" --version" "${TMPDIR:-/tmp}/mp-eb.$$" \
+    && grep -qF '*[0-9].[0-9]*) log "app exec check ok' "${TMPDIR:-/tmp}/mp-eb.$$"
+  ck "[맥동등 6/10] 실행 확인 함수 = -x cys · -x cysd · cys --version 실행(상한·exec 실패 126) · 답에 판번 모양" $? "cys_app_exec_ok 본문: $(wc -l < "${TMPDIR:-/tmp}/mp-eb.$$" | tr -d ' ')줄"
+  rm -f "${TMPDIR:-/tmp}/mp-eb.$$"
+  # ③ 두 자리에서 부른다(임시 자리 · 넣은 자리) · 넣은 자리 확인이 「마쳤습니다」보다 앞 · 「마쳤습니다」는 한 번뿐이고 「실행 확인」을 말한다
+  printf '%s\n' "$zb" | grep -vE '^[[:space:]]*#' | awk '
+    /^[[:space:]]*if cys_app_exec_ok "\$app"; then break; fi$/{a++}
+    /^[[:space:]]*if ! cys_app_exec_ok "\$CYS_FORK_APP"; then$/{b++; bl=NR}
+    /설치를 마쳤습니다/{m++; ml=NR; if ($0 ~ /서명 확인 · 실행 확인\)\."$/) mk=1}
+    END{exit !(a==1 && b==1 && m==1 && mk && bl<ml)}'
+  ck "[맥동등 6/10] 실행 확인을 임시 자리·넣은 자리 두 곳에서 · 「마쳤습니다(… 실행 확인)」는 그 뒤 한 번" $? "$(printf '%s\n' "$zb" | grep -nE 'cys_app_exec_ok|설치를 마쳤습니다' | tr '\n' '|' | cut -c1-240)"
+  # ④ 실패 시 재시도 = 설치 파일을 버리고 한 번만 다시 받는다(두 번째도 걸리면 넣지 않음)
+  printf '%s\n' "$zb" | grep -vE '^[[:space:]]*#' | awk '
+    /^[[:space:]]*if \[ "\$attempt" -ge 2 \]; then$/{g++}
+    /^[[:space:]]*attempt=2$/{s++}
+    /^[[:space:]]*rm -f "\$zip"$/{r++}
+    /^[[:space:]]*if ! step_download_cys \|\| \[ ! -f "\$zip" \]; then$/{w++}
+    /받은 프로그램이 이 맥에서 실행되지 않습니다/{t++}
+    END{exit !(g==1 && s==1 && r>=1 && w==1 && t==1)}'
+  ck "[맥동등 6/10] 실행이 안 되면 설치 파일을 버리고 한 번만 다시 받는다 · 두 번째면 「실행되지 않습니다 — 설치하지 않습니다」" $? "$(printf '%s\n' "$zb" | grep -nE 'attempt|step_download_cys|실행되지 않습니다' | tr '\n' '|' | cut -c1-240)"
+  # ⑤ 실제로 부른다 — 가짜 zip(실행 비트 없음·안 돎·판본 무응답)으로 step_install_cys 를 끝까지(검사기가 문자열만 보는 것을 막는 짝)
+  if [ "${MAC_INSTALL_GATE_SKIP:-}" = "1" ]; then
+    sk "[맥동등 6/10] 가짜 zip 실행 시험(tests/mac-install-mutate.sh)" "MAC_INSTALL_GATE_SKIP=1"
+  elif [ -f "$DIR/../tests/mac-install-mutate.sh" ]; then
+    bash "$DIR/../tests/mac-install-mutate.sh" --src "$DIR" >/dev/null 2>&1
+    ck "[맥동등 6/10] 가짜 zip 실행 시험 전건 통과(비트 없음→벨트로 돎 · 안 돎→안 넣음·재시도 1회 · 대조군)" $? "bash tests/mac-install-mutate.sh --src install-master 로 자세히"
+  else
+    sk "[맥동등 6/10] 가짜 zip 실행 시험" "시험 파일을 못 찾았다"
+  fi
+
+  echo "== 맥 동등화 — ps1 function ↔ sh 등가 대조표 (master#2da7c4b5 · 계약 master#f6dbc850) =="
+  local PT="$DIR/ps1-sh-parity.tsv"
+  if [ ! -f "$PT" ]; then
+    ck "[맥동등 대조표] install-master/ps1-sh-parity.tsv 가 있다" 1 "파일 없음 = 대조 미완(박사님 범위: 모든 ps1 function 에 sh 등가 또는 「OS 상 해당 없음」 사유)"
+  else
+    python3 - "$PS" "$SH" "$PT" > "${TMPDIR:-/tmp}/mp-pt.$$" 2>&1 <<'PYEOF'
+import re, sys
+ps, sh, pt = sys.argv[1:4]
+psf = [m.group(1) for m in re.finditer(r'(?m)^function ([A-Za-z0-9_-]+)', open(ps, encoding='utf-8-sig').read())]
+shf = set(m.group(1) for m in re.finditer(r'(?m)^([A-Za-z_][A-Za-z0-9_]*)\(\) *\{', open(sh, encoding='utf-8').read()))
+rows, bad = {}, []
+for i, l in enumerate(open(pt, encoding='utf-8').read().split('\n'), 1):
+    if not l.strip() or l.startswith('#'): continue
+    c = l.split('\t')
+    if len(c) != 4: bad.append('%d줄 칸 수 %d(4 여야)' % (i, len(c))); continue
+    p, s, st, why = [x.strip() for x in c]
+    if p in rows: bad.append('%d줄 중복 %s' % (i, p)); continue
+    rows[p] = (s, st, why)
+    if st == 'sh':
+        miss = [x for x in (y.strip() for y in s.split(',')) if not x or x not in shf]
+        if miss: bad.append('%s → sh 에 없음: %s' % (p, ','.join(miss) or '(빈칸)'))
+    elif st == 'na':
+        if not why: bad.append('%s → na 인데 사유 빈칸' % p)
+    else:
+        bad.append('%s → 상태 %r(sh|na 만)' % (p, st))
+dup = sorted(set(x for x in psf if psf.count(x) > 1))
+if dup: bad.append('ps1 중복 정의: ' + ','.join(dup))
+for p in psf:
+    if p not in rows: bad.append('표에 없음: ' + p)
+for p in rows:
+    if p not in psf: bad.append('ps1 에 없는 행: ' + p)
+nsh = sum(1 for v in rows.values() if v[1] == 'sh'); nna = sum(1 for v in rows.values() if v[1] == 'na')
+print('ps1 %d · 표 %d · sh %d · na %d · 문제 %d' % (len(psf), len(rows), nsh, nna, len(bad)))
+for b in bad[:12]: print('  - ' + b)
+sys.exit(1 if bad or not psf else 0)
+PYEOF
+    ck "[맥동등 대조표] ps1 의 모든 function 이 표에 있고 · sh 등가가 실재하거나 na 사유가 있다(결정론)" $? "$(head -6 "${TMPDIR:-/tmp}/mp-pt.$$" | tr '\n' '|' | cut -c1-400)"
+    rm -f "${TMPDIR:-/tmp}/mp-pt.$$"
+  fi
+
+  echo "== 맥 동등화 — 진행 전송 지점 대조(ps1 Send-Progress ↔ sh progress_send) =="
+  python3 - "$PS" "$SH" > "${TMPDIR:-/tmp}/mp-tx.$$" 2>&1 <<'PYEOF'
+import re, sys
+ps, sh = sys.argv[1:3]
+code = lambda f, enc: [l for l in open(f, encoding=enc).read().split('\n') if not re.match(r'\s*#', l)]
+P = [l for l in code(ps, 'utf-8-sig') if re.search(r'(^|[;\s])Send-Progress\s', l) and not re.match(r'\s*function ', l)]
+S = [l for l in code(sh, 'utf-8') if re.search(r'(^|[;\s&|{(])progress_send\s', l) and not re.match(r'\s*progress_send\(\)', l)]
+Q = r"""['"]?"""
+def s_rx(step, ev, det=None):
+    r = r'progress_send\s+' + Q + (re.escape(step) if step else r'\S+') + Q + r'\s+' + Q + ev + Q + r'(\s|$)'
+    return r + (r'.*' + re.escape(det) if det else '')
+# (이름, ps1 정규식(정확히 1줄), sh 정규식, sh 최소 줄 수) — ps1 5a1cd67 의 부르는 자리 23줄 전건
+T = [
+ ('fail(현재 단계)',      r"Send-Progress \(Get-CurrentStep\) 'fail'",               s_rx(None, 'fail'), 1),
+ ('2/10 wait',            r"Send-Progress '2/10' 'wait'",                             s_rx('2/10', 'wait'), 1),
+ ('3/10 wait',            r"Send-Progress '3/10' 'wait'",                             s_rx('3/10', 'wait'), 1),
+ ('6/10 wait',            r"Send-Progress '6/10' 'wait'",                             s_rx('6/10', 'wait'), 1),
+ ('child-retry',          r"'awaken:child-retry ' \+ \$retry",                        s_rx('10/10', 'info', 'awaken:child-retry'), 1),
+ ('child-verified',       r"'info' \$null 'awaken:child-verified'",                   s_rx('10/10', 'info', 'awaken:child-verified'), 1),
+ ('child-fail',           r"'info' \$null 'awaken:child-fail'",                       s_rx('10/10', 'info', 'awaken:child-fail'), 1),
+ ('master-retry',         r"'info' \$null 'awaken:master-retry'",                     s_rx('10/10', 'info', 'awaken:master-retry'), 1),
+ ('master-<state> ×2',    None,                                                       s_rx('10/10', 'info', 'awaken:master-'), 0),
+ ('end awaken:auto',      r"'10/10' 'end' .*'awaken:auto'",                           s_rx('10/10', 'end', 'awaken:auto'), 1),
+ ('info manual-fallback', r"'10/10' 'info' .*'awaken:manual-fallback'",               s_rx('10/10', 'info', 'awaken:manual-fallback'), 1),
+ ('1/10 start',           r"Send-Progress '1/10' 'start'",                            s_rx('1/10', 'start'), 1),
+ ('1/10 end',             r"Send-Progress '1/10' 'end'",                              s_rx('1/10', 'end'), 1),
+ ('1/10 info env',        r"Send-Progress '1/10' 'info' .*Get-InstallEnv",            s_rx('1/10', 'info'), 1),
+ ('2/10 start',           r"Send-Progress '2/10' 'start'",                            s_rx('2/10', 'start'), 1),
+ ('2/10 end',             r"Send-Progress '2/10' 'end'",                              s_rx('2/10', 'end'), 1),
+ ('3/10 start',           r"Send-Progress '3/10' 'start'",                            s_rx('3/10', 'start'), 1),
+ ('3/10 end',             r"Send-Progress '3/10' 'end'",                              s_rx('3/10', 'end'), 1),
+ ('4/10 start',           r"Send-Progress '4/10' 'start'",                            s_rx('4/10', 'start'), 1),
+ ('4/10 end',             r"Send-Progress '4/10' 'end'",                              s_rx('4/10', 'end'), 1),
+ ('5~8/10 start(반복)',   r"Send-Progress \$st\.Step 'start'",                        None, 0),
+ ('5~8/10 end(반복)',     r"Send-Progress \$st\.Step 'end'",                          None, 0),
+]
+bad = []; used = set()
+for name, prx, srx, smin in T:
+    if prx:
+        hit = [i for i, l in enumerate(P) if re.search(prx, l)]
+        if len(hit) != 1: bad.append('ps1 %s: %d줄(1 이어야)' % (name, len(hit)))
+        used.update(hit)
+    if srx and smin and sum(1 for l in S if re.search(srx, l)) < smin: bad.append('sh 없음: ' + name)
+# master-<state> — ps1 은 두 자리(첫 판정 · 재측정)
+mh = [i for i, l in enumerate(P) if re.search(r"\('awaken:master-' \+ \$state\)", l)]
+used.update(mh)
+if len(mh) != 2: bad.append('ps1 master-<state>: %d줄(2 여야)' % len(mh))
+if sum(1 for l in S if re.search(s_rx('10/10', 'info', 'awaken:master-'), l) and 'awaken:master-retry' not in l) < 2: bad.append('sh 없음(2자리 필요): master-<state>')
+# 5~8/10 — 반복 변수로 한 자리씩 부르거나, 단계 글자 넷을 각각 부른다
+for ev in ('start', 'end'):
+    lit = all(any(re.search(s_rx('%d/10' % n, ev), l) for l in S) for n in (5, 6, 7, 8))
+    var = any(re.search(r'progress_send\s+"?\$\{?[A-Za-z_]+\}?"?\s+' + Q + ev + Q + r'(\s|$)', l) for l in S)
+    if not (lit or var): bad.append('sh 없음: 5~8/10 %s(반복 변수 또는 단계 넷)' % ev)
+extra = [P[i].strip()[:80] for i in range(len(P)) if i not in used]
+if extra: bad.append('표에 없는 ps1 부르는 자리 %d: %s' % (len(extra), ' | '.join(extra[:3])))
+if len(P) != 23: bad.append('ps1 부르는 자리 %d줄(표 = 23)' % len(P))
+print('ps1 부르는 자리 %d줄 · sh 부르는 자리 %d줄 · 문제 %d' % (len(P), len(S), len(bad)))
+for b in bad[:14]: print('  - ' + b)
+sys.exit(1 if bad else 0)
+PYEOF
+  ck "[맥동등 전송] ps1 진행 전송 23자리(반복 전개 시 29건)가 sh 에 전건 있다(표 대조 · 표에 없는 ps1 자리도 붉음)" $? "$(head -8 "${TMPDIR:-/tmp}/mp-tx.$$" | tr '\n' '|' | cut -c1-420)"
+  rm -f "${TMPDIR:-/tmp}/mp-tx.$$"
+  # 레버 — JARVIS_NO_PROGRESS=1 이면 한 바이트도 안 나간다 · 대조군(레버 끔)에서는 실제로 보내려 한다(레버 축이 비어 있지 않다는 증명)
+  #   ⚠이 파일 머리의 export JARVIS_NO_PROGRESS=1 이 대조군까지 눈멀게 하지 않도록 대조군은 env -u 로 뺀다
+  #   (메모리 runner-wide-safety-lever-blinds-the-harness-that-tests-it).
+  local LB; LB="$(mktemp -d)"
+  mkdir -p "$LB/bin" "$LB/home-on" "$LB/home-off"
+  for b in curl osascript; do printf '#!/bin/bash\necho "%s $*" >> "%s/calls"\nexit 7\n' "$b" "$LB" > "$LB/bin/$b"; done
+  chmod +x "$LB/bin/"*
+  printf '%s\n' ". \"$SH\" >/dev/null 2>&1 || exit 9" 'MODE=full' "progress_send '1/10' 'start' '' '' ''" 'echo "TEST sent rc=$?"' > "$LB/run.sh"
+  PATH="$LB/bin:$PATH" HOME="$LB/home-on" JARVIS_HOME="$LB/home-on/install-jarvis" JARVIS_LIB_ONLY=1 JARVIS_NO_PROGRESS=1 JARVIS_PROGRESS_URL="http://127.0.0.1:9/progress" \
+    perl -e 'alarm shift; exec @ARGV' 30 bash "$LB/run.sh" </dev/null >"$LB/on.txt" 2>&1
+  local on_calls; on_calls="$(cat "$LB/calls" 2>/dev/null | wc -l | tr -d ' ')"; rm -f "$LB/calls"
+  env -u JARVIS_NO_PROGRESS PATH="$LB/bin:$PATH" HOME="$LB/home-off" JARVIS_HOME="$LB/home-off/install-jarvis" JARVIS_LIB_ONLY=1 JARVIS_PROGRESS_URL="http://127.0.0.1:9/progress" \
+    perl -e 'alarm shift; exec @ARGV' 30 bash "$LB/run.sh" </dev/null >"$LB/off.txt" 2>&1
+  local off_calls; off_calls="$(grep -c '^curl ' "$LB/calls" 2>/dev/null || true)"
+  grep -q '^TEST sent rc=0$' "$LB/on.txt" && grep -q '^TEST sent rc=0$' "$LB/off.txt" && [ "$on_calls" = "0" ] && [ "${off_calls:-0}" -ge 1 ]
+  ck "[맥동등 전송] JARVIS_NO_PROGRESS=1 이면 progress_send 가 아무것도 안 부른다 · 레버를 빼면 실제로 보내려 한다(대조군) · 실패해도 rc 0(fail-open)" $? "레버 켬 호출 ${on_calls}건 · 끔 curl ${off_calls:-0}건 · 켬 $(grep -m1 '^TEST sent' "$LB/on.txt" || echo 'TEST 줄 없음') / 끔 $(grep -m1 '^TEST sent' "$LB/off.txt" || echo 'TEST 줄 없음')"
+  rm -rf "$LB"
+  # T2 러너 편입(master#f26a1cdd ②) — 진행 전송·증거·캡처·첨부를 실물 함수로 가짜 서버(127.0.0.1)에 부르는 38축 · 뮤턴트는 tests/mac-telemetry-mutate.py 가 잰다
+  if [ "${MAC_TELEMETRY_SKIP:-}" = "1" ]; then
+    sk "[맥동등 전송] 실물 전송 러너(tests/mac-telemetry-run.sh)" "MAC_TELEMETRY_SKIP=1"
+  elif [ -f "$DIR/../tests/mac-telemetry-run.sh" ]; then
+    local TO; TO="$(bash "$DIR/../tests/mac-telemetry-run.sh" "$SH" 2>&1)"
+    [ $? -eq 0 ] && printf '%s\n' "$TO" | tail -3 | grep -qE 'PASS [1-9][0-9]* / FAIL 0'
+    ck "[맥동등 전송] 실물 전송 러너 전건 통과(진행·증거·캡처·첨부 · 가짜 서버 · 실 서버 0줄)" $? "$(printf '%s\n' "$TO" | grep -E 'FAIL|PASS [0-9]+ / FAIL' | head -3 | tr '\n' '|' | cut -c1-240)"
+  else
+    ck "[맥동등 전송] 실물 전송 러너(tests/mac-telemetry-run.sh)가 있다" 1 "파일 없음"
+  fi
+}
+if [ "${CHECKS_ONLY:-}" = "mac-parity" ]; then
+  mac_parity_axes
+  printf '\n통과 %s · 실패 %s%s\n' "$pass" "$fail" "$([ "$skip" -gt 0 ] && printf ' · 건너뜀 %s' "$skip")"
+  [ "$fail" -eq 0 ]; exit $?
+fi
+
+
 echo "== 파일 =="
 [ -f "$SH" ]; ck "bootstrap.sh 실재" $? "파일 없음"
 [ -f "$PS" ]; ck "bootstrap.ps1 실재" $? "파일 없음"
@@ -409,9 +598,13 @@ else
 fi
 
 echo "== 단계 2 — cys 설치 대행 [5]~[9] =="
-codegrep "$PS" 'CysWinBytes    = 139918106'; ck "[5] 설치 파일 크기 핀(= cysr v1.0.0 setup.exe)" $? "받다 끊긴 파일을 정상으로 본다"
-codegrep "$PS" "CysVersion     = '1\\.0\\.0'"; ck "[5] 윈 판본 핀 정확값(= cysr v1.0.0)" $? "이름표만 새 판본이고 실제로 받는 판본은 옛것이다"
-codegrep "$PS" "CysWinSha256   = 'b63178db8bff46c5769092798ebf1a30f0ae0c7e0a23c750308ad0b59bef33fe'"; ck "[5] 윈 설치 파일 sha256 정확값 핀(= 릴리스 SHA256SUMS 줄)" $? "지문이 한 글자만 틀려도 모든 설치가 지문 불일치로 멈춘다"
+# (installer-0321-pin) 1.0.1 발행(2026-09-16) 실측값이 채워졌다 — 아래 두 축은 이제 **초록이어야 한다**(자리표가 남으면 붉다).
+#   ⚠이 축은 **형식만** 본다(64자리인가·숫자인가). 한 글자 틀린 값도 여기서는 통과하므로, 값이 릴리스와 같은지는 tests/win-pin-release.sh 가 릴리스를 때려서 진다.
+codegrep "$PS" 'CysWinBytes    = [0-9]+$'; ck "[5] 설치 파일 크기 핀(= cysr v1.0.1 setup.exe · 숫자)" $? "받다 끊긴 파일을 정상으로 본다(자리표가 남았다)"
+codegrep "$PS" "CysVersion     = '1\\.0\\.1'"; ck "[5] 윈 판본 핀 정확값(= cysr v1.0.1)" $? "이름표만 새 판본이고 실제로 받는 판본은 옛것이다"
+codegrep "$PS" "CysWinSha256   = '[0-9a-f]{64}'"; ck "[5] 윈 설치 파일 sha256 핀(= 릴리스 SHA256SUMS 줄 · 64자리)" $? "지문이 없으면 모든 설치가 지문 불일치로 멈춘다(자리표가 남았다)"
+no_code "$PS" 'TBD-1\.0\.1' && no_code "$SH" 'TBD-1\.0\.1'
+ck "[v0320] 핀 자리표(TBD-1.0.1)가 두 설치기에 남지 않았다" $? "발행값이 아직 안 채워졌다 — 이대로 배포하면 cys 받기가 반드시 실패한다"
 # ⚠2026-09-10 저장소 개명(cys-terminal → cys-ro · 운영자). 옛 주소는 301 로 이어지지만 **정본은 새 이름**이다.
 #   축도 새 이름을 요구한다 — 그러지 않으면 옛 주소가 남아도 아무도 말하지 않는다.
 codegrep "$PS" 'github.com/oogisoogi/cys-ro/releases/download/'; ck "[5] 윈 다운로드 자리 = 우리 릴리스" $? "받을 곳이 우리 릴리스가 아니다(벤더 판을 깔면 우리 수리가 안 닿는다)"
@@ -509,18 +702,56 @@ nonascii() { # nonascii <파일> <줄 고르는 패턴>  — 고른 줄에 ASCII
 }
 n=$(nonascii "$PS" 'new-surface'); [ "${n:-1}" -eq 0 ]; ck "[9] ps1 창 여는 명령줄이 ASCII 뿐" $? "우리말 ${n}바이트 — 받는 쪽이 거절한다"
 n=$(nonascii "$SH" 'new-surface'); [ "${n:-1}" -eq 0 ]; ck "[9] sh 도 같음" $? "우리말 ${n}바이트"
-n=$(nonascii "$PS" 'firstPrompt = '); [ "${n:-1}" -eq 0 ]; ck "[9] ps1 첫 지시문이 ASCII 뿐" $? "우리말 ${n}바이트 — 열려도 지시가 깨진다"
-n=$(nonascii "$SH" 'first_prompt='); [ "${n:-1}" -eq 0 ]; ck "[9] sh 첫 지시문이 ASCII 뿐" $? "우리말 ${n}바이트"
+# 🔴2026-09-16 개정(TICKET=installer-0322-awaken) — 「첫 지시문도 ASCII 뿐」 축은 **조준이 틀렸다**.
+#   2026-09-05 실측이 거절당한 자리는 **cys 명령줄**(바로 위 두 축)이고, 첫 지시는 cys 를 지나지 않는다
+#   (wake 파일 안 → claude 인자). 그 길로 우리말이 온전히 가는 것은 0.3.21 의 선언 「너는 마스터다」가 실측으로 보여 줬다.
+#   ⇒ 축을 지우지 않고 **다시 겨눈다**: 첫 지시가 cys 인자로 새지 않는지(아래 여는 명령 축)와,
+#     첫 지시에 **맹목 실행 문구가 없는지**(거부를 부른 축)를 대신 잰다.
+no_code "$PS" 'firstPrompt = .*(do exactly what it says|first line must be)'; ck "[9] ps1 첫 지시에 맹목 실행·첫 줄 대본 요구가 없다" $? "거부를 부른 그 문구가 되돌아왔다"
+no_code "$SH" 'first_prompt=.*(do exactly what it says|first line must be)'; ck "[9] sh 도 같음" $? "거부를 부른 그 문구가 되돌아왔다"
 codegrep "$PS" "surfaceTitle = 'jarvis'"; ck "[9] ps1 창 이름이 ASCII" $? "이 이름이 거절당한 자리다"
 codegrep "$SH" '\-\-title "jarvis"'; ck "[9] sh 창 이름이 ASCII" $? "같음"
-# 우리말 문장은 인자가 아니라 지침 파일로 간다 — 그 파일은 자비스가 직접 읽는다.
-codegrep "$PS" 'Read the file \$DirectiveFile'; ck "[9] 우리말은 지침 파일로 보낸다" $? "-"
-codegrep "$SH" 'Read the file \$\{DIRECTIVE_FILE\}'; ck "[9] sh 도 같음" $? "-"
+# 첫 지시는 지침 파일 **하나만** 가리킨다(내용은 그 파일이 갖는다) · 문구는 의뢰형이다.
+codegrep "$PS" 'firstPrompt = "install-jarvis 폴더의 install-directive\.md\(\$DirectiveFile\) 를 읽고, 거기 적힌 준비 작업을 해 주세요\."'
+ck "[9] ps1 첫 지시는 의뢰형이고 지침 파일을 가리킨다" $? "문구가 갈렸다(2026-09-16 13:25 실측 문구)"
+codegrep "$SH" 'first_prompt="install-jarvis 폴더의 install-directive\.md\(\$\{DIRECTIVE_FILE\}\) 를 읽고, 거기 적힌 준비 작업을 해 주세요\."'
+ck "[9] sh 도 같음" $? "두 설치기의 첫 지시가 갈린다"
+# 선언 첫 줄은 **유지**된다 — 그것은 인사말이 아니라 팩 훅의 선언 트리거다(javis_detect.py 정규식).
+codegrep "$PS" '\$wakePrompt = \$FleetTrigger \+ "`n" \+ \$firstPrompt'; ck "[9] 선언이 첫 프롬프트의 그 자체 첫 줄(cys 안)" $? "선언이 빠지면 동료가 영영 안 선다"
+codegrep "$PS" '\$fallbackPrompt = \$FleetTrigger \+ "`n" \+ \$firstPrompt'; ck "[9] 이 창 폴백도 같음" $? "이 길로 온 자비스에게 선언이 없다"
 # 화면에 쓰는 글자와 바깥 출력을 받는 글자는 서로 다른 설정이다 — 한쪽만 맞추면 기록만 깨진다.
 codegrep "$PS" '^\$OutputEncoding = '; ck "[기록] 바깥 출력 받는 글자도 UTF-8" $? "화면은 멀쩡한데 기록이 깨진다"
 # 맥 동등 — 못 연 까닭과 사람이 칠 한 줄이 윈도우에만 있었다(2026-09-05 적발)
 codegrep "$SH" '프로그램이 답한 내용은 이렇습니다'; ck "[9] sh 도 못 연 까닭을 남긴다" $? "다음에도 원인을 모른다"
 codegrep "$SH" 'cys 를 열고 그 안에서 아래 한 줄을'; ck "[9] sh 도 사람이 칠 한 줄을 인쇄한다" $? "폴백이 한 갈래뿐이다"
+
+echo "== [10/10] 마스터 각성 판정 (TICKET=installer-0322-awaken · 거짓 초록 봉합) ==" 
+# 판정이 master 자리를 **실제로** 재는가. 앞 판 술어(Test-DeclarationSeen)는 자식 존재만 봤다.
+codegrep "$PS" 'function Confirm-MasterAwake'; ck "[10] 마스터 각성 판정 함수가 있다" $? "판정이 자식 존재만 본다(거짓 초록)"
+codegrep "$PS" "if \(\\\$r\.mark\) \{ return 'verified' \}" \
+  && codegrep "$PS" "if \(\\\$r\.a -ge 1\) \{ return 'no-start' \}" && codegrep "$PS" "return 'unknown'"
+ck "[10] 판정이 셋으로 갈린다(표지∧답 · 답만 · 둘 다 없음)" $? "두 상태를 한 칸에 담으면 못 잰 것이 거짓 실패·거짓 성공이 된다"
+[ "$(grep -c 'Get-MasterStateName \$r' "$PS")" = "2" ]
+ck "[10] 셋으로 가르는 자리는 한 곳뿐(두 부르는 자리가 같은 함수를 쓴다)" $? "판정이 두 벌이면 한쪽만 고쳐져 조용히 갈린다"
+# 셋의 화면 문구가 **서로 다르다** — 같으면 사람이 구별할 수 없다.
+codegrep "$PS" '자비스\(master\) 각성 확인'; ck "[10] verified 문구" $? "-"
+codegrep "$PS" '자비스\(master\)는 지시를 받았으나 준비 작업을 시작하지 않았습니다'; ck "[10] no-start 문구(원인 단정 없음)" $? "-"
+codegrep "$PS" '자비스\(master\)가 깼는지 판정하지 못했습니다'; ck "[10] unknown 문구" $? "-"
+codegrep "$PS" '거절했거나, 표지 파일을 쓰지 못했을 수 있습니다'; ck "[10] no-start 는 원인을 단정하지 않는다(표지 못 씀 = 거짓 적색 방지)" $? "한쪽으로 단정하면 새 실패 모드가 거부로 읽힌다"
+# 「깨어났습니다」는 verified 일 때만.
+codegrep "$PS" 'if \(\$mres\.state -eq .verified.\) \{'
+# 재시도는 한 번 · 선언을 다시 보내지 않는다.
+codegrep "$PS" '\$MasterRetryMax    = 1'; ck "[10] 마스터 재시도 상한 1회" $? "같은 문구를 되풀이해 밀어붙인다"
+no_code "$PS" 'Send-MasterRetry.*FleetTrigger'; ck "[10] 재시도에 선언을 다시 싣지 않는다" $? "창에 밀어 넣은 선언은 기계 배달로 거절된다(2026-09-05)"
+# 표지는 우리가 만들지 않는다 — 지침이 시키고, 깨우기 전에 지난 것을 지운다.
+codegrep "$PS" 'Clear-MasterMark'; ck "[10] 깨우기 전에 지난 설치의 표지를 지운다" $? "지난 표지가 남으면 아무 일도 안 해도 「시작했다」로 읽힌다"
+codegrep "$PS" '\$t -ge \$script:ChildAwakeSince\.AddSeconds\(-5\)'; ck "[10] 표지는 이번 설치 기준선 뒤의 것만 센다" $? "시각 축이 없으면 지우기 하나에만 기댄다"
+no_code "$PS" '(Set-Content|Out-File|WriteAllText).*MasterMarkName'; ck "[10] 설치기가 표지를 스스로 만들지 않는다" $? "우리가 만든 표지는 마스터의 증거가 못 된다"
+# 지침 파일이 그 표지를 **준비 작업 1번**으로 시킨다(약속한 자리와 재는 자리가 같아야 한다).
+# ⚠이 줄들은 **지침 파일 본문**(여기 문서)이라 `#` 로 시작한다 ⇒ 주석을 빼는 codegrep 으로는 못 본다.
+grep -q '^## 준비 작업 1번 — 표지 파일 하나 만들기' "$PS"; ck "[10] 지침이 표지 만들기를 첫 작업으로 적는다" $? "재는 것을 아무도 시키지 않는다"
+! grep -q '첫 응답의 \*\*첫 줄은 반드시' "$PS"; ck "[10] 지침에서 고정 첫 줄 강제가 사라졌다" $? "거부를 부른 축이 남아 있다"
+! grep -q '첫 응답의 \*\*첫 줄은 반드시' "$SH"; ck "[10] sh 지침도 같음" $? "-"
 
 echo "== 여는 명령 (2026-09-05 두 번 실측 · 문장을 인자로 실으면 조각난다) =="
 # 1차 = 우리말이 깨져 거절 · 2차 = 명령 안 따옴표가 벗겨져 조각 하나가 위치 인자로 갔다.
@@ -739,7 +970,7 @@ ck "[10] 윈은 동료 자리가 선 것을 보고서야 「깨어났습니다�
 no_code "$PS" '안전장치입니다|\(안전장치\)'; rc=$?; w="$GREP_WHY"
 ck "[10] 윈 화면에 안전장치 설명이 없다(2026-09-15 결정)" "$rc" "(${w})"
 codegrep "$PS" '\$FleetAwakeTries = [0-9]'; ck "[10] 윈 자동 각성 확인에 상한이 있다" $? "동료가 안 서면 끝없이 지켜본다"
-codegrep "$PS" '\$FleetAwakeTries = 48 '; ck "[10] 윈 자동 관측 상한 240초(자비스 첫 턴보다 길게 · 2026-09-15 윈 실기)" $? "상한이 첫 턴보다 짧으면 카드가 오발해 손 계수가 거짓으로 는다"
+codegrep "$PS" '\$FleetAwakeTries = 120 ' && codegrep "$PS" '^\$FleetPollSec   = 2 '; ck "[10] 윈 자동 관측 상한 240초(자비스 첫 턴보다 길게 · 2026-09-15 윈 실기)" $? "상한이 첫 턴보다 짧으면 카드가 오발해 손 계수가 거짓으로 는다"
 count_or_fail "$PS" '^[[:space:]]*Set-FleetFinished$'; rc=$?; n="$COUNT_N"; w="$(why_or_count)"
 [ "$rc" -eq 0 ] && [ "$n" -ge 2 ]
 ck "[10] 윈 성공 두 자리(자동 · 카드 뒤) 모두 끝났다고 적는다(2026-09-15 윈 실기)" $? "끝맺음이 성공 뒤에 「다시 실행」을 인쇄한다($w)"
@@ -748,7 +979,10 @@ codegrep "$PS" "Extension -eq '\.exe'"; ck "[10] 윈 wake.ps1 은 claude 실행 
 count_or_fail "$PS" '^[[:space:]]*Clear-FleetStrayKeys$'; rc=$?; n="$COUNT_N"; w="$(why_or_count)"
 [ "$rc" -eq 0 ] && [ "$n" -ge 3 ]
 ck "[10] 윈 [10/10] 은 기다린 뒤 떠나는 세 자리 모두에서 설치 창 입력 버퍼를 비운다(검토 Q3)" $? "창에 친 글자가 설치 뒤 PowerShell 명령으로 실행된다($w)"
-codegrep "$SH" '직접 치셔야 합니다'; ck "[10] sh 는 사람이 쳐야 한다고 말한다(맥은 범위 밖 · 종전 그대로)" $? "왜 기다리는지 모른 채 멈춰 있는 화면이 된다"
+# 🔴2026-09-16 뒤집었다(mac-parity-0323 · master#2da7c4b5 ② 「사람 손 = 클로드 로그인 1회 · 사람 카드는 폴백만」) — 앞 축은 맥이 사람에게 치게 하는 것을 **요구**했다.
+#   ⇒ 이제 맥 정상 경로가 「사람이 하실 일은 없습니다」라고 말하고, 옛 「직접 치셔야 합니다」 안내가 코드에 없어야 한다(되돌리면 붉음).
+codegrep "$SH" '자비스가 깨어나 동료들을 부르는지 지켜봅니다 \(최대 4분 · 사람이 하실 일은 없습니다\)' && no_code "$SH" '직접 치셔야 합니다'
+ck "[10] sh 정상 경로는 사람 손 0이라 말하고 「직접 치셔야 합니다」 안내가 없다(맥 선언 자동 · ps1 동등)" $? "사람이 치게 하는 옛 카드가 정상 경로에 남았다"
 codegrep "$PS" '\$FleetWaitTries = [0-9]'; ck "[10] 기다리는 상한이 있다" $? "영원히 기다린다"
 codegrep "$SH" 'FLEET_WAIT_TRIES'; ck "[10] sh 도 같음" $? "같음"
 codegrep "$PS" '기다리는 중입니다'; ck "[10] 기다리는 동안 살아 있다고 말한다" $? "멈춘 것처럼 보인다"
@@ -1855,7 +2089,7 @@ no_code "$PS" '강제: '; rc=$?; w="$GREP_WHY"; ck "[R5] 윈 화면에 「강제
 no_code "$SH" '강제: '; rc=$?; w="$GREP_WHY"; ck "[R5] 맥 화면에 「강제:」 0건" "$rc" "같음(${w})"
 # 🔴2026-09-15 자동 각성으로 사람 카드는 폴백으로만 남았다 — 그 폴백 문구가 부탁하는 말투인지를 잰다(앞 판 문구 「이 한마디만 사람이 칩니다」는 걷혔다).
 codegrep "$PS" '자비스가 저절로 깨어나지 않아 한마디만 부탁드립니다'; ck "[R5] 윈 문구에서 「강제」의 어감을 뺐다" $? "자비스는 「할 일 없음」이라 적는데 이쪽은 「강제」라 적어 모순이다"
-codegrep "$SH" '이 한마디만 사람이 칩니다'; ck "[R5] 맥도 같음" $? "같음"
+codegrep "$SH" '자비스가 저절로 깨어나지 않아 한마디만 부탁드립니다' && no_code "$SH" '이 한마디만 사람이 칩니다'; ck "[R5] 맥 폴백 문구도 윈과 같은 부탁형(옛 「이 한마디만 사람이 칩니다」 0건 · mac-parity-0323)" $? "같음"
 
 # ── ⓔ R6 자동 시작은 **작업을 직접 보고** 말한다 ────────────────
 codegrep "$PS" 'function Get-CysAutoStartState'; ck "[R6] 등록 여부를 자리로 잰다" $? "종료값·팩 출력으로 추정한다(두 줄이 서로 모순됐다)"
@@ -1936,11 +2170,17 @@ ck "[핀] 설치기(맥) 코드의 판본 문자열이 전부 핀 판본이다" 
 
 # ── ⓕ-2 맥 저희 판 전환 (2026-09-15) ────────────────────────────────
 #   애플 실리콘 맥은 우리 릴리스 zip 을 받아 풀어 넣는다. 인텔·자산 없음만 원작자 판으로 간다.
-codegrep "$SH" 'CYS_FORK_VERSION="1\.0\.0"'; ck "[전환] 맥 저희 판 판본 핀" $? "판본 핀이 없다"
+codegrep "$SH" 'CYS_FORK_VERSION="1\.0\.1"'; ck "[전환] 맥 저희 판 판본 핀" $? "판본 핀이 없다"
 codegrep "$SH" 'CYS_FORK_DIR="https://github\.com/oogisoogi/cys-ro/releases/download/v'; ck "[전환] 저희 판은 판본이 박힌 우리 릴리스 자리에서 받는다" $? "다른 자리를 가리킨다"
-codegrep "$SH" 'CYS_FORK_BYTES=471657674'; ck "[전환] 저희 판 크기 핀" $? "크기가 안 맞아 매번 멈춘다"
-codegrep "$SH" 'CYS_FORK_SHA256="408b4defc0c673912965fcf799156f17362ed895b76fae21fc377ae1dbd6a10a"'; ck "[전환] 저희 판 지문 핀" $? "크기만 같은 다른 파일이 통과한다"
-codegrep "$SH" 'CYS_FORK_CDHASH="84fda923e275eef4adfc81f74e52fab896ec5d9a"'; ck "[전환] 저희 판 CDHash 핀" $? "깔린 판을 판별할 값이 없다"
+# (installer-0321-pin) 1.0.1 발행(2026-09-16) 실측값이 채워졌다 — 아래 세 축은 이제 **초록이어야 한다**(자리표가 남으면 붉다 · 이 축도 형식만 본다).
+codegrep "$SH" 'CYS_FORK_BYTES="?[0-9]+"?$'; ck "[전환] 저희 판 크기 핀(숫자)" $? "크기가 안 맞아 매번 멈춘다(자리표가 남았다)"
+codegrep "$SH" 'CYS_FORK_SHA256="[0-9a-f]{64}"'; ck "[전환] 저희 판 지문 핀(64자리)" $? "크기만 같은 다른 파일이 통과한다(자리표가 남았다)"
+codegrep "$SH" 'CYS_FORK_CDHASH="[0-9a-f]{40}"'; ck "[전환] 저희 판 CDHash 핀(40자리)" $? "깔린 판을 판별할 값이 없다(자리표가 남았다)"
+# 1.0.1 부터 zip 최상위·설치 자리 = cysr.app · 옛 이름 cys.app 은 넣은 **뒤에** 보관 자리로 옮긴다(넣기 실패 시 손대지 않는다).
+codegrep "$SH" 'app="\$stage/cysr\.app"' && codegrep "$SH" '^CYS_FORK_APP="/Applications/cysr\.app"$'
+ck "[전환] 저희 판은 zip 안 cysr.app 을 /Applications/cysr.app 으로 넣는다" $? "옛 이름으로 풀거나 넣어 zip 을 못 찾는다"
+awk '/^[[:space:]]*cat > "\$swap" <<.EOF_SWAP.$/{f=1} f&&/^if mv "\$new" "\$dst"; then$/{m=NR} f&&m&&!o&&/mv "\$old" "\$oldprev"/{o=NR} f&&/^EOF_SWAP$/{exit} END{exit !(m&&o&&m<o)}' "$SH"
+ck "[전환] 옛 이름 cys.app 은 새 판을 넣은 뒤에만 보관 자리로 옮긴다" $? "넣기가 실패해도 쓰던 cys 가 사라진다"
 # 칩 갈래: arm64 만 저희 판, 그 밖은 원작자 판(intel 사유) — 순서까지 본다.
 awk '/^if \[ "\$\(uname -m\)" = "arm64" \]; then$/{f=1} f&&/^  cys_use_fork_pin$/{a=NR} f&&/^else$/{e=NR} f&&/cys_use_vendor_pin; CYS_VENDOR_WHY="intel"/{b=NR} f&&/^fi$/{exit} END{exit !(a&&e&&b&&a<e&&e<b)}' "$SH"
 ck "[전환] 애플 실리콘만 저희 판 · 인텔은 원작자 판" $? "칩 갈래가 뒤집히거나 사라졌다"
@@ -1948,10 +2188,10 @@ ck "[전환] 애플 실리콘만 저희 판 · 인텔은 원작자 판" $? "칩 
 awk '/^step_download_cys\(\) \{/{f=1} f&&/404\|410\)/{a=NR} f&&a&&!v&&/cys_use_vendor_pin; CYS_VENDOR_WHY="missing"/{v=NR} f&&/J-DL-05/{j=NR} f&&/^\}$/{exit} END{exit !(a&&v&&j&&a<v&&v<j)}' "$SH"
 ck "[전환] 저희 자산이 없으면 원작자 판으로 돌아간다" $? "자산이 없는 날 맥 설치가 멈춘다"
 # 이미 깔린 cys 는 「있다」가 아니라 CDHash 로 판을 보고 건너뛴다(어제 깐 원작자 판이 남지 않게).
-awk '/^step_install_cys\(\) \{/{f=1} f&&/cys_app_cdhash \/Applications\/cys\.app\)" = "\$CYS_FORK_CDHASH"/{a=NR} f&&/cys_install_from_zip "\$dst"/{b=NR} f&&/^\}$/{exit} END{exit !(a&&b&&a<b)}' "$SH"
+awk '/^step_install_cys\(\) \{/{f=1} f&&/cys_app_cdhash "\$CYS_FORK_APP"\)" = "\$CYS_FORK_CDHASH"/{a=NR} f&&/cys_install_from_zip "\$dst"/{b=NR} f&&/^\}$/{exit} END{exit !(a&&b&&a<b)}' "$SH"
 ck "[전환] 깔린 cys 는 판(CDHash)을 보고 건너뛴다" $? "원작자 판이 깔린 맥이 그대로 남는다"
 # 설치 순서: 격리 속성 지우기 → 서명 확인 → 옛 것 끄기 → 바꿔 넣기. 확인이 끄기보다 앞이어야 한다.
-awk '/^cys_install_from_zip\(\) \{/{f=1} f&&!x&&/^  xattr -cr "\$app"/{x=NR} f&&!c&&/codesign --verify --deep --strict "\$app"/{c=NR} f&&!k&&/^    cys_stop_old_app$/{k=NR} f&&!s&&/\/bin\/bash "\$swap" "\$app" "\$prev"/{s=NR} f&&/^\}$/{exit} END{exit !(x&&c&&k&&s&&x<c&&c<k&&k<s)}' "$SH"
+awk '/^cys_install_from_zip\(\) \{/{f=1} f&&!x&&/^[[:space:]]+xattr -cr "\$app"/{x=NR} f&&!c&&/codesign --verify --deep --strict "\$app"/{c=NR} f&&!k&&/^    cys_stop_old_app$/{k=NR} f&&!s&&/\/bin\/bash "\$swap" "\$app" "\$prev"/{s=NR} f&&/^\}$/{exit} END{exit !(x&&c&&k&&s&&x<c&&c<k&&k<s)}' "$SH"
 ck "[전환] 격리 지우기→서명 확인→옛 것 끄기→바꿔 넣기 순서" $? "확인 전에 돌던 cys 를 끄거나 격리 속성이 남는다"
 # 옛 것 끄기는 실행 파일 자리로만 고른다(명령줄 축 금지 — 편집기까지 끈다).
 #   ⚠함수를 못 찾으면 적색이다(없는 함수의 「0건」은 초록이 아니다). awk 정규식(ERE)으로 센다 —
@@ -1966,7 +2206,7 @@ ck "[전환] 맥 재설치가 지우개에 --keep-app 을 넘긴다(두 자리)"
 ! grep -qE '^[[:space:]]*KEEP_APP_ARG="--keep-app"' "$REIN_SH" && grep -qE 'arm64.*KEEP_APP_ARG="--keep-app"' "$REIN_SH"
 ck "[전환] 맥 재설치의 프로그램 남기기는 애플 실리콘에서만" $? "인텔 맥 재설치에서 옛 원작자 판이 그대로 남는다"
 # 넣기 실패 뒤: 반쪽을 치우고, 이번에 옮긴 옛 것만 되돌린다(교차 검토 지적).
-awk '/^[[:space:]]*cat > "\$swap" <<.EOF_SWAP.$/{f=1} f&&/moved=1$/{m=NR} f&&/^mv "\$new" "\$dst" && exit 0$/{a=NR} f&&a&&/^rm -rf "\$dst"$/{r=NR} f&&r&&/^\[ "\$moved" = "1" \] && \[ -e "\$prev" \] && mv "\$prev" "\$dst"$/{b=NR} f&&/^EOF_SWAP$/{exit} END{exit !(m&&a&&r&&b&&m<a&&a<r&&r<b)}' "$SH"
+awk '/^[[:space:]]*cat > "\$swap" <<.EOF_SWAP.$/{f=1} f&&/moved=1$/{m=NR} f&&/^if mv "\$new" "\$dst"; then$/{a=NR} f&&a&&/^rm -rf "\$dst"$/{r=NR} f&&r&&/^\[ "\$moved" = "1" \] && \[ -e "\$prev" \] && mv "\$prev" "\$dst"$/{b=NR} f&&/^EOF_SWAP$/{exit} END{exit !(m&&a&&r&&b&&m<a&&a<r&&r<b)}' "$SH"
 ck "[전환] 넣기 실패 뒤 반쪽을 치우고 이번에 옮긴 옛 것만 되돌린다" $? "반쪽이 남아 되돌리기가 막히거나 지난 보관본이 올라온다"
 codegrep "$SH" "curl -sS -L -r 0-0 -o /dev/null -w '%\{http_code\}'"; ck "[핀] 자리 물음은 받기와 같은 GET(첫 1바이트)으로 한다" $? "HEAD 로 물으면 받기는 되는 자리를 없다고 읽을 수 있다"
 awk '/^  if \[ "\$KEEP_APP" = "1" \]; then$/{k=NR} /^    drop_dir "\$CYS_APP"$/{d=NR} END{exit !(k&&d&&k<d&&d-k<=4)}' "$RESET_SH"
@@ -2331,8 +2571,8 @@ for f in "$PS" "$RESET" "$REIN_PS"; do
   codegrep "$f" '1\) ⊞ 윈도우 키\(키보드 왼쪽 아래, Ctrl과 Alt 사이\)를 누르고 powershell' && no_code "$f" '시작 단추를 누르고'; rc=$?
   ck "[v0317] 다시 하시는 법 첫 줄은 윈도우 키(사이트와 같은 말) · $(basename "$f")" "$rc" "(${GREP_WHY})"
 done
-codegrep "$PS" "^\\\$InstallerVersion *= '0\.3\.19'" && codegrep "$SH" '^INSTALLER_VERSION="0\.3\.19"'
-ck "[v0319] 판본 0.3.19(두 설치기)" $? "보고의 판본이 갈린다"
+codegrep "$PS" "^\\\$InstallerVersion *= '0\.3\.23'" && codegrep "$SH" '^INSTALLER_VERSION="0\.3\.23"'
+ck "[v0322] 판본 0.3.23(두 설치기 · 한 릴리스 = 한 판번)" $? "보고의 판본이 갈린다"
 # 확인 명령 한 번에도 상한 — 없으면 벤더 도구가 멈추는 순간 20분 상한까지 함께 멈춘다(이종 검토 1R 지적 채택).
 awk '/^function Get-LoginStatusText/{f=1}
      f&&/Start-Process -FilePath \$exe -ArgumentList .auth.,.status. .*-RedirectStandardOutput/{s=1}
@@ -2413,7 +2653,7 @@ codegrep "$PS" "'install-id'" && codegrep "$PS" '8,36' && codegrep "$PS" 'return
 ck "[텔레메트리] 설치 번호를 만들어 두고 재사용한다" $? "번호 자리·모양·재사용 검사 중 하나가 없다"
 # 첫 화면 고지 = 서버 정본 문안(계약 2절 정본 1곳) · [1/10] 에서 찍는다.
 codegrep "$PS" '^    Say \(.     . \+ \$ProgressNotice\)' \
-  && codegrep "$PS" '설치가 진행되는 동안 단계와 시각이 자동으로 전송됩니다\. 설치가 막히면 설치 창에 표시된 글자만 보내지며, 로그인 코드·이메일·계정 이름은 가려집니다\. 보관 30일 뒤 자동 삭제됩니다\.'   # v0.3.18 새 정본(서버 df326ab)
+  && codegrep "$PS" '설치가 진행되는 동안 단계와 시각이 자동으로 전송됩니다\. 설치가 막히거나 이상이 보이거나 끝났을 때, 그리고 운영팀이 청할 때 설치 창·로그인 창·자비스 창·첫 자리 화면의 글자와 그림이 함께 보내집니다\(다른 창은 찍지 않습니다\)\. 글자에서는 로그인 코드·이메일·계정 이름을 가리지만, 그림은 가릴 수 없어 운영팀만 봅니다\. 보관 30일 뒤 자동 삭제됩니다\.'   # v0.3.18 새 정본(서버 df326ab)
 ck "[텔레메트리] 첫 화면 고지가 서버 정본 문안과 같다" $? "첫 화면에 고지를 안 찍거나 문안이 다르다(계약 2절)"
 # [1/10] 뒤 살핌(info) 이벤트에 환경 전체를 싣는다.
 codegrep "$PS" "Send-Progress '1/10' 'info' \\\$null \\\$null \(Get-InstallEnv\)"
@@ -2451,6 +2691,8 @@ elif [ -f "$DIR/../tests/telemetry-emu-run.sh" ]; then
 else
   sk "[텔레메트리] 흉내 실행 시험" "시험 파일을 못 찾았다"
 fi
+
+mac_parity_axes
 
 printf '\n통과 %s · 실패 %s%s\n' "$pass" "$fail" "$([ "$skip" -gt 0 ] && printf ' · 건너뜀 %s' "$skip")"
 [ "$fail" -eq 0 ]

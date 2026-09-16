@@ -10,6 +10,12 @@
 #   paste-late   = (installer-awaken-verify) worker 가 옛 모양 입력줄(╭╮)에 붙여넣기가 남아 Return 두 번째에 비워진다 · 답 머리표 없이 화면만 바뀐다
 #                  · 비워진 뒤 위쪽 대화 기록에 「[Pasted text …」 가 남는다(이미 보낸 것 — 멈춘 것으로 세면 안 된다)
 #   child-stall  = (installer-awaken-verify) worker 가 Return 을 몇 번 넣어도 붙여넣기가 남는다 · 화면에 로그인 이름·이메일이 섞여 있다
+#   ── TICKET=installer-0322-awaken (마스터 각성 판정) · 전제 = 훅이 정상 실행돼 SessionStart 주입(45,644자)이 마스터 자리에 실린 상태 ──
+#   master-refuse     = 동료 자리는 서는데 **마스터는 말만 하고 준비 작업을 시작하지 않는다**(2026-09-16 거부의 모양) → 재시도 1회 뒤에도 표지 없음 → no-start + 사람 카드
+#   master-retry-late = 같은 모양인데 **재시도 한 줄을 받고 나서 표지를 쓴다** → verified(재시도가 헛일이 아님을 잰다)
+#   master-unknown    = 마스터 자리가 아무 말도 하지 않는다(답 레코드 0 · 표지 0) → unknown(「거절」이라고 말하지 않는다)
+#   master-stale-mark = 말은 했고 표지가 있는데 **시각이 지난 설치의 것**이다 → 시각 검사가 걸러 no-start(벨트 ②)
+#   master-prior-mark = 깨우기 **전부터** 표지가 놓여 있다(지난 설치 잔존) → 깨우기 전 지우기가 걸러 no-start(벨트 ①)
 # 목록 한 줄 모양 = cys 실물(탭 구분): surface:N<TAB>role=R<TAB>pid=P<TAB>exited=false<TAB>제목<TAB>폴더
 param([string]$Src, [string]$Scenario, [string]$Sb)
 $ErrorActionPreference = 'Continue'
@@ -35,14 +41,18 @@ $env:PATH = "$Sb/bin:" + $env:PATH
 $env:USERPROFILE = "$Sb/home"
 $env:JARVIS_HOME = $jh
 $env:JARVIS_LIB_ONLY = '1'
+# 깨우기 전부터 놓여 있는 표지 — 지우기(Clear-MasterMark)가 이것을 치워야 한다(시각 검사만으로는 못 거른다: 시각이 지금이다)
+if ($Scenario -eq 'master-prior-mark') { Set-Content -Path (Join-Path $jh 'awake-master.ok') -Value "prior`npid=1111" }
 . $Src
 $env:JARVIS_LIB_ONLY = ''
 $script:CysCli = 'cys'
 # 실물 상한을 줄이기 전에 적어 둔다(시험이 상한 값 자체를 재게)
 Write-Log ("TEST default awake cap=" + ($FleetAwakeTries * $FleetPollSec) + "s")
 Write-Log ("TEST default child cap=" + $ChildAwakeCapSec + "s gaps=" + ($ChildAwakeGaps -join ' ') + " grace=" + $ChildAwakeGraceSec + "s retry=" + $ChildAwakeMaxRetry)
+Write-Log ("TEST default master cap=" + $MasterAwakeCapSec + "s poll=" + $MasterAwakePollSec + "s retrycap=" + $MasterRetryCapSec + "s retry=" + $MasterRetryMax)
 $FleetPollSec = 0; $FleetAwakeTries = 3; $FleetWaitTries = 2
 $ChildAwakeGaps = @(0, 0, 0); $ChildAwakeGraceSec = 2; $ChildAwakeCapSec = 8
+$MasterAwakeCapSec = 2; $MasterAwakePollSec = 0; $MasterRetryCapSec = 2
 # 자식 자리 세션 기록(jsonl) 자리 = $env:USERPROFILE/.cys/claude/projects — 가짜 cys 가 SB/home 아래에 만든다(installer-awaken-jsonl)
 #   screen-lies    = 화면은 답한 모양인데 세션 기록이 없다(2026-09-16 샌드박스 5차 거짓 양성) → Return 3회 → child-fail
 #   stale-session  = 같은 폴더에 기준선 전 지난 설치의 깬 기록만 있다 → 세지 않고 Return 1회 → 새 기록으로 확인
@@ -54,6 +64,15 @@ function Send-Progress($step, $ev, $elapsed, $detail, $envInfo, $extra) {
     $row = [ordered]@{ step = $step; event = $ev; detail = $detail }
     if ($null -ne $extra) { foreach ($k in @($extra.Keys)) { $row[[string]$k] = $extra[$k] } }
     Add-Content -Path "$Sb/progress.jsonl" -Value ($row | ConvertTo-Json -Compress) -Encoding utf8
+}
+# 🔴증거 이벤트는 v0.3.20 부터 **따로 나간다**(답이 곧 그림 자리라 진행 전송과 길이 다르다).
+#   여기서도 가로채 같은 파일에 적는다 — 안 그러면 이 흉내의 증거 축이 **조용히 0건**이 된다(2026-09-16 실측).
+#   돌려주는 것은 $null 이라 그림은 올리지 않는다(이 흉내는 바깥에 닿지 않는다).
+function Send-EvidenceEvent([string]$Reason, [string]$Text) {
+    $row = [ordered]@{ step = (Get-CurrentStep); event = 'evidence'; detail = $null; reason = $Reason; masked = $true }
+    if ($Text) { $row['text'] = $Text }
+    Add-Content -Path "$Sb/progress.jsonl" -Value ($row | ConvertTo-Json -Compress) -Encoding utf8
+    return $null
 }
 # 실물 본문처럼 끝맺음을 finally 에서 부른다 — 성공 끝에 「다시 실행」 안내가 나가는지 재려고
 try { Step-Wake; Write-Log ("TEST reached=" + $script:ReachedWake + " hands=" + $script:HumanHands) }

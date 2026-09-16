@@ -41,7 +41,7 @@ decl CysWinSha256 && [[ "${DECL}" =~ ^\$CysWinSha256[[:space:]]+=[[:space:]]+\'(
 # 판본이 받을 자리와 파일 이름에 실제로 박혔는가 — 한쪽만 올리면 옛 파일을 받는다.
 case "${DLDIR}" in *"/v${VER}/") r=0 ;; *) r=1 ;; esac
 [ -n "${VER}" ] && [ "${r}" -eq 0 ]; ck "[핀] 받을 자리에 판본이 박혔다" $? "받을 자리가 다른 판본을 가리킨다"
-[ -n "${VER}" ] && [ "${WINFILE}" = "cys_${VER}_x64-setup.exe" ]; ck "[핀] 파일 이름에 판본이 박혔다" $? "파일 이름이 다른 판본이다"
+[ -n "${VER}" ] && { [ "${WINFILE}" = "cys_${VER}_x64-setup.exe" ] || [ "${WINFILE}" = "cysr_${VER}_x64-setup.exe" ]; }; ck "[핀] 파일 이름에 판본이 박혔다(cys_·cysr_ · 1.0.1 부터 cysr_ 예정)" $? "파일 이름이 다른 판본이다"
 
 # ── 2. 릴리스 SUMS 와 바이트 대조 ─────────────────────────────────────────
 SUMS="${SB}/SHA256SUMS.txt"

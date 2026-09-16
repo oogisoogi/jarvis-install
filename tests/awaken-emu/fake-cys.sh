@@ -10,9 +10,9 @@ S="$(cat "$SB/scenario")"
 PROJ="$SB/home/.cys/claude/projects"
 seat_cwd() { case "$1" in 10) printf '%s' "$SB/seats/cso" ;; 11) printf '%s' "$SB/seats/일꾼 w'1" ;; esac; }
 row() { printf 'surface:%s\trole=%s\tpid=1\texited=false\t%s\t%s\n' "$1" "$2" "$3" "${4:-/tmp}"; }
-# sess <자리> <user|assistant> [old] — 그 자리 세션 기록에 한 줄 더한다 · old = 기준선보다 먼저 생긴 지난 설치의 기록
-sess() {
-  python3 - "$PROJ" "$(seat_cwd "$1")" "$2" "$1" "$S" "${3:-}" <<'PY'
+# sess_cwd <자리 폴더> <user|assistant> <기록 이름> [old] — 그 폴더의 세션 기록에 한 줄 더한다
+sess_cwd() {
+  python3 - "$PROJ" "$1" "$2" "$3" "$S" "${4:-}" <<'PY'
 import sys, os, re, json
 root, cwd, kind, sid, scen, old = sys.argv[1:7]
 d = re.sub(r"[^A-Za-z0-9]", "-", cwd)
@@ -27,7 +27,26 @@ if old:
     os.utime(p, (1577804400, 1577804400))   # 2020-01-01 — 맥에서는 생긴 시각도 함께 당겨진다(실측)
 PY
 }
+sess() { sess_cwd "$(seat_cwd "$1")" "$2" "$1" "${3:-}"; }
 awake() { sess "$1" user; sess "$1" assistant; }
+# ── 마스터 자리(surface:9) 흉내 (TICKET=installer-0322-awaken) ────────────────────────────
+#   설치기는 마스터를 두 축으로 잰다: 그 자리 세션 기록의 **답 레코드**와 지침이 시키는 **표지 파일**.
+#   여기서 둘을 따로 켤 수 있어야 「받았으나 시작 안 함」(거부의 모양)과 「각성 확인」이 갈린다.
+master_jh() { cat "$SB/jarvis-home" 2>/dev/null; }
+master_mark() {
+  jh="$(master_jh)"; [ -n "$jh" ] || return 0
+  printf '%s\n' "2026-09-16T14:00:00+09:00" "pid=4242" > "$jh/awake-master.ok"
+}
+# 지난 설치가 남긴 표지 — **시각이 옛날**이다(이번 기준선보다 앞). 시각 검사가 이것을 걸러야 한다.
+master_mark_old() {
+  jh="$(master_jh)"; [ -n "$jh" ] || return 0
+  printf '%s\n' "2020-01-01T00:00:00+09:00" "pid=1111" > "$jh/awake-master.ok"
+  python3 -c 'import os,sys; os.utime(sys.argv[1], (1577804400, 1577804400))' "$jh/awake-master.ok"
+}
+master_answer() {
+  jh="$(master_jh)"; [ -n "$jh" ] || return 0
+  sess_cwd "$jh" user master; sess_cwd "$jh" assistant master
+}
 reveal() { # 자식 자리가 목록에 처음 설 때 한 번 — 시나리오별 세션 기록의 첫 상태
   [ -f "$SB/revealed" ] && return 0
   touch "$SB/revealed"
@@ -52,17 +71,34 @@ case "$1" in
       show=0
       case "$S" in
         success|child-awake|paste-late|child-stall|screen-lies|stale-session|fallback-dir|no-answer|grace) [ "$n" -ge 3 ] && show=1 ;;
+        master-refuse|master-retry-late|master-unknown|master-stale-mark|master-prior-mark|master-mark-only) [ "$n" -ge 3 ] && show=1 ;;   # 동료는 선다(편성 자동 복구) — 마스터만 안 깼다
+        master-late-fleet) [ "$n" -ge 3 ] && { show=1; master_mark; } ;;   # H-M1: 첫 마스터 판정이 끝난 뒤(동료가 서는 순간)에야 표지가 생긴다 → 최종 판정 직전 재측정만이 잡는다
         fallback-success) [ "$n" -ge 5 ] && show=1 ;;
+        master-verified-fleet-late) : ;;   # N13(t4-fix): 마스터는 깼는데(새 자리 기본 갈래 = 답+표지) 동료는 시험 상한 안에 끝내 안 선다
+
       esac
       if [ "$show" = 1 ]; then reveal; row 10 cso cso "$(seat_cwd 10)"; row 11 worker-2 worker "$(seat_cwd 11)"; fi
     fi
+    exit 0 ;;
+  ping)
+    # N16(t4-fix): SB/slow-ping 이 있으면 답 없이 2초 걸린다(앱 창 대기 한 바퀴가 1초보다 길 때 기록이 바퀴 수가 아니라 실제 초인지 잰다)
+    [ -f "$SB/slow-ping" ] && sleep 2
     exit 0 ;;
   new-surface)
     if [ "$2" = "--help" ]; then echo "      --agent <AGENT>"; exit 0; fi
     printf '%s\n' "$@" > "$SB/newsurface-args"
     # 거절 문구는 cys 0.14.36 이 내는 거절 사유 글자를 따른다(자리 번호는 싣지 않는다 — 실물 명령 출력 모양은 아직 안 쟀다)
     if [ "$S" = "no-surface" ]; then echo "Error: claim_denied: privileged role held by live surface" >&2; exit 7; fi
-    touch "$SB/opened"; echo "surface:9"; exit 0 ;;
+    touch "$SB/opened"
+    # 자비스 자리가 열린 순간 마스터가 무엇을 하는지 — 시나리오가 정한다
+    case "$S" in
+      master-unknown) : ;;                                   # 아무 말도 안 한다(답 레코드 0 · 표지 0) → 판정 못 함
+      master-mark-only) master_mark ;;                       # 표지는 썼는데 답 기록이 아직 안 내려갔다 → 표지만으로 각성 확인(이종 검토 1R)
+      master-refuse|master-retry-late|master-prior-mark|master-late-fleet) master_answer ;;   # 말은 했는데 준비 작업을 시작하지 않았다(2026-09-16 거부의 모양)
+      master-stale-mark) master_answer; master_mark_old ;;   # 말은 했고, 표지는 **지난 설치의 것**이 남아 있다(시각 검사 축)
+      *) master_answer; master_mark ;;                       # 읽고 판단한 뒤 준비 작업 1번을 했다
+    esac
+    echo "surface:9"; exit 0 ;;
   read-screen)
     id="${3#surface:}"
     case "$S:$id" in
@@ -84,6 +120,9 @@ case "$1" in
     fi
     exit 0 ;;
   send)
-    printf '%s\n' "$*" >> "$SB/sent"; exit 0 ;;
+    printf '%s\n' "$*" >> "$SB/sent"
+    # 재시도(보충 한 줄)를 받고 나서야 시작하는 갈래 — 재시도가 실제로 무언가를 바꾸는지 재려고
+    if [ "$S" = "master-retry-late" ] && [ "$3" = "surface:9" ]; then master_mark; fi
+    exit 0 ;;
 esac
 exit 0

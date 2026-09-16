@@ -30,12 +30,22 @@ def read(rel):
 
 
 rows = []
+wayos = collections.defaultdict(lambda: collections.defaultdict(list))   # 코드 → OS 칸(""·win·mac·na-mac) → 줄
 for n, line in enumerate(read("tests/help-escalation.tsv").splitlines(), 1):
     if not line.strip() or line.startswith("#"):
         continue
     parts = line.split("\t")
+    if len(parts) == 4 and parts[0] == "way" and parts[3] in ("win", "mac", "na-mac"):
+        wayos[parts[1]][parts[3]].append(parts[2])
+        if parts[3] == "na-mac":
+            if not parts[2].strip():
+                die("정본 %d행: na-mac 인데 까닭 칸이 비었다" % n)
+            continue   # 화면 줄이 아니다 — 두 번째 방법·폭 검사에 넣지 않는다
+        rows.append(parts[:3])
+        continue
     if len(parts) != 3:
-        die("정본 %d행: 칸이 3개가 아니다" % n)
+        die("정본 %d행: 칸이 3개(또는 way 에 OS 칸 win|mac|na-mac 을 더한 4개)가 아니다" % n)
+    wayos[parts[1]][""].append(parts[2]) if parts[0] == "way" else None
     rows.append(parts)
 common = [(k, key, t) for k, key, t in rows if k in ("stage2", "stage3", "sent")]
 ways = collections.OrderedDict()
@@ -80,9 +90,13 @@ if a.axis in ("ps1", "sh"):
             if p not in src:
                 miss.append("%s/%s: %s" % (k, key, p))
     mine = ("both", "win") if a.axis == "ps1" else ("both", "mac")
-    for c, ls in ways.items():
+    rowos = ("", "win") if a.axis == "ps1" else ("", "mac")
+    for c in ways:
         if os_of.get(c, "both") not in mine:
             continue
+        ls = [t for o in rowos for t in wayos[c][o]]
+        if not ls and not (a.axis == "sh" and wayos[c]["na-mac"]):
+            miss.append("way/%s: 이 OS 행이 없다(공통·%s 줄 또는 na-mac 까닭)" % (c, rowos[1]))
         for t in ls:
             if t not in src:
                 miss.append("way/%s: %s" % (c, t))
@@ -91,7 +105,7 @@ if a.axis in ("ps1", "sh"):
             miss.append("direct: " + c)
     if miss:
         die("%s 에 정본 줄이 글자 그대로 없다 %d건 · 첫 줄 = %s" % (rel, len(miss), miss[0]))
-    print("  %s 가 정본 줄 %d조각을 모두 품는다" % (rel, sum(len(pieces(t)) for k, _, t in common if t != "<WAY>") + sum(len(v) for k2, v in ways.items() if os_of.get(k2, "both") in mine)))
+    print("  %s 가 정본 줄 %d조각을 모두 품는다" % (rel, sum(len(pieces(t)) for k, _, t in common if t != "<WAY>") + sum(len(wayos[k2][o]) for k2 in ways for o in rowos if os_of.get(k2, "both") in mine)))
     sys.exit(0)
 
 if a.axis == "docs":

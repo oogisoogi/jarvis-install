@@ -47,7 +47,10 @@ AGORA_SKILL_IN_CYS="$HOME/.cys/claude/skills/agora-delegate"  # cys 계정 자�
 #   한 줄에 한 경로다(공백 든 경로를 쪼개지 않으려고 줄로 나눈다).
 PRESERVE_PATHS="$AGORA_HOME
 $AGORA_SKILL"
-CYS_APP="/Applications/cys.app"
+CYS_APP="/Applications/cysr.app"   # 1.0.1 부터 새 이름(installer-speed-pin-0320) · 없으면 옛 이름 자리를 본다
+[ -d "$CYS_APP" ] || CYS_APP="/Applications/cys.app"
+CYS_APP_OLD=""   # 새 이름이 있는데 옛 이름(cys.app)도 남은 맥 — 둘 다 같은 규칙으로 남기거나 지운다
+[ "$CYS_APP" = "/Applications/cysr.app" ] && [ -d /Applications/cys.app ] && CYS_APP_OLD="/Applications/cys.app"
 CYS_CLI=""
 for c in "$CYS_APP/Contents/MacOS/cys" "$HOME/.local/bin/cys" "/usr/local/bin/cys"; do
   [ -x "$c" ] && { CYS_CLI="$c"; break; }
@@ -410,8 +413,10 @@ diagnose() {
     #     프로그램 폴더 밖에 따로 있어서, 지난 편성 기록만 골라낼 필요 없이 전부 비울 수 있다.
     [ -d "$CYS_APP" ] && say "  [있음] cys 프로그램 · $CYS_APP (남깁니다 — 다시 깔 때 판을 확인해 그대로 쓰거나 바꿉니다)" \
                       || say "  [없음] cys 프로그램 · $CYS_APP"
+    [ -n "$CYS_APP_OLD" ] && say "  [있음] cys 프로그램(옛 이름) · $CYS_APP_OLD (남깁니다 — 다시 깔 때 새 이름으로 바꿔 넣으며 한 벌 보관합니다)"
   else
     [ -d "$CYS_APP" ]; row $? 'cys 프로그램' "$CYS_APP"
+    if [ -n "$CYS_APP_OLD" ]; then [ -d "$CYS_APP_OLD" ]; row $? 'cys 프로그램(옛 이름)' "$CYS_APP_OLD"; fi
   fi
   # footprint: M-DAEMON
   [ -f "$HOME/Library/LaunchAgents/com.cysjavis.cysd.plist" ]; row $? 'cys 상시 가동 등록' "$HOME/Library/LaunchAgents/com.cysjavis.cysd.plist"
@@ -1007,7 +1012,7 @@ purge() {
   #   1차 검토에서 다른 명령줄 축을 빼면서 이 한 줄을 놓쳤다. ★한 축을 지울 때는 **같은 성질의 축이
   #   또 있는지** 세어라. 아래 stop_cys_processes 가 자리 축 + 혈연으로 같은 일을 안전하게 한다.
   # ★이름이 아니라 **자리**로 한 번 더 훑는다(R1) — 데몬이 띄운 자식은 이름이 우리 것이 아니다.
-  CYS_ALIVE="$(stop_cys_processes "$CYS_APP" "$HOME/.cys")"
+  CYS_ALIVE="$(stop_cys_processes "$CYS_APP" ${CYS_APP_OLD:+"$CYS_APP_OLD"} "$HOME/.cys")"
   if [ -n "$CYS_ALIVE" ]; then
     say "  [주의] cys 자리에서 아직 돌고 있는 것이 있습니다 — 폴더가 안 지워질 수 있습니다."
     write_alive_procs "$CYS_ALIVE"
@@ -1024,8 +1029,10 @@ purge() {
   # footprint: M-APP
   if [ "$KEEP_APP" = "1" ]; then
     say "  [남김] cys 프로그램 · $CYS_APP (다시 깔 때 판을 확인해 그대로 쓰거나 바꿉니다)"
+    [ -n "$CYS_APP_OLD" ] && say "  [남김] cys 프로그램(옛 이름) · $CYS_APP_OLD (다시 깔 때 새 이름으로 바꿔 넣으며 한 벌 보관합니다)"
   else
     drop_dir "$CYS_APP"
+    [ -n "$CYS_APP_OLD" ] && drop_dir "$CYS_APP_OLD"
   fi
   # 🔴cys 계정 자리를 지우기 **전에** 토론장 안내 파일을 밖으로 옮겨 둔다(검토 지적 채택 2026-09-09).
   #   까닭: `~/.cys/claude/skills/agora-delegate` 는 cys 설치의 일부라 cys 와 함께 사라지는 것이 맞다.
@@ -1204,7 +1211,7 @@ fi
 #   ⚠묻는 것이 아니라 **알리는 것**이다 — 답을 안 받아도 진행한다(사람이 없는 자리에서는 안 묻는다).
 notice_close_cys() {
   local alive
-  alive="$(procs_under "$CYS_APP" "$HOME/.cys" 2>/dev/null | sort -u | wc -l | tr -d ' ')"
+  alive="$(procs_under "$CYS_APP" ${CYS_APP_OLD:+"$CYS_APP_OLD"} "$HOME/.cys" 2>/dev/null | sort -u | wc -l | tr -d ' ')"
   [ "${alive:-0}" -gt 0 ] || return 0
   say ""
   say "cys 가 아직 돌고 있습니다(${alive}가지). 먼저 cys 창을 닫아 주십시오."

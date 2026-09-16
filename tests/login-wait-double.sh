@@ -12,6 +12,7 @@
 # ⚠부품을 **awk 로 떼어 오지 않는다**(외부 검토 1차 LOW). 실물을 `JARVIS_LIB_ONLY=1` 로 **그대로 읽어** 쓴다 —
 #   떼어 낸 조각은 파일 전체의 문법 오류나 전역 상태 문제를 가려 준다.
 set -u
+export JARVIS_NO_PROGRESS=1   # 🔴흉내는 라이브 서버로 진행 이벤트를 보내지 않는다 — 0.3.23 에서 login_waiter 가 3/10 wait 를 보내게 된 뒤 이 러너가 실행마다 라이브 progress 로 5건을 보냈다(curl 가짜로 계수 실측 · awaken-emu-run 과 같은 레버)
 DIR="$(cd "$(dirname "$0")" && pwd)"
 SH="$DIR/../install-master/bootstrap.sh"
 SB="$(mktemp -d)"; mkdir -p "$SB/home"
