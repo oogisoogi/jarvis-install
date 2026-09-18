@@ -1248,7 +1248,7 @@ function Invoke-Purge {
         Write-Host ''
         Write-Host '  cys 프로그램은 윈도우 설정 앱에서 지워 주십시오 (이 스크립트가 직접 지우지 않습니다).'
         Write-Host '    시작 단추 > 설정 > 앱 > 설치된 앱 > cys > 제거'
-        Write-Host '    제거 창이 뜨면 안내대로 진행하시고, 끝나면 이 창으로 돌아오십시오.'
+        Write-Host '    제거 창이 나타나면 안내대로 진행하시고, 끝나면 이 창으로 돌아오십시오.'
         Write-Host ''
         # 건너뛰기는 없다 — cys 프로그램이 남으면 아래에서 [남음] 이 되고 재설치로 넘어가지 않는다.
         #   (앞 판의 「건너뛰려면 그냥 Enter」는 Enter 만 믿고 곧바로 지우던 시절의 문구였다. 확인 단계가
@@ -1526,7 +1526,7 @@ if ($aliveNow.Count -gt 0) {
 if (-not $Yes) {
     Write-Host ''
     Write-Host '위 목록을 지웁니다. 되돌릴 수 없습니다.'
-    $answer = Read-Host '계속하려면 「지웁니다」 라고 쳐 주십시오'
+    $answer = Read-Host '계속하려면 「지웁니다」 라고 입력해 주십시오'
     if ($answer -ne '지웁니다') { Write-Host '그만둡니다 — 아무것도 지우지 않았습니다.'; exit 1 }
 }
 

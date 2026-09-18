@@ -111,7 +111,7 @@ if ($resetRc -ne 0) {
 
 # ── 3단 · 처음부터 다시 깐다 ──────────────────────────────────────
 Write-Host ''
-Write-Host '=== 이제 처음부터 다시 깝니다 ==='
+Write-Host '=== 이제 처음부터 다시 설치합니다 ==='
 Write-Host ''
 if (-not (Invoke-DownloadWithRetry ($Base + '/bootstrap.ps1') $BootstrapFile '설치 도우미')) {
     Write-Host ''

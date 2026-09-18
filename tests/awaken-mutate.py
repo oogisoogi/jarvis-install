@@ -253,11 +253,11 @@ MUTANTS = [
      "  CYS_APP_OPENED=1\n  i=0; t0=\"$SECONDS\"",
      "  CYS_APP_OPENED=0\n  say \"     cys 앱 창을 열었습니다 — 자비스는 그 창(제목 jarvis)에서 깨어납니다.\"\n  i=0; t0=\"$SECONDS\"",
      "[맥 앱 창 app-no-surface] 자리를 못 열면"),
-    # 자동 관측 상한을 90초로 되돌림 — 자비스 첫 턴보다 짧아 카드가 오발한다(2026-09-15 윈 실기 결함 ①)
+    # 자동 관측 상한을 옛 240초(4분)로 되돌림 — 1.0.2 A2 팩 자원 게이트 재측정 상한(180초)을 못 덮어 카드가 오발할 수 있다(TICKET=installer-0325 c9 · 2026-09-18)
     ("cap-revert-90", PS,
+     "$FleetAwakeTries = 210 ",
      "$FleetAwakeTries = 120 ",
-     "$FleetAwakeTries = 45 ",
-     "[성공] 자동 관측 상한은 240초"),
+     "[성공] 자동 관측 상한은 420초"),
     # ── mac-parity-0323 (TICKET=mac-parity-t3-gates · 2026-09-16) — checks.sh 맥 동등화 축(러너 = checks · CHECKS_ONLY=mac-parity) ──
     #   앵커 = T1 벨트 b010f14 의 실물 줄. 여섯째 칸 "checks" = 이 뮤턴트는 흉내 러너가 아니라 checks.sh 맥 구역으로 잰다.
     # [10/10] 마스터 보충 한 줄을 우리말(ps1 글자)로 되돌림 — H-M2 축(ASCII) 회귀 · 판정 master#63749eda

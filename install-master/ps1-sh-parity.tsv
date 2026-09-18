@@ -3,6 +3,8 @@
 # ps1 = bootstrap.ps1 @5a1cd67 · 행 순서 = ps1 파일 순서
 # ⚠「# todo」 줄 = 아직 이식하지 않은 함수(표에 행이 없으므로 checks 대조 축은 붉다 — 거짓 초록을 만들지 않으려고 상태를 지어내지 않았다)
 #   괄호 안 = 맡은 티켓 제안(T1 = 설치 단계 · T2 = 전송·증거·캡처)
+Test-Ps32OnWin64	-	na	64bit OS 위 32bit PowerShell(x86) 프로세스 판정 — bash 에는 이 구분이 없다(macOS 는 프로세스 비트수 갈래가 없음). TICKET=installer-0325 c8(2026-09-17 2d6f25b)
+Build-Ps32RelaunchArgs	-	na	32bit 프로세스를 64bit PowerShell(sysnative)로 재실행할 인자 조립 — 위와 같은 이유로 sh 대응 없음. TICKET=installer-0325 c8(2026-09-17 2d6f25b)
 Write-Log	log	sh	같은 일(기록 파일에 시각+줄 덧붙임)
 Say	say	sh	화면+기록 같은 일 · 오류 글 즉시 캡처(ⓕ③) = say_error_text_hook(T2 9abadd2) · 단 윈판의 단계 줄 모음(StepLog)은 맥 say 에 없음
 Invoke-Logged	invoke_logged	sh	바깥 명령 출력을 화면(7칸 들여)·기록 양쪽에 · 기록 [무엇] rc=N · 부르는 자리 = [8/10] init-pack·daemon install·(무응답 때) daemon status(ps1 3094·3102·3163 같음)
@@ -133,7 +135,7 @@ Write-MasterRequestCard	master_request_card	sh	같은 일(카드 글자 동일)
 Get-MasterStateNow	master_state_now	sh	같은 일((recheck) 기록)
 Write-MasterUnknownCard	master_unknown_card	sh	같은 일
 Set-FleetNeedsMaster	set_fleet_needs_master	sh	같은 일
-Step-Fleet	step_fleet	sh	[10/10] 같은 일(기준선·역할 대기·자식 확인·끝 증거) · 단 윈판의 자동 각성 대기 4분·master 각성 확인은 맥에 없음(맥은 처음부터 사람 카드)
+Step-Fleet	step_fleet	sh	[10/10] 같은 일(기준선·자동 각성 대기 7분·역할 대기·자식 확인·master 각성 확인·끝 증거) · mac-parity-t1-core(2026-09-16)로 맥도 자동 각성·master 각성 확인 동형화(옛 「맥에 없음·처음부터 사람 카드」서술은 그 뒤로 낡음) · TICKET=installer-0325 c9(2026-09-18)로 대기 4분→7분 동형 연장
 Read-RemoteHelpStream	remote_help_http	sh	응답 본문 읽기 — 맥은 curl -o 로 파일에 받음
 Invoke-RemoteHelpHttp	remote_help_http	sh	같은 일(20초 상한 · ack·close 출처 헤더 · 000=닿지 못함) · 단 윈판의 /attach 헤더는 맥에 없음
 Get-RemoteHelpNames	remote_help_js,remote_help_report	sh	지울 로그인 이름 모으기 — 맥은 JS harvestNames(osascript) + id -un·id -F·basename $HOME
@@ -164,7 +166,10 @@ Invoke-RemoteHelp	remote_help,remote_help_on_signal	sh	원격 해결 진입·창
 Get-InstallId	install_id_ensure	sh	같은 일 · $JARVIS_HOME/install-id · 모양 [0-9A-Za-z_-]{8,36} · 600 권한 · ps1 이 쓴 CRLF 도 읽음
 Send-Progress	progress_send	sh	같은 인자 순서(step·event·elapsed·detail·env) · 3초 상한 · fail-open · 여섯째 $extra 는 ps1 도 부르는 자리 0 이라 옮기지 않음
 Protect-EvidenceText	evidence_mask_line	sh	마스킹 = JS maskEvidenceText(PROGRESS_JS) · 식은 tests/mask-vectors.json 과 글자 동일 · 셸 창구가 evidence_mask_line
-Get-EvidenceText	evidence_text_file	sh	기록 끝 60000B → 잘렸으면 첫 줄 버림 → 마스킹 → 32000B(윈판 설치 창 글자 = 맥은 say 가 같은 줄을 기록에 씀)
+Get-EvidenceText	evidence_text_file	sh	기록 끝 60000B → 잘렸으면 첫 줄 버림 → 마스킹 → 32000B(윈판 설치 창 글자 = 맥은 say 가 같은 줄을 기록에 씀) · TICKET=installer-0325 c5(2026-09-18)로 윈판만 못 읽으면 빈 글 대신 사유코드([text:empty(...)]) 반환 — 맥 evidence_text_file 은 이 폴백 없음(09-17 10:01 실기는 윈 전용이라 이 라운드 범위 밖)
+Get-EvidenceCaptures	evidence_once	sh	TICKET=installer-0325 c5(2026-09-18) 신설(윈 전용) — 그림을 먼저 찍어 실패 사유를 손에 쥔다 · 맥 evidence_once 는 옛 순서(글자 먼저→그림 나중) 그대로라 그림 실패 사유가 서버에 안 실린다(이 라운드는 안 고침 · 같은 결함이 맥에도 있을 수 있음)
+Get-EvidenceCaptureFailNote	evidence_once	sh	위와 짝 — 찍기 실패 사유를 글자 칸에 붙일 문장으로 만든다(윈 전용 신설)
+Send-CapturedEvidenceImages	evidence_images_send	sh	이미 찍어 둔 그림만 올린다(Send-EvidenceImages 의 c5 대체 경로 · 윈 전용 신설)
 Send-EvidenceOnce	evidence_once	sh	같은 일 · (이유×단계) 한 번 · 글 뒤 설치 창 그림
 Get-CurrentStep	current_step	sh	같은 일(마지막 [n/10] · 맥은 기록 파일에서)
 Get-InstallEnv	progress_env_fields	sh	맥에서 채울 수 있는 칸 = claude_ver·cys_ver·mac_ver(sw_vers)·admin · win_build·ps_ver·av·browser 는 윈도우 전용 칸

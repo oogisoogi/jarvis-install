@@ -110,3 +110,18 @@ Set-Content -Path "$Sb/state/image.error" -Value 'image_cap' -NoNewline
 Out-Fact 'after_cap_done' $script:EvidenceImageDone
 [void](Send-EvidenceImage $slot 'installer_window' $jpg)       # 접힌 뒤에는 요청 자체를 안 보낸다
 Out-Fact 'after_fail' 'SURVIVED'
+Remove-Item -Path "$Sb/state/image.status", "$Sb/state/image.error" -ErrorAction SilentlyContinue   # 아래 두 시험엔 무관 — 정상 응답으로 되돌린다
+
+# ⑫ TICKET=installer-0325 c5(2026-09-18) — 못 읽으면(원본 파일이 없다) 빈 글이 아니라 사유 코드를 돌려준다
+$script:LogFileSaved = $LogFile
+$LogFile = (Join-Path $Sb 'no-such-log-c5.log')   # 존재하지 않는 자리 — Get-FileBytesCapped 가 $null 을 준다
+$script:TranscriptOn = $false
+Out-Fact 'evtext_empty_reason' (Get-EvidenceText)
+$LogFile = $script:LogFileSaved
+
+# ⑬ TICKET=installer-0325 c5(2026-09-18) — 그림 찍기가 예외로 죽어도 그 사유가 evidence_text 칸에 실려 서버에 닿는다
+#   (옛 판은 catch 가 Write-Log 로 이 기계의 파일에만 적고 서버엔 아무 신호도 안 갔다 · 09-17 10:01 실기 WHm7yvpu)
+function Get-InstallerWindowJpeg { throw 'boom-c5-capture' }
+$script:EvidenceImageSent = 0
+Send-EvidenceOnce 'c5-capture-fail'
+Out-Fact 'c5_capture_images_sent' $script:EvidenceImageSent

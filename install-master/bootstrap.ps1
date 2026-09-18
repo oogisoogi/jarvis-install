@@ -44,6 +44,38 @@ param(
     [switch]$DryRun
 )
 
+# 🔴2026-09-17(TICKET=installer-0325 c8 · 09-17 19:49 실기 · 도움 7NBPKA79 · J-PATH-01 오판정):
+#   64비트 윈도우에서 시작 메뉴의 「Windows PowerShell (x86)」(32비트 프로세스)로 이 파일을 열면
+#   [1-1] 환경 보고는 64bit=True 를 정확히 찍으면서도(OS 판정) 그 32비트 프로세스 안에서
+#   공식 클로드 설치기가 3초 만에·종료 코드 미판독으로 조용히 실패한다(같은 날 AMD64 기기는 정상) —
+#   우리 안내가 아니라 그 프로세스 자체의 문제라 여기서 못 고친다. 가장 이른 자리(사람이 무엇을 보기도
+#   전)에서 64비트 PowerShell 로 **같은 한 줄**을 자동으로 다시 열어 넘긴다.
+# ★판정·인자 조립을 함수로 뺀다 — [Environment] 정적 값을 직접 묻는 한 줄이면, 32비트 프로세스가
+#   없는 이 기계(pwsh 는 64비트뿐)에서는 그 갈래를 흉내로 재는 길이 없다. 값을 인자로 받는 순수
+#   함수라야 시험이 값을 주입해 갈래를 강제로 태울 수 있다(installer-0325 c8-mutate.ps1).
+function Test-Ps32OnWin64([bool]$IsOsX64, [bool]$IsProcX64) {
+    return ($IsOsX64 -and (-not $IsProcX64))
+}
+function Build-Ps32RelaunchArgs([string]$ScriptPath, [bool]$DetectOnlyFlag, [bool]$DryRunFlag) {
+    $a = @('-NoProfile', '-ExecutionPolicy', 'Bypass', '-File', $ScriptPath)
+    if ($DetectOnlyFlag) { $a += '-DetectOnly' }
+    if ($DryRunFlag) { $a += '-DryRun' }
+    return $a
+}
+if (Test-Ps32OnWin64 ([Environment]::Is64BitOperatingSystem) ([Environment]::Is64BitProcess)) {
+    $sysnative = Join-Path $env:WINDIR 'sysnative\WindowsPowerShell\v1.0\powershell.exe'
+    if ((Test-Path -LiteralPath $sysnative) -and $PSCommandPath) {
+        Write-Host '32비트 PowerShell 에서 열렸습니다 — 64비트 PowerShell 로 이어서 엽니다.'
+        $reArgs = Build-Ps32RelaunchArgs $PSCommandPath $DetectOnly.IsPresent $DryRun.IsPresent
+        $relaunch = Start-Process -FilePath $sysnative -ArgumentList $reArgs -NoNewWindow -Wait -PassThru
+        exit $relaunch.ExitCode
+    }
+    # sysnative 경로가 없거나(옛 윈도우) 이 파일로 직접 돌고 있지 않으면(예: -Command 로 안에서 호출)
+    # 재실행을 못 한다 — 여기서 조용히 넘기면 [2/10] 이 J-PATH-01(재시작 처방·이 원인에 안 맞음)로
+    # 오판정한다. 표지만 남겨 [2/10] 판정 분기(J-PS32-01)가 원인을 정확히 말하게 한다.
+    $script:Ps32NoRelaunch = $true
+}
+
 # $ErrorActionPreference = 'Stop' 을 쓰지 않는다: 이 스크립트는 실패를 죽음이 아니라 판정값(enum)으로 적는다.
 $ErrorActionPreference = 'Continue'
 
@@ -78,17 +110,17 @@ $DlDir         = Join-Path $JarvisHome 'dl'
 #   $CysDisplayName · $CysVersion · $CysWinFile(자산 이름이 바뀌면) · $CysWinBytes · $CysWinSha256 — 값은 발행 뒤 SHA256SUMS.txt 와 대조(tests/win-pin-release.sh).
 #   화면 머리글은 이 값으로 「<이름> <판> · 설치 도우미 <설치기 판>」 을 찍는다(설치기 판 = $InstallerVersion · 별도 semver).
 $CysDisplayName = 'cysr'
-$CysVersion     = '1.0.1'
+$CysVersion     = '1.0.2'
 $CysDownloadDir = "https://github.com/oogisoogi/cys-ro/releases/download/v${CysVersion}/"
-# ✅아래 세 값 = v1.0.1 발행(2026-09-16 10:56 · Latest) 뒤 **실측으로 채웠다**(installer-0321-pin · 앞 판 자리표 TBD-1.0.1 을 대신한다).
-#   출처 = 릴리스 SHA256SUMS.txt(그 파일 자신의 sha256 = c7b93b67bc17cd7f5cc88706eb6350c5dd7bc5c5cefb79dd7ea234c808c1f16e) · 크기는 릴리스 자산 목록과 내려받은 파일 양쪽에서 쟀다.
+# ✅아래 세 값 = v1.0.2 발행(2026-09-18 11:23 · Latest) 뒤 **실측으로 채웠다**(installer-0325-r3 · 앞 판 값(v1.0.1)을 대신한다).
+#   출처 = 릴리스 SHA256SUMS.txt(그 파일 자신의 sha256 = 17ad2595213ae3868fb56820cd6c7aabca2d66f9c7130d618e4cc57d38f4897e) · 크기는 릴리스 자산 목록과 내려받은 파일 양쪽에서 쟀다.
 #   ⚠판을 올릴 때 이 세 값을 그대로 두면 받기가 반드시 실패한다 — 대조는 tests/win-pin-release.sh 가 릴리스를 때려서 진다.
 # ⚠파일 이름 줄은 **선언 한 줄·뒤에 아무것도 없어야** 한다(tests/win-pin-release.sh 가 줄 끝까지 맞춰 읽는다).
 #   `${CysVersion}` 를 그대로 두는 것이 정본이다 — 판을 올릴 때 이름이 함께 따라 오르고, 뮤턴트 M508 이 그 따라오름을 잰다.
-#   지금 값은 풀면 cysr_1.0.1_x64-setup.exe = 릴리스 자산 이름과 글자 그대로 같다.
+#   지금 값은 풀면 cysr_1.0.2_x64-setup.exe = 릴리스 자산 이름과 글자 그대로 같다.
 $CysWinFile     = "cysr_${CysVersion}_x64-setup.exe"
-$CysWinBytes    = 139989480
-$CysWinSha256   = 'f33cb82e0cd96cd67827cb05b9139064bcad20103ede743b7fe7efad41e2564d'   # 릴리스 SHA256SUMS.txt 의 줄
+$CysWinBytes    = 140031327
+$CysWinSha256   = '9e54bef7449a1762adca97aff5ffe7ecd21137ce08a7c2c0279af2e6367afb1c'   # 릴리스 SHA256SUMS.txt 의 줄
 $CysDownloadUrl = $CysDownloadDir + $CysWinFile
 
 $LoginPollInterval = 2     # 초 — 승인 프로세스가 끝난 뒤 로그인을 다시 확인하는 간격
@@ -550,6 +582,7 @@ $HelpWays = @{
     'J-NET-03'   = @('회사·학교 망은 바깥 서버를 막아 둔 경우가 있습니다.', '휴대폰 핫스팟 같은 다른 인터넷으로 연결하신 뒤 다시 실행해 주십시오.')
     'J-RM-01'    = @('재설치 명령을 한 번 더 실행해 주십시오.', '열려 있는 cys 는 재설치가 스스로 닫습니다.')
     'J-PATH-01'  = @('컴퓨터를 한 번 다시 시작하신 뒤 새 창에서 다시 실행해 주십시오.')
+    'J-PS32-01'  = @('시작 메뉴에서 (x86) 이 붙지 않은 「Windows PowerShell」을 찾아 여신 뒤,', '아래 「다시 하시는 법」대로 다시 실행해 주십시오.')
     'J-LOGIN-01' = @('브라우저가 뜨지 않았거나 다른 브라우저에 로그인돼 있으면,', '화면에 보이는 https:// 로 시작하는 로그인 주소를 복사해', '로그인된 브라우저 주소창에 붙여넣어 주십시오.')
     'J-LOGIN-02' = @('브라우저 창을 모두 닫으신 뒤 다시 실행해 주십시오.', '승인은 한 번만 누르시고 코드를 복사하면 설치가 이어집니다.', '안 이어지면 설치 창을 한 번 클릭한 뒤 Ctrl+V 로 붙여넣어 주십시오.')
     'J-HOME-01'  = @('창을 닫고 새 창을 여신 뒤(남은 설정이 따라오지 않습니다)', '다시 실행해 주십시오.')
@@ -1185,7 +1218,7 @@ function Invoke-OldHomeCleanup {
     Write-Host '     안에 있는 것(이 도구가 만드는 이름뿐입니다):'
     foreach ($it in (Get-HomeEntries)) { Write-Host ("       · " + $it.Name) }
     Write-Host '     이 폴더를 지우고 새로 만들면 그대로 이어서 설치합니다. 되돌릴 수 없습니다.'
-    $answer = Read-Host '계속하려면 「지웁니다」 라고 쳐 주십시오(그만두시려면 그냥 Enter)'
+    $answer = Read-Host '계속하려면 「지웁니다」 라고 입력해 주십시오(그만두시려면 그냥 Enter)'
     if ($answer -ne '지웁니다') { Write-Host '     그만둡니다 — 아무것도 지우지 않았습니다.'; return $false }
     try { Remove-Item -LiteralPath $JarvisHome -Recurse -Force -ErrorAction Stop } catch { }
     if (Test-Path -LiteralPath $JarvisHome) { Write-Host '     그 폴더를 지우지 못했습니다.'; return $false }
@@ -1891,6 +1924,20 @@ function Step-InstallClaude {
         $u = [Environment]::GetEnvironmentVariable('Path','User')
         if ($u) { foreach ($p in ($u -split ';')) { if ($p -and ([Environment]::ExpandEnvironmentVariables($p).TrimEnd('\') -ieq $bin)) { $inUser = '예'; break } } }
         $hasExe = if (Test-Path $exe) { '예' } else { '아니오' }
+        # 🔴2026-09-17(TICKET=installer-0325 c8): J-PATH-01(처방 = 재시작)로 판정하기 **전에**
+        #   「설치기가 3초도 안 돼 끝났고 파일도 안 생겼다」 갈래를 먼저 가른다 — 32비트 PowerShell 에서
+        #   막힌 설치기는 재시작해도 안 풀린다(원인이 프로세스 비트수라 재시작과 무관하다).
+        $elapsedSec = $null
+        try { if ($p.StartTime -and $p.ExitTime) { $elapsedSec = [int]($p.ExitTime - $p.StartTime).TotalSeconds } } catch { }
+        if ((-not [Environment]::Is64BitProcess) -and ($hasExe -eq '아니오') -and ($null -ne $elapsedSec) -and ($elapsedSec -lt 3)) {
+            Say '[2/10] 설치기가 시작한 지 3초도 안 돼 끝났고 파일도 생기지 않았습니다.'
+            Write-JCode 'J-PS32-01' '32비트 PowerShell(Windows PowerShell (x86))에서는 공식 설치기가 조용히 실패합니다'
+            Set-NextStepRerun '시작 메뉴에서 (x86) 이 붙지 않은 「Windows PowerShell」을 찾아 여신 뒤, 아래 「다시 하시는 법」대로 다시 실행해 주십시오.'
+            Say "     파일 있음: $hasExe ($(Redact $exe)) · 사용자 PATH 등록: $inUser · 설치기 종료 코드: $rcShown · 설치기 걸린 시간: ${elapsedSec}초"
+            Say '     이 화면을 사진으로 남겨 주십시오.'
+            $script:ShowRerun = $true
+            return 4
+        }
         Say '[2/10] 설치기는 끝났는데 claude 명령이 아직 안 잡힙니다.'
         Write-JCode 'J-PATH-01' '깔렸는데 이 창에서 명령을 찾지 못합니다'
         Set-NextStepRerun 'PowerShell 창을 새로 열고 아래 「다시 하시는 법」대로 다시 실행해 주십시오.'
@@ -2151,7 +2198,7 @@ function Step-Login {
         return
     }
     Human '벤더' '로그인 승인 클릭 — 클로드 회사 화면에서만 할 수 있다(우리가 대신 못 누른다)'
-    Say '[3/10] 지금 로그인 화면을 엽니다. 브라우저가 뜨면 승인을 눌러 주십시오.'
+    Say '[3/10] 지금 로그인 화면을 엽니다. 브라우저가 나타나면 승인을 눌러 주십시오.'
     foreach ($ln in $LoginCardLines) { Say $ln }
     # ★기다림은 `WaitForExit(ms)` 로 한다 — 커널 대기라 이 창의 입력을 건드리지 않는다(검토 지적 채택 2026-09-11 · 새 창에서도 그대로 둔다).
     # ★상한에 닿으면 그 창을 끝낸다 = 사람이 창을 닫은 것과 같은 결과 ⇒ 아래 확인과 J-LOGIN-01 회복 경로로 그대로 흘러간다.
@@ -2950,7 +2997,7 @@ function Step-InstallCys {
 
     Human 'OS' '설치 파일 실행 확인 — 처음 보는 프로그램이라 경고 창이 뜰 수 있습니다'
     if ($refresh) { Say "[6/10] 같은 판(v$CysVersion)을 이번 판 파일로 덮어 설치합니다 (깔린 파일이 이번 판과 같다고 확인되지 않았습니다)." } elseif ($upgradeFrom) { Say "[6/10] cys 를 v$upgradeFrom 에서 v$CysVersion 으로 덮어 설치합니다." } else { Say '[6/10] cys 를 설치합니다.' }
-    Say '     파랗게 「Windows에서 PC를 보호했습니다」 창이 뜨면 [추가 정보] → [실행] 을 눌러 주십시오.'
+    Say '     파랗게 「Windows에서 PC를 보호했습니다」 창이 나타나면 [추가 정보] → [실행] 을 눌러 주십시오.'
     Say '     이 창은 서명되지 않은 프로그램에 뜨는 것이며 공식 안내에도 적혀 있습니다.'
     # 안내는 설치기를 띄우기 「전에」 해야 한다 — 백신이 이 창을 종료시키면 뒤에 적은 말은 나오지 못한다.
     Say '     백신이 막았다고 하면 그 화면을 사진으로 남겨 주십시오 — 이름, 대상 파일, 조치(차단·격리·종료) 세 가지가 보이게.'
@@ -3360,7 +3407,7 @@ function Step-Wake {
         #  (1) 이 창에서 바로 띄운다 — 지금 바로 쓸 수 있다.
         #  (2) cys 창에서 마무리하고 싶으시면 칠 줄을 인쇄해 둔다.
         Say ''
-        Say '     cys 창 안에서 이어서 하고 싶으시면, cys 를 열고 그 안에서 아래 한 줄을 쳐 주십시오:'
+        Say '     cys 창 안에서 이어서 하고 싶으시면, cys 를 열고 그 안에서 아래 한 줄을 입력해 주십시오:'
         Say "       $cmd"
         Say ''
         Say '     지금은 이 창에서 바로 띄웁니다.'
@@ -3398,7 +3445,7 @@ function Step-Wake {
 # 자비스는 「너는 마스터다」라는 말을 들어야 깨어나 동료를 부른다.
 # 🔴2026-09-15 결정 — 그 말을 사람이 치지 않는다. [9/10] 이 자비스를 띄울 때 첫 프롬프트의 첫 줄로 함께 넘긴다.
 #   (09-05 판의 「사람이 직접 친다」 부탁은 폐지됐다 · 사용자가 편해야 한다가 최고 원칙이다.)
-# 우리가 하는 일 = ⑴동료 자리가 서는지 **실제로 보고**(최대 4분) ⑵서면 「깨어났습니다」 ⑶안 서면 그때만 사람에게 부탁한다.
+# 우리가 하는 일 = ⑴동료 자리가 서는지 **실제로 보고**(최대 7분) ⑵서면 「깨어났습니다」 ⑶안 서면 그때만 사람에게 부탁한다.
 #   ★「보냈다」로 성공을 말하지 않는다 — 자식 좌석(cso·worker)이 선 것이 곧 선언이 들어갔다는 증거다.
 #     안 섰는데 「깨어났습니다」라고 하면 사용자는 창을 닫고 자비스는 영영 혼자 남는다.
 $FleetTrigger = '너는 마스터다'
@@ -3419,9 +3466,14 @@ $MasterAwakeCapSec = 120                 # 첫 관측 상한(브리프 지정) �
 $MasterAwakePollSec = 3
 $MasterRetryCapSec = 60                  # 재시도 뒤 다시 재는 상한
 $MasterRetryMax    = 1                   # 재시도는 **한 번**뿐이다(같은 문구를 되풀이해 밀어붙이지 않는다)
+# 재시도 보충 한 줄의 **정본**(이 한 자리 · 시험은 이 줄을 읽어 쓴다 — 사본을 두지 않는다).
+#   🔴2026-09-17(TICKET=installer-0325 c2 · 09-16 22:3x 판정 A · H-M2 근본): 앞 판은 이 자리에 우리말 장문을
+#   두고 있었다 — H-M2(우리말 장문을 창에 밀어 넣는 층의 인코딩 축)는 윈도우에도 똑같이 있는 위험이라,
+#   맥판 sh MASTER_RETRY_MSG(bootstrap.sh 3513)와 **글자까지 같은 한 문구**로 맞춘다(번역문 아님).
+$MasterRetryMsg = 'The earlier request asks you to read install-directive.md, judge it yourself, and then do the preparation tasks. If it looks fine, please start with preparation task 1 (create the marker file). If you decide not to, write the reason in one line.'
 $FleetRoles   = @('master', 'cso', 'worker')   # 이 기계에서 세울 수 있는 역할(리뷰어 둘은 고르기 나름)
 $FleetPollSec   = 2    # 자리 목록을 몇 초마다 보는가(시험이 줄여 쓴다) · 종전 5초(installer-speed-pin-0320 — 먼저 보고 나서 기다린다)
-$FleetAwakeTries = 120 # 2초 × 120 = 240초(4분). 사람 손 없이 동료가 서기를 기다리는 상한.
+$FleetAwakeTries = 210 # 2초 × 210 = 420초(7분). 옛 240초(4분)에 팩 자원 게이트 재측정 상한(1.0.2 A2 · load 트립 시 30s×6=180s)을 더해 늘림(TICKET=installer-0325 c9 · 2026-09-18). 사람 손 없이 동료가 서기를 기다리는 상한.
 #   🔴90초였다가 올렸다(2026-09-15 윈 실기) — 자비스의 첫 턴(지침 읽기 + 점검)이 1분 13초 넘게 걸려, 90초가 먼저 끝나
 #     폴백 카드가 뜬 뒤에 사람이 아무것도 안 쳤는데 함대가 섰다(카드는 순수 오발 · 손 계수가 거짓으로 늘었다).
 $FleetWaitTries = 180  # 2초 × 180 = 6분. (자동이 안 닿았을 때) 사람이 창을 찾아 한 문장 치기에 넉넉한 시간.
@@ -3728,8 +3780,7 @@ function Send-MasterRetry([string]$Cli, [string]$Ref) {
     #   ⛔선언(「너는 마스터다」)을 다시 보내지 않는다: 그 줄은 이미 첫 프롬프트로 갔고,
     #     창에 밀어 넣은 글은 팩 판정기가 기계 배달로 보아 선언으로 세지 않는다(2026-09-05 실측).
     if (-not $Ref) { return $false }
-    $msg = '앞서 보낸 요청은 install-directive.md 를 읽고 판단하신 뒤 준비 작업을 해 달라는 뜻입니다. ' +
-           '읽어 보시고 괜찮다면 준비 작업 1번(표지 파일 만들기)부터 해 주세요. 판단해 보시고 못 하겠다면 그 까닭을 한 줄로 적어 주세요.'
+    $msg = $MasterRetryMsg
     [void](Invoke-CysCapped $Cli ('send --surface ' + $Ref + ' "' + $msg + '"') $ChildReadCapMs)
     Start-Sleep -Seconds 2
     [void](Invoke-CysCapped $Cli ('send-key --surface ' + $Ref + ' Return') $ChildReadCapMs)
@@ -3780,10 +3831,10 @@ function Write-MasterRequestCard {
     # 마스터가 지시는 받았는데 시작하지 않은 끝에서만 인쇄한다.
     #   ⛔여기에 「너는 마스터다」를 적지 않는다 — 그 한마디는 이미 들어갔고, 다시 쳐도 같은 자리에 선다.
     #   ★적는 문구는 **2026-09-16 13:25 에 같은 기계에서 실제로 받아들여진 그 문장**이다.
-    Human '자비스' '자비스가 아직 준비 작업을 시작하지 않아 한 줄만 부탁드립니다 — cys 창에서 쳐 주십시오'
+    Human '자비스' '자비스가 아직 준비 작업을 시작하지 않아 한 줄만 부탁드립니다 — cys 창에서 입력해 주십시오'
     Say ''
     Say '   ┌───────────────────────────────────────────────────────────────┐'
-    Say '   │   cys 창(제목 jarvis)에 이렇게 쳐 주십시오:                   │'
+    Say '   │   cys 창(제목 jarvis)에 이렇게 입력해 주십시오:               │'
     Say '   │                                                               │'
     Say '   │     install-jarvis 폴더의 install-directive.md 를 읽고,       │'
     Say '   │     거기 적힌 준비 작업을 해 주세요.                          │'
@@ -3804,7 +3855,7 @@ function Write-MasterUnknownCard {
     # 「판정 못 함」은 「거절했다」가 아니다 — 우리 관측이 닿지 않았을 수도 있다. 그래서 문구가 다르다.
     Say ''
     Say '   cys 창(제목 jarvis)을 열어 자비스가 무엇을 하고 있는지 보아 주십시오.'
-    Say '   아무 말도 하지 않고 있으면 이렇게 쳐 주시면 됩니다: install-jarvis 폴더의 install-directive.md 를 읽고, 거기 적힌 준비 작업을 해 주세요.'
+    Say '   아무 말도 하지 않고 있으면 이렇게 입력해 주시면 됩니다: install-jarvis 폴더의 install-directive.md 를 읽고, 거기 적힌 준비 작업을 해 주세요.'
 }
 function Set-FleetNeedsMaster {
     # 끝맺음이 「예상 못 한 끝」으로 읽지 않게 하되, 「끝났습니다」라고도 하지 않는다 — 남은 일을 그대로 적는다.
@@ -3837,7 +3888,7 @@ function Step-Fleet {
     $mres = Confirm-MasterAwake $cli $SurfaceRef
     Write-MasterSay $mres
     # ── ② 자동 각성 확인(사람 손 0) — 선언은 [9/10] 이 첫 프롬프트로 이미 넘겼다 ──
-    Say '[10/10] 자비스가 깨어나 동료들을 부르는지 지켜봅니다 (최대 4분 · 사람이 하실 일은 없습니다).'
+    Say '[10/10] 자비스가 깨어나 동료들을 부르는지 지켜봅니다 (최대 7분 · 사람이 하실 일은 없습니다).'
     Write-Log "fleet: auto awaken - watching child seats in $SurfaceRef (cap $($FleetAwakeTries * $FleetPollSec)s)"
     $fleetSw = [System.Diagnostics.Stopwatch]::StartNew()   # [10/10] 소요(초)를 진행 전송에 싣는다(installer-speed-pin-0320)
     $live = @()
@@ -3879,14 +3930,14 @@ function Step-Fleet {
     #   ⚠원인을 단정하지 않는다 — 우리가 아는 것은 「상한 안에 안 섰다」뿐이다(카드 뒤에 저절로 서는 일도 실기에서 있었다).
     Write-Log "fleet awaken: no child seat within $($FleetAwakeTries * $FleetPollSec)s -> manual fallback card"
     Send-Progress '10/10' 'info' ([int]$fleetSw.Elapsed.TotalSeconds) 'awaken:manual-fallback' $null   # 자동 각성 미도달 → 사람 카드(master 병합 연결 2026-09-15)
-    Human '자비스' '자비스가 저절로 깨어나지 않아 한마디만 부탁드립니다 — cys 창에서 쳐 주십시오'
+    Human '자비스' '자비스가 저절로 깨어나지 않아 한마디만 부탁드립니다 — cys 창에서 입력해 주십시오'
     Say ''
-    Say '   ┌─────────────────────────────────────────────┐'
-    Say ("   │   cys 창(제목 jarvis)에 이렇게 쳐 주십시오:  │")
-    Say ("   │                                             │")
-    Say ("   │        " + $FleetTrigger + "                        │")
-    Say ("   │                                             │")
-    Say '   └─────────────────────────────────────────────┘'
+    Say '   ┌──────────────────────────────────────────────────┐'
+    Say ("   │   cys 창(제목 jarvis)에 이렇게 입력해 주십시오:  │")
+    Say ("   │                                                  │")
+    Say ("   │        " + $FleetTrigger + "                             │")
+    Say ("   │                                                  │")
+    Say '   └──────────────────────────────────────────────────┘'
     Say ''
     Say '   그 한마디를 들으면 자비스가 동료들을 부릅니다. 여기서 기다리다가 다 서면 알려 드립니다.'
     Write-Log "fleet: waiting for owner declaration in $SurfaceRef"
@@ -3911,7 +3962,7 @@ function Step-Fleet {
                 Say ("   자비스가 동료들을 부르는 중입니다. 그대로 기다려 주십시오 ($mins).")
                 Say ("     선 자리 = " + ($live -join ' · ') + '  (사람이 하실 일은 없습니다)')
             } else {
-                Say ("   기다리는 중입니다 ($mins). 아직 치지 않으셨다면 지금 쳐 주십시오.")
+                Say ("   기다리는 중입니다 ($mins). 아직 입력하지 않으셨다면 지금 입력해 주십시오.")
             }
         }
     }
@@ -3944,7 +3995,7 @@ function Step-Fleet {
         Say '     자비스는 이미 깨어 있습니다(master 자리가 섰습니다) — 그 한마디는 들어갔습니다.'
         Say '     남은 자리를 다시 세우려면 cysr 창의 jarvis 칸에 『너는 마스터다.』 한 줄을 다시 쳐 주십시오(이 설치 창이 아닙니다).'
     } else {
-        Say '     아직 그 한마디를 치지 않으셨다면, cys 창에서 지금 쳐 주시면 됩니다.'
+        Say '     아직 그 한마디를 입력하지 않으셨다면, cys 창에서 지금 입력해 주시면 됩니다.'
         Say '     치셨는데도 서지 않았다면 cys 창의 자비스에게 물어보십시오 — 무엇이 걸렸는지 사람 말로 알려 줍니다.'
     }
     Write-Log ("fleet missing: " + ($missing -join ','))
@@ -3962,7 +4013,7 @@ function Step-Fleet {
 #   글자 칸은 `\z` 로 끝을 못박아 다시 만든다. 이름·글자·판본 비교는 대소문자를 가르는 -ceq·-cmatch·-ccontains 만 쓴다.
 # ⚠PowerShell 은 `'true' -eq $true` 를 참으로 본다 ⇒ 칸마다 **형(type)을 먼저** 본다.
 # ⚠이 절은 맥에서 PowerShell 없이 **정적 검사 + 맥판과의 대조**로만 증명했다 — 윈도우 실기가 필요한 축은 내부 문서.
-$InstallerVersion       = '0.3.24'   # 보고의 installer_version · $BootstrapVersion 은 화면 머리글 용도 그대로(보내지 않는다)
+$InstallerVersion       = '0.3.25'   # 보고의 installer_version · $BootstrapVersion 은 화면 머리글 용도 그대로(보내지 않는다)
 $HelpApiUrl             = 'https://jarvis-install.godmeyou.kr'
 $RemoteHelpNoticeUrl    = 'jarvis-install.godmeyou.kr/help/notice'
 # [1/10] 고지 1줄 = /help/notice 정본이 인용하는 문장 그대로 + 끝에 자세한 안내 자리. ⛔문안 변경 금지(맥판과 글자가 같아야 한다).
@@ -5023,9 +5074,13 @@ function Protect-EvidenceText([string]$Raw) {
 
 function Get-EvidenceText {
     # 설치 창 글자 = Start-Transcript 파일(켜져 있을 때) · 아니면 설치 기록(화면 줄을 전부 담는다) — 끝에서 읽어 마스킹한 뒤 자른다.
+    # 🔴TICKET=installer-0325 c5(2026-09-18) — 못 읽었으면(빈 문자열) 조용히 공백을 보내지 않는다. 서버가 「정체가 났다」만 받고
+    #   「무엇이 보였나」는 못 받는 사고(09-17 10:01 실기 WHm7yvpu)가 여기서 났다 — Send-EvidenceEvent 는 $Text 가 falsy(빈 문자열)면
+    #   text 칸 자체를 뺀다(그 자체는 'requested' 등에 쓰는 의도된 동작 · 안 건드린다). 그래서 이 함수는 **읽기에 실패했다는 사실 자체를**
+    #   빈 글이 아니라 사유 코드로 돌려준다 — 관측 실패를 사유로 말하게 한다.
     $src = if ($script:TranscriptOn -and (Test-Path -LiteralPath $TranscriptFile)) { $TranscriptFile } else { $LogFile }
     $bytes = Get-FileBytesCapped $src $EvidenceSourceBytes
-    if ($null -eq $bytes -or $bytes.Length -eq 0) { return '' }
+    if ($null -eq $bytes -or $bytes.Length -eq 0) { return '[text:empty(no-source)]' }
     $cut = $false
     try { $cut = ((Get-Item -LiteralPath $src -ErrorAction Stop).Length -gt $bytes.Length) } catch { }
     if ($bytes.Length -ge 2 -and $bytes[0] -eq 0xFF -and $bytes[1] -eq 0xFE) { $raw = [System.Text.Encoding]::Unicode.GetString($bytes, 2, $bytes.Length - 2) }
@@ -5033,9 +5088,40 @@ function Get-EvidenceText {
     # 끝에서 잘라 읽었으면 첫 줄은 반쪽이다 — 반쪽 토큰이 규칙에 안 걸린 채 나가지 않게 버린다.
     if ($cut) { $nl = $raw.IndexOf("`n"); if ($nl -ge 0) { $raw = $raw.Substring($nl + 1) } else { $raw = '' } }
     $masked = Protect-EvidenceText $raw
-    return (Get-RemoteHelpTailBytes $masked $EvidenceTextBytes)
+    $out = Get-RemoteHelpTailBytes $masked $EvidenceTextBytes
+    if (-not $out) { return '[text:empty(masked-or-cut)]' }
+    return $out
 }
 
+# 🔴TICKET=installer-0325 c5(2026-09-18) — 그림을 먼저 찍어(실패 사유까지 손에 쥔 채) 글자를 보내야, 찍기가 죽어도
+#   그 사유가 evidence_text 에 실려 서버에 닿는다(옛 순서는 글자를 먼저 보낸 뒤 그림을 올려서, 그림이 예외로 죽으면
+#   catch 가 Write-Log 로 이 기계의 파일에만 적고 서버엔 아무 신호도 안 갔다).
+function Get-EvidenceCaptures([string[]]$Kinds) {
+    $out = New-Object System.Collections.Generic.List[object]
+    foreach ($k in @($Kinds)) {
+        $bytes = $null; $err = ''
+        try { $bytes = Get-EvidenceKindJpeg $k } catch { $err = [string]$_.Exception.Message }
+        if (($null -eq $bytes -or $bytes.Length -eq 0) -and -not $err) { $err = 'empty' }
+        $out.Add([ordered]@{ Kind = $k; Bytes = $bytes; FailReason = $err })
+    }
+    return $out
+}
+function Get-EvidenceCaptureFailNote($Captures) {
+    $lines = @()
+    foreach ($c in @($Captures)) {
+        if ($null -eq $c.Bytes -or $c.Bytes.Length -eq 0) {
+            $r = if ($c.FailReason) { [string]$c.FailReason } else { 'empty' }
+            $lines += ('[capture:' + $c.Kind + ' fail=' + $r + ']')
+        }
+    }
+    if ($lines.Count -eq 0) { return '' }
+    return (Get-RemoteHelpTailBytes (Protect-EvidenceText ($lines -join ' ')) 400)
+}
+function Send-CapturedEvidenceImages($Slot, $Captures) {
+    foreach ($c in @($Captures)) {
+        if ($null -ne $c.Bytes -and $c.Bytes.Length -gt 0) { [void](Send-EvidenceImage $Slot $c.Kind $c.Bytes) }
+    }
+}
 function Send-EvidenceOnce([string]$Reason) {
     # fail-open · (이유 × 단계) 한 번 · 설치를 막지 않는다.
     try {
@@ -5043,8 +5129,11 @@ function Send-EvidenceOnce([string]$Reason) {
         if ($script:EvidenceSent.ContainsKey($key)) { return }
         $script:EvidenceSent[$key] = $true
         $t = Get-EvidenceText
+        $captures = Get-EvidenceCaptures (Get-DefaultEvidenceKinds)   # v0.3.20 — 글자만으로는 09-16 실기의 정체를 알 수 없었다
+        $failNote = Get-EvidenceCaptureFailNote $captures
+        if ($failNote) { $t = ([string]$t) + "`n" + $failNote }   # 사진이 안 찍혔으면 그 사유도 글자 칸에 함께 싣는다(c5)
         $slot = Send-EvidenceEvent $Reason $t
-        Send-EvidenceImages $slot (Get-DefaultEvidenceKinds)   # v0.3.20 — 글자만으로는 09-16 실기의 정체를 알 수 없었다
+        Send-CapturedEvidenceImages $slot $captures
         Write-Log ('evidence sent: ' + $key + ' ' + [System.Text.Encoding]::UTF8.GetByteCount([string]$t) + 'B')
     } catch { Write-Log ('evidence error (fail-open): ' + $_.Exception.Message) }
 }

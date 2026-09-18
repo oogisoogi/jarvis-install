@@ -19,7 +19,7 @@
 # ⛔바깥에 닿지 않는다 — 실제 cys·claude 호출 0 · 쓰기는 mktemp -d 안에서만.
 # ⚠여기서 **안 재는 것**(윈도우 실기에서만 있는 것): wake.ps1 을 PS 5.1 이 아니라 pwsh 7 로 돌린다(인자 조립 규칙이 다를 수 있다) ·
 #   claude.exe/.cmd 고르기 · 첫 프롬프트에도 자비스의 선언 훅이 실제로 도는가 · 콘솔 입력 버퍼(맥 흉내엔 콘솔 입력이 없어 비우기는 -1 로 적힌다) ·
-#   동료가 자동 관측 상한(4분) 안에 서는가.
+#   동료가 자동 관측 상한(7분) 안에 서는가.
 export JARVIS_NO_PROGRESS=1   # 🔴흉내·검사는 라이브 서버로 진행 이벤트를 보내지 않는다(2026-09-15 15:49 master 게이트 실행이 라이브 progress에 가짜 4건을 남긴 사고 · Send-Progress의 레버)
 set -u
 HERE="$(cd "$(dirname "$0")" && pwd)"
@@ -45,6 +45,10 @@ bad() { fail=$((fail+1)); printf '  FAIL %s  ← %s\n' "$1" "$2"; }
 t() { if [ "$1" -eq 0 ]; then ok "$2"; else bad "$2" "$3"; fi; }
 run_ps() { perl -e 'alarm shift; exec @ARGV' 60 "$PW" -NoProfile -File "$@" </dev/null; }
 has() { grep -qE -- "$2" "$1"; }
+# 윈 재시도 보충 한 줄의 정본을 **읽어서** 쓴다(TICKET=installer-0325 c2 · 사본을 박으면 문구를 고칠 때마다
+#   이 축이 거짓 적색이 된다 — 09-16 우리말 장문이 ASCII 영문으로 바뀌면서 실제로 한 번 그랬다).
+WIN_RETRY_MSG="$([ -n "$PW" ] && sed -n "s/^\\\$MasterRetryMsg = '\(.*\)'\$/\1/p" "$PS")"
+WIN_RETRY_MSG_RE="$(printf '%s' "$WIN_RETRY_MSG" | sed -e 's/[.[\*^$()+?{|]/\\&/g')"
 
 echo "== [9/10]~[10/10] 자동 각성 =="
 for s in success claim-denied fallback-success no-surface child-awake paste-late child-stall screen-lies stale-session fallback-dir no-answer grace master-refuse master-retry-late master-unknown master-stale-mark master-prior-mark master-mark-only; do
@@ -57,8 +61,8 @@ for s in success claim-denied fallback-success no-surface child-awake paste-late
   has "$L" 'TEST finally'; t $? "[$s] 흉내가 끝까지 돌았다" "마지막 줄이 없다 — 멈췄거나 죽었다(err: $(head -c 160 "$SB/err.txt"))"
   # 자비스 창에는 글도 키도 넣지 않는다 · 예외는 둘뿐이다: 자식 자리(surface:10·11)의 Return(installer-awaken-verify)
   #   과 마스터가 「받았으나 시작 안 함」일 때의 **보충 한 줄 1회**(installer-0322-awaken · 선언은 다시 보내지 않는다).
-  ! grep -qvE '^send-key --surface surface:1[01] Return$|^send --surface surface:9 앞서 보낸 요청은 |^send-key --surface surface:9 Return$' "$SB/sent" 2>/dev/null
-  t $? "[$s] 창에 밀어 넣는 것은 자식 Return 과 마스터 보충 한 줄뿐" "$(grep -vE '^send-key --surface surface:1[01] Return$|^send --surface surface:9 앞서 보낸 요청은 |^send-key --surface surface:9 Return$' "$SB/sent" 2>/dev/null | head -2 | tr '\n' '|')"
+  ! grep -qvE "^send-key --surface surface:1[01] Return\$|^send --surface surface:9 ${WIN_RETRY_MSG_RE}\$|^send-key --surface surface:9 Return\$" "$SB/sent" 2>/dev/null
+  t $? "[$s] 창에 밀어 넣는 것은 자식 Return 과 마스터 보충 한 줄뿐" "$(grep -vE "^send-key --surface surface:1[01] Return\$|^send --surface surface:9 ${WIN_RETRY_MSG_RE}\$|^send-key --surface surface:9 Return\$" "$SB/sent" 2>/dev/null | head -2 | tr '\n' '|')"
   msend9() { [ -f "$SB/sent" ] || { echo 0; return; }; grep -cE '^send --surface surface:9 ' "$SB/sent" || true; }
   case "$s" in master-refuse|master-retry-late|master-stale-mark|master-prior-mark) want9=1 ;; *) want9=0 ;; esac
   [ "$(msend9)" = "$want9" ] && ! grep -q '^send --surface surface:9 .*너는 마스터다' "$SB/sent" 2>/dev/null
@@ -115,8 +119,8 @@ PYEOF
       t $? "[성공] 자리 여는 명령의 인자에는 우리말이 한 글자도 없다" "$(tr '\n' ' ' < "$SB/newsurface-args" 2>/dev/null | cut -c1-200)"
       has "$L" 'fleet stray keys in installer window cleared='
       t $? "[성공] [10/10] 을 떠나기 전에 설치 창 입력 버퍼를 비운다" "비우기 기록이 없다"
-      has "$L" 'TEST default awake cap=240s$'
-      t $? "[성공] 자동 관측 상한은 240초(자비스 첫 턴보다 길게 · 윈 실기)" "$(grep 'default awake cap' "$L")"
+      has "$L" 'TEST default awake cap=420s$'
+      t $? "[성공] 자동 관측 상한은 420초(자비스 첫 턴보다 길게 · 윈 실기)" "$(grep 'default awake cap' "$L")"
       grep -q '다음에 할 일: 없습니다 — 설치가 끝났습니다. 이 창을 닫으셔도 됩니다.' "$O" && ! has "$L" 'unexpected end'
       t $? "[성공] 끝맺음이 「설치가 끝났습니다」 · 「다시 실행」 안내를 인쇄하지 않는다" "$(grep '다음에 할 일' "$O" | head -1)"
       # installer-awaken-jsonl — 세션 기록이 없는(미제출) worker 자리에 Return 한 번 → 세션 기록으로 깸 확인 · 이미 깬 cso 는 무동작
@@ -350,16 +354,18 @@ PYEOF
 t $? "[맥 master] 보충 한 줄 정본 = bootstrap.sh 상수 MASTER_RETRY_MSG 한 줄 · send_master_retry 가 그것을 보냄 · 빈 글 아님 · ASCII 뿐(H-M2 · 판정 master#63749eda) · 선언 재전송 없음" "읽은 글: $(printf '%s' "$MAC_RETRY_MSG" | cut -c1-120)"
 MAC_MASTER_SCEN="${AWAKEN_EMU_MAC_MASTER:-success master-refuse master-retry-late master-unknown master-stale-mark master-prior-mark master-mark-only master-late-fleet master-verified-fleet-late}"
 for s in $MAC_MASTER_SCEN; do
-  SB="$BASE/macm-$s"; mkdir -p "$SB/bin" "$SB/home"
+  SB="$BASE/macm-$s"; mkdir -p "$SB/bin" "$SB/home" "$SB/cys.app"
   cp "$EMU/fake-cys.sh" "$SB/bin/cys"; chmod +x "$SB/bin/cys"
   printf '#!/bin/bash\necho "EMU-CLAUDE-INLINE"\nexit 0\n' > "$SB/bin/claude"; chmod +x "$SB/bin/claude"
+  # c7 — 실 osascript·실 앱에 안 닿는다(샌드박스 안 빈 폴더 · CYS_KIND=fork). 부른 것만 기록.
+  printf '#!/bin/bash\nprintf "%%s\\n" "$*" >> "%s/osascript-calls"\nexit 0\n' "$SB" > "$SB/bin/osascript"; chmod +x "$SB/bin/osascript"
   JH="$SB/home/install-jarvis"
   printf '%s' "$s" > "$SB/scenario"; printf '%s' "$JH" > "$SB/jarvis-home"
   cat > "$SB/run.sh" <<EOF
 . "$SHF" || exit 9
 printf 'TEST default awake cap=%ss\n' "\$(( \${FLEET_AWAKE_TRIES:-0} * \${FLEET_POLL_SEC:-0} ))"
 printf 'TEST default master cap=%ss poll=%ss retrycap=%ss retry=%s\n' "\${MASTER_AWAKE_CAP_SEC:-}" "\${MASTER_AWAKE_POLL_SEC:-}" "\${MASTER_RETRY_CAP_SEC:-}" "\${MASTER_RETRY_MAX:-}"
-CYS_CLI=cys; MODE=full
+CYS_CLI=cys; MODE=full; CYS_KIND=fork; CYS_FORK_APP="$SB/cys.app"
 FLEET_POLL_SEC=0; FLEET_AWAKE_TRIES=3; FLEET_WAIT_TRIES=2
 CHILD_AWAKE_GAPS='0 0 0'; CHILD_AWAKE_GRACE_SEC=2; CHILD_AWAKE_CAP_SEC=8
 MASTER_AWAKE_CAP_SEC=2; MASTER_AWAKE_POLL_SEC=0; MASTER_RETRY_CAP_SEC=2
@@ -398,12 +404,19 @@ PYEOF
       t $? "[맥 master 성공] 선언 「너는 마스터다」는 첫 프롬프트의 그 자체 첫 줄(wake.sh 안)" "$(head -c 240 "$JH/wake.sh" 2>/dev/null | tr '\n' '|')"
       grep -q '^TEST default master cap=120s poll=3s retrycap=60s retry=1$' "$O"
       t $? "[맥 master 성공] 마스터 판정 상한 = 120초 · 3초 간격 · 재시도 1회 · 재시도 뒤 60초(ps1 과 같은 값)" "$(grep 'default master' "$O")"
-      grep -q '^TEST default awake cap=240s$' "$O"
-      t $? "[맥 master 성공] 동료 자동 관측 상한 = 240초(ps1 과 같은 값)" "$(grep 'default awake' "$O")"
+      grep -q '^TEST default awake cap=420s$' "$O"
+      t $? "[맥 master 성공] 동료 자동 관측 상한 = 420초(ps1 과 같은 값)" "$(grep 'default awake' "$O")"
       grep -q '다음에 할 일: 없습니다 — 설치가 끝났습니다. 이 창을 닫으셔도 됩니다.' "$O"
       t $? "[맥 master 성공] 끝맺음이 「설치가 끝났습니다」" "$(grep '다음에 할 일' "$O" | head -1)"
       grep -q '^pid=4242$' "$JH/awake-master.ok" 2>/dev/null
-      t $? "[맥 master 성공] 표지는 마스터가 만든 것이다(설치기가 스스로 만들지 않는다)" "$(head -2 "$JH/awake-master.ok" 2>/dev/null | tr '\n' '|')" ;;
+      t $? "[맥 master 성공] 표지는 마스터가 만든 것이다(설치기가 스스로 만들지 않는다)" "$(head -2 "$JH/awake-master.ok" 2>/dev/null | tr '\n' '|')"
+      # c7 — [10/10] 완주 성공 순간 cysr 창을 앞으로(재기동 없이 activate 만)
+      grep -qF "tell application \"$SB/cys.app\" to activate" "$SB/osascript-calls" 2>/dev/null
+      t $? "[맥 c7] 완주 성공 시 cysr 창을 activate 로 앞에 올린다" "$(cat "$SB/osascript-calls" 2>/dev/null | tr '\n' '|')"
+      [ "$(wc -l < "$SB/osascript-calls" 2>/dev/null | tr -d ' ')" = "1" ]
+      t $? "[맥 c7] activate 는 정확히 1회뿐(재기동 아님 — open -a 를 또 부르지 않는다)" "osascript 호출 $(wc -l < "$SB/osascript-calls" 2>/dev/null | tr -d ' ')회"
+      grep -q 'cysr 창이 앞에 보이지 않으면 Dock 의 cysr 아이콘을 한 번 눌러 주세요' "$O"
+      t $? "[맥 c7] 안 보일 때의 안내(Dock 아이콘 · 다시 실행 금지)를 화면에 남긴다" "$(grep -n 'Dock' "$O" | tr '\n' '|' | cut -c1-200)" ;;
     master-refuse)
       mhas 'awaken master: marker=awaken:master-no-start mark=False a=1 retry=1$' \
         && grep -q '     자비스(master)는 지시를 받았으나 준비 작업을 시작하지 않았습니다' "$O" \
@@ -521,6 +534,47 @@ t $? "[윈 정적] 로그인 대기 구간에서는 빠른 편집을 켠다(로�
 [ "$(grep -cE '^[[:space:]]+confirm_child_seats "\$cli"$' "$DIR/bootstrap.sh")" = "2" ] \
   && [ "$(grep -cE '^[[:space:]]+\[void\]\(Confirm-ChildSeats \$cli\)$' "$DIR/bootstrap.ps1")" = "2" ]
 t $? "[맥·윈] 자식 자리 확인을 [10/10] 두 자리에서 부른다" "맥 $(grep -cE 'confirm_child_seats "\$cli"' "$DIR/bootstrap.sh") · 윈 $(grep -cE 'Confirm-ChildSeats \$cli' "$DIR/bootstrap.ps1")"
+
+echo "== [9/10] wake.sh 경로에 작은따옴표(TICKET=installer-0325 c1 · 09-16 756 발견 · 사용자 이름에 ' 포함) =="
+# 무엇을 재는가: 4070 은 wake.sh **안**의 문장(wake_prompt)만 지켰다 — 여는 명령(cmd_line)에 실리는 것은
+# **경로**(wake_file)라, 홈 경로에 작은따옴표가 있으면 그 글자가 그대로 실려 나간다. cys(→터미널)가 이 문자열을
+# 다시 셈으로 파싱하는 자리(bash -c 로 흉내)에서 따옴표가 거기서 끊기는지가 이 시험의 핵심이다.
+SB="$BASE/quote-home"; mkdir -p "$SB/bin" "$SB/home/O'Brien"
+cp "$EMU/fake-cys.sh" "$SB/bin/cys"; chmod +x "$SB/bin/cys"
+cat > "$SB/bin/claude" <<CLAUDE_EOF
+#!/bin/bash
+printf '%s\n' "\$@" >> "$SB/claude-args"
+exit 0
+CLAUDE_EOF
+chmod +x "$SB/bin/claude"
+JH="$SB/home/O'Brien/install-jarvis"
+printf 'success' > "$SB/scenario"; printf '%s' "$JH" > "$SB/jarvis-home"
+cat > "$SB/run.sh" <<EOF
+. "$SHF" || exit 9
+CYS_CLI=cys; MODE=full
+FLEET_POLL_SEC=0; FLEET_AWAKE_TRIES=3; FLEET_WAIT_TRIES=2
+CHILD_AWAKE_GAPS='0 0 0'; CHILD_AWAKE_GRACE_SEC=2; CHILD_AWAKE_CAP_SEC=8
+MASTER_AWAKE_CAP_SEC=2; MASTER_AWAKE_POLL_SEC=0; MASTER_RETRY_CAP_SEC=2
+mkdir -p "$JH"
+step_wake
+echo "TEST wake rc=\$?"
+EOF
+PATH="$SB/bin:$PATH" HOME="$SB/home/O'Brien" JARVIS_HOME="$JH" JARVIS_LIB_ONLY=1 \
+  perl -e 'alarm shift; exec @ARGV' 60 bash "$SB/run.sh" </dev/null >"$SB/out.txt" 2>"$SB/err.txt"
+O="$SB/out.txt"
+grep -q '^TEST wake rc=' "$O"
+t $? "[맥 c1] 홈 경로에 작은따옴표(O'Brien)가 있어도 흉내가 끝까지 돌았다" "err: $(head -c 200 "$SB/err.txt" | tr '\n' '|')"
+[ -x "$JH/wake.sh" ]
+t $? "[맥 c1] wake.sh 가 생성·실행권한을 갖는다" "$(ls -l "$JH/wake.sh" 2>&1)"
+CMD_LINE="$(awk '/^--cmd$/{getline; print; exit}' "$SB/newsurface-args" 2>/dev/null)"
+[ -n "$CMD_LINE" ]
+t $? "[맥 c1] cys 에 넘긴 여는 명령(cmd_line)을 잡았다" "newsurface-args: $(cat "$SB/newsurface-args" 2>/dev/null | tr '\n' '|' | cut -c1-200)"
+# ★핵심 — cmd_line 이 다른 프로그램(터미널 창)에서 셈으로 다시 파싱돼도(bash -c 흉내) 안 끊기고 wake.sh 를 실제로 돈다
+PATH="$SB/bin:$PATH" HOME="$SB/home/O'Brien" bash -c "$CMD_LINE" >"$SB/replay.out" 2>"$SB/replay.err"
+grep -q -- '--dangerously-skip-permissions' "$SB/claude-args" 2>/dev/null
+t $? "[맥 c1] cmd_line 을 다시 셈 파싱해도(bash -c) 끊기지 않고 claude 가 실제로 불린다(경로 작은따옴표 방어)" "replay err: $(cat "$SB/replay.err" 2>/dev/null | tr '\n' '|' | cut -c1-200) · claude-args: $(cat "$SB/claude-args" 2>/dev/null | tr '\n' '|' | cut -c1-160)"
+grep -q '^너는 마스터다$' "$SB/claude-args" 2>/dev/null
+t $? "[맥 c1] 다시 실행된 wake.sh 가 선언 첫 줄을 그대로 claude 에 넘긴다(경로 이스케이프가 프롬프트 내용을 훼손하지 않는다)" "$(cat "$SB/claude-args" 2>/dev/null | tr '\n' '|' | cut -c1-200)"
 
 printf '\n통과 %s · 실패 %s\n' "$pass" "$fail"
 [ "$fail" -eq 0 ] || exit 1

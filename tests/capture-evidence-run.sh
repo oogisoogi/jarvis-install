@@ -115,6 +115,10 @@ elif what == "ev_reasons":  print(",".join(sorted(set(r.get("reason") or "" for 
 elif what == "empty_text":  print(sum(1 for r in prog if r.get("event") == "evidence" and r.get("has_text") and not r.get("text")))
 elif what == "notext_ev":   print(sum(1 for r in prog if r.get("event") == "evidence" and not r.get("has_text")))
 elif what == "getpaths":    print(",".join(r["path"] for r in rows if r["method"] == "GET"))
+elif what == "text_by_reason":
+    reason = sys.argv[3] if len(sys.argv) > 3 else ""
+    m = [r.get("text") or "" for r in prog if r.get("event") == "evidence" and r.get("reason") == reason]
+    print(m[0] if m else "<없음>")
 PYEOF
 }
 [ -s "$F" ]; t $? "[몰이] 끝까지 돌았다" "facts 가 비었다(err: $(head -c 200 "$BASE/err.txt"))"
@@ -215,6 +219,21 @@ LOGF="$BASE/home/install-jarvis/bootstrap.log"
 t $? "[ⓕ③] 기록 파일의 사유 글도 가려져 있다(실패 때 이 파일이 통째로 나간다)" "$(grep 'capture evidence: error-text' "$LOGF" 2>/dev/null | head -1 | cut -c1-140)"
 [ "$(fact installer_jpeg_null)" = "True" ]; t $? "[설치 창] 맥에는 윈도우 콘솔이 없어 그림 없이 끝난다(죽지 않는다)" "null=$(fact installer_jpeg_null)"
 [ "$(fact appwin_nocli_null)" = "True" ]; t $? "[앱 창] 자리를 모를 때 죽지 않고 그림 없이 끝난다" "appwin_nocli_null=$(fact appwin_nocli_null)"
+
+echo
+echo "== TICKET=installer-0325 c5(2026-09-18) — 정체 증거 공백 도착(윈 evidence_text NULL) 폴백 =="
+# 09-17 10:01 실기(WHm7yvpu) — Send-EvidenceOnce 'stall' 이 evidence_text=NULL·이미지 0장으로 서버에 도착했다.
+# ⚠여기서 안 재는 것: 실 윈도우 콘솔 캡처·실 백신 3종 차단·서버 실물 — 순수 pwsh 문자열/제어흐름 로직만(윈 실기는 이 티켓 범위 밖).
+case "$(fact evtext_empty_reason)" in
+  '[text:empty(no-source)]') ok "[c5] 원본 파일이 없으면 빈 글이 아니라 사유 코드를 돌려준다" ;;
+  *) bad "[c5] 원본 파일이 없으면 빈 글이 아니라 사유 코드를 돌려준다" "받은 값=$(fact evtext_empty_reason)" ;;
+esac
+C5TXT="$(q text_by_reason c5-capture-fail)"
+printf '%s' "$C5TXT" | grep -q '\[capture:installer_window fail=boom-c5-capture\]'
+t $? "[c5] 그림 찍기가 예외로 죽으면 그 사유가 evidence_text 칸에 실려 서버에 닿는다(옛 판은 이 기계 기록에만 남았다)" "받은 text=$C5TXT"
+[ -n "$C5TXT" ] && [ "$C5TXT" != "<없음>" ]
+t $? "[c5] 그림이 전부 실패해도(글자 없이) evidence_text 칸을 비워 보내지 않는다" "text=$C5TXT"
+[ "$(fact c5_capture_images_sent)" = "0" ]; t $? "[c5] 찍기 실패한 종류는 올리지 않는다(보낸 그림 0장)" "보낸 그림 $(fact c5_capture_images_sent)장"
 
 printf '\n통과 %s · 실패 %s\n' "$pass" "$fail"
 [ "$fail" -eq 0 ]

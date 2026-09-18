@@ -120,18 +120,18 @@ BLOCKED_STEP=""
 #   ⚠맥은 판번 대조에 CDHash(설치된 프로그램의 내용 지문)를 이미 함께 쓴다 — 판번이 같아도 CDHash 가 다르면 바꿔 넣는다(step_install_cys).
 #   화면 머리글 = 「<이름> <판> · 설치 도우미 <설치기 판>」(설치기 판 = INSTALLER_VERSION · 별도 semver).
 CYS_DISPLAY_NAME="cysr"
-CYS_FORK_VERSION="1.0.1"
+CYS_FORK_VERSION="1.0.2"
 CYS_FORK_DIR="https://github.com/oogisoogi/cys-ro/releases/download/v${CYS_FORK_VERSION}/"
 # 1.0.1 부터 zip 최상위 = cysr.app(안의 실행 파일 = Contents/MacOS/cys · cys-app · cysd · CFBundleName cysr · 로컬 빌드 실측 2026-09-16).
 CYS_FORK_FILE="cysr-macos-arm64-v${CYS_FORK_VERSION}.zip"
-# ✅아래 크기·지문·CDHash = v1.0.1 발행(2026-09-16 10:56 · Latest) 뒤 **실측으로 채웠다**(installer-0321-pin · 앞 판 자리표 TBD-1.0.1 을 대신한다).
-#   출처 = 릴리스 SHA256SUMS.txt(그 파일 자신의 sha256 = c7b93b67bc17cd7f5cc88706eb6350c5dd7bc5c5cefb79dd7ea234c808c1f16e) · 크기는 릴리스 자산 목록과 내려받은 파일 양쪽에서 쟀다.
-#   CDHash 는 **발행된 그 zip** 을 풀어(ditto -x -k) `codesign -dv` 로 쟀다(서명 = cys-local · zip 최상위 = cysr.app 하나).
-CYS_FORK_BYTES="471843743"
-CYS_FORK_SHA256="e8de7109dc344514adce06608014643758c887b8acf810ed23e76333f2064369"
+# ✅아래 크기·지문·CDHash = v1.0.2 발행(2026-09-18 11:23 · Latest) 뒤 **실측으로 채웠다**(installer-0325-r3 · 앞 판 값(v1.0.1)을 대신한다).
+#   출처 = 릴리스 SHA256SUMS.txt(그 파일 자신의 sha256 = 17ad2595213ae3868fb56820cd6c7aabca2d66f9c7130d618e4cc57d38f4897e) · 크기는 릴리스 자산 목록과 내려받은 파일 양쪽에서 쟀다.
+#   CDHash 는 **발행된 그 zip** 을 풀어(ditto -x -k) `codesign -dvvv` 로 쟀다(서명 = cys-local · zip 최상위 = cysr.app 하나).
+CYS_FORK_BYTES="471899457"
+CYS_FORK_SHA256="86ba5a68f9d07f4598094841209ee5471d3fa5396c2f5a93f49a787620ba389a"
 # 설치된 프로그램이 「바로 이 판」인가를 가르는 값. 판본 숫자는 원작자 판도 같은 숫자를 쓸 수 있어서
 #   숫자만 보면 **원작자 판을 우리 판으로 읽고 건너뛴다**(어제 원작자 판을 깐 맥이 그대로 남는다).
-CYS_FORK_CDHASH="41c1aa3096e97a61a013d9b2605fac0ce48a4920"
+CYS_FORK_CDHASH="17d240abc9d7a9261d410e58616ff1aeb1848c2e"
 # 저희 판이 놓이는 자리 = /Applications/cysr.app · 옛 이름 자리 = /Applications/cys.app(0.14.x·1.0.0 이 깔린 자리 · 원작자 판도 이 이름).
 CYS_FORK_APP="/Applications/cysr.app"
 CYS_OLD_APP="/Applications/cys.app"
@@ -1517,7 +1517,7 @@ offer_old_home_cleanup() {  # rc 0 = 사람이 허락해 지웠다 · 그 밖 = 
     [ -n "$p" ] && echo "       · $(basename "$p")"
   done
   echo "     이 폴더를 지우고 새로 만들면 그대로 이어서 설치합니다. 되돌릴 수 없습니다."
-  printf '계속하려면 「지웁니다」라고 쳐 주십시오(그만두시려면 그냥 Enter): '
+  printf '계속하려면 「지웁니다」라고 입력해 주십시오(그만두시려면 그냥 Enter): '
   read -r answer < /dev/tty || answer=""
   if [ "$answer" != "지웁니다" ]; then
     echo "     그만둡니다 — 아무것도 지우지 않았습니다."
@@ -2268,7 +2268,7 @@ step_login() {
     return 6
   fi
   human "벤더" "로그인 승인 클릭 — 클로드 회사 화면에서만 할 수 있다(우리가 대신 못 누른다)"
-  say "[3/10] 지금 로그인 화면을 엽니다. 브라우저가 뜨면 승인을 눌러 주십시오."
+  say "[3/10] 지금 로그인 화면을 엽니다. 브라우저가 나타나면 승인을 눌러 주십시오."
   # 로그인 카드(2026-09-14 워크숍 · 윈과 같은 세 가지 · 붙여넣기 키만 맥 것) — 승인을 두 번 누르거나 주소창 주소를 붙여넣어 코드가 무효가 됐다.
   say "     로그인은 이렇게 해 주십시오 (3가지만):"
   say "     1) 열려 있는 Claude 탭을 모두 닫고, 브라우저에서 「승인」은 한 번만 누르십시오 (두 번 누르면 앞 코드가 무효가 됩니다)."
@@ -3035,7 +3035,7 @@ EOF_SWAP
     rc=$?
   else
     say "[6/10] 이 계정에는 프로그램 폴더에 넣을 권한이 없습니다 — 관리자 비밀번호 창을 띄웁니다."
-    say "     창이 뜨면 이 컴퓨터의 관리자 이름과 비밀번호를 넣어 주십시오. (자비스는 비밀번호를 대신 넣지 않습니다.)"
+    say "     창이 나타나면 이 컴퓨터의 관리자 이름과 비밀번호를 넣어 주십시오. (자비스는 비밀번호를 대신 넣지 않습니다.)"
     osascript -e 'on run argv' \
       -e 'do shell script "/bin/bash " & quoted form of (item 1 of argv) & " " & quoted form of (item 2 of argv) & " " & quoted form of (item 3 of argv) & " " & quoted form of (item 4 of argv) & " " & quoted form of (item 5 of argv) & " " & quoted form of (item 6 of argv) with administrator privileges' \
       -e 'end run' "$swap" "$app" "$prev" "$CYS_FORK_APP" "$CYS_OLD_APP" "$oldprev" >>"$LOG_FILE" 2>&1
@@ -3110,7 +3110,7 @@ cys_install_from_dmg() {
        #   ⚠평소 경로에는 손이 늘지 않는다. 여는 것은 「안 그러면 설치가 불가능한」 경우뿐이다.
        cys_dmg_remount || { say "[6/10] 설치 파일을 다시 열지 못했습니다."; return 6; }
        say "[6/10] 이 계정에는 프로그램 폴더에 넣을 권한이 없습니다 — 설치 도우미를 엽니다."
-       say "     창이 뜨면 「설치」를 누르시고, 이 컴퓨터의 관리자 비밀번호를 넣어 주십시오."
+       say "     창이 나타나면 「설치」를 누르시고, 이 컴퓨터의 관리자 비밀번호를 넣어 주십시오."
        say "     (자비스는 비밀번호를 대신 넣지 않습니다. 넣으신 뒤 끝나면 「닫기」를 누르십시오.)"
        open "$CYS_DMG_MNT/Install cys.app" >>"$LOG_FILE" 2>&1 || {
          say "     설치 도우미를 열지 못했습니다. 공식 페이지에서 직접 받아 열어 주십시오: $CYS_SITE_URL"
@@ -3494,10 +3494,10 @@ step_prepare_account() {
 #   ⛔창에 글을 밀어 넣는 길(cys send)은 쓰지 않는다 — 자비스가 기계 배달로 보고 동료를 부르지 않는다(2026-09-05 실측).
 #     첫 프롬프트는 배달 기록에 없어 선언으로 읽힌다(팩 v0.14.36 판정기 2026-09-15 실측 · 메모리 installer-auto-declaration-first-prompt-not-cys-send).
 #   앞 판 맥 주석(「사람이 직접 친 선언만 … 우리가 대신 넣지 않는다」)은 cys send 경로에 대한 말이었다 — 첫 프롬프트 경로는 그 장치에 걸리지 않는다.
-# 우리가 하는 일 = ⑴마스터가 실제로 일을 시작했는지 잰다 ⑵동료 자리가 서는지 본다(최대 4분) ⑶안 서면 그때만 사람에게 부탁한다.
+# 우리가 하는 일 = ⑴마스터가 실제로 일을 시작했는지 잰다 ⑵동료 자리가 서는지 본다(최대 7분) ⑶안 서면 그때만 사람에게 부탁한다.
 FLEET_TRIGGER='너는 마스터다'
 FLEET_POLL_SEC=2      # 자리 목록을 몇 초마다 보는가 · 종전 5초(installer-speed-pin-0320 — 먼저 보고 나서 기다린다)
-FLEET_AWAKE_TRIES=120 # 2초 × 120 = 4분. 사람 손 없이 동료가 서기를 기다리는 상한(윈도우판 $FleetAwakeTries 와 같은 값 · 90초에서 올린 까닭도 같다)
+FLEET_AWAKE_TRIES=210 # 2초 × 210 = 420초(7분). 옛 240초(4분)에 팩 자원 게이트 재측정 상한(1.0.2 A2 · load 트립 시 30s×6=180s)을 더해 늘림(TICKET=installer-0325 c9 · 2026-09-18) — 윈도우판 $FleetAwakeTries 와 같은 값(90초에서 240초로 올린 까닭도 같다)
 FLEET_WAIT_TRIES=180  # 2초 × 180 = 6분. (자동이 안 닿았을 때) 사람이 창을 찾아 한 문장 치기에 넉넉한 시간
 FLEET_ROLES='master cso worker'
 # ── 마스터 각성 판정(윈도우판 TICKET=installer-0322-awaken 의 이식 · 상수·기록 글자·화면 문구는 ps1 과 같다) ──
@@ -3801,10 +3801,10 @@ say_master_state() { # 셋을 **서로 다른 문구**로 찍는다(ps1 Write-Ma
   esac
 }
 master_request_card() { # 받았는데 시작 안 한 끝에서만 · ⛔「너는 마스터다」를 적지 않는다(이미 들어갔다)
-  human '자비스' '자비스가 아직 준비 작업을 시작하지 않아 한 줄만 부탁드립니다 — cys 창에서 쳐 주십시오'
+  human '자비스' '자비스가 아직 준비 작업을 시작하지 않아 한 줄만 부탁드립니다 — cys 창에서 입력해 주십시오'
   say ''
   say '   ┌───────────────────────────────────────────────────────────────┐'
-  say '   │   cys 창(제목 jarvis)에 이렇게 쳐 주십시오:                   │'
+  say '   │   cys 창(제목 jarvis)에 이렇게 입력해 주십시오:               │'
   say '   │                                                               │'
   say '   │     install-jarvis 폴더의 install-directive.md 를 읽고,       │'
   say '   │     거기 적힌 준비 작업을 해 주세요.                          │'
@@ -3816,7 +3816,7 @@ master_request_card() { # 받았는데 시작 안 한 끝에서만 · ⛔「너�
 master_unknown_card() { # 「판정 못 함」은 「거절했다」가 아니다 — 문구가 다르다
   say ''
   say '   cys 창(제목 jarvis)을 열어 자비스가 무엇을 하고 있는지 보아 주십시오.'
-  say '   아무 말도 하지 않고 있으면 이렇게 쳐 주시면 됩니다: install-jarvis 폴더의 install-directive.md 를 읽고, 거기 적힌 준비 작업을 해 주세요.'
+  say '   아무 말도 하지 않고 있으면 이렇게 입력해 주시면 됩니다: install-jarvis 폴더의 install-directive.md 를 읽고, 거기 적힌 준비 작업을 해 주세요.'
 }
 # 기다리는 동안 설치 창에 친 글자를 비운다(ps1 Clear-FleetStrayKeys 3508 의 짝) — 비우지 않으면 설치가 끝난 뒤 셸이 그 줄을 **명령으로** 읽는다
 #   (예: 카드를 보고 이 창에 「너는 마스터다」+Enter → zsh: command not found). 개수만 기록한다(글자는 적지 않는다).
@@ -3886,7 +3886,7 @@ step_fleet() {
   confirm_master_awake "$cli" "$ref"
   say_master_state
   # ── ② 자동 각성 확인(사람 손 0) — 선언은 [9/10] 이 첫 프롬프트로 이미 넘겼다 ──
-  say '[10/10] 자비스가 깨어나 동료들을 부르는지 지켜봅니다 (최대 4분 · 사람이 하실 일은 없습니다).'
+  say '[10/10] 자비스가 깨어나 동료들을 부르는지 지켜봅니다 (최대 7분 · 사람이 하실 일은 없습니다).'
   log "fleet: auto awaken - watching child seats in $ref (cap $((FLEET_AWAKE_TRIES * FLEET_POLL_SEC))s)"
   fleet_start="$(date +%s)"
   i=0
@@ -3921,8 +3921,10 @@ step_fleet() {
     fi
     # 🔴「깨어났습니다」는 **마스터 판정이 verified 일 때만** 말한다.
     if [ "$MASTER_STATE" = verified ]; then
+      raise_cys_app_window   # c7 — 다 선 지금이 참가자가 창을 찾는 순간이다(재기동 없이 앞으로만)
       say '   자비스가 깨어났습니다 — 이제 설치 창을 닫으셔도 됩니다.'
       say '   (설치 창을 닫아도 자비스 창은 그대로 둡니다 — 이어서 cys 창의 자비스와 이야기하시면 됩니다.)'
+      say '   cysr 창이 앞에 보이지 않으면 Dock 의 cysr 아이콘을 한 번 눌러 주세요(다시 실행하지 않습니다).'
       set_fleet_finished
       drain_tty_keys
       trap - INT
@@ -3944,14 +3946,14 @@ step_fleet() {
     say "[10/10] 마스터는 깨어났습니다 · 동료 자리는 자비스가 세우는 중입니다($((FLEET_WAIT_TRIES * FLEET_POLL_SEC / 60))분 더 기다립니다) · 사람이 하실 일은 없습니다."
     log "fleet: master verified - waiting for child seats without declaration card in $ref"
   else
-    human "자비스" "자비스가 저절로 깨어나지 않아 한마디만 부탁드립니다 — cys 창에서 쳐 주십시오"
+    human "자비스" "자비스가 저절로 깨어나지 않아 한마디만 부탁드립니다 — cys 창에서 입력해 주십시오"
     say ""
-    say "   ┌─────────────────────────────────────────────┐"
-    say "   │   cys 창(제목 jarvis)에 이렇게 쳐 주십시오:  │"
-    say "   │                                             │"
-    say "   │        ${FLEET_TRIGGER}                        │"
-    say "   │                                             │"
-    say "   └─────────────────────────────────────────────┘"
+    say "   ┌──────────────────────────────────────────────────┐"
+    say "   │   cys 창(제목 jarvis)에 이렇게 입력해 주십시오:  │"
+    say "   │                                                  │"
+    say "   │        ${FLEET_TRIGGER}                             │"
+    say "   │                                                  │"
+    say "   └──────────────────────────────────────────────────┘"
     say ""
     say "   cys 창 = 방금 열린 cys 앱 창입니다(이 검은 터미널 창이 아닙니다). 안 보이면 Dock 의 cys 아이콘을 누르십시오."
     say "   그 한마디를 들으면 자비스가 동료들을 부릅니다. 여기서 기다리다가 다 서면 알려 드립니다."
@@ -3972,7 +3974,7 @@ step_fleet() {
       elif [ "$MASTER_STATE" = verified ]; then
         say "   동료 자리를 기다리는 중입니다 ($((waited / 60))분 지남 · 최대 $((FLEET_WAIT_TRIES * FLEET_POLL_SEC / 60))분 · 사람이 하실 일은 없습니다)."
       else
-        say "   기다리는 중입니다 ($((waited / 60))분 지남 · 최대 $((FLEET_WAIT_TRIES * FLEET_POLL_SEC / 60))분). 아직 치지 않으셨다면 지금 쳐 주십시오."
+        say "   기다리는 중입니다 ($((waited / 60))분 지남 · 최대 $((FLEET_WAIT_TRIES * FLEET_POLL_SEC / 60))분). 아직 입력하지 않으셨다면 지금 입력해 주십시오."
       fi
     fi
   done
@@ -4010,7 +4012,7 @@ step_fleet() {
     NEXT_STEP='cys 창(제목 jarvis)의 자비스와 이어서 이야기하십시오 — 남은 자리가 왜 안 섰는지 물어보시면 됩니다.'
     SHOW_RERUN=0
   else
-    say "     아직 그 한마디를 치지 않으셨다면, cys 창에서 지금 쳐 주시면 됩니다."
+    say "     아직 그 한마디를 입력하지 않으셨다면, cys 창에서 지금 입력해 주시면 됩니다."
     say "     치셨는데도 서지 않았다면 cys 창의 자비스에게 물어보십시오 — 무엇이 걸렸는지 사람 말로 알려 줍니다."
   fi
   log "fleet missing: $(printf '%s' "${missing# }" | tr ' ' ',')"
@@ -4078,7 +4080,12 @@ ${first_prompt}"
     # ★자리를 열기 **전에** 기준선을 찍는다(2차 검토 N2). 이 줄이 자리 여는 줄보다 뒤에 오면
     #   우리가 만든 master 자리까지 기준선에 들어가 영영 안 세어진다.
     set_fleet_baseline "$cli"
-    cmd_line="bash $wake_file"
+    # 🔴2026-09-17(TICKET=installer-0325 c1 · 09-16 756 발견 · 미수정 이월): 위 4070 은 wake.sh **안**의 문장만 지켰다 —
+    #   여는 명령(cmd_line)에 실리는 것은 **경로**(wake_file)인데, 사용자 이름(홈 경로)에 작은따옴표가 있으면
+    #   그 글자가 그대로 실려 나가 이 명령을 다시 셈 파싱하는 쪽(cys → 터미널)에서 따옴표가 거기서 끊긴다.
+    #   ⇒ 경로에도 같은 방어(작은따옴표 이스케이프 후 통째로 홑따옴표로 감싼다)를 건다.
+    wake_file_esc="$(printf '%s' "$wake_file" | sed "s/'/'\\\\''/g")"
+    cmd_line="bash '$wake_file_esc'"
     if [ ! -f "$wake_file" ] || case "$wake_file" in *" "*) true ;; *) false ;; esac; then
       say "     여는 파일의 경로를 쓸 수 없어 cys 안에서는 열지 못합니다. 이 창에서 띄웁니다."
       log "wake path unusable: $wake_file"
@@ -4102,7 +4109,7 @@ ${first_prompt}"
     say "     cys 안에서 열지 못했습니다. 프로그램이 답한 내용은 이렇습니다:"
     printf '%s\n' "$ref" | while IFS= read -r ln; do [ -n "$ln" ] && say "       $ln"; done
     say ""
-    say "     cys 창 안에서 이어서 하고 싶으시면, cys 를 열고 그 안에서 아래 한 줄을 쳐 주십시오:"
+    say "     cys 창 안에서 이어서 하고 싶으시면, cys 를 열고 그 안에서 아래 한 줄을 입력해 주십시오:"
     say "       $cmd_line"
     say ""
     say "     자리를 열지 못해 이 설치 창에서 깨웁니다."
@@ -4154,6 +4161,25 @@ open_cys_app() {
   return 0
 }
 
+# cys 앱 창을 **앞으로** 가져온다(TICKET=installer-0325 c7 · 09-17 연수 실증 2/2 맥).
+#   open_cys_app() 은 [9/10] 초입에 단 한 번 부른다 — 그 뒤 [10/10] 동료 자동 각성을 최대 7분
+#   기다리는 동안 참가자가 다른 창을 보고 있으면 cysr 창이 뒤에 남는다. 실기 2건에서 참가자가
+#   「자동 실행되지 않았다」고 보고 앱을 **손으로 다시 열어** 살아 있던 자리를 exited 로 만들었다.
+#   ⛔재기동 금지(자리 보존) — `open -a` 는 「없으면 켜고 있으면 그저 최근 실행」이라 앞으로 오는지
+#   보장이 약하다. `osascript … activate` 는 이미 도는 앱의 창을 **띄우기 없이** 앞으로만 올리는
+#   표준 방식이라 그 자체로 재기동 위험이 없다 — 실패해도(앱이 아직 안 떴거나 창이 없거나) fail-open.
+raise_cys_app_window() {
+  local app cli="${CYS_CLI:-cys}"
+  app="$(cys_app_dir)"
+  if [ ! -d "$app" ]; then log "raise cys window: skipped (no app at $app)"; return 0; fi
+  if osascript -e "tell application \"$app\" to activate" >>"$LOG_FILE" 2>&1; then
+    log "raise cys window: activate ok ($app)"
+  else
+    log "raise cys window: activate failed ($app) — Dock 안내로 보완"
+  fi
+  return 0
+}
+
 # ── 원격 해결 (help-s2) — 막히면 진단이 서버로 가고, 운영팀 명령을 이 창이 실행한다 ────────
 # 계약 정본 = ai-jarvis `web-install/docs/HELP-API.md` 4절·5절·7절·9-4절 · 실행 가능한 명세 = `web-install/test-s2/s2-double.ts`.
 # ★사람이 누르는 것은 없다 — [1/10] 에서 고지 1줄을 보여 드리고, 막혀 멈추면 묻지 않고 보낸다(서열 1 쉬운 설치).
@@ -4164,7 +4190,7 @@ open_cys_app() {
 # ★언제 도는가 = 자비스를 깨우기 **전에** 진단 코드를 남기고 멈춘 끝. 자비스를 깨운 뒤에는 돌지 않는다
 #   (자비스가 이 창을 넘겨받으므로 두 쪽이 한 화면에 섞이지 않게).
 # ⚠JSON·재검사·스크럽은 macOS 기본 `osascript`(JavaScript)가 한다 — 깨끗한 맥에는 jq·python 이 없다.
-INSTALLER_VERSION="0.3.24"      # 보고의 installer_version · BOOTSTRAP_VERSION 은 화면 머리글 용도 그대로(보내지 않는다)
+INSTALLER_VERSION="0.3.25"      # 보고의 installer_version · BOOTSTRAP_VERSION 은 화면 머리글 용도 그대로(보내지 않는다)
 HELP_API_URL="https://jarvis-install.godmeyou.kr"
 REMOTE_HELP_NOTICE_URL="jarvis-install.godmeyou.kr/help/notice"
 # [1/10] 고지 1줄 = /help/notice 정본(page.ts)이 인용하는 문장 그대로 + 끝에 자세한 안내 자리(계약 7-1절). ⛔문안 변경 금지.

@@ -117,7 +117,7 @@ fi
 
 # ── 3단 · 처음부터 다시 깐다 ──────────────────────────────────────
 say ""
-say "=== 이제 처음부터 다시 깝니다 ==="
+say "=== 이제 처음부터 다시 설치합니다 ==="
 say ""
 if ! download_with_retry "$BOOTSTRAP_URL" "$BOOTSTRAP_FILE" "설치 도우미"; then
   say ""

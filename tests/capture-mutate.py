@@ -163,6 +163,16 @@ MUTANTS = [
      "설치가 막히거나 이상이 보이거나 끝났을 때, 그리고 운영팀이 청할 때 설치 창·로그인 창·자비스 창·첫 자리 화면의 글자와 그림이 함께 보내집니다(다른 창은 찍지 않습니다). 글자에서는 로그인 코드·이메일·계정 이름을 가리지만, 그림은 가릴 수 없어 운영팀만 봅니다.",
      "설치가 막히면 설치 창에 표시된 글자만 보내지며, 로그인 코드·이메일·계정 이름은 가려집니다.",
      "[고지] 고지가 「글자만」이라고 말하지 않는다", CAP),
+    # TICKET=installer-0325 c5(2026-09-18) — 원본 파일이 없을 때 사유 코드 대신 빈 글로 되돌림(09-17 10:01 실기 WHm7yvpu 재현)
+    ("evidence-text-empty-revert", PS,
+     "    if ($null -eq $bytes -or $bytes.Length -eq 0) { return '[text:empty(no-source)]' }",
+     "    if ($null -eq $bytes -or $bytes.Length -eq 0) { return '' }",
+     "[c5] 원본 파일이 없으면 빈 글이 아니라 사유 코드를 돌려준다", CAP),
+    # TICKET=installer-0325 c5(2026-09-18) — 그림 찍기 실패 사유를 글자 칸에 담는 것을 되돌린다(옛 판 = 이 기계 기록에만 남음)
+    ("evidence-capture-failnote-revert", PS,
+     "        if ($failNote) { $t = ([string]$t) + \"`n\" + $failNote }   # 사진이 안 찍혔으면 그 사유도 글자 칸에 함께 싣는다(c5)\n",
+     "",
+     "[c5] 그림 찍기가 예외로 죽으면 그 사유가 evidence_text 칸에 실려 서버에 닿는다", CAP),
 ]
 
 

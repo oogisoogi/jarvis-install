@@ -1227,7 +1227,7 @@ notice_close_cys
 if [ "$ASSUME_YES" != "1" ]; then
   say ""
   say "위 목록을 지웁니다. 되돌릴 수 없습니다."
-  printf '계속하려면 「지웁니다」라고 쳐 주십시오: '
+  printf '계속하려면 「지웁니다」라고 입력해 주십시오: '
   read -r answer < /dev/tty || answer=""
   if [ "$answer" != "지웁니다" ]; then
     say "그만둡니다 — 아무것도 지우지 않았습니다."

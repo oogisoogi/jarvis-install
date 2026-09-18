@@ -621,7 +621,7 @@ echo "== 단계 2 — cys 설치 대행 [5]~[9] =="
 # (installer-0321-pin) 1.0.1 발행(2026-09-16) 실측값이 채워졌다 — 아래 두 축은 이제 **초록이어야 한다**(자리표가 남으면 붉다).
 #   ⚠이 축은 **형식만** 본다(64자리인가·숫자인가). 한 글자 틀린 값도 여기서는 통과하므로, 값이 릴리스와 같은지는 tests/win-pin-release.sh 가 릴리스를 때려서 진다.
 codegrep "$PS" 'CysWinBytes    = [0-9]+$'; ck "[5] 설치 파일 크기 핀(= cysr v1.0.1 setup.exe · 숫자)" $? "받다 끊긴 파일을 정상으로 본다(자리표가 남았다)"
-codegrep "$PS" "CysVersion     = '1\\.0\\.1'"; ck "[5] 윈 판본 핀 정확값(= cysr v1.0.1)" $? "이름표만 새 판본이고 실제로 받는 판본은 옛것이다"
+codegrep "$PS" "CysVersion     = '1\\.0\\.2'"; ck "[5] 윈 판본 핀 정확값(= cysr v1.0.2)" $? "이름표만 새 판본이고 실제로 받는 판본은 옛것이다"
 codegrep "$PS" "CysWinSha256   = '[0-9a-f]{64}'"; ck "[5] 윈 설치 파일 sha256 핀(= 릴리스 SHA256SUMS 줄 · 64자리)" $? "지문이 없으면 모든 설치가 지문 불일치로 멈춘다(자리표가 남았다)"
 no_code "$PS" 'TBD-1\.0\.1' && no_code "$SH" 'TBD-1\.0\.1'
 ck "[v0320] 핀 자리표(TBD-1.0.1)가 두 설치기에 남지 않았다" $? "발행값이 아직 안 채워졌다 — 이대로 배포하면 cys 받기가 반드시 실패한다"
@@ -763,6 +763,15 @@ codegrep "$PS" 'if \(\$mres\.state -eq .verified.\) \{'
 # 재시도는 한 번 · 선언을 다시 보내지 않는다.
 codegrep "$PS" '\$MasterRetryMax    = 1'; ck "[10] 마스터 재시도 상한 1회" $? "같은 문구를 되풀이해 밀어붙인다"
 no_code "$PS" 'Send-MasterRetry.*FleetTrigger'; ck "[10] 재시도에 선언을 다시 싣지 않는다" $? "창에 밀어 넣은 선언은 기계 배달로 거절된다(2026-09-05)"
+# 재시도 보충 한 줄은 맥·윈이 **글자까지 같다**(TICKET=installer-0325 c2 · 09-16 22:3x 판정 A · H-M2 근본 —
+#   우리말 장문을 창에 밀어 넣는 층의 인코딩 축은 윈도우에도 똑같이 있다 · 정본 = 맥 sh MASTER_RETRY_MSG).
+mrm_sh="$(sed -n "s/^MASTER_RETRY_MSG='\(.*\)'\$/\1/p" "$SH")"
+mrm_ps="$(sed -n "s/^\\\$MasterRetryMsg = '\(.*\)'\$/\1/p" "$PS")"
+[ -n "$mrm_sh" ] && [ "$mrm_sh" = "$mrm_ps" ]
+ck "[10] 맥·윈 재시도 보충 한 줄이 정본과 글자까지 같다(H-M2 근본)" $? "sh=[${mrm_sh:0:60}…] ps=[${mrm_ps:0:60}…]"
+# ⚠값만 대조하면 상수 선언은 맞는데 실제 쓰는 자리(Send-MasterRetry)가 옛 문구로 도는 것을 못 본다
+#   (선언은 참인데 규칙이 실제로 적용되는지는 못 잰다 — declaration-reading-test 함정).
+codegrep "$PS" '\$msg = \$MasterRetryMsg'; ck "[10] Send-MasterRetry 가 실제로 그 상수를 쓴다(선언과 사용이 갈리지 않는다)" $? "상수만 고치고 쓰는 자리를 안 바꾸면 이 축이 헛돈다"
 # 표지는 우리가 만들지 않는다 — 지침이 시키고, 깨우기 전에 지난 것을 지운다.
 codegrep "$PS" 'Clear-MasterMark'; ck "[10] 깨우기 전에 지난 설치의 표지를 지운다" $? "지난 표지가 남으면 아무 일도 안 해도 「시작했다」로 읽힌다"
 codegrep "$PS" '\$t -ge \$script:ChildAwakeSince\.AddSeconds\(-5\)'; ck "[10] 표지는 이번 설치 기준선 뒤의 것만 센다" $? "시각 축이 없으면 지우기 하나에만 기댄다"
@@ -785,7 +794,10 @@ codegrep "$PS" 'ShortPath'; ck "[9] 경로에 빈칸이 있으면 짧은 이름�
 awk '/if \(\(\$wakeArg -match . .\) -or -not \(Test-Path \$wakeFile\)\)/{a=NR} /new-surface --role master/{b=NR} END{exit !(a&&b&&a<b)}' "$PS"
 ck "[9] 못 쓸 경로면 보내기 전에 멈춘다" $? "조각난 명령을 보내 원인이 한 겹 늘어난다"
 codegrep "$SH" 'wake_file='; ck "[9] sh 도 파일로 연다" $? "맥만 옛 방식이다"
-codegrep "$SH" 'cmd_line="bash \$wake_file"'; ck "[9] sh 여는 명령도 파일 하나뿐" $? "-"
+# ⚠2026-09-17(TICKET=installer-0325 c1): 경로에 작은따옴표 방어(홑따옴표로 감싼다)가 붙어 리터럴이
+#   cmd_line="bash '$wake_file_esc'" 로 바뀌었다 — 지키는 성질(파일 하나만 가리킨다)은 그대로이므로
+#   와일드카드로 넓혀 잡는다(글자 그대로 고정하면 이 방어를 걸 때마다 이 축이 거짓 적색이 된다).
+codegrep "$SH" 'cmd_line="bash .*wake_file'; ck "[9] sh 여는 명령도 파일 하나뿐" $? "-"
 # 큰 화면 권유 질문 — 키를 미리 크게 적어 두면 안 묻는다(실측 근거 = 그 값이 3인 기계에서 안 떴다)
 codegrep "$PS" 'fullscreenUpsellSeenCount -NotePropertyValue 99'; ck "[4] 큰 화면 권유 질문을 미리 넘긴다" $? "사람 손이 하나 더 든다"
 codegrep "$SH" 'plutil -replace fullscreenUpsellSeenCount -integer 99'; ck "[4] sh 도 같음(있으면 고쳐 쓴다)" $? "맥만 질문이 뜬다"
@@ -990,7 +1002,7 @@ ck "[10] 윈은 동료 자리가 선 것을 보고서야 「깨어났습니다�
 no_code "$PS" '안전장치입니다|\(안전장치\)'; rc=$?; w="$GREP_WHY"
 ck "[10] 윈 화면에 안전장치 설명이 없다(2026-09-15 결정)" "$rc" "(${w})"
 codegrep "$PS" '\$FleetAwakeTries = [0-9]'; ck "[10] 윈 자동 각성 확인에 상한이 있다" $? "동료가 안 서면 끝없이 지켜본다"
-codegrep "$PS" '\$FleetAwakeTries = 120 ' && codegrep "$PS" '^\$FleetPollSec   = 2 '; ck "[10] 윈 자동 관측 상한 240초(자비스 첫 턴보다 길게 · 2026-09-15 윈 실기)" $? "상한이 첫 턴보다 짧으면 카드가 오발해 손 계수가 거짓으로 는다"
+codegrep "$PS" '\$FleetAwakeTries = 210 ' && codegrep "$PS" '^\$FleetPollSec   = 2 '; ck "[10] 윈 자동 관측 상한 420초(자비스 첫 턴보다 길게 · 팩 자원게이트 재측정 180초를 덮는다 · TICKET=installer-0325 c9)" $? "상한이 첫 턴+재측정 상한보다 짧으면 카드가 오발해 손 계수가 거짓으로 는다"
 count_or_fail "$PS" '^[[:space:]]*Set-FleetFinished$'; rc=$?; n="$COUNT_N"; w="$(why_or_count)"
 [ "$rc" -eq 0 ] && [ "$n" -ge 2 ]
 ck "[10] 윈 성공 두 자리(자동 · 카드 뒤) 모두 끝났다고 적는다(2026-09-15 윈 실기)" $? "끝맺음이 성공 뒤에 「다시 실행」을 인쇄한다($w)"
@@ -1001,7 +1013,7 @@ count_or_fail "$PS" '^[[:space:]]*Clear-FleetStrayKeys$'; rc=$?; n="$COUNT_N"; w
 ck "[10] 윈 [10/10] 은 기다린 뒤 떠나는 세 자리 모두에서 설치 창 입력 버퍼를 비운다(검토 Q3)" $? "창에 친 글자가 설치 뒤 PowerShell 명령으로 실행된다($w)"
 # 🔴2026-09-16 뒤집었다(mac-parity-0323 · master#2da7c4b5 ② 「사람 손 = 클로드 로그인 1회 · 사람 카드는 폴백만」) — 앞 축은 맥이 사람에게 치게 하는 것을 **요구**했다.
 #   ⇒ 이제 맥 정상 경로가 「사람이 하실 일은 없습니다」라고 말하고, 옛 「직접 치셔야 합니다」 안내가 코드에 없어야 한다(되돌리면 붉음).
-codegrep "$SH" '자비스가 깨어나 동료들을 부르는지 지켜봅니다 \(최대 4분 · 사람이 하실 일은 없습니다\)' && no_code "$SH" '직접 치셔야 합니다'
+codegrep "$SH" '자비스가 깨어나 동료들을 부르는지 지켜봅니다 \(최대 7분 · 사람이 하실 일은 없습니다\)' && no_code "$SH" '직접 치셔야 합니다'
 ck "[10] sh 정상 경로는 사람 손 0이라 말하고 「직접 치셔야 합니다」 안내가 없다(맥 선언 자동 · ps1 동등)" $? "사람이 치게 하는 옛 카드가 정상 경로에 남았다"
 codegrep "$PS" '\$FleetWaitTries = [0-9]'; ck "[10] 기다리는 상한이 있다" $? "영원히 기다린다"
 codegrep "$SH" 'FLEET_WAIT_TRIES'; ck "[10] sh 도 같음" $? "같음"
@@ -2190,7 +2202,7 @@ ck "[핀] 설치기(맥) 코드의 판본 문자열이 전부 핀 판본이다" 
 
 # ── ⓕ-2 맥 저희 판 전환 (2026-09-15) ────────────────────────────────
 #   애플 실리콘 맥은 우리 릴리스 zip 을 받아 풀어 넣는다. 인텔·자산 없음만 원작자 판으로 간다.
-codegrep "$SH" 'CYS_FORK_VERSION="1\.0\.1"'; ck "[전환] 맥 저희 판 판본 핀" $? "판본 핀이 없다"
+codegrep "$SH" 'CYS_FORK_VERSION="1\.0\.2"'; ck "[전환] 맥 저희 판 판본 핀" $? "판본 핀이 없다"
 codegrep "$SH" 'CYS_FORK_DIR="https://github\.com/oogisoogi/cys-ro/releases/download/v'; ck "[전환] 저희 판은 판본이 박힌 우리 릴리스 자리에서 받는다" $? "다른 자리를 가리킨다"
 # (installer-0321-pin) 1.0.1 발행(2026-09-16) 실측값이 채워졌다 — 아래 세 축은 이제 **초록이어야 한다**(자리표가 남으면 붉다 · 이 축도 형식만 본다).
 codegrep "$SH" 'CYS_FORK_BYTES="?[0-9]+"?$'; ck "[전환] 저희 판 크기 핀(숫자)" $? "크기가 안 맞아 매번 멈춘다(자리표가 남았다)"
@@ -2591,8 +2603,8 @@ for f in "$PS" "$RESET" "$REIN_PS"; do
   codegrep "$f" '1\) ⊞ 윈도우 키\(키보드 왼쪽 아래, Ctrl과 Alt 사이\)를 누르고 powershell' && no_code "$f" '시작 단추를 누르고'; rc=$?
   ck "[v0317] 다시 하시는 법 첫 줄은 윈도우 키(사이트와 같은 말) · $(basename "$f")" "$rc" "(${GREP_WHY})"
 done
-codegrep "$PS" "^\\\$InstallerVersion *= '0\.3\.24'" && codegrep "$SH" '^INSTALLER_VERSION="0\.3\.24"'
-ck "[v0322] 판본 0.3.24(두 설치기 · 한 릴리스 = 한 판번)" $? "보고의 판본이 갈린다"
+codegrep "$PS" "^\\\$InstallerVersion *= '0\.3\.25'" && codegrep "$SH" '^INSTALLER_VERSION="0\.3\.25"'
+ck "[v0322] 판본 0.3.25(두 설치기 · 한 릴리스 = 한 판번)" $? "보고의 판본이 갈린다"
 # 확인 명령 한 번에도 상한 — 없으면 벤더 도구가 멈추는 순간 20분 상한까지 함께 멈춘다(이종 검토 1R 지적 채택).
 awk '/^function Get-LoginStatusText/{f=1}
      f&&/Start-Process -FilePath \$exe -ArgumentList .auth.,.status. .*-RedirectStandardOutput/{s=1}
@@ -2655,6 +2667,16 @@ elif [ -f "$DIR/../tests/reinstall-keepapp-emu-run.sh" ]; then
   ck "[재설치] 흉내 실행 시험이 전건 통과한다(묻는 자리 0 · 프로그램 남김 · 설치 도우미 도달 · 편성 기록 지움)" $? "bash tests/reinstall-keepapp-emu-run.sh 로 자세히"
 else
   sk "[재설치] 흉내 실행 시험" "시험 파일을 못 찾았다"
+fi
+
+# ── 32비트 PowerShell 감지·64비트 재실행(TICKET=installer-0325 c8) ──
+if ! command -v pwsh >/dev/null 2>&1; then
+  sk "[c8] 32비트 감지 시험" "pwsh 가 없다"
+elif [ -f "$DIR/../tests/ps32-detect-run.sh" ]; then
+  bash "$DIR/../tests/ps32-detect-run.sh" --dir "$DIR" >/dev/null 2>&1
+  ck "[c8] 32비트 PowerShell 감지·재실행 인자 조립 시험이 전건 통과한다" $? "bash tests/ps32-detect-run.sh 로 자세히"
+else
+  sk "[c8] 32비트 감지 시험" "시험 파일을 못 찾았다"
 fi
 
 echo "== 텔레메트리 — 진행 자동 전송·진단 자료 자동 수집 (계약 v1 2026-09-15 · additive) =="
