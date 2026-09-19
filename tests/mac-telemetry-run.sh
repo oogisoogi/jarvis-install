@@ -73,7 +73,7 @@ POINTS='0/10|fail||J-NET-01||425
 5/10|end|12|rc=0||5694'
 printf '%s\n' "$POINTS" > "$SB/points.txt"
 before=$(reqcount)
-run_lib p1 'MODE=full; HELP_API_URL="$T_URL"; INSTALLER_VERSION=0.3.25
+run_lib p1 'MODE=full; HELP_API_URL="$T_URL"; INSTALLER_VERSION=0.3.26
   while IFS="|" read -r s e el d en ln; do
     out="$(progress_send "$s" "$e" "$el" "$d" "$en")"
     [ -z "$out" ] || echo "STDOUT-LEAK $ln" >> "$T_SB/leak"
@@ -98,7 +98,7 @@ for r, p in zip(reqs, pts):
     want = ["install_id", "installer_version", "os", "step", "event", "at"] + (["elapsed_s"] if el else []) + (["detail"] if d else []) + (["env"] if en else [])
     if keys != want: bad.append(f"{ln}: 칸 순서 {keys} ≠ {want}")
     if b.get("os") != "mac": bad.append(f"{ln}: os {b.get('os')}")
-    if b.get("installer_version") != "0.3.25": bad.append(f"{ln}: 판번 {b.get('installer_version')}")
+    if b.get("installer_version") != "0.3.26": bad.append(f"{ln}: 판번 {b.get('installer_version')}")
     if b.get("step") != s or b.get("event") != e: bad.append(f"{ln}: step/event {b.get('step')}/{b.get('event')}")
     if el and b.get("elapsed_s") != int(el): bad.append(f"{ln}: elapsed_s {b.get('elapsed_s')!r}")
     if d and b.get("detail") != d: bad.append(f"{ln}: detail {b.get('detail')!r}")
@@ -124,7 +124,7 @@ ID1="$(cat "$SB/p1/home/install-jarvis/install-id" 2>/dev/null)"
 
 echo "== ② install_id 보존(재실행 = 같은 번호) · 깨진 파일 = 새 번호 =="
 mkdir -p "$SB/p2/home/install-jarvis"; cp "$SB/p1/home/install-jarvis/install-id" "$SB/p2/home/install-jarvis/install-id"
-run_lib p2 'MODE=full; HELP_API_URL="$T_URL"; INSTALLER_VERSION=0.3.25; install_id_ensure; printf "%s" "$INSTALL_ID" > "$T_SB/id"' T_URL="$URL"
+run_lib p2 'MODE=full; HELP_API_URL="$T_URL"; INSTALLER_VERSION=0.3.26; install_id_ensure; printf "%s" "$INSTALL_ID" > "$T_SB/id"' T_URL="$URL"
 [ "$(cat "$SB/p2/id")" = "$ID1" ]; t $? "새 프로세스가 같은 파일에서 같은 번호를 읽었다($ID1)" "$(cat "$SB/p2/id")"
 mkdir -p "$SB/p3/home/install-jarvis"; printf 'bad id with spaces!\r\n' > "$SB/p3/home/install-jarvis/install-id"
 run_lib p3 'install_id_ensure; printf "%s" "$INSTALL_ID" > "$T_SB/id"'
@@ -136,7 +136,7 @@ run_lib p3b 'install_id_ensure; printf "%s" "$INSTALL_ID" > "$T_SB/id"'
 
 echo "== ③ 레버·모드 — JARVIS_NO_PROGRESS=1 · dry · detect 이면 0건 =="
 before=$(reqcount)
-run_lib p4 'HELP_API_URL="$T_URL"; INSTALLER_VERSION=0.3.25
+run_lib p4 'HELP_API_URL="$T_URL"; INSTALLER_VERSION=0.3.26
   MODE=full; JARVIS_NO_PROGRESS=1; progress_send 1/10 start; evidence_event_send fail ""; step_baselines_update; echo "$STEP_BASELINE_NOTE" > "$T_SB/note1"
   unset JARVIS_NO_PROGRESS; MODE=dry; progress_send 1/10 start; evidence_event_send fail ""; step_baselines_update; echo "$STEP_BASELINE_NOTE" > "$T_SB/note2"
   MODE=detect; progress_send 1/10 start' T_URL="$URL"
@@ -144,7 +144,7 @@ run_lib p4 'HELP_API_URL="$T_URL"; INSTALLER_VERSION=0.3.25
 [ "$(cat "$SB/p4/note1")" = "skip:no-progress" ] && [ "$(cat "$SB/p4/note2")" = "skip:mode" ]; t $? "기준선 표지 = skip:no-progress · skip:mode(윈판 같은 글)" "$(cat "$SB/p4/note1" "$SB/p4/note2" 2>/dev/null | tr '\n' ' ')"
 
 echo "== ④ fail-open — 닿지 않는 주소 · 서버 500 =="
-run_lib p5 'MODE=full; INSTALLER_VERSION=0.3.25; JARVIS_PROGRESS_URL="http://127.0.0.1:9/api/progress"
+run_lib p5 'MODE=full; INSTALLER_VERSION=0.3.26; JARVIS_PROGRESS_URL="http://127.0.0.1:9/api/progress"
   s=$(date +%s); progress_send 1/10 start; progress_send 1/10 end; rc=$?; e=$(date +%s)
   echo "$rc $((e - s))" > "$T_SB/r"'
 read -r rc5 sec5 < "$SB/p5/r"
@@ -153,7 +153,7 @@ read -r rc5 sec5 < "$SB/p5/r"
 [ "$(grep -c 'progress send failed (fail-open)' "$SB/p5/home/install-jarvis/bootstrap.log" 2>/dev/null)" = "1" ]; t $? "경고는 실행당 한 줄(윈판 문구 그대로)" "$(grep 'progress send' "$SB/p5/home/install-jarvis/bootstrap.log" 2>/dev/null)"
 [ ! -s "$SB/p5/stdout" ]; t $? "화면(표준 출력)에 아무것도 안 찍었다" "$(head -2 "$SB/p5/stdout")"
 echo 500 > "$ST/progress.status"
-run_lib p6 'MODE=full; HELP_API_URL="$T_URL"; INSTALLER_VERSION=0.3.25; progress_send 2/10 start; echo $? > "$T_SB/rc"' T_URL="$URL"
+run_lib p6 'MODE=full; HELP_API_URL="$T_URL"; INSTALLER_VERSION=0.3.26; progress_send 2/10 start; echo $? > "$T_SB/rc"' T_URL="$URL"
 rm -f "$ST/progress.status"
 [ "$(cat "$SB/p6/rc")" = "0" ] && grep -q 'progress send failed (fail-open) - http 500' "$SB/p6/home/install-jarvis/bootstrap.log"; t $? "서버 500 도 rc 0 · 기록 한 줄(http 500)" "$(grep 'progress' "$SB/p6/home/install-jarvis/bootstrap.log" 2>/dev/null)"
 
@@ -201,7 +201,7 @@ mkdir -p "$SB/p8/home/install-jarvis"
   printf '%s\n' "2026-09-16T22:00:04+0900 Paste code here if prompted > aBcDeFgHiJkLmNoPqRsTuVwXyZ0123#stateABCDEFGH"
   printf '%s\n' "2026-09-16T22:00:05+0900 [3/10] 지금 로그인 화면을 엽니다." ; } > "$SB/p8/home/install-jarvis/bootstrap.log"
 before=$(reqcount)
-run_lib p8 'MODE=full; HELP_API_URL="$T_URL"; INSTALLER_VERSION=0.3.25; evidence_once fail; evidence_once fail; evidence_once stall' T_URL="$URL"
+run_lib p8 'MODE=full; HELP_API_URL="$T_URL"; INSTALLER_VERSION=0.3.26; evidence_once fail; evidence_once fail; evidence_once stall' T_URL="$URL"
 python3 - "$REQ" "$before" <<'PY'
 import json, sys
 reqs = [json.loads(l) for l in open(sys.argv[1], encoding="utf-8")][int(sys.argv[2]):]
@@ -228,7 +228,7 @@ ls "$SB/p8/home/install-jarvis"/.progress.* >/dev/null 2>&1; [ $? -ne 0 ]; t $? 
 echo "== ⑥-2 진단 코드(jcode) — 막힌 자리 fail 전송 + 실패 증거(윈판 Write-JCode 동형) =="
 mkdir -p "$SB/p8b/home/install-jarvis"; printf '%s\n' "2026-09-16T22:00:00+0900 [6/10] cys 를 설치합니다." > "$SB/p8b/home/install-jarvis/bootstrap.log"
 before=$(reqcount)
-run_lib p8b 'MODE=full; HELP_API_URL="$T_URL"; INSTALLER_VERSION=0.3.25; jcode J-CYS-07 "설치 실패"' T_URL="$URL"
+run_lib p8b 'MODE=full; HELP_API_URL="$T_URL"; INSTALLER_VERSION=0.3.26; jcode J-CYS-07 "설치 실패"' T_URL="$URL"
 python3 - "$REQ" "$before" <<'PY2'
 import json, sys
 reqs = [json.loads(l) for l in open(sys.argv[1], encoding="utf-8")][int(sys.argv[2]):]
@@ -241,7 +241,7 @@ t $? "jcode 한 번 → [6/10] fail(detail=코드) 1건 + fail 증거 1건(이 �
 
 echo "== ⑦ 오류 글 촉발(say → error-text) · 사유 글 마스킹 · 재귀 없음 =="
 before=$(reqcount)
-run_lib p9 'MODE=full; HELP_API_URL="$T_URL"; INSTALLER_VERSION=0.3.25; say "[5/10] npm ERR! install failed for hong@example.com at /Users/hongildong/x"; say "[5/10] 두 번째 Failed 줄"; say "평범한 줄"' T_URL="$URL"
+run_lib p9 'MODE=full; HELP_API_URL="$T_URL"; INSTALLER_VERSION=0.3.26; say "[5/10] npm ERR! install failed for hong@example.com at /Users/hongildong/x"; say "[5/10] 두 번째 Failed 줄"; say "평범한 줄"' T_URL="$URL"
 python3 - "$REQ" "$before" <<'PY'
 import json, sys
 reqs = [json.loads(l) for l in open(sys.argv[1], encoding="utf-8")][int(sys.argv[2]):]
@@ -261,7 +261,7 @@ grep -q 'capture evidence: error-text|5/10 \[5/10\] npm ERR! install failed for 
 echo "== ⑧ 운영팀 촬영 요청(capture) — 진행 답에 실려 오면 받아 두고 1회 처리 · 모르는 종류는 그것만 건너뜀 =="
 printf '{"id":"c1","install_id":"x","kinds":["installer_window","whole_screen","app_window"],"expires_at":"z"}' > "$ST/capture.json"
 before=$(reqcount)
-run_lib p10 'MODE=full; HELP_API_URL="$T_URL"; INSTALLER_VERSION=0.3.25; progress_send 5/10 start; echo "$CAPTURE_REQUESTED" > "$T_SB/req"; capture_requested_run; capture_requested_run' T_URL="$URL"
+run_lib p10 'MODE=full; HELP_API_URL="$T_URL"; INSTALLER_VERSION=0.3.26; progress_send 5/10 start; echo "$CAPTURE_REQUESTED" > "$T_SB/req"; capture_requested_run; capture_requested_run' T_URL="$URL"
 [ "$(cat "$SB/p10/req")" = "installer_window app_window" ]; t $? "받아 둔 종류 = installer_window app_window(whole_screen 은 건너뜀)" "$(cat "$SB/p10/req")"
 python3 - "$REQ" "$before" <<'PY'
 import json, sys
@@ -278,7 +278,7 @@ t $? "기록 = 받음·처리 두 줄(윈판 문구)" "$(grep capture "$SB/p10/h
 echo "== ⑨ 그림 올리기 — 머리글 토큰·경로·content-type·길이 · 429 image_cap 뒤 멈춤 · 한 장 상한 =="
 head -c 2048 /dev/urandom > "$SB/fake.jpg"
 before=$(reqcount)
-run_lib p11 'MODE=full; HELP_API_URL="$T_URL"; INSTALLER_VERSION=0.3.25
+run_lib p11 'MODE=full; HELP_API_URL="$T_URL"; INSTALLER_VERSION=0.3.26
   evidence_event_send slow "" && echo "slot $EV_SEQ ${#EV_TOKEN}" > "$T_SB/slot"
   evidence_image_send installer_window "$T_JPG"; echo $? > "$T_SB/rc1"
   evidence_image_send whole_screen "$T_JPG"; echo $? > "$T_SB/rc2"' T_URL="$URL" T_JPG="$SB/fake.jpg"
@@ -300,25 +300,25 @@ t $? "그림 1건: 경로 evidence/<seq>/image?kind=&filename= · x-progress-upl
 [ "$(cat "$SB/p11/rc1")" = "0" ] && [ "$(cat "$SB/p11/rc2")" = "1" ]; t $? "rc = 보냄 0 · 계약 밖 종류 1"
 echo 429 > "$ST/image.status"; echo image_cap > "$ST/image.error"
 before=$(reqcount)
-run_lib p12 'MODE=full; HELP_API_URL="$T_URL"; INSTALLER_VERSION=0.3.25
+run_lib p12 'MODE=full; HELP_API_URL="$T_URL"; INSTALLER_VERSION=0.3.26
   evidence_event_send slow ""; evidence_image_send installer_window "$T_JPG"; evidence_image_send app_window "$T_JPG"; echo "$EVIDENCE_IMAGE_DONE" > "$T_SB/done"' T_URL="$URL" T_JPG="$SB/fake.jpg"
 rm -f "$ST/image.status" "$ST/image.error"
 [ "$(python3 -c 'import json,sys; print(sum(1 for l in list(open(sys.argv[1]))[int(sys.argv[2]):] if json.loads(l)["what"]=="image"))' "$REQ" "$before")" = "1" ] && [ "$(cat "$SB/p12/done")" = "1" ]
 t $? "429 image_cap 뒤에는 더 올리지 않는다(그림 요청 1건 · 멈춤 표지)"
 head -c 1572865 /dev/zero > "$SB/big.jpg"
 before=$(reqcount)
-run_lib p13 'MODE=full; HELP_API_URL="$T_URL"; INSTALLER_VERSION=0.3.25; evidence_event_send slow ""; evidence_image_send installer_window "$T_JPG"; echo $? > "$T_SB/rc"' T_URL="$URL" T_JPG="$SB/big.jpg"
+run_lib p13 'MODE=full; HELP_API_URL="$T_URL"; INSTALLER_VERSION=0.3.26; evidence_event_send slow ""; evidence_image_send installer_window "$T_JPG"; echo $? > "$T_SB/rc"' T_URL="$URL" T_JPG="$SB/big.jpg"
 [ "$(cat "$SB/p13/rc")" = "1" ] && grep -q 'evidence image skip (1572865B > 한 장 상한): installer_window' "$SB/p13/home/install-jarvis/bootstrap.log"; t $? "1.5MB 를 넘는 그림은 보내지 않는다(기록 한 줄)"
 
 echo "== ⑩ 단계 기준선 — 받은 칸만 쓰고 모르면 거짓 =="
 printf '{"os":"mac","steps":[{"step":"5/10","median_elapsed_s":10,"samples":7},{"step":"6/10","median_elapsed_s":null,"samples":2},{"step":"bad","median_elapsed_s":3}]}' > "$ST/baseline.json"
-run_lib p14 'MODE=full; HELP_API_URL="$T_URL"; INSTALLER_VERSION=0.3.25; step_baselines_update
+run_lib p14 'MODE=full; HELP_API_URL="$T_URL"; INSTALLER_VERSION=0.3.26; step_baselines_update
   step_is_slow 5/10 21; a=$?; step_is_slow 5/10 20; b=$?; step_is_slow 6/10 999; c=$?; step_is_slow 7/10 999; d=$?
   echo "$STEP_BASELINE_NOTE $a $b $c $d $(step_baseline_sec 5/10)" > "$T_SB/r"' T_URL="$URL"
 rm -f "$ST/baseline.json"
 [ "$(cat "$SB/p14/r")" = "ok:1 0 1 1 1 10" ]; t $? "ok:1 · 21s>2×10 느림 · 20s 아님 · null 칸·없는 칸 = 거짓 · 기준 10" "$(cat "$SB/p14/r")"
 grep -q '"path": "/api/progress/baseline?os=mac"' "$REQ"; t $? "기준선은 os=mac 으로 묻는다"
-run_lib p15 'MODE=full; HELP_API_URL="$T_URL"; INSTALLER_VERSION=0.3.25; step_baselines_update; echo "$STEP_BASELINE_NOTE" > "$T_SB/r"' T_URL="$URL"
+run_lib p15 'MODE=full; HELP_API_URL="$T_URL"; INSTALLER_VERSION=0.3.26; step_baselines_update; echo "$STEP_BASELINE_NOTE" > "$T_SB/r"' T_URL="$URL"
 [ "$(cat "$SB/p15/r")" = "http:404" ] && grep -q 'step baseline: http:404 (빈 칸 = 그 단계 느림 촉발 꺼짐)' "$SB/p15/home/install-jarvis/bootstrap.log"; t $? "못 받으면 http:404 · 기록 문구 윈판 그대로" "$(cat "$SB/p15/r")"
 
 echo "== ⑪ 설치 뒤 증거(post-install) · 자식 자리 정체 증거 =="
@@ -329,7 +329,7 @@ printf '%s\n' "Claude Code v2" "Stop hook error: failed" "user hong@example.com 
 EOF
 chmod +x "$SB/bin/fakecys"
 before=$(reqcount)
-run_lib p16 'MODE=full; HELP_API_URL="$T_URL"; INSTALLER_VERSION=0.3.25
+run_lib p16 'MODE=full; HELP_API_URL="$T_URL"; INSTALLER_VERSION=0.3.26
   post_install_evidence "$T_CLI" surface:9; post_install_evidence "$T_CLI" surface:9
   child_stall_evidence worker "$(printf "line1\nmail hong@example.com\n")"; child_stall_evidence worker "again"' T_URL="$URL" T_CLI="$SB/bin/fakecys"
 python3 - "$REQ" "$before" <<'PY'
@@ -360,7 +360,7 @@ for a; do last="$a"; done
 printf 'not-a-jpeg' > "$last"
 EOF
 chmod +x "$SB/bin/fakeshot"
-SHOT_BODY='MODE=full; HELP_API_URL="$T_URL"; INSTALLER_VERSION=0.3.25
+SHOT_BODY='MODE=full; HELP_API_URL="$T_URL"; INSTALLER_VERSION=0.3.26
   evidence_kind_jpeg installer_window "$T_SB/a.jpg"; echo $? > "$T_SB/rc1"
   evidence_kind_jpeg app_window "$T_SB/b.jpg"; echo $? > "$T_SB/rc2"
   evidence_event_send post-install "" && evidence_images_send app_window installer_window
@@ -382,7 +382,7 @@ t $? "[N1 정적] 진짜 촬영기 경로는 기본값 한 곳에만 있다(다�
 echo "== ⑫ 첨부(보고가 열린 뒤) — 출처 머리글 · 계약 3절 순서 · 맥에 없는 것은 까닭 한 줄 =="
 before=$(reqcount)
 mkdir -p "$SB/p17/home/install-jarvis"; echo "log line" > "$SB/p17/home/install-jarvis/bootstrap.log"; echo "# env" > "$SB/p17/home/install-jarvis/env-report.md"
-run_lib p17 'MODE=full; HELP_API_URL="$T_URL"; INSTALLER_VERSION=0.3.25; RH_ID=TEST2345; RH_TMP="$T_SB/rh"; mkdir -p "$RH_TMP"
+run_lib p17 'MODE=full; HELP_API_URL="$T_URL"; INSTALLER_VERSION=0.3.26; RH_ID=TEST2345; RH_TMP="$T_SB/rh"; mkdir -p "$RH_TMP"
   printf "x-help-client: %s\n" aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa > "$RH_TMP/client-header"
   help_fail_attachments' T_URL="$URL"
 python3 - "$REQ" "$before" <<'PY'

@@ -99,6 +99,10 @@ while ($JarvisHome.Length -gt 1 -and ($JarvisHome.EndsWith('\') -or $JarvisHome.
 $LogFile       = Join-Path $JarvisHome 'bootstrap.log'
 $ReportFile    = Join-Path $JarvisHome 'env-report.md'
 $DirectiveFile = Join-Path $JarvisHome 'install-directive.md'
+# 설치가 끝까지 섰다는 표지(TICKET=installer-0326 C1) — 성공 두 자리(Set-FleetFinished)에서만 쓴다 · 내용 = 한 줄(시각·설치 도우미 판·cys 판).
+#   다음 실행이 이 파일의 **쓰인 시각**을 보고 「방금 끝난 설치」인지 가른다(Test-RecentInstallDone).
+$InstallDoneFile = Join-Path $JarvisHome 'install-done.txt'
+$RerunDoneWindowSec = 600   # 완료 뒤 이 시간(10분) 안의 재실행만 「이미 끝나 있습니다」로 끝낸다(master#eeaa7413 A안) · 그 뒤 재실행은 정상 진행
 $DlDir         = Join-Path $JarvisHome 'dl'
 
 # cys 설치 파일 — 판본을 파일 이름에 박아 배포하므로 여기에 핀한다.
@@ -197,6 +201,7 @@ $OutputEncoding = [System.Text.Encoding]::UTF8
 # 백신이 PowerShell 자체를 종료시키면 이 스크립트는 한마디도 남기지 못하고 사라진다(2026-09-05 실측).
 # 그때 유일하게 남는 것이 기록 파일의 마지막 줄이다 — 그래서 이번 실행이 한 줄이라도 적기 전에 떠 둔다.
 $script:PrevTail = ''
+$script:PrevDoneAt = $null   # 지난 실행이 「설치가 끝났습니다」로 끝났으면 그 줄의 시각(표지 파일이 없는 옛 판 완료 기록 · installer-0326 C1)
 $script:PrevRunState = ''   # 지난 실행이 어디까지 갔나 — '' 모름 · closed 끝맺음까지 · wait 원격 해결 대기 중 · answer 처방을 받은 뒤 · ended 원격 해결이 스스로 끝남
 if (Test-Path $LogFile) {
     # 기록은 UTF-8 로 쓴다(Write-Log · v0.3.18) — 같은 글자표로 읽는다
@@ -213,6 +218,10 @@ if (Test-Path $LogFile) {
             elseif ($ln -match '^\S+\s+remote help: report [A-Z2-9]{8}') { $script:PrevRunState = 'wait' }
             elseif ($ln -match '^\S+\s+처방(\(조치 [0-9]+\))?: ') { $script:PrevRunState = 'answer' }
             elseif ($ln -match '^\S+\s+(원격 해결 시간\([0-9]+분\)이 끝나 멈춥니다|원격 해결이 끝났습니다)') { $script:PrevRunState = 'ended' }
+            # 성공 끝맺음 줄(Set-FleetFinished 문구) — 마지막 실행 안에 있을 때만 그 시각을 쥔다
+            if ($ln -match '^(\S+)\s+다음에 할 일: 없습니다 — 설치가 끝났습니다') {
+                try { $script:PrevDoneAt = [datetimeoffset]::Parse($Matches[1], [Globalization.CultureInfo]::InvariantCulture) } catch { $script:PrevDoneAt = $null }
+            }
         }
     }
 }
@@ -933,6 +942,23 @@ function Redact($s) {
 
 #   `claude auth status` 로 프로브하면 안 된다: 낡은 판본은 그 문자열을 질문으로 읽고 세션을 띄운다
 #   판본 숫자로 재지 않는 이유 = 클로드는 자동 판올림이 돌아 「요구 최소 판본」 상수가 곧 낡는다.
+# 🔴(TICKET=installer-0326 C1 · 09-18 UHHFFFZJ) `& claude` 를 **맨몸으로 부르지 않는다.** 명령이 「있다」(Get-Command 가 npm 의
+#   claude.ps1 을 찾는다)고 해서 부를 수 있는 것이 아니었다 — 그 claude.ps1 이 가리키는 실행 파일(node_modules\…\claude.exe)이
+#   없으면 부르는 순간 「그런 명령이 없다」 오류가 나고, 본문 try 안이라 **설치 도우미가 [1/10] 에서 통째로 끝났다**(J-UNK-00 거짓 카드).
+#   ⇒ 부르기를 이 한 곳에 모아 그 오류를 여기서 받는다. 받으면 공식 설치 자리(~\.local\bin\claude.exe)를 직접 불러 본다.
+#   그것도 없으면 $null — 부르는 쪽은 「판본을 못 읽었다」로 적고 다음으로 간다(죽지 않는다).
+function Invoke-ClaudeCli {
+    try { return @(& claude @args 2>$null) } catch {
+        try { Write-Log ('claude call failed (' + ($args -join ' ') + '): ' + $_.Exception.GetType().Name) } catch { }
+    }
+    $exe = Join-Path $env:USERPROFILE '.local\bin\claude.exe'
+    if (Test-Path -LiteralPath $exe -PathType Leaf) {
+        try { Write-Log ('claude call fallback: ' + (Redact $exe)); return @(& $exe @args 2>$null) } catch {
+            try { Write-Log ('claude call fallback failed: ' + $_.Exception.GetType().Name) } catch { }
+        }
+    }
+    return $null
+}
 function Test-ClaudeAuthCmd {
     # 🔴**부르기 전에 있는지 본다**(2026-09-09 러너 실측으로 드러난 결함).
     #   클로드가 없는 기계에서 `& claude` 는 「그런 명령이 없다」로 **던진다**. 본문이 try 로 감싸여
@@ -941,7 +967,7 @@ function Test-ClaudeAuthCmd {
     #   ⚠맥판은 같은 자리에서 안 죽는다(없는 명령은 종료값 127 로 지나간다) — **두 OS 가 갈리던 자리다.**
     #   ★없는 것을 물으면 답은 「모른다」여야지 죽음이면 안 된다.
     if (-not (Get-Command claude -ErrorAction SilentlyContinue)) { return $false }
-    $h = (& claude --help 2>$null) -join "`n"
+    $h = (Invoke-ClaudeCli --help) -join "`n"
     return ($h -match '(?m)^\s*auth\s')
 }
 
@@ -1249,7 +1275,7 @@ function Invoke-DetectStage1 {
     # 1-2 클로드가 깔렸는가·판본  자동 판올림이 도므로 판본을 게이트로 쓰지 않는다
     $cmd = Get-Command claude -ErrorAction SilentlyContinue
     if ($cmd) {
-        $cver = (& claude --version 2>$null | Select-Object -First 1)
+        $cver = (Invoke-ClaudeCli --version | Select-Object -First 1)
         if ($cver -and (Test-ClaudeAuthCmd)) {
             $script:ClaudeOk = $true
             Add-Row '1-2' '클로드 판본' $cver 'ok' (Redact $cmd.Source)
@@ -1274,7 +1300,7 @@ function Invoke-DetectStage1 {
         # 여기서 `auth status` 를 부르면 그 문자열이 질문으로 나간다(모델 호출 1회). 부르지 않는다.
         Add-Row '1-3' '로그인·구독' '-' 'unknown' '이 판본은 로그인 확인 명령을 모른다 — 판올림 뒤에 다시 본다'
     } elseif ($script:ClaudeOk) {
-        $auth = (& claude auth status 2>$null) -join "`n"
+        $auth = (Invoke-ClaudeCli auth status) -join "`n"
         $logged = [regex]::Match($auth, '"loggedIn"\s*:\s*(true|false)').Groups[1].Value
         $sub    = [regex]::Match($auth, '"subscriptionType"\s*:\s*"([^"]*)"').Groups[1].Value
         if ($logged -eq 'true') {
@@ -1953,7 +1979,7 @@ function Step-InstallClaude {
         return 4
     }
     $script:ClaudeOk = $true
-    Say "[2/10] 완료: $((& claude --version 2>$null | Select-Object -First 1)) ($(Redact (Get-Command claude).Source))"
+    Say "[2/10] 완료: $((Invoke-ClaudeCli --version | Select-Object -First 1)) ($(Redact (Get-Command claude).Source))"
     return 0
 }
 
@@ -3557,6 +3583,38 @@ function Test-DeclarationSeen($live) {
 function Set-FleetFinished {
     $script:NextStep = '없습니다 — 설치가 끝났습니다. 이 창을 닫으셔도 됩니다.'
     $script:ShowRerun = $false
+    Write-InstallDoneMark
+}
+# 🔴(TICKET=installer-0326 C1 · 실전 2건: 09-17 PhsTjiL0 · 09-18 UHHFFFZJ) 설치가 10/10 까지 끝난 **2초 뒤** 같은 창에서 설치 도우미가
+#   처음부터 다시 돌았고, 두 번째 실행이 [1/10] 에서 죽어 「다시 하시는 법」 카드(J-UNK-00)를 사람에게 보였다 — 설치는 멀쩡했는데.
+#   다시 돈 까닭은 아직 확정하지 못했다(윈 실기 필요 · HANDOFF 참조). ⇒ 까닭과 무관하게 듣도록, 끝까지 선 설치는 표지를 남기고
+#   **방금(10분 안) 끝난 설치 위의 재실행**은 아무것도 하지 않고 「이미 끝나 있습니다」로 끝낸다(Test-RecentInstallDone).
+#   ⚠fail-open — 표지를 못 쓰면 한 줄만 적고 넘어간다(설치는 이미 끝났다 · 다음 재실행이 정상 진행할 뿐이다).
+function Write-InstallDoneMark {
+    try {
+        $line = 'done ' + (Get-Date -Format 'yyyy-MM-ddTHH:mm:sszzz') + ' installer ' + $InstallerVersion + ' cys ' + $CysVersion
+        Write-TextNoBom $InstallDoneFile ($line + "`r`n")
+        Write-Log ('install done mark: ' + (Redact $InstallDoneFile))
+    } catch { try { Write-Log ('install done mark not written (fail-open): ' + $_.Exception.Message) } catch { } }
+}
+# 방금 끝난 설치인가 — 돌려주는 것 = 판정 근거 한 줄(맞으면) · '' (아니면)
+#   ⑴표지 파일이 있고 그 파일이 쓰인 지 $RerunDoneWindowSec 안이다 ⑵(표지가 없는 옛 판 완료) 지난 기록의 마지막 실행이
+#   「다음에 할 일: 없습니다 — 설치가 끝났습니다」로 끝났고 그 줄의 시각이 창 안이다. 시각이 미래(시계가 되돌려짐)면 맞지 않는 것으로 본다.
+#   ★시각을 인자로 받는다 — 흉내 시험이 「지금」을 주입해 창 안·밖 갈래를 강제로 태울 수 있게(Test-Ps32OnWin64 와 같은 까닭).
+function Test-RecentInstallDone([datetimeoffset]$Now) {
+    try {
+        if (Test-Path -LiteralPath $InstallDoneFile -PathType Leaf) {
+            $w = [datetimeoffset](Get-Item -LiteralPath $InstallDoneFile -ErrorAction Stop).LastWriteTime
+            $age = ($Now - $w).TotalSeconds
+            if (($age -ge 0) -and ($age -le $RerunDoneWindowSec)) { return ('mark ' + [int]$age + 's') }
+            return ''
+        }
+        if ($null -ne $script:PrevDoneAt) {
+            $age = ($Now - $script:PrevDoneAt).TotalSeconds
+            if (($age -ge 0) -and ($age -le $RerunDoneWindowSec)) { return ('log ' + [int]$age + 's') }
+        }
+    } catch { }
+    return ''
 }
 function Clear-FleetStrayKeys {
     $n = Get-LoginStrayKeyCount
@@ -4013,7 +4071,7 @@ function Step-Fleet {
 #   글자 칸은 `\z` 로 끝을 못박아 다시 만든다. 이름·글자·판본 비교는 대소문자를 가르는 -ceq·-cmatch·-ccontains 만 쓴다.
 # ⚠PowerShell 은 `'true' -eq $true` 를 참으로 본다 ⇒ 칸마다 **형(type)을 먼저** 본다.
 # ⚠이 절은 맥에서 PowerShell 없이 **정적 검사 + 맥판과의 대조**로만 증명했다 — 윈도우 실기가 필요한 축은 내부 문서.
-$InstallerVersion       = '0.3.25'   # 보고의 installer_version · $BootstrapVersion 은 화면 머리글 용도 그대로(보내지 않는다)
+$InstallerVersion       = '0.3.26'   # 보고의 installer_version · $BootstrapVersion 은 화면 머리글 용도 그대로(보내지 않는다)
 $HelpApiUrl             = 'https://jarvis-install.godmeyou.kr'
 $RemoteHelpNoticeUrl    = 'jarvis-install.godmeyou.kr/help/notice'
 # [1/10] 고지 1줄 = /help/notice 정본이 인용하는 문장 그대로 + 끝에 자세한 안내 자리. ⛔문안 변경 금지(맥판과 글자가 같아야 한다).
@@ -5728,6 +5786,20 @@ try {
     # 머리글 앞머리 「=== 자비스 설치 도우미 」 는 지난 실행 읽기(Show-PrevRunNote)의 경계 표지다 — 앞머리는 바꾸지 않는다.
     Say "=== 자비스 설치 도우미 — $CysDisplayName $CysVersion · 설치 도우미 $InstallerVersion (모드: $Mode) ==="
     Show-PrevRunNote
+    # (installer-0326 C1) 방금 끝난 설치 위의 재실행 = 할 일이 없다 — 아무것도 살피지·보내지 않고 끝낸다(카드 0 · 사람 손 0).
+    #   ⚠[1/10] 고지($ProgressNotice) 전이라 진행 기록도 보내지 않는다(고지 없이 보내지 않는다) — 기록 파일 한 줄이 흔적의 전부다.
+    #   ⚠재설치 길(JARVIS_ENTRY=reinstall)은 빼고 잰다 — 지우기가 신뢰 칸 정리 실패로 작업 폴더를 일부러 남긴 경우(reset-clean W-JARVISHOME)
+    #     표지도 함께 남는다. 그때 10분 안의 재설치를 「이미 끝나 있습니다」로 삼키면 사람이 고르신 재설치가 아무 일도 안 한다.
+    if (($Mode -eq 'full') -and ($env:JARVIS_ENTRY -ne 'reinstall')) {
+        $doneWhy = Test-RecentInstallDone ([datetimeoffset]::Now)
+        if ($doneWhy) {
+            Write-Log ('rerun after done: nothing to do (' + $doneWhy + ')')
+            Say '설치가 이미 끝나 있습니다. 새로 하실 일은 없습니다.'
+            $script:NextStep = '없습니다 — 이 창은 닫으셔도 됩니다. 자비스 창에서 이어서 하시면 됩니다.'
+            $script:ShowRerun = $false
+            exit 0
+        }
+    }
     Say '[1/10] 이 컴퓨터를 살펴봅니다.'
     Say ('     ' + $RemoteHelpNotice)
     $script:NoticeShown = $true

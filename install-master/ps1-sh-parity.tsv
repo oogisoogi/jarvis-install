@@ -35,6 +35,7 @@ Set-NextStepRerun	next_rerun	sh	같은 일
 Show-RerunHow	show_rerun_how	sh	같은 일(창 여는 법·키만 맥 것)
 Say-AntivirusHold	-	na	작업 표시줄·화면 오른쪽 아래 백신 창의 [파일 전송]/[실행] 단추 안내 = 윈도우 백신 알림 UI 전용 — 맥은 J-AV-02 자리에서 격리 안내 한 줄만 인라인
 Redact	redact	sh	같은 일(집 폴더 → ~)
+Invoke-ClaudeCli	-	na	「명령은 잡히는데 가리키는 실행 파일이 없는」 클로드를 부르면 PowerShell 은 본문 try 안에서 설치 도우미 전체를 끝낸다(09-18 UHHFFFZJ J-UNK-00) — bash(set -u · set -e 없음)는 같은 호출이 종료값 127 로 지나가고 죽지 않는다. TICKET=installer-0326 C1
 Test-ClaudeAuthCmd	claude_has_auth_cmd	sh	같은 일(claude --help 에 auth 하위명령이 있는가)
 Test-CysAgentFlag	cys_supports_agent_flag	sh	같은 일
 Get-CysVersionLine	cys_version_line	sh	같은 일
@@ -111,6 +112,8 @@ Set-FleetBaseline	set_fleet_baseline	sh	같은 일(못 찍으면 판정 안 함)
 Get-LiveRoles	live_roles	sh	같은 일(기준선 뒤 새 자리만)
 Test-DeclarationSeen	declaration_seen	sh	같은 일
 Set-FleetFinished	set_fleet_finished	sh	같은 일(NEXT_STEP 끝남 문구 · 다시 실행 안내 끔)
+Write-InstallDoneMark	-	na	완료 표지(install-done.txt) — 「완료 직후 재기동」은 윈도우에서만 났다(텔레메트리 전수 2026-09-18: 10/10 뒤 1/10 재시작 = 윈 2건 · 맥 0건) · 원인(런처 줄끝 LF 후보)도 윈 cmd.exe 쪽이다. 맥 이식은 윈 실기로 원인 확정 뒤 판단(브리프 「맥은 동형 확인만」). TICKET=installer-0326 C1
+Test-RecentInstallDone	-	na	위와 같은 까닭(완료 표지를 읽는 쪽 · 윈 전용 사고) · TICKET=installer-0326 C1
 Clear-FleetStrayKeys	drain_tty_keys	sh	같은 일 — 맥 터미널도 기다리는 동안 친 글자가 셸 명령으로 읽힌다(/dev/tty 비우기)
 Invoke-CysCapped	cys_capped	sh	같은 일(상한 · CYS_NO_AUTOSTART · perl alarm)
 ConvertTo-ClaudeProjectSlug	claude_project_slug	sh	같은 일

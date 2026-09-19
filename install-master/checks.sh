@@ -1082,8 +1082,9 @@ echo "== 없는 것을 물었을 때 죽지 않는다 (2026-09-09 러너 실측)
 codegrep "$PS" 'function Test-ClaudeAuthCmd \{'
 ck "[갈림] ps1 능력 확인 함수가 있다" $? "함수 자체가 사라졌다"
 # ★함수 **안에서** 확인이 `& claude` 보다 먼저 오는가 — 순서가 이 축의 전부다.
+#   (installer-0326 C1) 부르기는 이제 한 곳(Invoke-ClaudeCli)을 거친다 — 그 이름도 「부르기」로 센다(간접 호출에 축이 눈멀지 않게).
 awk '/^function Test-ClaudeAuthCmd/,/^}/' "$PS" \
-  | awk '/Get-Command claude -ErrorAction SilentlyContinue/{g=NR} /& claude --help/{c=NR} END{exit !(g && c && g < c)}'
+  | awk '/Get-Command claude -ErrorAction SilentlyContinue/{g=NR} /(& claude|Invoke-ClaudeCli) --help/{c=NR} END{exit !(g && c && g < c)}'
 ck "[갈림] ps1 능력 확인이 부르기 전에 있는지 본다" $? "없는 기계에서 던지고 스크립트가 끝난다(미리보기가 [2/10] 에서 멈췄다)"
 awk '/^function Step-Login/,/^}/' "$PS" | grep -q 'Get-Command claude -ErrorAction SilentlyContinue'
 ck "[갈림] ps1 재판정도 부르기 전에 있는지 본다" $? "같은 자리에서 같은 이유로 죽는다"
@@ -2209,6 +2210,23 @@ codegrep "$SH" 'CYS_FORK_DIR="https://github\.com/oogisoogi/cys-ro/releases/down
 codegrep "$SH" 'CYS_FORK_BYTES="?[0-9]+"?$'; ck "[전환] 저희 판 크기 핀(숫자)" $? "크기가 안 맞아 매번 멈춘다(자리표가 남았다)"
 codegrep "$SH" 'CYS_FORK_SHA256="[0-9a-f]{64}"'; ck "[전환] 저희 판 지문 핀(64자리)" $? "크기만 같은 다른 파일이 통과한다(자리표가 남았다)"
 codegrep "$SH" 'CYS_FORK_CDHASH="[0-9a-f]{40}"'; ck "[전환] 저희 판 CDHash 핀(40자리)" $? "깔린 판을 판별할 값이 없다(자리표가 남았다)"
+# (installer-0326 C2 · 799 적발) 위 세 축은 **형식만** 본다 — 한 글자 틀린 CDHash 도 초록이었다. 값이 발행된 zip 과 같은지는
+#   tests/mac-pin-release.sh 가 릴리스를 때려서 잰다(크기·지문 = SUMS·HEAD · CDHash = 발행 zip 을 풀어 codesign -dvvv).
+#   ⚠오프라인(측정 못 함 · rc 2)은 통과가 아니라 「건너뜀」이다. 그 밖의 실패(404·지문 불일치·풀기 실패)는 적색이다.
+#   ★시험 파일은 **이 checks.sh 옆의 tests/** 에서 찾는다(대상 폴더 사본에는 tests/ 가 없다 — 뮤턴트 하네스가 사본으로 돈다).
+MPR="$(cd "$(dirname "$0")/.." 2>/dev/null && pwd)/tests/mac-pin-release.sh"
+if [ ! -f "$MPR" ]; then
+  ck "[전환] 저희 판 핀 = 발행 zip 실측(크기·지문·CDHash · tests/mac-pin-release.sh)" 1 "시험 파일이 없다: $MPR"
+else
+  bash "$MPR" "$SH" > "${TMPDIR:-/tmp}/mpr.$$" 2>&1; mprc=$?
+  if [ "$mprc" -eq 2 ]; then
+    sk "[전환] 저희 판 핀 = 발행 zip 실측(크기·지문·CDHash · tests/mac-pin-release.sh)" "오프라인 — 릴리스를 못 때렸다(측정 못 함)"
+  else
+    # 사유에는 하위 시험의 FAIL 줄을 옮기되 「FAIL」·「←」 표지는 벗긴다 — 그대로 두면 축 이름을 읽는 하네스(red())가 그 표지에서 잘못 자른다.
+    ck "[전환] 저희 판 핀 = 발행 zip 실측(크기·지문·CDHash · tests/mac-pin-release.sh)" "$mprc" "$(grep '^  FAIL' "${TMPDIR:-/tmp}/mpr.$$" | head -3 | sed -e 's/^  FAIL //' -e 's/  ← / : /g' | tr '\n' '|' | cut -c1-300)"
+  fi
+  rm -f "${TMPDIR:-/tmp}/mpr.$$"
+fi
 # 1.0.1 부터 zip 최상위·설치 자리 = cysr.app · 옛 이름 cys.app 은 넣은 **뒤에** 보관 자리로 옮긴다(넣기 실패 시 손대지 않는다).
 codegrep "$SH" 'app="\$stage/cysr\.app"' && codegrep "$SH" '^CYS_FORK_APP="/Applications/cysr\.app"$'
 ck "[전환] 저희 판은 zip 안 cysr.app 을 /Applications/cysr.app 으로 넣는다" $? "옛 이름으로 풀거나 넣어 zip 을 못 찾는다"
@@ -2604,8 +2622,8 @@ for f in "$PS" "$RESET" "$REIN_PS"; do
   codegrep "$f" '1\) ⊞ 윈도우 키\(키보드 왼쪽 아래, Ctrl과 Alt 사이\)를 누르고 powershell' && no_code "$f" '시작 단추를 누르고'; rc=$?
   ck "[v0317] 다시 하시는 법 첫 줄은 윈도우 키(사이트와 같은 말) · $(basename "$f")" "$rc" "(${GREP_WHY})"
 done
-codegrep "$PS" "^\\\$InstallerVersion *= '0\.3\.25'" && codegrep "$SH" '^INSTALLER_VERSION="0\.3\.25"'
-ck "[v0322] 판본 0.3.25(두 설치기 · 한 릴리스 = 한 판번)" $? "보고의 판본이 갈린다"
+codegrep "$PS" "^\\\$InstallerVersion *= '0\.3\.26'" && codegrep "$SH" '^INSTALLER_VERSION="0\.3\.26"'
+ck "[v0322] 판본 0.3.26(두 설치기 · 한 릴리스 = 한 판번)" $? "보고의 판본이 갈린다"
 # 확인 명령 한 번에도 상한 — 없으면 벤더 도구가 멈추는 순간 20분 상한까지 함께 멈춘다(이종 검토 1R 지적 채택).
 awk '/^function Get-LoginStatusText/{f=1}
      f&&/Start-Process -FilePath \$exe -ArgumentList .auth.,.status. .*-RedirectStandardOutput/{s=1}
@@ -2678,6 +2696,17 @@ elif [ -f "$DIR/../tests/ps32-detect-run.sh" ]; then
   ck "[c8] 32비트 PowerShell 감지·재실행 인자 조립 시험이 전건 통과한다" $? "bash tests/ps32-detect-run.sh 로 자세히"
 else
   sk "[c8] 32비트 감지 시험" "시험 파일을 못 찾았다"
+fi
+
+# ── 완료 직후 재실행 = 할 일 없음 · 부를 수 없는 클로드에 죽지 않음(TICKET=installer-0326 C1) ──
+#   ★이 절의 축은 tests/rerun-after-done-mutate.py 뮤턴트(R1~R8)로 붉어지는 것을 확인한다.
+if ! command -v pwsh >/dev/null 2>&1; then
+  sk "[c0326-1] 완료 직후 재실행 시험" "pwsh 가 없다"
+elif [ -f "$DIR/../tests/rerun-after-done-run.sh" ]; then
+  bash "$DIR/../tests/rerun-after-done-run.sh" --dir "$DIR" >/dev/null 2>&1
+  ck "[c0326-1] 완료 직후 재실행은 할 일 없음으로 끝나고(카드 0) · 부를 수 없는 클로드에 죽지 않는다" $? "bash tests/rerun-after-done-run.sh 로 자세히"
+else
+  sk "[c0326-1] 완료 직후 재실행 시험" "시험 파일을 못 찾았다"
 fi
 
 echo "== 텔레메트리 — 진행 자동 전송·진단 자료 자동 수집 (계약 v1 2026-09-15 · additive) =="
