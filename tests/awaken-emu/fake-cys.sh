@@ -124,5 +124,9 @@ case "$1" in
     # 재시도(보충 한 줄)를 받고 나서야 시작하는 갈래 — 재시도가 실제로 무언가를 바꾸는지 재려고
     if [ "$S" = "master-retry-late" ] && [ "$3" = "surface:9" ]; then master_mark; fi
     exit 0 ;;
+  rotate)
+    # 0.3.29: 설치기가 재설치 끝에 부른다. 1.1.2 앞 cys 의 실제 답(09-21 이 맥 cys 1.0.2 실측)을 흉내 낸다 —
+    #   모르는 하위명령 · rc 2 ⇒ 설치기는 종전 [재시작] 안내로 폴백한다(이 흉내의 자리 선점 기대가 그 문장이다).
+    echo "error: unrecognized subcommand 'rotate'" >&2; exit 2 ;;
 esac
 exit 0

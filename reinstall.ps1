@@ -6,7 +6,7 @@
 #   3) 최신 설치 도우미를 새로 받아 처음부터 다시 돌린다
 #
 # 쓰는 법 — 창에 이 한 줄을 붙여넣으십시오 (명령 프롬프트 창에서도 같습니다)
-#   powershell -NoProfile -ExecutionPolicy Bypass -Command "irm https://jarvis.godmeyou.kr/install/reinstall.ps1 -OutFile ([Environment]::GetFolderPath('UserProfile')+'\reinstall-jarvis.ps1'); powershell -ExecutionPolicy Bypass -File ([Environment]::GetFolderPath('UserProfile')+'\reinstall-jarvis.ps1')"
+#   powershell -NoProfile -ExecutionPolicy Bypass -Command "try { Remove-Item ([Environment]::GetFolderPath('UserProfile')+'\reinstall-jarvis.ps1') -ErrorAction SilentlyContinue; irm https://jarvis.godmeyou.kr/install/reinstall.ps1 -OutFile ([Environment]::GetFolderPath('UserProfile')+'\reinstall-jarvis.ps1') -ErrorAction Stop; powershell -ExecutionPolicy Bypass -File ([Environment]::GetFolderPath('UserProfile')+'\reinstall-jarvis.ps1') } catch { Write-Host '설치 파일을 받지 못했습니다. 인터넷 연결을 확인하신 뒤 이 줄을 다시 붙여 넣어 주십시오.'; exit 1 }"
 #
 #   뒤에 -List 를 붙이면 무엇을 지울지 보기만 합니다 (아무것도 안 바꿉니다).
 #
@@ -32,7 +32,7 @@ try { [Console]::OutputEncoding = [System.Text.Encoding]::UTF8 } catch { }
 # ⚠아래 한 줄은 사이트가 게시하는 재설치 명령과 **글자까지 같아야 한다**(머리글의 한 줄도 같다).
 #   갈리면 화면에서 복사한 명령이 사이트의 것과 달라진다 — checks.sh 가 그 동일성을 잰다.
 $JarvisRerunReinstall = @'
-powershell -NoProfile -ExecutionPolicy Bypass -Command "irm https://jarvis.godmeyou.kr/install/reinstall.ps1 -OutFile ([Environment]::GetFolderPath('UserProfile')+'\reinstall-jarvis.ps1'); powershell -ExecutionPolicy Bypass -File ([Environment]::GetFolderPath('UserProfile')+'\reinstall-jarvis.ps1')"
+powershell -NoProfile -ExecutionPolicy Bypass -Command "try { Remove-Item ([Environment]::GetFolderPath('UserProfile')+'\reinstall-jarvis.ps1') -ErrorAction SilentlyContinue; irm https://jarvis.godmeyou.kr/install/reinstall.ps1 -OutFile ([Environment]::GetFolderPath('UserProfile')+'\reinstall-jarvis.ps1') -ErrorAction Stop; powershell -ExecutionPolicy Bypass -File ([Environment]::GetFolderPath('UserProfile')+'\reinstall-jarvis.ps1') } catch { Write-Host '설치 파일을 받지 못했습니다. 인터넷 연결을 확인하신 뒤 이 줄을 다시 붙여 넣어 주십시오.'; exit 1 }"
 '@
 function Show-RerunHow {
     Write-Host ''

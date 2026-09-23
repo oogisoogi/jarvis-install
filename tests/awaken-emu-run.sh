@@ -218,7 +218,7 @@ PYEOF
       t $? "[마스터 거부] 동료가 서도 그것을 마스터 각성으로 세지 않는다(거짓 초록 봉합)" "$(grep -E 'fleet awaken|확인하지 못' "$L" "$O" | tail -2 | tr '\n' '|' | cut -c1-220)"
       grep -q 'install-jarvis 폴더의 install-directive.md 를 읽고,' "$O" && ! grep -q '│        너는 마스터다' "$O"
       t $? "[마스터 거부] 사람 카드에 적히는 것은 **실제로 받아들여진 문장**이다(선언 재입력이 아니다)" "$(grep -n '쳐 주십시오' "$O" | head -2 | tr '\n' '|' | cut -c1-200)"
-      grep -q '다음에 할 일: cys 창(제목 jarvis)의 자비스에게 위 한 줄을 전해 주십시오' "$O" && ! grep -q '설치가 끝났습니다' "$O"
+      grep -q '다음에 할 일: cys 창의 master 자리에 있는 자비스에게 위 한 줄을 전해 주십시오' "$O" && ! grep -q '설치가 끝났습니다' "$O"
       t $? "[마스터 거부] 끝맺음이 「끝났습니다」라고 말하지 않는다 · 남은 일을 그대로 적는다" "$(grep '다음에 할 일' "$O" | head -1)"
       ;;
     master-retry-late)
@@ -250,17 +250,18 @@ PYEOF
       t $? "[판정 못 함] 판정이 안 되는 자리에 보충 한 줄을 밀어 넣지 않는다(재시도는 답이 있을 때만)" "보낸 횟수 $(msend9)"
       ;;
     no-surface)
-      has "$L" 'new-surface failed' && grep -q 'EMU-CLAUDE-INLINE' "$O" && ! grep -q '자비스가 깨어났습니다' "$O"
-      t $? "[창 못 엶] 종전 폴백(이 창에서 띄움) 그대로 · 「깨어났습니다」 없음" "$(grep -E 'new-surface|TEST' "$L" | tail -2 | tr '\n' '|' | cut -c1-200)"
-      # 이 창에서 띄울 때도 선언이 그 자체 첫 줄이다(2026-09-15 윈 2차 재설치 실기 — 폴백 프롬프트에 「너는 마스터다」가 없었다)
-      python3 - "$SB/claude-args" "$JH" <<'PYEOF'
-import sys, base64
-rows = [base64.b64decode(l).decode("utf-8") for l in open(sys.argv[1]).read().split("\n") if l]
-want = ["--dangerously-skip-permissions",
-        "너는 마스터다\ninstall-jarvis 폴더의 install-directive.md(" + sys.argv[2] + "/install-directive.md) 를 읽고, 거기 적힌 준비 작업을 해 주세요."]
-sys.exit(0 if rows == want else 1)
-PYEOF
-      t $? "[창 못 엶] 이 창에서 띄울 때도 선언은 첫 프롬프트의 그 자체 첫 줄 · claude 가 두 줄 그대로 받는다" "받은 인자 $(wc -l < "$SB/claude-args" 2>/dev/null | tr -d ' ')개"
+      # 0.3.28 개정 — 이 시나리오의 거절 문구는 claim_denied(자리 선점)다.
+      #   그 뜻은 「열지 못했다」가 아니라 **「자비스는 이미 저 앱 안에 있다」**이므로 두 번째를 띄우지 않는다.
+      #   옛 기대(2026-09-15~0.3.27) = 「종전 폴백(이 창에서 띄움) 그대로 · claude 인자 두 줄」.
+      #     09-21 07:30 실기(재설치)로 폐기됐다 — 그 길로 간 설치는 자비스가 창을 차지해 [10/10] 도
+      #     끝맺음도 오지 않았고, 쓰시는 분은 다음에 무엇을 할지 알 길이 없었다.
+      has "$L" 'seat claim denied' && grep -q '자비스는 이미 열려 있는 cysr 앱 안에 있습니다' "$O" \
+        && ! grep -q 'EMU-CLAUDE-INLINE' "$O" && ! grep -q '자비스가 깨어났습니다' "$O"
+      t $? "[자리 선점] 이 창에서 또 띄우지 않고 앱 쪽으로 넘긴다(옛 기대 = 창 폴백 · 0.3.28 에서 폐기)" "$(grep -E 'seat claim|TEST' "$L" | tail -2 | tr '\n' '|' | cut -c1-200)"
+      grep -qE '앱 오른쪽 위의 \[재시작\] 을 한 번 눌러 주세요|cysr 앱을 자동으로 띄우지 못했습니다' "$O"
+      t $? "[자리 선점] 다음에 무엇을 하실지 한 줄로 말한다(재시작 · 또는 자동 실행 실패 안내)" "안내 줄이 없다"
+      [ ! -s "$SB/claude-args" ]
+      t $? "[자리 선점] claude 를 이 창에서 한 번도 부르지 않는다(두 번째 자비스 0)" "부른 인자 $(wc -l < "$SB/claude-args" 2>/dev/null | tr -d ' ')개"
       ;;
   esac
 done
@@ -426,7 +427,7 @@ PYEOF
       t $? "[맥 마스터 거부] 동료가 서도 그것을 마스터 각성으로 세지 않는다(거짓 초록 봉합)" "$(grep -E '확인하지 못' "$O" | head -1 | cut -c1-200)"
       grep -q 'install-jarvis 폴더의 install-directive.md 를 읽고,' "$O" && ! grep -q '│        너는 마스터다' "$O"
       t $? "[맥 마스터 거부] 사람 카드에 적히는 것은 실제로 받아들여진 문장(선언 재입력 아님)" "$(grep -n '쳐 주십시오' "$O" | head -2 | tr '\n' '|' | cut -c1-200)"
-      grep -q '다음에 할 일: cys 창(제목 jarvis)의 자비스에게 위 한 줄을 전해 주십시오' "$O" && ! grep -q '설치가 끝났습니다' "$O"
+      grep -q '다음에 할 일: cys 창의 master 자리에 있는 자비스에게 위 한 줄을 전해 주십시오' "$O" && ! grep -q '설치가 끝났습니다' "$O"
       t $? "[맥 마스터 거부] 끝맺음이 「끝났습니다」라고 말하지 않는다 · 남은 일을 그대로 적는다" "$(grep '다음에 할 일' "$O" | head -1)" ;;
     master-retry-late)
       mhas 'awaken master: marker=awaken:master-verified mark=True a=1 retry=1$' && grep -q '     자비스(master) 각성 확인' "$O" && grep -q '자비스가 깨어났습니다' "$O"
@@ -464,9 +465,9 @@ PYEOF
       grep -q '\[10/10\] 아직 서지 않은 자리가 있습니다' "$O" && grep -q '마스터는 깨어났습니다 · 동료 자리는 자비스가 세우는 중입니다' "$W" && ! grep -q '너는 마스터다' "$W" && ! grep -q '쳐 주십시오' "$W" \
         && ! grep -q '저절로 깨어나지 않아' "$O" && ! grep -q '사람 손 #' "$O" && mhas 'fleet: master verified - waiting for child seats without declaration card'
       t $? "[맥 마스터 깸·동료 늦음] 카드 문구에 「너는 마스터다」·「쳐 주십시오」 없음(대기 단계 · 최종 카드 줄 앞) · 「사람이 하실 일은 없습니다」(N13)" "$(grep -nE '너는 마스터다|쳐 주십시오|깨어나지 않아|마스터는 깨어|아직 서지 않은' "$O" | head -4 | tr '\n' '|' | cut -c1-240)"
-      grep -qF '     마스터는 깨어 있습니다. 남은 자리를 다시 세우려면 cysr 창의 jarvis 칸에 『너는 마스터다.』 한 줄을 다시 쳐 주십시오(이 설치 창이 아닙니다).' "$O" && ! grep -q '이어서 세웁니다' "$O" && ! grep -q '다시 치실 필요는 없습니다' "$O"
-      t $? "[맥 마스터 깸·동료 늦음] 상한 소진 뒤 최종 카드는 cysr 창 jarvis 칸 재선언 한 줄을 안내 · 「이어서 세웁니다」 거짓 약속 없음(v0324 C2)" "$(grep -nE '남은 자리|치실 필요' "$O" | head -3 | tr '\n' '|' | cut -c1-240)"
-      grep -q '다음에 할 일: cys 창(제목 jarvis)의 자비스와 이어서 이야기하십시오' "$O" && ! grep -q '다시 하시는 법' "$O"
+      grep -qF '     마스터는 깨어 있습니다. 남은 자리를 다시 세우려면 cysr 창의 master 자리에 『너는 마스터다.』 한 줄을 다시 쳐 주십시오(이 설치 창이 아닙니다).' "$O" && ! grep -q '이어서 세웁니다' "$O" && ! grep -q '다시 치실 필요는 없습니다' "$O"
+      t $? "[맥 마스터 깸·동료 늦음] 상한 소진 뒤 최종 카드는 cysr 창 master 자리 재선언 한 줄을 안내 · 「이어서 세웁니다」 거짓 약속 없음(v0324 C2)" "$(grep -nE '남은 자리|치실 필요' "$O" | head -3 | tr '\n' '|' | cut -c1-240)"
+      grep -q '다음에 할 일: cys 창의 master 자리에 있는 자비스와 이어서 이야기하십시오' "$O" && ! grep -q '다시 하시는 법' "$O"
       t $? "[맥 마스터 깸·동료 늦음] 끝맺음이 「다시 실행」이 아니라 자비스와 이어서 이야기(N13)" "$(grep '다음에 할 일' "$O" | head -1)" ;;
   esac
 done
@@ -503,15 +504,17 @@ EOF
       w="$(sed -n 's/.*app open: .* waited=\([0-9][0-9]*\)s tries=\([0-9][0-9]*\)$/\1 \2/p' "$L" 2>/dev/null | tail -1)"
       [ -n "$w" ] && [ "${w% *}" -ge 5 ] && [ "${w#* }" = "2" ]
       t $? "[맥 앱 창 $s] 대기 기록 waited 는 실제 흐른 초(ping 2초 × 2바퀴 + 쉼 → 5초 이상 · tries=2 · N16)" "기록: $(grep 'app open:' "$L" 2>/dev/null | tail -1 | sed 's/.*ping_ok/ping_ok/')"
-      a="$(grep -n 'app open: ' "$L" 2>/dev/null | head -1 | cut -d: -f1)"; b="$(grep -n '자비스는 그 창(제목 jarvis)에서 깨어납니다' "$L" 2>/dev/null | head -1 | cut -d: -f1)"
+      a="$(grep -n 'app open: ' "$L" 2>/dev/null | head -1 | cut -d: -f1)"; b="$(grep -n '자비스는 그 창의 master 자리에서 깨어납니다' "$L" 2>/dev/null | head -1 | cut -d: -f1)"
       c="$(grep -n 'cys 안에서 자비스를 열었습니다 (surface:9)' "$L" 2>/dev/null | head -1 | cut -d: -f1)"
       [ -n "$a" ] && [ -n "$b" ] && [ -n "$c" ] && [ "$b" -gt "$a" ] && [ "$c" -eq $((b + 1)) ] && [ -s "$SB/newsurface-args" ]
       t $? "[맥 앱 창 $s] 「그 창에서 깨어납니다」는 자리가 열린 뒤에 말한다(앱 대기 기록 뒤 · 「자비스를 열었습니다」 바로 앞 · N3)" "줄 app-open=$a 문장=$b 열었습니다=$c" ;;
     app-no-surface)
       grep -q "^open -a $SB/cys.app" "$SB/open-calls" 2>/dev/null && [ -s "$SB/newsurface-args" ]
       t $? "[맥 앱 창 $s] 전제: 앱 창은 열었고 자리 열기를 불렀다(거절됨)" "open=$(wc -l < "$SB/open-calls" 2>/dev/null | tr -d ' ') newsurface=$([ -s "$SB/newsurface-args" ] && echo 1 || echo 0)"
-      ! grep -q '그 창(제목 jarvis)에서 깨어납니다' "$O" && grep -q '자리를 열지 못해 이 설치 창에서 깨웁니다' "$O" && grep -q 'EMU-CLAUDE-INLINE' "$O"
-      t $? "[맥 앱 창 $s] 자리를 못 열면 「그 창에서 깨어납니다」가 남지 않고 「이 설치 창에서 깨웁니다」 · 실제로 이 창에서 뜬다(N3)" "$(grep -nE '깨어납니다|깨웁니다|EMU-CLAUDE' "$O" | tr '\n' '|' | cut -c1-240)" ;;
+      # 0.3.28 개정 — 옛 기대는 「자리를 열지 못해 이 설치 창에서 깨웁니다」 + 이 창에서 실제로 띄움이었다.
+      #   거절 사유가 자리 선점이면 그 길은 두 번째 자비스를 만든다 ⇒ 앱 쪽으로 넘기고 이 창에서는 안 띄운다.
+      ! grep -q '그 창의 master 자리에서 깨어납니다' "$O" && grep -q '자비스는 이미 열려 있는 cysr 앱 안에 있습니다' "$O" && ! grep -q 'EMU-CLAUDE-INLINE' "$O"
+      t $? "[맥 앱 창 $s] 자리 선점이면 앱 쪽으로 넘긴다 · 이 창에서 또 띄우지 않는다(옛 기대 = 창 폴백 · 0.3.28 에서 폐기)" "$(grep -nE '깨어납니다|깨웁니다|EMU-CLAUDE' "$O" | tr '\n' '|' | cut -c1-240)" ;;
   esac
 done
 # 윈 정적 축 — 콘솔 빠른 편집(QuickEdit)을 머리글 앞에서 끄고 끝맺음 뒤 되돌린다(installer-awaken-verify-r2 · 윈도우 콘솔은 흉내로 못 돈다)

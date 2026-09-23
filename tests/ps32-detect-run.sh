@@ -48,7 +48,7 @@ out2="$(run_lib "$PS" "
 (Build-Ps32RelaunchArgs '/tmp/a b/bootstrap.ps1' \$false \$false) -join '|'
 (Build-Ps32RelaunchArgs '/tmp/a b/bootstrap.ps1' \$true  \$true)  -join '|'
 ")"
-printf '%s' "$out2" | grep -qF -- '-NoProfile|-ExecutionPolicy|Bypass|-File|/tmp/a b/bootstrap.ps1'
+printf '%s' "$out2" | grep -qF -- '-NoProfile|-ExecutionPolicy|Bypass|-File|"/tmp/a b/bootstrap.ps1"'
 t $? "[인자] 기본값(DetectOnly·DryRun 둘 다 없음) — 다섯 토큰뿐" "$out2"
 printf '%s' "$out2" | grep -qF -- '-DetectOnly|-DryRun'
 t $? "[인자] -DetectOnly -DryRun 이 켜지면 그대로 이어 붙는다(순서·개수 보존)" "$out2"

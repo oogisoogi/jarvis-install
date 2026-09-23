@@ -81,8 +81,9 @@ def win_exprs() -> list[str]:
 
 def check_win() -> None:
     line, exprs = win_exprs()
-    say(len(exprs) == 2, f"윈 한 줄에 자리 식이 둘이다(받는 곳·실행하는 곳) — 실제 {len(exprs)}")
-    say(len(set(exprs)) == 1, "그 둘이 글자 그대로 같다(받은 곳과 다른 곳을 실행하지 않는다)")
+    # 0.3.35(dbg-D5 F5): 받기 전에 옛 파일을 지운다 — 자리 식이 셋(지우는 곳·받는 곳·실행하는 곳)이고 셋이 같아야 한다.
+    say(len(exprs) == 3, f"윈 한 줄에 자리 식이 셋이다(지우는 곳·받는 곳·실행하는 곳) — 실제 {len(exprs)}")
+    say(len(set(exprs)) == 1, "그 셋이 글자 그대로 같다(받은 곳과 다른 곳을 지우거나 실행하지 않는다)")
     if exprs:
         made = WIN_PROFILE + exprs[0]
         print("     계산된 자리:", made)

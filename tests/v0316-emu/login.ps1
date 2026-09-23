@@ -18,7 +18,7 @@ case "$1 $2" in
           if [ "$n" -ge 2 ]; then touch "$SB/logged"; mv "$0" "$SB/claude.away"; ( /bin/sleep 2; mv "$SB/claude.away" "$SB/bin/claude" ) >/dev/null 2>&1 & fi
           exit 0 ;;
        ok-first) touch "$SB/logged"; exit 0 ;;
-       timeout) /bin/sleep 3033; exit 0 ;;
+       timeout) (exec -a "$SB/emu-sleep" /bin/sleep 3033); exit 0 ;;
      esac ;;
   "auth status") if [ -f "$SB/logged" ]; then echo '{"loggedIn": true}'; else echo '{"loggedIn": false}'; fi; exit 1 ;;
 esac

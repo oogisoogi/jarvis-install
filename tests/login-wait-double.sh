@@ -16,7 +16,11 @@ export JARVIS_NO_PROGRESS=1   # 🔴흉내는 라이브 서버로 진행 이벤�
 DIR="$(cd "$(dirname "$0")" && pwd)"
 SH="$DIR/../install-master/bootstrap.sh"
 SB="$(mktemp -d)"; mkdir -p "$SB/home"
-cleanup() { pkill -f "sleep 97" 2>/dev/null; rm -rf "$SB"; }
+# ⚠고아 계수·정리는 **이 실행만의 간격 값**으로 가린다(dbg-D5 F8). 감시자의 sleep 은 제품 코드가 띄우므로 이름을 바꿀 수 없다 —
+#   앞 판은 고정 97초를 전역 이름으로 세고 껐다 ⇒ 다른 worktree 의 동시 실행을 끄고 그 수까지 셌다.
+#   간격 = 1000 + (셸 번호 mod 8000) 초 — 같은 기계에서 동시에 도는 실행끼리 겹칠 일이 사실상 없고 성공 경로(2초)에는 영향 없다.
+ORPH_SEC=$(( 1000 + $$ % 8000 ))
+cleanup() { pkill -f "sleep $ORPH_SEC\$" 2>/dev/null; rm -rf "$SB"; }
 trap cleanup EXIT
 PASS=0; FAIL=0
 ck() { if [ "$2" -eq 0 ]; then PASS=$((PASS+1)); printf '  ok   %s\n' "$1"; else FAIL=$((FAIL+1)); printf '  FAIL %s  ← %s\n' "$1" "${3:-}"; fi; }
@@ -99,11 +103,11 @@ run_case quiet 30 600 'sleep 1'
 ck "[조용] 금방 끝난 승인에는 한 줄도 안 보탠다" $? "빨리 끝낸 사람에게 잔소리를 한다"
 
 echo "== ⑤ ★고아를 안 남기는가 (외부 검토 1차 MEDIUM) =="
-# 간격을 97초로 둬서 **우리 sleep 만** 이름으로 가려낸다. 성공 경로(금방 끝남)를 돈 뒤 남아 있으면 고아다.
-pkill -f "sleep 97" 2>/dev/null; sleep 1
-run_case orphan 97 600 'sleep 2'
+# 간격을 이 실행만의 값(ORPH_SEC)으로 둬서 **우리 sleep 만** 이름으로 가려낸다. 성공 경로(금방 끝남)를 돈 뒤 남아 있으면 고아다.
+pkill -f "sleep $ORPH_SEC\$" 2>/dev/null; sleep 1
+run_case orphan "$ORPH_SEC" 600 'sleep 2'
 sleep 2
-left=$(pgrep -f "sleep 97" 2>/dev/null | wc -l | tr -d ' ')
+left=$(pgrep -f "sleep $ORPH_SEC\$" 2>/dev/null | wc -l | tr -d ' ')
 [ "$left" -eq 0 ]
 ck "[고아] 감시자가 끝나며 제 자식(sleep)도 데려간다(남은 것 ${left}개)" $? "성공할 때마다 고아가 하나씩 쌓인다"
 

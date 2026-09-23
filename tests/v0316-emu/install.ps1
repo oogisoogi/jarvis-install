@@ -4,7 +4,7 @@ $ErrorActionPreference = 'Continue'
 New-Item -ItemType Directory -Force -Path "$Sb/home/install-jarvis", "$Sb/bin" | Out-Null
 Set-Content -Path "$Sb/scenario" -Value $Scenario -NoNewline
 # 가짜 공식 설치기 자리(pwsh 이름) — 자식 sleep 을 두고 영원히 안 끝난다
-Set-Content -Path "$Sb/bin/pwsh" -Value "#!/bin/bash`n/bin/sleep 3011 &`nwait`n" -NoNewline
+Set-Content -Path "$Sb/bin/pwsh" -Value "#!/bin/bash`n(exec -a '$Sb/emu-sleep' /bin/sleep 3011) &`nwait`n" -NoNewline
 & chmod +x "$Sb/bin/pwsh"
 # 받을 파일(가짜 claude.exe) — install stable 는 시나리오에 따라 멈추거나 제자리에 둔다
 $fake = @'
@@ -15,7 +15,7 @@ case "$1 $2" in
   "--help "*) echo "Commands:"; echo "  auth    Manage authentication"; exit 0 ;;
   "install stable")
      if [ "$(cat "$SB/scenario")" = step5ok ]; then mkdir -p "$SB/home/.local/bin"; cp "$0" "$SB/home/.local/bin/claude.exe"; chmod +x "$SB/home/.local/bin/claude.exe"; exit 0; fi
-     /bin/sleep 3022 & wait ;;
+     (exec -a "$SB/emu-sleep" /bin/sleep 3022) & wait ;;
   "auth status") echo '{"loggedIn": true}'; exit 0 ;;
 esac
 exit 0

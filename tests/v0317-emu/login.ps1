@@ -19,12 +19,12 @@ case "$1 $2" in
      case "$S" in
        slow-approve) /bin/sleep 3; cred; touch "$SB/logged"; exit 0 ;;
        instant-return) exit 1 ;;
-       hang|hang-ask) exec /bin/sleep 3071 ;;
-       file-only) ( /bin/sleep 1; cred; touch "$SB/logged" ) >/dev/null 2>&1 & exec /bin/sleep 3072 ;;
-       no-status) ( /bin/sleep 1; cred ) >/dev/null 2>&1 & exec /bin/sleep 3073 ;;
-       file-not-logged) ( /bin/sleep 1; cred ) >/dev/null 2>&1 & exec /bin/sleep 3074 ;;
-       stale-file) exec /bin/sleep 3075 ;;
-       status-hang) exec /bin/sleep 3077 ;;
+       hang|hang-ask) exec -a "$SB/emu-sleep" /bin/sleep 3071 ;;
+       file-only) ( /bin/sleep 1; cred; touch "$SB/logged" ) >/dev/null 2>&1 & exec -a "$SB/emu-sleep" /bin/sleep 3072 ;;
+       no-status) ( /bin/sleep 1; cred ) >/dev/null 2>&1 & exec -a "$SB/emu-sleep" /bin/sleep 3073 ;;
+       file-not-logged) ( /bin/sleep 1; cred ) >/dev/null 2>&1 & exec -a "$SB/emu-sleep" /bin/sleep 3074 ;;
+       stale-file) exec -a "$SB/emu-sleep" /bin/sleep 3075 ;;
+       status-hang) exec -a "$SB/emu-sleep" /bin/sleep 3077 ;;
        inline) echo "EMU-VENDOR-LOGIN-OUTPUT"; cred; touch "$SB/logged"; exit 0 ;;
        clip-*)
          # 사람의 「복사」를 흉내 낸다 — 복사된 내용 파일을 시간차로 바꾼다
@@ -41,12 +41,12 @@ case "$1 $2" in
            if [ "$S" = "clip-inject" ] && [ "$line" = "$GOOD" ]; then cred; touch "$SB/logged"; echo "Login successful."; exit 0; fi
            echo "Invalid code. Please make sure the full code was copied." >&2
          done
-         exec /bin/sleep 3078 ;;
+         exec -a "$SB/emu-sleep" /bin/sleep 3078 ;;
      esac ;;
   "auth status")
      case "$S" in
        no-status|stale-file) echo "error: unknown command"; exit 1 ;;
-       status-hang) exec /bin/sleep 3076 ;;
+       status-hang) exec -a "$SB/emu-sleep" /bin/sleep 3076 ;;
      esac
      if [ -f "$SB/logged" ]; then echo '{"loggedIn": true, "authMethod": "claude.ai", "email": "emu-person@example.com", "subscriptionType": "pro"}'; exit 0
      else echo '{"loggedIn": false}'; exit 1; fi ;;

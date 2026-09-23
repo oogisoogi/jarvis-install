@@ -1,10 +1,12 @@
 # ps1 function ↔ bootstrap.sh 등가 대조표 (TICKET=mac-parity-t1-core · 2026-09-16 · 계약 master#92224011)
 # 칸 = ps1함수<TAB>sh함수<TAB>상태<TAB>사유 · 상태 = sh(등가 실재) | na(OS 상 해당 없음 · 사유 필수)
 # ps1 = bootstrap.ps1 @5a1cd67 · 행 순서 = ps1 파일 순서
+# (표 밖 짝) 재설치 입구 reinstall.ps1 ↔ reinstall.sh: 지우기 도구를 묻지 않게 부른다 = 윈 -KeepApp -Yes · 맥 --yes(0.3.35 · TICKET=installer-0335 dbg-D5 F2 · 이 표는 bootstrap.ps1 함수만 대조하므로 주석 행)
+# (표 밖 짝) 배포 한 줄: 맥 = `curl … && bash …`(받기 실패면 안 돈다) · 윈 = 0.3.35 부터 `try { 옛 파일 지우기; irm … -ErrorAction Stop; powershell -File … } catch { 안내; exit 1 }`(받기 실패면 옛 파일을 안 돌린다 · dbg-D5 F5 · 앞 판은 `;` 로 이어 옛 파일이 돌았다)
 # ⚠「# todo」 줄 = 아직 이식하지 않은 함수(표에 행이 없으므로 checks 대조 축은 붉다 — 거짓 초록을 만들지 않으려고 상태를 지어내지 않았다)
 #   괄호 안 = 맡은 티켓 제안(T1 = 설치 단계 · T2 = 전송·증거·캡처)
 Test-Ps32OnWin64	-	na	64bit OS 위 32bit PowerShell(x86) 프로세스 판정 — bash 에는 이 구분이 없다(macOS 는 프로세스 비트수 갈래가 없음). TICKET=installer-0325 c8(2026-09-17 2d6f25b)
-Build-Ps32RelaunchArgs	-	na	32bit 프로세스를 64bit PowerShell(sysnative)로 재실행할 인자 조립 — 위와 같은 이유로 sh 대응 없음. TICKET=installer-0325 c8(2026-09-17 2d6f25b)
+Build-Ps32RelaunchArgs	-	na	32bit 프로세스를 64bit PowerShell(sysnative)로 재실행할 인자 조립 — 위와 같은 이유로 sh 대응 없음. TICKET=installer-0325 c8(2026-09-17 2d6f25b) · 0.3.35: -File 경로를 큰따옴표로 감싸 넘긴다(공백 든 사용자 폴더에서 쪼개지던 것 · dbg-D5 F7)
 Write-Log	log	sh	같은 일(기록 파일에 시각+줄 덧붙임)
 Say	say	sh	화면+기록 같은 일 · 오류 글 즉시 캡처(ⓕ③) = say_error_text_hook(T2 9abadd2) · 단 윈판의 단계 줄 모음(StepLog)은 맥 say 에 없음
 Invoke-Logged	invoke_logged	sh	바깥 명령 출력을 화면(7칸 들여)·기록 양쪽에 · 기록 [무엇] rc=N · 부르는 자리 = [8/10] init-pack·daemon install·(무응답 때) daemon status(ps1 3094·3102·3163 같음)
@@ -28,8 +30,9 @@ Save-HelpAttempts	help_attempts_write	sh	같은 일(코드 이름순 · 임시 �
 Update-HelpAttempts	help_attempts_update	sh	같은 일
 Write-HelpEscalation	help_escalation_print,help_way_lines,help_is_direct	sh	같은 일(2회째 다른 방법 · 3회째 담당자)
 Save-HelpLastReport	help_last_report_save	sh	같은 일
-Test-QuietErrorRecord	-	na	PowerShell $Error 기록·ErrorAction 구문 트리 판정 전용 — bash 에는 오류 기록 모음이라는 개념이 없음
-Write-ClosingNote	closing_note	sh	끝맺음 같은 일(EXIT 트랩) · 단 윈판의 「예상 못 한 끝」 마지막 오류 기록·J-UNK-00 채우기·원격 해결 앞 다시 하는 법 1회는 맥에 없음
+Test-QuietErrorRecord	-	na	PowerShell $Error 기록·ErrorAction 구문 트리 판정 전용 — bash 에는 오류 기록 모음이라는 개념이 없음 · 0.3.35: 명령 목록은 파일마다 한 번 · 판정은 오류 자리마다 한 번(dbg-D5 F9)
+Test-QuietAstSpot	-	na	Test-QuietErrorRecord 의 판정 몸체(0.3.35 · dbg-D5 F9 로 떼어 냄) — 위와 같은 이유로 sh 대응 없음
+Write-ClosingNote	closing_note	sh	끝맺음 같은 일(EXIT 트랩) · 단 윈판의 「예상 못 한 끝」 마지막 오류 기록·J-UNK-00 채우기·원격 해결 앞 다시 하는 법 1회는 맥에 없음 · 0.3.35(dbg-D5 F10): 코드 없는 실패 끝의 실패 이벤트(J-UNK-00)는 양쪽 다 보낸다(윈 = 채우기 자리 · 맥 = 0 이 아닌 끝 코드 + 코드 없음 · 맥은 화면 코드는 안 채움)
 Get-RerunCmd	rerun_cmd	sh	같은 일(들어온 길에 따라 명령 전체)
 Set-NextStepRerun	next_rerun	sh	같은 일
 Show-RerunHow	show_rerun_how	sh	같은 일(창 여는 법·키만 맥 것)
@@ -39,6 +42,9 @@ Invoke-ClaudeCli	-	na	「명령은 잡히는데 가리키는 실행 파일이 �
 Test-ClaudeAuthCmd	claude_has_auth_cmd	sh	같은 일(claude --help 에 auth 하위명령이 있는가)
 Test-CysAgentFlag	cys_supports_agent_flag	sh	같은 일
 Get-CysVersionLine	cys_version_line	sh	같은 일
+Get-DlProbeWords	dl_probe_words	sh	1-7 받는 자리 점검(ok·bad·fail·unknown)을 사람 말 한 줄로. TICKET=installer-0328
+Get-ClaudeInstallLogTail	claude_install_log_tail	sh	[2/10] 자식 설치기가 남긴 글자의 꼬리 N 줄(없으면 빈 것). TICKET=installer-0328
+Show-ClaudeInstallLogTail	show_claude_install_log_tail	sh	그 꼬리를 화면과 환경 보고 양쪽에 붙인다 · 한 줄도 없으면 「없습니다」로 적는다(부재를 침묵으로 두지 않는다). TICKET=installer-0328
 Test-CysBody	cys_app_dir,detect_stage1	sh	cys 몸통 판정 — 맥은 설치 목록(레지스트리)이 없고 /Applications/cysr.app·cys.app 존재를 cys_app_dir·detect_stage1 이 봄
 Show-OldCysNote	note_old_cys_app	sh	같은 일(0.14.x 옛 판 한 줄 안내)
 Get-CysInstalledVersion	note_old_cys_app,cys_install_from_zip	sh	설치된 판본 읽기 — 맥은 defaults read CFBundleShortVersionString 인라인
@@ -73,7 +79,7 @@ Write-ClaudeInstallDiag	write_claude_install_diag	sh	상한에 닿았을 때 살
 Stop-ProcTree	stop_proc_tree	sh	깊은 자식부터 끄고 마지막에 본인(우리가 띄운 설치기 나무만) · 5초 안에 끝났는지 기록 · 끄는 동안 셸의 「Killed: 9 …」 알림을 화면에서 가림
 Wait-ProcBounded	wait_proc_bounded	sh	상한 있는 대기 + 30초마다 한 줄(N분 M초 지남 · 최대 K분) · rc 0 끝남 / 1 상한
 Install-ClaudeDirect	install_claude_direct	sh	공식 install.sh 가 받는 자리(downloads.claude.ai/claude-code-releases)에서 ①판본 ②manifest 해시 ③본체 ④shasum 대조 ⑤받은 파일로 install(3분 상한 · 넘으면 진단·끄기) → 안 되면 ~/.local/bin/claude 에 .jarvis-new 거쳐 두기 → --version(90초 상한) 판정 · 플랫폼 darwin-arm64|x64(로제타면 arm64) · 실패 끝 코드 = J-NET-03(윈 J-AV-01 은 윈도우 전용) · 같은 자리 재발 시 상한 5분 줄이기(윈 J-AV-01 계수)는 맥에 없음
-Step-InstallClaude	step_install_claude	sh	같은 일([2/10] 멱등 설치·PATH·판본 확인) · 단 윈판의 설치기 상한·백신 대기 안내·직접 받기 폴백은 맥에 없음
+Step-InstallClaude	step_install_claude	sh	같은 일([2/10] 멱등 설치·PATH·판본 확인) · 단 윈판의 설치기 상한·백신 대기 안내·직접 받기 폴백은 맥에 없음 · 0.3.35: 윈판 사용자 PATH 훑기 루프가 설치기 프로세스 변수를 덮어 빠른 종료 판정(J-PS32-01·J-DL-07)이 죽던 것 수리(dbg-D5 F6 · 판정 결과는 맥과 같은 갈래로 돌아옴)
 Set-LoginStage	set_login_stage	sh	같은 일(기록에 login stage: <표지>) · 표지 = wait (installer-fed|plain) · question · confirm · done by status after window ended · fail — 맥은 다시 열기(reopen)·창 띄우기 실패(start-failed) 갈래가 없어 그 표지도 없음
 Get-LoginCredStamp	-	na	~/.claude/.credentials.json 시각·크기 — 맥 클로드는 로그인 정보를 키체인에 두어 이 파일로 판정하지 않음
 Test-LoginCredFresh	-	na	로그인 파일이 이번에 생겼거나 고쳐졌는가 — 맥은 로그인 정보가 키체인이라 해당 파일이 없음
@@ -92,21 +98,39 @@ Read-LoginFailKey	read_login_fail_key	sh	1·2·3·Enter 한 키를 상한(60초)
 Invoke-LoginFailQuestion	login_fail_question	sh	상한(20분)에서 끝났을 때만 · 문구 네 줄·분류 표지(browser-not-opened·no-approval-screen·approved-code-rejected·unknown·no-answer·no-console-input)·기록 줄 ps1 글자 동일 · 상한 판정 = login_end_wait 가 남기는 .login-capped 표지
 Complete-LoginSuccess	step_login	sh	로그인 성공 처리 — 맥은 S1_LOGGED_IN=1 + 「로그인 확인했습니다」(구독 기록·표지는 없음)
 Add-LoginReport	add_login_report	sh	일곱 줄(로그인 창·승인 프로세스·다시 열기·코드 넣기·끝난 뒤 확인·상한에서 받은 답·쌓인 글자 수)을 기록과 환경 보고에 · 로그인 실패 끝에서만(ps1 같음) · 코드 넣기 = login_feeder 끝 기록 줄에서 셈
+Get-LoginProfileCandidates	login_profile_candidates	sh	로그인을 물어볼 설정 폴더 후보 — 기본 프로필 · ~/.cys/claude · CLAUDE_CONFIG_DIR · **실재하는 것만**. TICKET=installer-0328
+Test-ProfileLoggedIn	profile_login_answer	sh	그 프로필로 auth status 한 번 — yes|no|unknown(윈은 error 도 있다 · 실행 자체가 던지는 자리가 윈에만 있다). TICKET=installer-0328
+Restore-LoginFromProfiles	restore_login_from_profiles	sh	후보를 전부 묻고 로그인된 것을 기본 프로필로 되가져온다 — 윈은 .credentials.json 파일 복사, 맥은 키체인 항목 복사(자리만 다르고 하는 일은 같다). TICKET=installer-0328
 Step-Login	step_login	sh	[3/10] 같은 일 · 단 윈판의 이른 끝 1회 다시 열기(J-LOGIN-02)·5분 점검 안내·실패 질문은 맥에 없음
 Write-Directive	write_directive	sh	같은 일(설치 지침 파일 놓기 · 문안은 OS 별)
 Get-ProfileTargets	profile_configs,profile_settings	sh	개인·자비스 전용 두 자리 — 맥은 설정 파일·settings 경로를 두 함수로 나눔
 Set-ClaudePrefs	seed_claude_prefs	sh	첫 실행 질문 사전 설정·홈 신뢰는 없을 때만 — 맥은 plutil · 단 윈판의 .bak-jarvis 사본·되읽기 복원은 맥에 없음
 Set-ClaudeSettings	seed_claude_settings	sh	같은 일(theme·skipDangerousModePermissionPrompt·remoteControlAtStartup·autoUpdatesChannel)
+Get-CredExpiresAt	cred_expires_of	sh	자격증명 글의 claudeAiOauth.expiresAt 숫자(못 읽으면 빈 값) — 윈은 파일 · 맥은 키체인 값을 파이프로만. TICKET=installer-0332(2026-09-21)
+Test-CredHasLogin	cred_has_login	sh	원본에 로그인 토큰(claudeAiOauth accessToken·refreshToken)이 있나 — 윈은 파일 · 맥은 키체인 값을 파이프로만. TICKET=installer-0332(2026-09-22 · master 판정 1b01748b · 899 L5)
+Get-LoginCopyPlan	login_copy_plan	sh	순수 — 자비스 쪽 없음 = copy:absent · 더 옛것 = copy:older · 더 새것 = keep:newer · 같음 = keep:same · 비교 = expiresAt(둘 다 있을 때) 아니면 수정 시각(흉내 동형 축 · 글자까지 같다). TICKET=installer-0332(2026-09-21 · master 판정 70ab51cf A1)
 Copy-LoginToIsolated	copy_login_to_isolated	sh	같은 일 — 맥은 파일이 아니라 키체인 항목을 복사(서비스 이름 = CLAUDE_CONFIG_DIR sha256 앞 8자 · 실측)
+Get-LoginCopyWords	login_copy_words	sh	판정 → 기록 한 줄 사람 말(값 없음) · 두 OS 글자까지 같다. TICKET=installer-0332(2026-09-21)
 Get-TrustRollbackWords	trust_rollback_words	sh	같은 일
 Undo-TrustSeed	seed_claude_prefs,trust_key_state	sh	넣은 홈 신뢰 키 되돌리고 되읽어 verified·kept·unknown — 맥은 plutil -remove 인라인 + trust_key_state
 Set-AllProfiles	seed_all_profiles,trust_set_rollback_state	sh	전 자리 사전 설정 + 기록 실패 시 되돌림 상태(나쁜 쪽 유지)
 Step-Prepare	step_prepare	sh	같은 일([4/10])
-Step-DownloadCys	step_download_cys,cys_http_code	sh	[5/10] 같은 일(크기·지문·공간·404/410) · 단 윈판의 「같은 판·같은 내용이면 받지 않음」·407 프록시 갈래는 맥에 없음(맥은 받은 뒤 [6/10] 에서 건너뜀)
+Step-DownloadCys	step_download_cys,cys_http_code	sh	[5/10] 같은 일(크기·지문·공간·404/410) · 404/410 = 양쪽 즉시 실패(J-DL-05 · rc 5 · 같은 문구 · 원작자 판 폴백 없음 · 맥 폴백은 0.3.35 에서 제거 · TICKET=installer-0335 dbg-D5 F1) · 407 = 양쪽 즉시 끝(J-NET-01 · rc 5 · 같은 문구 · 맥은 0.3.35 dbg-D5 F10 에서 신설 · 앞 판 맥은 30분 대기) · 단 윈판의 「같은 판·같은 내용이면 받지 않음」은 맥에 없음(맥은 받은 뒤 [6/10] 에서 건너뜀)
 Step-InstallCys	step_install_cys,cys_install_from_zip,cys_install_from_dmg	sh	[6/10] 같은 일(설치 방식은 OS 별 — zip 원자 교체·벤더 dmg)
 Step-VerifyCys	step_verify_cys	sh	[7/10] 같은 일 · 단 윈판의 cys PATH 심기(Seed-CysPath)는 맥에 없음
+Test-CysPong	step_prepare_account	sh	[8/10] 등록 전 데몬 선확인 — 맥은 step_prepare_account 안 인라인 ping(0.3.29) · 윈은 상한 5초·CYS_NO_AUTOSTART(묻는 것이 데몬을 띄우지 않게) · 답하고 작업 등록 yes 면 daemon install 생략. TICKET=installer-0330(2026-09-21)
+Get-CysDaemonPid	daemon_pid_of	sh	cys identify(JSON)의 daemon_pid · 상한 5초 · 못 읽으면 빈 값 — [8/10] 앞뒤 pid 대조용. TICKET=installer-0330(2026-09-21)
+Get-RotatePlan	rotate_plan	sh	순수 — 앞에 답 없음 = skip:fresh · pid 바뀜 = skip:pid · 같음 = run:same · 못 읽음 = run:unknown(흉내 동형 축 · 글자까지 같다). skip 이면 [9/10] 이 rotate 를 부르지 않고 rotate=skipped-restarted. TICKET=installer-0330(2026-09-21)
 Step-PrepareAccount	step_prepare_account	sh	[8/10] 같은 일(init-pack·daemon install·ping·doctor) · 단 윈판의 앱 직접 열기 폴백·자동 시작 실측·좌석 치명 항목 분류는 맥에 없음
-Step-Wake	step_wake,cys_open_master_seat	sh	[9/10] 같은 일 · 단 윈판은 선언(너는 마스터다)을 첫 지시에 싣고 표지를 지우며, 맥은 일부러 싣지 않음(맥 실기 근거 0)
+Get-RotateStageOf	rotate_stage_of	sh	rotate 가 부르는 자식 명령 줄 → 단계 표지(1-drain·2-daemon·2-daemon-up·4-pack·5-restore) · 관측 표지일 뿐 단계를 복제하지 않는다. TICKET=installer-0330(2026-09-21)
+Get-ChildCmdLines	cys_rotate_state	sh	rotate 자식 명령 줄 읽기 — 윈 Get-CimInstance Win32_Process(상한 3초) · 맥은 cys_rotate_state 안 ps -A -o ppid=,command= 인라인. TICKET=installer-0330(2026-09-21)
+Get-RotateSkipDeptsFlag	rotate_skip_depts_flag	sh	순수 — cys --version 한 줄이 1.1.3 이상이면 --skip-depts · 아니면 빈 값(옛 cys 는 모르는 인자에 실패) · env CYS_ROTATE_SKIP_DEPTS=1 은 언제나. TICKET=installer-0332(2026-09-22 · master 판정 0c0f5705)
+Get-CysRotateState	cys_rotate_state	sh	재설치 끝 자동 재시작 = 앱 [재시작] 과 같은 한 명령 cys rotate --timeout 120(1.1.2) · 벽시계 상한 180초(0.3.31 · 360(master 판정 aa4419f8)에서 단축 · 관측 판정 observed-ok 는 Invoke-RotateObserve 행) · 돌려주는 값 「판정\trc\t마지막 알림 줄」 · 0·21 ok(21 = 「저장 확인 일부 미완」 1줄) · 25 held(창 확인) · 22·23·24 fail-<rc>(앱을 열면 다시 시도) · absent|timeout 같은 분류(흉내 동형 축) · ok·held 아니면 종전 1클릭 안내로 폴백 · 5단 복제 금지(master 판정 859ceeb2). TICKET=installer-0329 · v112-vm-verify(2026-09-21)
+Get-MasterSeatRef	master_seat_ref	sh	cys list 에서 살아 있는(exited=true 아님) role=master 자리 번호 하나 — 재설치 post-install 증거가 읽을 자리. TICKET=installer-0329(2026-09-21)
+Test-SeatClaimDenied	seat_claim_denied	sh	new-surface 답이 「이미 살아 있는 master 자리가 쥐고 있다」인지 판정(claim_denied · master+held by a live surface) — 순수 함수(답 글자만 받는다). TICKET=installer-0328(2026-09-21)
+Get-CysAppExe	cys_app_dir	sh	창(GUI)을 여는 대상을 고른다 — 윈은 설치 폴더에서 cys-app.exe·cysr.exe 를 찾고, 맥은 앱 번들 자리 하나라 cys_app_dir 이 같은 일을 한다. TICKET=installer-0328
+Start-CysAppWindow	start_cys_app_window	sh	앱 창을 띄운다 · 이미 떠 있으면 재기동 않고 앞으로만(윈 WScript.Shell AppActivate ↔ 맥 raise_cys_app_window osascript activate) · 찍는 값 raised|started|빈 글. TICKET=installer-0328
+Step-Wake	step_wake,cys_open_master_seat	sh	[9/10] 같은 일 · 단 윈판은 선언(너는 마스터다)을 첫 지시에 싣고 표지를 지우며, 맥은 일부러 싣지 않음(맥 실기 근거 0) · [5/10]~[8/10] 막힘 뒤: 맥·윈 = 각성에 들어가지 않고 「설치가 끝나지 않았습니다」+진단 코드로 즉시 끝(맥 0.3.35 dbg-D5 F3 · 윈 짝 0.3.35 r2 결정 A · 윈 행동 시험 tests/d5-f3w · 윈 실기 미실측) · 윈 Step-Wake 안의 막힌 단 갈래(이 창에서 띄움)는 도달 불가로 남음(지우지 않음 · 결정 C 와 같은 별건)
 Get-SurfaceIds	set_fleet_baseline	sh	cys list 에서 surface 번호 모으기 — 윈판에서도 부르는 자리 0 · 맥은 set_fleet_baseline 인라인
 Set-FleetBaseline	set_fleet_baseline	sh	같은 일(못 찍으면 판정 안 함)
 Get-LiveRoles	live_roles	sh	같은 일(기준선 뒤 새 자리만)
@@ -126,6 +150,7 @@ Confirm-ChildSeat	confirm_child_seat	sh	같은 일(Return 3회·유예·90초)
 Send-ChildStallEvidence	child_stall_evidence	sh	깨지 않은 자식 자리 화면 끝 40줄 마스킹 → reason=stall 증거 · 자리마다 한 번 · 부르는 자리 = 자식 실패 뒤(ps1 3682 ↔ sh confirm_child_seats)
 Confirm-ChildSeats	confirm_child_seats	sh	같은 일 · 단 윈판의 진행 전송(awaken:child-*)은 맥에 없음
 Get-MasterMarkPath	master_mark_path	sh	같은 일
+Move-OldRound	archive_old_round	sh	재설치로 다시 쓰는 install-jarvis/_round 의 옛 잔재를 _round/archive/<시각>/ 로 옮김(삭제 0 · 기존 archive 보존 · 없으면 「_round 없음」 한 줄) · 자리 열기 전(master 판정 180d303e = B). TICKET=installer-0329(2026-09-21)
 Clear-MasterMark	clear_master_mark	sh	같은 일(기록 줄 글자 동일)
 Test-MasterMark	test_master_mark	sh	같은 일(기준선-5초 · stat -f %m)
 Get-MasterAssistantCount	master_assistant_count	sh	같은 일(자식 판정과 같은 세션 기록 읽기)
@@ -138,6 +163,7 @@ Write-MasterRequestCard	master_request_card	sh	같은 일(카드 글자 동일)
 Get-MasterStateNow	master_state_now	sh	같은 일((recheck) 기록)
 Write-MasterUnknownCard	master_unknown_card	sh	같은 일
 Set-FleetNeedsMaster	set_fleet_needs_master	sh	같은 일
+Invoke-StepFleet	invoke_step_fleet	sh	[10/10] 시작·끝 전송을 한 곳에 모은 감싸개(되돌아가는 길이 여럿이라 각 return 에 붙이면 하나를 빠뜨린다). TICKET=installer-0328
 Step-Fleet	step_fleet	sh	[10/10] 같은 일(기준선·자동 각성 대기 7분·역할 대기·자식 확인·master 각성 확인·끝 증거) · mac-parity-t1-core(2026-09-16)로 맥도 자동 각성·master 각성 확인 동형화(옛 「맥에 없음·처음부터 사람 카드」서술은 그 뒤로 낡음) · TICKET=installer-0325 c9(2026-09-18)로 대기 4분→7분 동형 연장
 Read-RemoteHelpStream	remote_help_http	sh	응답 본문 읽기 — 맥은 curl -o 로 파일에 받음
 Invoke-RemoteHelpHttp	remote_help_http	sh	같은 일(20초 상한 · ack·close 출처 헤더 · 000=닿지 못함) · 단 윈판의 /attach 헤더는 맥에 없음
@@ -203,3 +229,7 @@ Send-Attachment	help_attach	sh	같은 일 · remote_help_http 첨부에도 출�
 Send-FailAttachments	help_fail_attachments	sh	같은 순서 · console_text·login_window_png 는 맥에 없어 까닭 한 줄씩 기록
 Disable-ConsoleQuickEdit	-	na	윈도우 콘솔 「빠른 편집」(클릭 시 출력 정지) 끄기 — 맥 터미널에는 해당 모드가 없음
 Restore-ConsoleQuickEdit	-	na	윈도우 콘솔 빠른 편집 되돌리기 — 맥 터미널에는 해당 개념 없음
+Get-RotateAliveRefs	rotate_alive_refs	sh	cys list 글 → 살아 있는(exited=false) 자리 번호들 — rotate 기준선·관측의 「옛 자리가 사라졌나」 축. TICKET=installer-0331(2026-09-21)
+Get-RotateRoleRefs	rotate_role_refs	sh	cys list 글 → 살아 있는 역할 자리 번호들(역할 빈칸·-·none 제외) — 관측 성공의 「역할 자리 ≥3」 축. TICKET=installer-0331(2026-09-21)
+Get-RotateObserveVerdict	rotate_observe_verdict	sh	순수 — ok · no:pid · no:old-seats · no:role-seats(흉내 동형 축 · 여덟 입력 글자까지 같다) · 성공 = pid 바뀜 + 기준선 자리 0 + 역할 자리 ≥3. TICKET=installer-0331(2026-09-21)
+Invoke-RotateObserve	rotate_observe	sh	세 축(ping·데몬 pid·cys list · 각 상한 5초 · 무기동)을 한 번 재 판정을 돌려주고 bootstrap.log 에 남긴다(주기 = 1줄 · 마지막 = ①②③ 3줄 + verdict). 드레인 뒤(단계 2 이후)에만 주기 관측 · 성공이면 rotate 를 끊고 observed-ok · 상한 180 뒤 1회 더. TICKET=installer-0331(2026-09-21)

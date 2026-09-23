@@ -36,7 +36,8 @@ EMU="$HERE/v0316-emu"
 BASE="$(mktemp -d -t v0316-emu)" || exit 2
 BASE="$(cd "$BASE" && pwd -P)" || exit 2
 # 흉내가 띄운 대기 프로세스는 이름표(대기 초 수)로 가른다 — 끝나면 남은 것을 치운다
-cleanup() { pkill -f 'sleep 30(11|22|33)' 2>/dev/null; rm -rf "$BASE"; }
+# ⚠정리·계수는 이 실행의 폴더($BASE)가 든 프로세스만 — 전역 이름은 다른 worktree 의 동시 실행을 끈다(dbg-D5 F8 · 가짜 이름 = $SB/emu-sleep).
+cleanup() { pkill -f "$BASE/" 2>/dev/null; rm -rf "$BASE"; }
 trap cleanup EXIT
 pass=0; fail=0
 ok()  { pass=$((pass+1)); printf '  ok   %s\n' "$1"; }
@@ -46,7 +47,7 @@ t() { if [ "$1" -eq 0 ]; then ok "$2"; else bad "$2" "$3"; fi; }
 run_ps() { perl -e 'alarm shift; exec @ARGV' 150 "$PW" -NoProfile -File "$@"; }
 has() { grep -qE -- "$2" "$1"; }
 cnt() { grep -cE -- "$2" "$1" 2>/dev/null; }
-left() { pgrep -f "$1" 2>/dev/null | wc -l | tr -d ' '; }
+left() { pgrep -f "$BASE/.*$1" 2>/dev/null | wc -l | tr -d ' '; }
 
 echo "== ① [2/10] 상한 → 진단 → 직접 받기 =="
 for s in hang5 step5ok mismatch av; do

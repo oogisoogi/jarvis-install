@@ -149,7 +149,7 @@ run_ps "$EMU/cys.ps1" -Src "$PS" -Scenario settings -Sb "$SB" >"$SB/out.txt" 2>"
 L="$SB/home/install-jarvis/bootstrap.log"
 has "$L" 'TEST channel=stable skip=True'
 t $? "[stable 설정] settings.json 에 autoUpdatesChannel=stable 을 심는다(윈)" "$(grep -a 'TEST channel' "$L" | tail -1) (err: $(head -c 160 "$SB/err.txt"))"
-grep -vE '^[[:space:]]*#' "$PS" | grep -qF -e "-ArgumentList @('-NoProfile', '-Command', \"& ([scriptblock]::Create((irm '\$ClaudeInstallUrl' -UseBasicParsing))) \$ClaudeChannel\")" && grep -qE "^\\\$ClaudeChannel +=[[:space:]]+'stable'" "$PS" && grep -vE '^[[:space:]]*#' "$PS" | grep -qF "(\$ClaudeDirectBaseUrl + '/' + \$ClaudeChannel)" && grep -vE '^[[:space:]]*#' "$PS" | grep -qF -e "-ArgumentList 'install',\$ClaudeChannel"
+grep -vE '^[[:space:]]*#' "$PS" | grep -qF -e "([scriptblock]::Create((irm '\$ClaudeInstallUrl' -UseBasicParsing))) \$ClaudeChannel" && grep -qE "^\\\$ClaudeChannel +=[[:space:]]+'stable'" "$PS" && grep -vE '^[[:space:]]*#' "$PS" | grep -qF "(\$ClaudeDirectBaseUrl + '/' + \$ClaudeChannel)" && grep -vE '^[[:space:]]*#' "$PS" | grep -qF -e "-ArgumentList 'install',\$ClaudeChannel"
 t $? "[stable 설치] 윈 설치기 세 자리(공식 설치기 인자 · 직접 받기 판본 자리 · install 하위명령)가 stable 채널을 쓴다" "한 자리 이상이 latest 로 남았다"
 SHF="$(cd "$DIR" && pwd)/bootstrap.sh"
 [ "$(grep -vE '^[[:space:]]*#' "$SHF" | grep -cF '| bash -s "$CLAUDE_CHANNEL" )')" = "2" ] && grep -qE '^CLAUDE_CHANNEL="stable"$' "$SHF" && grep -vE '^[[:space:]]*#' "$SHF" | grep -qF 'plutil -replace autoUpdatesChannel -string "$CLAUDE_CHANNEL"'

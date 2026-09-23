@@ -15,7 +15,7 @@
 #   powershell -File bootstrap.ps1 -DryRun         판정은 다 하되 바깥을 바꾸는 행위는 하지 않는다
 #
 # 배포 한 줄 (사람이 붙여넣는 것 — cmd 창과 PowerShell 창 어느 쪽에서도 이 명령이 그대로 돈다)
-#   powershell -NoProfile -ExecutionPolicy Bypass -Command "irm https://jarvis.godmeyou.kr/install/bootstrap.ps1 -OutFile ([Environment]::GetFolderPath('UserProfile')+'\install-jarvis.ps1'); powershell -ExecutionPolicy Bypass -File ([Environment]::GetFolderPath('UserProfile')+'\install-jarvis.ps1')"
+#   powershell -NoProfile -ExecutionPolicy Bypass -Command "try { Remove-Item ([Environment]::GetFolderPath('UserProfile')+'\install-jarvis.ps1') -ErrorAction SilentlyContinue; irm https://jarvis.godmeyou.kr/install/bootstrap.ps1 -OutFile ([Environment]::GetFolderPath('UserProfile')+'\install-jarvis.ps1') -ErrorAction Stop; powershell -ExecutionPolicy Bypass -File ([Environment]::GetFolderPath('UserProfile')+'\install-jarvis.ps1') } catch { Write-Host '설치 파일을 받지 못했습니다. 인터넷 연결을 확인하신 뒤 이 줄을 다시 붙여 넣어 주십시오.'; exit 1 }"
 #   -ExecutionPolicy Bypass 가 없으면 윈도우 기본값(Restricted)에서 스크립트가 로드되지 않는다.
 #   왜 이 모양인가 (구판은 cmd 창에 붙여넣으면 안 돌았다)
 #     - 구판은 맨 앞이 irm 이라 cmd 창에서는 그런 명령이 없다는 오류가 난다.
@@ -57,7 +57,10 @@ function Test-Ps32OnWin64([bool]$IsOsX64, [bool]$IsProcX64) {
     return ($IsOsX64 -and (-not $IsProcX64))
 }
 function Build-Ps32RelaunchArgs([string]$ScriptPath, [bool]$DetectOnlyFlag, [bool]$DryRunFlag) {
-    $a = @('-NoProfile', '-ExecutionPolicy', 'Bypass', '-File', $ScriptPath)
+    # 🔴경로는 큰따옴표로 감싸서 넘긴다(dbg-D5 F7 · TICKET=installer-0335) — Start-Process 는 배열 원소를 따옴표 없이 공백으로
+    #   이어 붙인다. 사용자 폴더 이름에 공백이 있으면(C:\Users\홍 길동) -File 경로가 쪼개져 다시 연 창이 파일을 못 찾는다.
+    #   윈도우 파일 이름에는 큰따옴표가 들어갈 수 없으므로 감싸기만으로 충분하다(tests/d5-f7-relaunch-space-path.sh).
+    $a = @('-NoProfile', '-ExecutionPolicy', 'Bypass', '-File', ('"' + $ScriptPath + '"'))
     if ($DetectOnlyFlag) { $a += '-DetectOnly' }
     if ($DryRunFlag) { $a += '-DryRun' }
     return $a
@@ -84,10 +87,18 @@ $ReportHead = '[자비스] 환경 보고 v0'   # ④단 첫 응답의 고정 첫
 
 # ── 핀 (외부 URL은 이 두 줄이 전부다) ─────────────────────────────
 $ClaudeInstallUrl = 'https://claude.ai/install.ps1'
+# 🔴공식 설치기가 **실제로 파일을 받아 오는 자리**다(설치기 0.3.28 · 2026-09-21).
+#   09-20 22:1x 깨끗한 기계 3대(MT3G4UWR·JV9PAQ5X·2JZH3G77)에서 [2/10] 이 1초 만에 끝나고 파일이 안 생겼다.
+#   그때 1-7 망 점검은 claude.ai 와 우리 릴리스 두 곳만 봤다 — **정작 받아 오는 이 자리는 안 봤다.**
+#   답은 판번 한 줄(예: 2.1.278)이다 — 200 만으로는 로그인 담벼락·오류 쪽 200 과 갈리지 않는다.
+$ClaudeDownloadProbeUrl = 'https://downloads.claude.ai/claude-code-releases/stable'
 # 🔴v0.3.18 — 참가자 클로드는 **stable 채널**로 깔고 그 채널에 묶는다(자동 판올림으로 참가자 화면이 수업 중에 바뀌지 않게).
 #   공식 문서(code.claude.com/docs/en/setup · 2026-09-15 확인): 설치기는 `stable` 인자를 받고 「설치 때 고른 채널이 자동 판올림의 기본값이 된다」 ·
 #   설정 열쇠 = settings.json 의 "autoUpdatesChannel": "stable"(약 1주 늦고 큰 퇴행 판을 건너뜀). ⇒ 설치 인자 + 설정 열쇠 둘 다.
 $ClaudeChannel    = 'stable'
+# 「설치기가 시작하자마자 죽었다」의 경계(초) — 09-20 실기 3대는 전부 1초였다. 32비트 갈래(J-PS32-01)와 같은 값을 쓴다.
+$ClaudeInstallFastExitSec = 3
+$script:NetFailed = $false   # 1-7 네트워크 점검에 실패 행이 있었나(v0.3.32 · [2/10] J-DL-07 갈래가 읽는다)
 $CysSiteUrl       = 'https://github.com/oogisoogi/cys-ro/releases/latest'   # 손으로 받을 때의 자리 = 우리 릴리스 페이지
 
 # ── 자리 ──────────────────────────────────────────────────────────
@@ -114,17 +125,19 @@ $DlDir         = Join-Path $JarvisHome 'dl'
 #   $CysDisplayName · $CysVersion · $CysWinFile(자산 이름이 바뀌면) · $CysWinBytes · $CysWinSha256 — 값은 발행 뒤 SHA256SUMS.txt 와 대조(tests/win-pin-release.sh).
 #   화면 머리글은 이 값으로 「<이름> <판> · 설치 도우미 <설치기 판>」 을 찍는다(설치기 판 = $InstallerVersion · 별도 semver).
 $CysDisplayName = 'cysr'
-$CysVersion     = '1.0.2'
+# 0.3.34: 핀 = 1.1.5 드래프트 발행 자산 실측값(2026-09-23 · TICKET=v115-installer · 1.1.4 미발행 승계 · 9차 절단 fd356c06)
+# 0.3.35: 핀 값 = 1.1.5 11차 절단 발행 자산 실측값(태그 커밋 526325bf · SUMS 418a1b6e · 11차 재핀에서 채움) · 바뀐 것 = 맥: 저희 자산 404 의 원작자 판 폴백 제거(J-DL-05 · F1) · 재설치가 「지웁니다」를 묻지 않음(F2) · [5/10]~[8/10] 막힘 뒤 각성 금지(F3) / 윈: 배포 한 줄이 받기 실패면 옛 파일을 안 돌림(F5) · [2/10] 빠른 종료 판정 수리(F6) · 32비트 창 재실행 경로 인용(F7) · 끝맺음 오류 가르기 캐시(F9) · [5/10]~[8/10] 막힘 뒤 각성 금지(F3 짝 · r2 결정 A) / 양쪽: 코드 없는 실패 끝에도 실패 이벤트(F10①) · 맥 407 즉시 끝(F10③) · TICKET=installer-0335 dbg-D5
+$CysVersion     = '1.1.5'
 $CysDownloadDir = "https://github.com/oogisoogi/cys-ro/releases/download/v${CysVersion}/"
-# ✅아래 세 값 = v1.0.2 발행(2026-09-18 11:23 · Latest) 뒤 **실측으로 채웠다**(installer-0325-r3 · 앞 판 값(v1.0.1)을 대신한다).
-#   출처 = 릴리스 SHA256SUMS.txt(그 파일 자신의 sha256 = 17ad2595213ae3868fb56820cd6c7aabca2d66f9c7130d618e4cc57d38f4897e) · 크기는 릴리스 자산 목록과 내려받은 파일 양쪽에서 쟀다.
+# ✅아래 세 값 = v1.1.5 드래프트 릴리스(2026-09-24 · 11차 절단 · 태그 커밋 526325bf) 의 자산에서 **실측으로 채웠다**(11차 재핀 · 10차 값(9d695ec8)을 대신한다).
+#   출처 = 릴리스 SHA256SUMS.txt(그 파일 자신의 sha256 = 418a1b6e0b45433c56299ad2eca35456b75c029dbdc125feb04e290f332750bd · 13행) · 크기·지문은 릴리스 API 자산 digest·받은 실물과 대조(3/3 일치).
 #   ⚠판을 올릴 때 이 세 값을 그대로 두면 받기가 반드시 실패한다 — 대조는 tests/win-pin-release.sh 가 릴리스를 때려서 진다.
 # ⚠파일 이름 줄은 **선언 한 줄·뒤에 아무것도 없어야** 한다(tests/win-pin-release.sh 가 줄 끝까지 맞춰 읽는다).
 #   `${CysVersion}` 를 그대로 두는 것이 정본이다 — 판을 올릴 때 이름이 함께 따라 오르고, 뮤턴트 M508 이 그 따라오름을 잰다.
-#   지금 값은 풀면 cysr_1.0.2_x64-setup.exe = 릴리스 자산 이름과 글자 그대로 같다.
+#   지금 값은 풀면 cysr_1.1.5_x64-setup.exe = 릴리스 자산 이름과 글자 그대로 같다.
 $CysWinFile     = "cysr_${CysVersion}_x64-setup.exe"
-$CysWinBytes    = 140031327
-$CysWinSha256   = '9e54bef7449a1762adca97aff5ffe7ecd21137ce08a7c2c0279af2e6367afb1c'   # 릴리스 SHA256SUMS.txt 의 줄
+$CysWinBytes    = 140687576
+$CysWinSha256   = '66343d9f8be10c7c2b287032721c030272f8325b72e7c4a8b4190af076af5d49'   # 릴리스 SHA256SUMS.txt 의 줄
 $CysDownloadUrl = $CysDownloadDir + $CysWinFile
 
 $LoginPollInterval = 2     # 초 — 승인 프로세스가 끝난 뒤 로그인을 다시 확인하는 간격
@@ -601,6 +614,7 @@ $HelpWays = @{
     'J-UNK-00'   = @('컴퓨터를 한 번 다시 시작하신 뒤 다시 실행해 주십시오.')
     'J-DL-03'    = @('컴퓨터를 한 번 다시 시작하신 뒤 새 창에서 다시 실행해 주십시오.')
     'J-DL-04'    = @('휴대폰 핫스팟 같은 다른 인터넷으로 연결하신 뒤 다시 실행해 주십시오.')
+    'J-DL-07'    = @('클로드를 내려받는 서버에 닿지 못했습니다.', '휴대폰 핫스팟 같은 다른 인터넷으로 연결하신 뒤 다시 실행해 주십시오.', '회사·학교 망이면 그 망이 막아 둔 것일 수 있습니다.')
 }
 $HelpDirectCodes = @('J-DL-05')   # 다른 방법이 없는 코드 = 2회째부터 곧바로 담당자 안내
 $script:HelpStage      = 1
@@ -771,6 +785,12 @@ $script:ClosingDone = $false
 #   ⇒ 오류가 난 자리(스크립트 · 줄 · 칸)를 감싸는 가장 작은 명령을 구문 트리에서 찾아, 그 명령의 ErrorAction 값과 오류 흐름 돌리기를 본다.
 #   ⚠구문 트리를 못 얻거나 자리를 못 찾으면 「조용하지 않음」이다 — 앞 판처럼 참고로 적는다(모르는 것을 지우지 않는다).
 $script:QuietAstCache = @{}
+# 🔴0.3.35(dbg-D5 F9 · TICKET=installer-0335): 명령 목록(FindAll)은 파일마다 **한 번만** 뜨고, 판정은 오류 자리(파일·줄·칸)마다 한 번만 한다.
+#   앞 판은 오류 기록 1건마다 구문 트리 전체를 새로 훑었고 끝맺음이 그것을 두 번(조용/그냥) 불렀다 — 기록 250건이면
+#   약 250×2×0.28초(이 맥 pwsh 7 실측 1회 277ms) ≈ 2분 동안 끝맺음이 멈춘 것처럼 보였다(tests/d5-f9-closing-error-scan-cost.sh).
+#   판정은 자리에만 달렸으므로(같은 자리 = 같은 줄 글자·같은 감싸는 명령) 자리로 기억해도 값이 바뀌지 않는다.
+$script:QuietCmdCache = @{}
+$script:QuietHitCache = @{}
 function Test-QuietErrorRecord($e) {
     $ii = $null
     try { $ii = $e.InvocationInfo } catch { }
@@ -786,8 +806,18 @@ function Test-QuietErrorRecord($e) {
     }
     $ast = $script:QuietAstCache[$file]
     if (-not $ast) { return $lineQuiet }
+    $spot = $file + '|' + $ln + '|' + $col
+    if ($script:QuietHitCache.ContainsKey($spot)) { return $script:QuietHitCache[$spot] }
+    if (-not $script:QuietCmdCache.ContainsKey($file)) {
+        $script:QuietCmdCache[$file] = @($ast.FindAll({ param($n) $n -is [System.Management.Automation.Language.CommandAst] }, $true))
+    }
+    $verdict = Test-QuietAstSpot $script:QuietCmdCache[$file] $ln $col $lineQuiet
+    $script:QuietHitCache[$spot] = $verdict
+    return $verdict
+}
+function Test-QuietAstSpot($cmds, [int]$ln, [int]$col, [bool]$lineQuiet) {   # 오류 자리를 감싸는 가장 작은 명령부터 바깥으로 — 조용한 확인인가
     $hit = $null
-    foreach ($c in $ast.FindAll({ param($n) $n -is [System.Management.Automation.Language.CommandAst] }, $true)) {
+    foreach ($c in $cmds) {
         $x = $c.Extent
         $afterStart = ($ln -gt $x.StartLineNumber) -or ($ln -eq $x.StartLineNumber -and $col -ge $x.StartColumnNumber)
         $beforeEnd  = ($ln -lt $x.EndLineNumber) -or ($ln -eq $x.EndLineNumber -and $col -le $x.EndColumnNumber)
@@ -840,7 +870,8 @@ function Write-ClosingNote {
         if ($quietErr.Count -gt 0) { Write-Log ('unexpected end: skipped ' + $quietErr.Count + ' quietly handled check error(s)') }
         if ($script:LoginStage) { Write-Log ('unexpected end: last login stage = ' + $script:LoginStage) }
         # 코드가 비면 원격 해결(Invoke-RemoteHelp)이 보고를 보내지 않는다 ⇒ 설치 모드·깨우기 전의 끝만 「분류 못 함」으로 채운다.
-        if ((-not $script:JCode) -and ($Mode -eq 'full') -and (-not $script:ReachedWake)) { $script:JCode = 'J-UNK-00'; Write-Log 'jcode J-UNK-00 unexpected end' }
+        # 0.3.35(dbg-D5 F10 ①): 채운 코드를 진행 이벤트로도 보낸다 — 앞 판은 여기서 코드만 채우고 실패 이벤트는 0 이었다(운영이 셀 수 없음).
+        if ((-not $script:JCode) -and ($Mode -eq 'full') -and (-not $script:ReachedWake)) { $script:JCode = 'J-UNK-00'; Write-Log 'jcode J-UNK-00 unexpected end'; Send-Progress (Get-CurrentStep) 'fail' $null 'J-UNK-00' $null }
     }
     $next = $script:NextStep
     Say ''
@@ -893,10 +924,10 @@ function Write-ClosingNote {
 # ⚠아래 두 줄은 사이트가 게시하는 명령과 **글자까지 같아야 한다** — checks.ps1 이 아니라
 #   checks.sh 가 머리글의 한 줄과 이 상수의 동일성을 잰다(둘이 갈리면 사람이 복사한 것이 달라진다).
 $JarvisRerunBootstrap = @'
-powershell -NoProfile -ExecutionPolicy Bypass -Command "irm https://jarvis.godmeyou.kr/install/bootstrap.ps1 -OutFile ([Environment]::GetFolderPath('UserProfile')+'\install-jarvis.ps1'); powershell -ExecutionPolicy Bypass -File ([Environment]::GetFolderPath('UserProfile')+'\install-jarvis.ps1')"
+powershell -NoProfile -ExecutionPolicy Bypass -Command "try { Remove-Item ([Environment]::GetFolderPath('UserProfile')+'\install-jarvis.ps1') -ErrorAction SilentlyContinue; irm https://jarvis.godmeyou.kr/install/bootstrap.ps1 -OutFile ([Environment]::GetFolderPath('UserProfile')+'\install-jarvis.ps1') -ErrorAction Stop; powershell -ExecutionPolicy Bypass -File ([Environment]::GetFolderPath('UserProfile')+'\install-jarvis.ps1') } catch { Write-Host '설치 파일을 받지 못했습니다. 인터넷 연결을 확인하신 뒤 이 줄을 다시 붙여 넣어 주십시오.'; exit 1 }"
 '@
 $JarvisRerunReinstall = @'
-powershell -NoProfile -ExecutionPolicy Bypass -Command "irm https://jarvis.godmeyou.kr/install/reinstall.ps1 -OutFile ([Environment]::GetFolderPath('UserProfile')+'\reinstall-jarvis.ps1'); powershell -ExecutionPolicy Bypass -File ([Environment]::GetFolderPath('UserProfile')+'\reinstall-jarvis.ps1')"
+powershell -NoProfile -ExecutionPolicy Bypass -Command "try { Remove-Item ([Environment]::GetFolderPath('UserProfile')+'\reinstall-jarvis.ps1') -ErrorAction SilentlyContinue; irm https://jarvis.godmeyou.kr/install/reinstall.ps1 -OutFile ([Environment]::GetFolderPath('UserProfile')+'\reinstall-jarvis.ps1') -ErrorAction Stop; powershell -ExecutionPolicy Bypass -File ([Environment]::GetFolderPath('UserProfile')+'\reinstall-jarvis.ps1') } catch { Write-Host '설치 파일을 받지 못했습니다. 인터넷 연결을 확인하신 뒤 이 줄을 다시 붙여 넣어 주십시오.'; exit 1 }"
 '@
 $script:ShowRerun = $false
 function Get-RerunCmd {
@@ -1011,6 +1042,35 @@ function Get-CysVersionLine {
 #   몸통  = 지금 실행 파일이 있다
 #   명령  = 이 창에서 부를 수 있다
 # 설치 목록만 보고 「있다」고 판정하면 안 된다. 지난 설치가 끝까지 못 간 컴퓨터에서 실제로 어긋난다.
+# 받는 자리 점검(1-7)의 답을 사람 말로 — 「안 쟀다」와 「못 닿았다」를 가른다.
+function Get-DlProbeWords {
+    switch ($script:DlProbe) {
+        'ok'   { return '설치 시작 전에는 닿았습니다(그 사이에 끊겼을 수 있습니다).' }
+        'bad'  { return '답은 왔지만 판번이 아니었습니다 — 회사·학교 망의 안내 화면일 수 있습니다.' }
+        'fail' { return '닿지 못했습니다 — 이 자리가 막혀 있습니다.' }
+        default { return '재지 못했습니다.' }
+    }
+}
+$script:ClaudeInstallLog = ''
+# 자식 설치기가 남긴 글자의 꼬리를 화면과 환경 보고 양쪽에 붙인다(20줄) — 없으면 없다고 적는다.
+function Get-ClaudeInstallLogTail([int]$N) {
+    if (-not $script:ClaudeInstallLog) { return @() }
+    try {
+        if (-not (Test-Path -LiteralPath $script:ClaudeInstallLog)) { return @() }
+        return @(Get-Content -LiteralPath $script:ClaudeInstallLog -Tail $N -ErrorAction Stop)
+    } catch { return @() }
+}
+function Show-ClaudeInstallLogTail {
+    $tail = @(Get-ClaudeInstallLogTail 20)
+    if ($tail.Count -eq 0) {
+        Say '     설치기가 남긴 글자: 없습니다(한 줄도 적히지 않았습니다).'
+        Add-ReportLines @('', '## [2/10] 클로드 설치기가 남긴 글자', '- 없습니다(한 줄도 적히지 않았습니다).')
+        return
+    }
+    Say '     설치기가 마지막에 한 말입니다:'
+    foreach ($ln in $tail) { if (([string]$ln).Trim()) { Say ('       ' + (Redact ([string]$ln))) } }
+    Add-ReportLines (@('', '## [2/10] 클로드 설치기가 남긴 글자(마지막 20줄)') + @($tail | ForEach-Object { '- ' + (Redact ([string]$_)) }))
+}
 function Test-CysBody {
     $reg = $null
     try {
@@ -1385,7 +1445,23 @@ function Invoke-DetectStage1 {
             }
         }
     }
-    Add-Row '1-7' '네트워크(공식 2곳)' $netVal $netEnum '연결 성립만 본다 · 본문을 판정에 안 쓴다'
+    # 🔴받는 자리(downloads.claude.ai)는 **본문까지** 본다 — 여기만 판정 축이 다르다(0.3.28).
+    #   까닭: 위 두 곳은 「나갈 수 있는가」를 재지만 이 자리는 「받아 올 수 있는가」를 잰다.
+    #   담벼락·프록시는 200 에 안내 문서를 실어 보낸다 ⇒ 판번 한 줄이 아니면 통과로 세지 않는다.
+    $script:DlProbe = 'unknown'
+    try {
+        $dr = Invoke-WebRequest -Uri $ClaudeDownloadProbeUrl -TimeoutSec 8 -UseBasicParsing -ErrorAction Stop
+        $dtxt = ([string]$dr.Content).Trim()
+        if (([int]$dr.StatusCode -eq 200) -and ($dtxt -match '^[0-9]+\.[0-9]+\.[0-9]+')) {
+            $script:DlProbe = 'ok'; $netVal += ($ClaudeDownloadProbeUrl + '=' + $dtxt + ' ')
+        } else {
+            $script:DlProbe = 'bad'; $netVal += ($ClaudeDownloadProbeUrl + '=판번이 아닌 답 '); $netEnum = 'failed'
+        }
+    } catch {
+        $script:DlProbe = 'fail'; $netVal += ($ClaudeDownloadProbeUrl + '=실패 '); $netEnum = 'failed'
+    }
+    Add-Row '1-7' '네트워크(공식 3곳)' $netVal $netEnum '앞 두 곳은 연결 성립만 · 받는 자리는 판번 한 줄까지 본다'
+    $script:NetFailed = ($netEnum -eq 'failed')
 
     #   사람이 읽는 표에서 번호가 튀면 빠진 줄이 있다고 읽는다. 판정에는 영향이 없는 소건이지만 그래서 고친다.
     #   설치 목록(레지스트리)은 프로그램을 가리키는데 그 자리에 실행 파일이 없다. 이름만 다르지 같은 결함이다.
@@ -1460,7 +1536,9 @@ function Write-Report {
     #   실제로는 4번이었다(로그인 · 폴더 신뢰 · bypass 동의 · 렌더러). 이 축은 언제나 「목표 달성」 쪽으로 틀린다.
     #   ⇒ 선언값과 관측값을 두 줄로 갈라 적고, 관측값은 사람이 채우는 빈칸으로 둔다.
     [void]$lines.Add("- 사람 손 (프로그램이 센 것): **$($script:HumanHands)번** — 미리 아는 자리만 셉니다.")
-    [void]$lines.Add('- 사람 손 (실제로 누른 횟수): ____번  ← **직접 적어 주십시오.** 비어 있으면 「0」이 아니라 「세지 못했다」는 뜻입니다.')
+    #   v0.3.29(TICKET=installer-0329 ④ · 윈 실기 09-21 14:2x): 이 칸이 빈칸이라 자리의 master 가 「세지 못했다」로 보고했다 —
+    #   설치 창 [9/10] 에 찍힌 수와 **같은 값**을 적는다(이 보고는 [9/10] 바로 앞에 쓰인다 · 사람에게 채우라고 하지 않는다).
+    [void]$lines.Add("- 사람 손 (실제로 누른 횟수): **$($script:HumanHands)번** — 설치 창 [9/10] 에 나온 수와 같습니다.")
     if ($script:StepLog.Count -gt 0) {
         [void]$lines.Add('')
         [void]$lines.Add('**지나온 단계** (화면에서 지워졌을 수 있어 여기 남깁니다)')
@@ -1854,8 +1932,19 @@ function Step-InstallClaude {
     #   ⚠자식의 화면 출력은 그대로 이 창에 흐르게 둔다(리다이렉트하지 않는다) — 「글자가 주르륵」이
     #     정상이라고 바로 위에서 말했고, 리다이렉트는 자식 안에서 공식 설치기가 쓰는 명령을 흔든다.
     try {
+        # 🔴자식이 한 말을 파일로도 남긴다(0.3.28) — 09-20 22:1x 실기 3대에서 [2/10] 이 1초에 끝났는데
+        #   **자식이 무슨 말을 했는지 기록이 0** 이라 원인을 영영 못 골랐다.
+        #   ⛔리다이렉트(-RedirectStandardOutput)는 쓰지 않는다 — 바로 위 주석대로 화면 흐름이 끊기고
+        #     자식 안의 공식 설치기가 흔들린다. Start-Transcript 는 **화면으로도 흘려보내면서** 같은 글자를 파일에 적는다.
+        $ClaudeInstallLog = Join-Path $JarvisHome 'claude-install.log'
+        $script:ClaudeInstallLog = $ClaudeInstallLog
+        $logQuoted = $ClaudeInstallLog -replace "'", "''"
+        $childCmd = "try { Start-Transcript -Path '$logQuoted' -Force | Out-Null } catch { }; " +
+                    "try { & ([scriptblock]::Create((irm '$ClaudeInstallUrl' -UseBasicParsing))) $ClaudeChannel } " +
+                    "catch { try { Write-Host ('[claude-install error] ' + (`$_ | Out-String).Trim()) } catch { }; throw } " +
+                    "finally { try { Stop-Transcript | Out-Null } catch { } }"
         $p = Start-Process -FilePath $psExe -NoNewWindow -PassThru -ErrorAction Stop `
-                           -ArgumentList @('-NoProfile', '-Command', "& ([scriptblock]::Create((irm '$ClaudeInstallUrl' -UseBasicParsing))) $ClaudeChannel")
+                           -ArgumentList @('-NoProfile', '-Command', $childCmd)
     } catch {
         Say "[2/10] 실패: $($_.Exception.Message). 인터넷 연결을 확인해 주십시오. 아래 「다시 하시는 법」대로 다시 실행하시면 여기서부터 이어서 갑니다."
         $script:ShowRerun = $true
@@ -1928,7 +2017,22 @@ function Step-InstallClaude {
     } elseif ($null -eq $installRc) {
         Say '[2/10] 설치기가 끝났는데 종료 코드를 읽지 못했습니다 — 숫자 대신 클로드 명령이 답하는지로 판정합니다.'
     } elseif ($installRc -ne 0) {
+        # v0.3.32(TICKET=installer-0332 · master 판정 abb77ec4 · 도움 KW67JGJG 범위 확대): 종료 코드를 읽은 기계도
+        #   파일이 없고 1-7 망 점검에 실패 행이 있으면 같은 원인·같은 처방(J-DL-07 · 다른 인터넷)으로 보낸다 — 앞 판은 일반 「다시 실행」이었다.
+        $rcExe = Join-Path $env:USERPROFILE '.local\bin\claude.exe'
+        if ((-not (Test-Path -LiteralPath $rcExe)) -and $script:NetFailed) {
+            Write-Log ('J-DL-07 by: net-failed rc=' + $installRc)
+            Say "[2/10] 설치기가 오류로 끝났고(종료 코드 $installRc) 파일이 생기지 않았습니다. 처음 점검에서 인터넷 연결이 한 곳 이상 실패했습니다."
+            Write-JCode 'J-DL-07' '클로드를 내려받는 서버에 닿지 못한 것으로 보입니다'
+            Set-NextStepRerun '휴대폰 핫스팟 같은 다른 인터넷으로 연결하신 뒤, 아래 「다시 하시는 법」대로 다시 실행해 주십시오.'
+            Say ('     내려받는 자리 점검 결과: ' + (Get-DlProbeWords))
+            Show-ClaudeInstallLogTail
+            $script:ShowRerun = $true
+            return 4
+        }
         Say "[2/10] 실패 (종료 코드 $installRc). 아래 「다시 하시는 법」대로 다시 실행하시면 여기서부터 이어서 갑니다."
+        # v0.3.32(TICKET=installer-0332 ③ · 도움 KW67JGJG): 이 갈래는 설치기가 한 말을 한 줄도 남기지 않았다 — 다음 진단이 추정이 되지 않게 꼬리를 붙인다.
+        Show-ClaudeInstallLogTail
         $script:ShowRerun = $true
         return 4
     }
@@ -1948,7 +2052,9 @@ function Step-InstallClaude {
         $bin = (Join-Path $env:USERPROFILE '.local\bin').TrimEnd('\')
         $inUser = '아니오'
         $u = [Environment]::GetEnvironmentVariable('Path','User')
-        if ($u) { foreach ($p in ($u -split ';')) { if ($p -and ([Environment]::ExpandEnvironmentVariables($p).TrimEnd('\') -ieq $bin)) { $inUser = '예'; break } } }
+        # 🔴루프 변수는 $p 가 아니다(dbg-D5 F6 · TICKET=installer-0335) — $p 는 위에서 띄운 설치기 프로세스다. 같은 이름으로 돌면
+        #   아래 걸린 시간($p.StartTime·ExitTime)이 늘 빈칸이 되어 빠른 종료 갈래(J-PS32-01·J-DL-07)가 죽고 J-PATH-01 로 오진했다.
+        if ($u) { foreach ($pathEntry in ($u -split ';')) { if ($pathEntry -and ([Environment]::ExpandEnvironmentVariables($pathEntry).TrimEnd('\') -ieq $bin)) { $inUser = '예'; break } } }
         $hasExe = if (Test-Path $exe) { '예' } else { '아니오' }
         # 🔴2026-09-17(TICKET=installer-0325 c8): J-PATH-01(처방 = 재시작)로 판정하기 **전에**
         #   「설치기가 3초도 안 돼 끝났고 파일도 안 생겼다」 갈래를 먼저 가른다 — 32비트 PowerShell 에서
@@ -1964,10 +2070,31 @@ function Step-InstallClaude {
             $script:ShowRerun = $true
             return 4
         }
+        # 🔴2026-09-21(설치기 0.3.28): 32비트가 아닌데도 **설치기가 곧바로 죽고 파일이 안 생겼다**면
+        #   재시작(J-PATH-01)은 처방이 아니다 — 그 기계는 받아 오지 못한 것이다(09-20 22:1x 깨끗한 기계 3대).
+        #   ★판정은 「빨리 끝났다」 하나로 하지 않는다: 받는 자리 점검(1-7)이 무엇이라 답했는지를 함께 적어
+        #     사람이 읽는 문장과 다음 판정이 같은 근거를 보게 한다.
+        # 🔴v0.3.32(TICKET=installer-0332 · 도움 KW67JGJG 09-21 23:49 · 같은 기기 09-20 2JZH3G77 · J-PATH-01 2회째):
+        #   걸린 시간을 못 읽은 기계(종료 코드도 못 읽음)는 위 「빨리 끝났다」 판정이 서지 않아 재시작 처방(J-PATH-01)으로 떨어졌다.
+        #   ⇒ 파일이 없고 **1-7 망 점검에 실패 행이 있으면** 걸린 시간과 무관하게 같은 갈래(다른 인터넷으로)로 보낸다.
+        $fastExit = (($null -ne $elapsedSec) -and ($elapsedSec -lt $ClaudeInstallFastExitSec))
+        if (($hasExe -eq '아니오') -and ($fastExit -or $script:NetFailed)) {
+            Write-Log ('J-DL-07 by: ' + $(if ($fastExit) { 'fast-exit' } else { 'net-failed' }) + ' (elapsed=' + $elapsedSec + ' netFailed=' + $script:NetFailed + ')')
+            if ($fastExit) { Say ('[2/10] 설치기가 시작한 지 ' + $ClaudeInstallFastExitSec + '초도 안 돼 끝났고 파일도 생기지 않았습니다.') }
+            else { Say '[2/10] 설치기는 끝났는데 파일이 생기지 않았습니다. 처음 점검에서 인터넷 연결이 한 곳 이상 실패했습니다.' }
+            Write-JCode 'J-DL-07' '클로드를 내려받는 서버에 닿지 못한 것으로 보입니다'
+            Set-NextStepRerun '휴대폰 핫스팟 같은 다른 인터넷으로 연결하신 뒤, 아래 「다시 하시는 법」대로 다시 실행해 주십시오.'
+            Say ("     파일 있음: $hasExe ($(Redact $exe)) · 사용자 PATH 등록: $inUser · 설치기 종료 코드: $rcShown · 설치기 걸린 시간: ${elapsedSec}초")
+            Say ('     내려받는 자리 점검 결과: ' + (Get-DlProbeWords))
+            Show-ClaudeInstallLogTail
+            $script:ShowRerun = $true
+            return 4
+        }
         Say '[2/10] 설치기는 끝났는데 claude 명령이 아직 안 잡힙니다.'
         Write-JCode 'J-PATH-01' '깔렸는데 이 창에서 명령을 찾지 못합니다'
         Set-NextStepRerun 'PowerShell 창을 새로 열고 아래 「다시 하시는 법」대로 다시 실행해 주십시오.'
         Say "     파일 있음: $hasExe ($(Redact $exe)) · 사용자 PATH 등록: $inUser · 설치기 종료 코드: $rcShown"
+        Show-ClaudeInstallLogTail
         Say '     이 화면을 사진으로 남겨 주십시오. PowerShell 창을 새로 열고 아래 「다시 하시는 법」대로 다시 실행하시면 여기서부터 이어서 갑니다.'
         $script:ShowRerun = $true
         return 4
@@ -2190,6 +2317,82 @@ function Add-LoginReport($info) {
     Add-ReportLines (@('', '## [3/10] 로그인 단계에서 본 것') + @($lines | ForEach-Object { '- ' + $_ }))
 }
 
+# ══ 로그인 승계 — 이 기계에 이미 있는 자격증명을 찾아 쓴다 (설치기 0.3.28 · 2026-09-21) ═══════
+#   🔴실기 09-21 07:31: 이미 로그인된 기기(cysr 1.0.2)에서 **크롬 로그인 화면이 다시 떴다**(사람 손 +1).
+#   앞 판이 물어본 자리는 **기본 프로필 하나**뿐이었다 — 그런데 이 설치기 자신이 [8/10] 에서 로그인을
+#   자비스 전용 프로필(~\.cys\claude)로 **옮겨 둔다**. 기본 쪽이 비고 전용 쪽만 차 있는 상태가 실제로 생긴다.
+#   ⇒ 실재하는 후보를 **전부** 물어보고, 어느 하나라도 로그인돼 있으면 기본 프로필로 되가져와 카드를 건너뛴다.
+#   ⚠「추정」으로 끝내지 않기 위해 **무엇을 물었고 각각 무엇이라 답했는지**를 기록·환경 보고에 남긴다 —
+#     다음 윈도우 실기 한 번이면 원인이 확정된다(지금은 이 기계에서 잴 수 없다).
+#   ⚠기본 프로필이 이미 로그인돼 있으면 아무것도 건드리지 않는다(더 새 토큰을 옛 것으로 덮지 않는다 · 맥판과 같은 규율).
+$script:LoginSweep = ''   # 환경 보고·기록에 실리는 한 줄(profile=answer · 쉼표로 이음)
+function Get-LoginProfileCandidates {
+    # 돌려주는 것 = @{ Name = 사람이 읽는 이름; Dir = 설정 폴더('' = 기본 프로필) } 의 목록 · **실재하는 것만**.
+    $out = New-Object System.Collections.ArrayList
+    [void]$out.Add(@{ Name = 'default'; Dir = '' })
+    $iso = Join-Path (Join-Path $env:USERPROFILE '.cys') 'claude'
+    if (Test-Path -LiteralPath $iso) { [void]$out.Add(@{ Name = 'cys'; Dir = $iso }) }
+    if ($env:CLAUDE_CONFIG_DIR -and (Test-Path -LiteralPath $env:CLAUDE_CONFIG_DIR)) {
+        [void]$out.Add(@{ Name = 'env'; Dir = $env:CLAUDE_CONFIG_DIR })
+    }
+    return $out
+}
+function Test-ProfileLoggedIn($exe, [string]$Dir) {
+    # 그 프로필로 한 번 묻는다. 상한·죽이기는 Get-LoginStatusText 가 이미 진다.
+    $save = $env:CLAUDE_CONFIG_DIR
+    $had  = Test-Path env:CLAUDE_CONFIG_DIR
+    try {
+        if ($Dir) { $env:CLAUDE_CONFIG_DIR = $Dir } elseif ($had) { Remove-Item env:CLAUDE_CONFIG_DIR -ErrorAction SilentlyContinue }
+        $a = ''
+        try { $a = Get-LoginStatusText $exe } catch { return 'error' }
+        if ($a -match '"loggedIn"\s*:\s*true')  { return 'yes' }
+        if ($a -match '"loggedIn"\s*:\s*false') { return 'no' }
+        return 'unknown'
+    } finally {
+        if ($had) { $env:CLAUDE_CONFIG_DIR = $save } else { Remove-Item env:CLAUDE_CONFIG_DIR -ErrorAction SilentlyContinue }
+    }
+}
+# 후보를 전부 물어보고, 기본 프로필이 비어 있으면 로그인된 프로필의 자격증명 파일을 기본 쪽으로 되가져온다.
+#   돌려주는 값 = $true(기본 프로필이 이제 로그인 상태다) · $false(아니다).
+#   ⚠윈도우의 자격증명은 **파일**이다(.credentials.json) — 맥의 키체인과 다르다(맥판은 copy_login_to_isolated 참조).
+function Restore-LoginFromProfiles($exe) {
+    $marks = New-Object System.Collections.ArrayList
+    $src = ''
+    foreach ($c in (Get-LoginProfileCandidates)) {
+        $ans = Test-ProfileLoggedIn $exe $c.Dir
+        [void]$marks.Add($c.Name + '=' + $ans)
+        if ($ans -eq 'yes') {
+            if (-not $c.Dir) { $script:LoginSweep = ($marks -join ','); Write-Log ('login sweep: ' + $script:LoginSweep + ' -> default already logged in'); return $true }
+            if (-not $src) { $src = $c.Dir }
+        }
+    }
+    $script:LoginSweep = ($marks -join ',')
+    Write-Log ('login sweep: ' + $script:LoginSweep)
+    if (-not $src) { return $false }
+    $from = Join-Path $src '.credentials.json'
+    $toDir = Join-Path $env:USERPROFILE '.claude'
+    $to    = Join-Path $toDir '.credentials.json'
+    if (-not (Test-Path -LiteralPath $from)) {
+        Write-Log ('login carry-back: source file not found (' + (Redact $from) + ') — 이 기계는 파일이 아닌 다른 자리에 두는 판일 수 있다')
+        return $false
+    }
+    try {
+        if (-not (Test-Path -LiteralPath $toDir)) { [void](New-Item -ItemType Directory -Path $toDir -Force -ErrorAction Stop) }
+        Copy-Item -LiteralPath $from -Destination $to -Force -ErrorAction Stop
+    } catch {
+        Write-Log ('login carry-back failed: ' + $_.Exception.Message)
+        return $false
+    }
+    $after = Test-ProfileLoggedIn $exe ''
+    $script:LoginSweep = $script:LoginSweep + ',carry-back=' + $after
+    Write-Log ('login carry-back: ' + (Redact $from) + ' -> ' + (Redact $to) + ' · default=' + $after + ' (되돌리기 = 옮긴 파일 삭제)')
+    if ($after -eq 'yes') {
+        Say '     이 컴퓨터에 이미 있던 로그인을 그대로 씁니다 — 로그인 화면을 열지 않습니다.'
+        return $true
+    }
+    return $false
+}
+
 # ⚠이 함수는 값을 돌려주지 않는다 — 결과는 $script:LoginRc 에 둔다(부르는 쪽이 반환값을 받으면 안 된다).
 #   🔴받으면 이 함수 안에서 실행한 벤더 명령의 출력이 화면이 아니라 그 변수로 빨려 들어가, 이 창에서 로그인할 때 코드 입력 칸이 안 뜬다(about_Return · 2026-09-15 규명).
 function Step-Login {
@@ -2212,6 +2415,10 @@ function Step-Login {
         $reauth = ''
         try { $reauth = Get-LoginStatusText $claudeExe } catch { $reauth = '' }
         if ($reauth -match '"loggedIn"\s*:\s*true') { $script:LoggedIn = $true }
+    }
+    # 🔴기본 프로필이 「아니다」라고 답했을 때가 승계가 필요한 자리다(위 Restore-LoginFromProfiles 머리 주석).
+    if ((-not $script:LoggedIn) -and ($Mode -ne 'dry') -and (Get-Command claude -ErrorAction SilentlyContinue) -and (Test-ClaudeAuthCmd)) {
+        if (Restore-LoginFromProfiles $claudeExe) { $script:LoggedIn = $true }
     }
     if ($script:LoggedIn) { Say '[3/10] 이미 로그인돼 있습니다 — 건너뜁니다.'; return }
     if ($Mode -eq 'dry')  { Say "[3/10] (dry-run) 로그인 창을 열지 않았습니다. 승인 대기 상한 $LoginWaitTimeout 초(벽시계) · 끝난 뒤 확인 $LoginConfirmTries 회($LoginPollInterval 초 간격) · $LoginCheckpointSec 초에 한 번 점검."; return }
@@ -2661,6 +2868,45 @@ function Set-ClaudeSettings {
 # 동료 노드는 자비스 전용 자리로 뜨는데, 로그인 정보는 **개인 자리**에 저장된다(윈도우).
 # 그래서 그 자리에는 로그인이 없어 동료들이 전부 「로그인하십시오」에서 선다(2026-09-05 실측).
 # 쓰는 분 자신의 로그인 정보를, 같은 컴퓨터의 다른 자리로 **옮겨 놓기만** 한다(다른 사람 것도, 다른 기계도 아니다).
+# 🔴v0.3.32(TICKET=installer-0332 B2 · master 판정 70ab51cf = A1): 앞 판은 **언제나** 덮었다(Copy-Item -Force) —
+#   자비스 자리가 이미 토큰을 갱신해 더 새것을 들고 있어도 재설치마다 개인 자리의 옛 사본으로 되돌렸다.
+#   ⇒ 「신선한 쪽이 이긴다 · 한 방향」: 자비스 자리가 없거나 더 옛것일 때만 개인 → 자비스로 옮긴다(개인 자리는 안 건드린다).
+#   비교 = 두 파일의 claudeAiOauth.expiresAt(만료 시각) · 둘 중 하나라도 없으면 수정 시각. 덮기 전 사본 1세대(.bak-jarvis · 누적하지 않는다).
+#   ⚠값(토큰·만료 시각)은 기록에도 싣지 않는다 — 판정과 근거 이름만 한 줄.
+#   【추정 · 정직 칸】 갱신 토큰이 1회용으로 회전되어 옛 사본이 곧바로 무효가 되는지는 실측하지 않았다 — 이 판정은 그 경우에도 안전한 쪽을 고른 것이다.
+function Get-CredExpiresAt([string]$Path) {
+    # 만료 시각(숫자) 또는 $null — 못 읽으면 $null(비교는 수정 시각으로 넘어간다).
+    try {
+        $o = Get-Content -LiteralPath $Path -Raw -Encoding UTF8 -ErrorAction Stop | ConvertFrom-Json -ErrorAction Stop
+        $v = $o.claudeAiOauth.expiresAt
+        if ($null -ne $v -and [string]$v -match '^\d+$') { return [int64]$v }
+    } catch { }
+    return $null
+}
+function Test-CredHasLogin([string]$Path) {
+    # 로그인 토큰(claudeAiOauth 의 accessToken·refreshToken 중 하나)이 들어 있나 — 로그아웃하면 이 칸이 빠진 파일이 남을 수 있다(899 L5 【추정】)
+    try {
+        $o = Get-Content -LiteralPath $Path -Raw -Encoding UTF8 -ErrorAction Stop | ConvertFrom-Json -ErrorAction Stop
+        $a = $o.claudeAiOauth
+        if ($null -ne $a -and (([string]$a.accessToken) -or ([string]$a.refreshToken))) { return $true }
+    } catch { }
+    return $false
+}
+function Get-LoginCopyPlan($DstExists, $SrcExp, $DstExp, $SrcMtime, $DstMtime) {
+    # 순수 — 돌려주는 것 = 「copy|keep」:「근거」 (맥 login_copy_plan 과 글자까지 같다).
+    #   copy:absent  = 자비스 자리에 없다
+    #   copy:older   = 자비스 쪽이 더 옛것(근거는 기록 줄에 따로)
+    #   keep:newer   = 자비스 쪽이 더 새것 → 그대로
+    #   keep:same    = 같다 → 그대로
+    if (-not $DstExists) { return 'copy:absent' }
+    #   keep:unknown = 수정 시각도 못 읽었다 → 0 으로 읽어 덮지 않는다(맥 키체인 mdat 읽기 실패 갈래와 동형)
+    if ($null -ne $SrcExp -and $null -ne $DstExp) { $a = [int64]$SrcExp; $b = [int64]$DstExp }
+    elseif ($null -ne $SrcMtime -and $null -ne $DstMtime -and [string]$SrcMtime -ne '' -and [string]$DstMtime -ne '') { $a = [int64]$SrcMtime; $b = [int64]$DstMtime }
+    else { return 'keep:unknown' }
+    if ($a -gt $b) { return 'copy:older' }
+    if ($a -lt $b) { return 'keep:newer' }
+    return 'keep:same'
+}
 function Copy-LoginToIsolated {
     $src = Join-Path (Join-Path $env:USERPROFILE '.claude') '.credentials.json'
     $iso = Join-Path (Join-Path $env:USERPROFILE '.cys') 'claude'
@@ -2672,14 +2918,46 @@ function Copy-LoginToIsolated {
     }
     $dst = Join-Path $iso '.credentials.json'
     try {
-        Copy-Item $src $dst -Force -ErrorAction Stop
+        # ⚠Get-Item 에 -Force = 점(.)으로 시작하거나 숨김 속성인 파일도 본다(흉내 실측: 없으면 「항목을 찾을 수 없습니다」로 옮기기 전체가 실패).
+        $dstExists = Test-Path -LiteralPath $dst
+        # v0.3.32(TICKET=installer-0332 · master 판정 1b01748b · 899 L5): 원본에 로그인 토큰이 없으면(로그아웃 상태 파일) 옮기지 않는다 —
+        #   앞 판은 수정 시각만 새것이면 copy:older 로 자비스 쪽 살아 있는 로그인을 로그아웃 파일로 덮었다. 맥 짝 = 같은 판정·같은 기록 줄.
+        if (-not (Test-CredHasLogin $src)) {
+            Write-Log ('login copy plan: keep:src-logged-out (basis=token) — ' + (Get-LoginCopyWords 'keep:src-logged-out'))
+            return $false
+        }
+        $srcExp = Get-CredExpiresAt $src
+        $dstExp = if ($dstExists) { Get-CredExpiresAt $dst } else { $null }
+        $basis = if ($null -ne $srcExp -and $null -ne $dstExp) { 'expiresAt' } else { 'mtime' }
+        $srcMt = (Get-Item -LiteralPath $src -Force -ErrorAction Stop).LastWriteTimeUtc.Ticks
+        $dstMt = if ($dstExists) { (Get-Item -LiteralPath $dst -Force -ErrorAction Stop).LastWriteTimeUtc.Ticks } else { 0 }
+        $plan = Get-LoginCopyPlan $dstExists $srcExp $dstExp $srcMt $dstMt
+        Write-Log ('login copy plan: ' + $plan + ' (basis=' + $basis + ') — ' + (Get-LoginCopyWords $plan))
+        if ($plan -like 'keep:*') {
+            Say '     동료들이 쓸 로그인 정보는 이미 이어져 있어 그대로 둡니다.'
+            return $true
+        }
+        if ($dstExists) { Copy-Item -LiteralPath $dst -Destination ($dst + '.bak-jarvis') -Force -ErrorAction Stop }
+        Copy-Item -LiteralPath $src -Destination $dst -Force -ErrorAction Stop
         Say '     동료들이 쓸 로그인 정보를 이어 두었습니다.'
-        Write-Log "login copy: $(Redact $src) -> $(Redact $dst) (되돌리기 = 옮긴 파일 삭제)"
+        Write-Log "login copy: $(Redact $src) -> $(Redact $dst) (되돌리기 = 옮긴 파일 삭제$(if ($dstExists) { ' · 앞 사본 = .bak-jarvis' }))"
         return $true
     } catch {
         Say '     (로그인 정보를 이어 두지 못했습니다. 동료들이 로그인을 물을 수 있습니다.)'
         Write-Log "login copy failed: $($_.Exception.Message)"
         return $false
+    }
+}
+function Get-LoginCopyWords([string]$Plan) {
+    # 기록 한 줄에 싣는 사람 말(값 없음) — 맥 login_copy_words 와 같다.
+    switch ($Plan) {
+        'copy:absent' { return '자비스 쪽에 없음 → 옮김' }
+        'copy:older'  { return '자비스 쪽이 더 옛것 → 옮김' }
+        'keep:newer'  { return '자비스 쪽이 더 새것 → 그대로' }
+        'keep:same'   { return '두 쪽이 같음 → 그대로' }
+        'keep:src-logged-out' { return '개인 쪽에 로그인이 없음 → 옮기지 않음' }
+        'keep:unknown' { return '비교 못 함 → 그대로' }
+        default       { return '판정 못 함' }
     }
 }
 
@@ -3159,6 +3437,31 @@ function Step-VerifyCys {
 $DaemonPingCapSec = 20    # 데몬 응답을 기다리는 상한(초) — 종전 2초×10회와 같다
 $DaemonPingGapMs  = 500   # 다시 묻기 전 간격 — 뜬 것을 보면 곧바로 넘어간다(installer-speed-pin-0320)
 $script:DoctorText = $null   # [8/10] 자가진단 출력 — 뒤의 보고 갱신(2단)이 같은 명령을 다시 부르지 않고 이것을 쓴다
+# ── 데몬 선확인 · rotate 생략 판정 (v0.3.30 · TICKET=installer-0330 · 맥 cys_pong·daemon_pid_of·rotate_plan 짝) ──
+$DaemonProbeCapMs = 5000          # 선확인 ping·identify 한 번의 상한 — 상한 있는 단계 안에 상한 없는 호출을 두지 않는다
+$script:DaemonPidBefore = $null
+$script:DaemonPidAfter  = $null
+$script:RotatePlan      = 'run:unset'   # [8/10] 이 판정을 못 남겼으면(dry 등) 종전대로 rotate 를 부른다
+function Test-CysPong([string]$Cli) {
+    return ([string](Invoke-CysCapped $Cli 'ping' $DaemonProbeCapMs) -match 'pong')
+}
+function Get-CysDaemonPid([string]$Cli) {
+    # cys identify(JSON)의 daemon_pid — cys 1.1.2 rotate 가 옛 데몬을 찾는 것과 같은 값 · 못 읽으면 $null
+    $m = [regex]::Match([string](Invoke-CysCapped $Cli 'identify' $DaemonProbeCapMs), '"daemon_pid"\s*:\s*(\d+)')
+    if ($m.Success) { return [int64]$m.Groups[1].Value }
+    return $null
+}
+function Get-RotatePlan($PrePong, $PrePid, $PostPid) {
+    # 순수 — 돌려주는 것 = 「run|skip」:「까닭」 한 낱말(기록용).
+    #   skip:fresh = [8/10] 앞에 데몬이 없었다 → 이번에 뜬 데몬이 곧 새 판이다(지난 편성은 그 데몬이 켜지며 되살린다)
+    #   skip:pid   = 앞뒤 pid 가 다르다 → [8/10] 에서 이미 재기동됐다(09-21 18:18 실기의 모양)
+    #   run:same   = 같은 옛 데몬이 그대로 돈다 → 새 판으로 바꾸려면 rotate 가 필요하다
+    #   run:unknown = pid 를 못 읽었다 → 모르는 채 건너뛰지 않는다(종전대로 rotate)
+    if (-not $PrePong) { return 'skip:fresh' }
+    if ($null -eq $PrePid -or $null -eq $PostPid) { return 'run:unknown' }
+    if ([int64]$PrePid -ne [int64]$PostPid) { return 'skip:pid' }
+    return 'run:same'
+}
 function Step-PrepareAccount {
     if ($Mode -eq 'dry') { Say '[8/10] (dry-run) 계정 준비를 하지 않았습니다.'; return 0 }
     $cli = if ($script:CysCli) { $script:CysCli } else { 'cys' }
@@ -3173,10 +3476,29 @@ function Step-PrepareAccount {
     #   전용 자리는 바로 위 init-pack 이 만든다. 시드는 자가진단 결과와 관계가 없다(2026-09-10 개정) — 갈림길보다 앞이기만 하면 된다.
     Set-AllProfiles | Out-Null
     Copy-LoginToIsolated | Out-Null
-    $daemonRc = Invoke-Logged 'daemon install' $cli @('daemon', 'install')
+    # 🔴v0.3.30(TICKET=installer-0330 · 09-21 18:18 윈 재실행 실기 · 맥 0.3.29 선확인 짝): 데몬이 이미 답하는데 등록을 다시 부르면
+    #   작업 덮어쓰기 뒤 데몬 pid 가 바뀌었다(14888→22660 【관측】 · 끊긴 기전은 schtasks /Create /F 로 【추정】) —
+    #   앱이 자리를 되살렸고 [9/10] 은 그 위에서 rotate 를 또 불러 360초를 다 썼다.
+    #   ⇒ 먼저 묻는다(CYS_NO_AUTOSTART — 묻는 것이 데몬을 띄우지 않게). 답하고 등록도 우리 작업(yes)이면 등록을 건너뛴다.
+    #   답하는데 등록이 없거나 다르면 등록만 한다(덮어쓸 실행 중 작업이 없다 · 옛 데몬을 멈추는 명령은 부르지 않는다).
+    #   전후 데몬 pid 를 남긴다 — [9/10] 이 「이미 새 데몬인가」를 이것으로 가른다(Get-RotatePlan).
+    $prePong = Test-CysPong $cli
+    $script:DaemonPidBefore = if ($prePong) { Get-CysDaemonPid $cli } else { $null }
+    $preState = if ($prePong) { Get-CysAutoStartState $cli } else { '' }
+    Write-Log ('daemon precheck pong=' + $prePong + ' pid=' + $script:DaemonPidBefore + ' task=' + $preState)
+    if ($prePong -and $preState -eq 'yes') {
+        # v0.3.32(TICKET=installer-0332 C1 · 09-21 22:2x 윈 실기 사진): 앞 판은 여기서 「그대로 둡니다」를 말하고
+        #   아래 「등록 여부는 따로 말한다」가 「자동 시작 등록됨」을 한 줄 더 찍어 두 줄이 서로 다른 말처럼 읽혔다.
+        #   ⇒ 이 갈래는 이 한 줄로 끝낸다(아래 따로 말하는 줄은 건너뛴 갈래에서 찍지 않는다).
+        Say '     cys 가 이미 돌고 있고 자동 시작도 등록돼 있어(작업 이름 cysd) 그대로 둡니다.'
+        Write-Log 'daemon install skipped: already running and scheduled task cysd = yes (reinstall)'
+        $daemonRc = 'skipped'
+    } else {
+        $daemonRc = Invoke-Logged 'daemon install' $cli @('daemon', 'install')
+    }
     # ★등록됐는지는 **작업을 직접 보고** 정한다(위 Test-CysAutoStart 의 까닭). 팩이 찍은 줄도,
     #   우리 추정도 아니다. 이 값 하나로 아래 문구가 갈린다 — 그래야 두 줄이 서로 모순되지 않는다.
-    $script:AutoStartState = Get-CysAutoStartState $cli
+    $script:AutoStartState = if ($daemonRc -eq 'skipped') { $preState } else { Get-CysAutoStartState $cli }
     Write-Log ("daemon install rc=$daemonRc · scheduled task cysd = " + $script:AutoStartState)
     Write-Log ('timing 8/10 daemon-install t=' + [int]$prepSw.Elapsed.TotalSeconds + 's')
     # 한 번 응답을 받았으면 그것으로 판정한다. 다시 물으면 그 순간의 흔들림으로 성공이 실패가 된다.
@@ -3227,7 +3549,7 @@ function Step-PrepareAccount {
         }
     }
     # ★답이 왔든 안 왔든 **등록 여부는 따로 말한다** — 이 둘을 한 줄에 뭉치면 다시 모순이 생긴다(6차 검토).
-    if ($alive -and -not $script:DaemonTemporary) {
+    if ($alive -and -not $script:DaemonTemporary -and $daemonRc -ne 'skipped') {
         Say ('     ' + (Get-AutoStartWords $script:AutoStartState))
     }
     if (-not $alive) {
@@ -3242,6 +3564,10 @@ function Step-PrepareAccount {
         $script:ShowRerun = $true
         return 8
     }
+    # v0.3.30: 이 단계가 끝난 지금의 데몬 pid 와 대조해 [9/10] 의 rotate 를 부를지 정한다(Get-RotatePlan 머리 주석).
+    $script:DaemonPidAfter = Get-CysDaemonPid $cli
+    $script:RotatePlan = Get-RotatePlan $prePong $script:DaemonPidBefore $script:DaemonPidAfter
+    Write-Log ('daemon pid before=' + $script:DaemonPidBefore + ' after=' + $script:DaemonPidAfter + ' rotate plan=' + $script:RotatePlan)
     $doc = (Invoke-CysProbe $cli @('doctor')) -join "`n"
     $script:DoctorText = $doc
     Write-Log ('timing 8/10 doctor t=' + [int]$prepSw.Elapsed.TotalSeconds + 's')
@@ -3313,6 +3639,294 @@ function Step-PrepareAccount {
     return 0
 }
 
+# ══ 자리 선점 갈래 — 이미 살아 있는 master 자리가 있을 때 (설치기 0.3.28 · 2026-09-21) ══════
+#   실기 09-21 07:30(install Ck2edlP6 · 재설치): 자리를 여는 명령이
+#   `claim_denied: master held by a live surface` 로 거절했다. 앞 판은 그 답을 「열지 못했다」로만 읽고
+#   **이 설치 창에서 자비스를 또 띄웠다** — 그 자비스가 창을 차지해 [10/10] 이 영영 오지 않았고,
+#   쓰시는 분은 「그래서 cysr 을 내가 직접 실행해야 하는가」를 알 길이 없었다(쓰시는 분의 물음 그대로).
+#   ★거절의 뜻은 「실패」가 아니라 **「자비스는 이미 저 앱 안에 있다」**다 ⇒ 두 번째를 띄우지 않고
+#     앱 창을 띄워(또는 앞으로 가져와) 그 자리를 쓰시게 한다. 사람 손은 0 이 목표다.
+#   ⚠순수 함수로 둔다 — 흉내 시험이 답 문자열만 주입해 갈래를 태울 수 있게(Test-Ps32OnWin64 와 같은 까닭).
+# ── 재설치 끝의 자동 재시작(v0.3.29 · TICKET=installer-0329 ③ · master 판정 859ceeb2 · 맥 cys_rotate_state 짝) ──
+#   앱의 [재시작] 버튼(rotate_daemon)과 **같은 한 명령** `cys rotate`(cys 포크 1.1.2)를 부른다.
+#   ⛔그 5단을 이 스크립트에 옮겨 적지 않는다 — 버튼·sh·ps1 세 벌이 표류한다.
+#   CYS_NO_AUTOSTART 를 걸지 않는다 — rotate 가 새 cysd 를 스스로 띄워야 한다(Invoke-CysCapped 와 다른 까닭).
+# 값 두 개(master 판정 aa4419f8 · 2026-09-21 · TICKET=v112-vm-verify · 맥 ROTATE_DRAIN_TIMEOUT_SEC/ROTATE_WALL_CAP_SEC 짝):
+#   rotate --timeout 은 drain --verify 의 **노드별** 대기다 — 저장 확인 전역 상한 = timeout×2+5. 120 ⇒ ① 최대 245s ·
+#   벽시계 상한 360s ⇒ ②데몬 교체 ~ ⑤복원 여유 115s(② 도중에 끊으면 함대가 내려간 채 남는다 = 최악) — 0.3.29 판단 · 0.3.31 에서 180 으로 줄임(아래 $RotateWallCapMs 주석).
+$RotateDrainTimeoutSec = 120      # cys rotate --timeout(노드별 저장 대기)
+$RotateWallCapMs       = 180000   # 설치기가 rotate 전체를 기다리는 벽시계 상한 · 닿으면 관측 판정 한 번 뒤 버튼 안내로 폴백한다
+# v0.3.31(TICKET=installer-0331 · 2026-09-21 19:1x 결정 · 맥 ROTATE_WALL_CAP_SEC 짝): 360 → 180. 09-21 18:57 윈 실기에서 결과는 성공
+#   (데몬 pid 22660→27688 · 자리 53~55 → 56~58)인데 rotate 가 stage 2-daemon-up 에서 새 데몬을 알아보지 못해 316초에 상한으로 끊겼다
+#   (cys 1.1.2 윈 결함) ⇒ rc 가 아니라 **관측**(Invoke-RotateObserve)으로 결과를 가른다. 드레인 실측 45s + 데몬·복원 여유 = 180.
+#   ⚠드레인 전역 상한(245s)보다 짧다 — 드레인이 180s 를 넘기면 상한이 드레인 도중에 끊는다(옛 데몬·자리는 그대로 · 폴백 안내).
+#   관측 판정이 rotate 를 끊는 것은 드레인 뒤(단계 2 이후)에만이다.
+$RotateObserveMs = 10000   # 관측 간격
+# v0.3.31 판정 C(TICKET=installer-0331 · 2026-09-21 19:56 결정 · 맥 ROTATE_DRAIN_HARD_SEC 짝): 상한에 닿았을 때 1-drain 이면 끊지 않고
+#   드레인이 끝날 때까지 더 기다린다. 드레인이 끝나면 관측 1회 → 성공이면 observed-ok · 아니면 폴백하되 ⛔rotate 는 끊지 않는다
+#   (드레인 직후 = 데몬 교체 단계 · 거기서 끊으면 함대가 내려간 채 남는다). 안전 한도 = 드레인 자체 상한(timeout×2+5) + 30s.
+$RotateDrainHardMs = ($RotateDrainTimeoutSec * 2 + 5 + 30) * 1000
+function Get-RotateAliveRefs([string]$ListText) {
+    # cys list 글 → 살아 있는 자리 번호들 · 한 줄 = <surface:N>`trole=…`tpid=…`texited=<bool>`t…
+    $r = @()
+    foreach ($ln in ($ListText -split "`r?`n")) {
+        $c = $ln -split "`t"
+        if ($c.Count -ge 4 -and $c[0] -match '^surface:\d+$' -and $c[3] -eq 'exited=false') { $r += $c[0] }
+    }
+    return $r   # ⚠ ,$r 로 싸면 @() 가 한 겹 더 싸 개수가 1이 된다(흉내 시험 실측) — 부르는 쪽이 @() 로 받는다
+}
+function Get-RotateRoleRefs([string]$ListText) {
+    # 살아 있는 역할 자리 번호들(역할이 비었거나 - · none 이면 빼고)
+    $r = @()
+    foreach ($ln in ($ListText -split "`r?`n")) {
+        $c = $ln -split "`t"
+        if ($c.Count -ge 4 -and $c[0] -match '^surface:\d+$' -and $c[3] -eq 'exited=false' -and $c[1] -match '^role=.' -and $c[1] -ne 'role=-' -and $c[1] -ne 'role=none') { $r += $c[0] }
+    }
+    return $r
+}
+function Get-RotateObserveVerdict($BasePid, $NowPid, [string]$BaseRefs, [string]$ListText) {
+    # 순수 — ok · no:pid · no:old-seats · no:role-seats (맥 rotate_observe_verdict 짝 · 글자까지 같다)
+    #   성공 = pid 가 rotate 앞 기준선과 다르다 + 기준선 자리가 하나도 살아 있지 않다 + 역할 자리 3개 이상 살아 있다.
+    if ([string]$BasePid -notmatch '^\d+$') { return 'no:pid' }   # 기준선을 못 읽었으면 「바뀌었다」를 말할 수 없다
+    if ([string]$NowPid -notmatch '^\d+$') { return 'no:pid' }
+    if ([string]$BasePid -eq [string]$NowPid) { return 'no:pid' }
+    $base = @(([string]$BaseRefs).Trim() -split '\s+' | Where-Object { $_ })
+    foreach ($r in @(Get-RotateAliveRefs $ListText)) { if ($base -contains $r) { return 'no:old-seats' } }
+    if (@(Get-RotateRoleRefs $ListText).Count -lt 3) { return 'no:role-seats' }
+    return 'ok'
+}
+function Invoke-RotateObserve([string]$Cli, $BasePid, [string]$BaseRefs, [int]$At, [bool]$Final) {
+    # 세 축(ping·데몬 pid·cys list)을 한 번 재서 판정을 돌려주고 bootstrap.log 에 값을 남긴다(맥 rotate_observe 짝)
+    $pong = if (Test-CysPong $Cli) { 'yes' } else { 'no' }
+    $now = Get-CysDaemonPid $Cli
+    $lst = [string](Invoke-CysCapped $Cli 'list' $DaemonProbeCapMs)
+    $v = Get-RotateObserveVerdict $BasePid $now $BaseRefs $lst
+    $alive = @(Get-RotateAliveRefs $lst)
+    $base = @(([string]$BaseRefs).Trim() -split '\s+' | Where-Object { $_ })
+    $old = @($base | Where-Object { $alive -contains $_ }).Count
+    $roles = @(Get-RotateRoleRefs $lst)
+    $bp = if ($null -ne $BasePid -and "$BasePid") { "$BasePid" } else { '?' }
+    $np = if ($null -ne $now -and "$now") { "$now" } else { '?' }
+    if ($Final) {
+        Write-Log ('rotate observe [t=' + $At + 's] ① ping: pong=' + $pong)
+        Write-Log ('rotate observe [t=' + $At + 's] ② daemon pid: ' + $bp + ' -> ' + $np)
+        Write-Log ('rotate observe [t=' + $At + 's] ③ seats: old alive ' + $old + '/' + $base.Count + ' · role alive ' + $roles.Count + ' (' + $(if ($roles.Count) { $roles -join ' ' } else { 'none' }) + ')')
+        Write-Log ('rotate observe [t=' + $At + 's] verdict=' + $v)
+    } else {
+        Write-Log ('rotate observe [t=' + $At + 's] pong=' + $pong + ' pid=' + $bp + '->' + $np + ' old-alive=' + $old + '/' + $base.Count + ' role-alive=' + $roles.Count + ' verdict=' + $v)
+    }
+    return $v
+}
+# 종료코드 표(cys 1.1.2 rotate_rc doc) — 0·21 ⇒ ok(안내 = 표준 출력 마지막 줄 · 21 이면 「저장 확인 일부 미완 — 대화는 복원됨」) ·
+#   25 ⇒ held(「창을 확인해 주세요」) · 22·23·24 ⇒ fail-<rc>(「앱을 열면 다시 시도됩니다」 + 폴백) · 옛 cys ⇒ absent · 상한 ⇒ timeout.
+# v0.3.30(TICKET=installer-0330 ③): rotate 를 **기다리며 기록한다** — 09-21 18:25 윈 실기는 「rotate: timeout」 한 줄뿐이라
+#   어느 단계에서 360초를 썼는지 로그로 가를 수 없었다. ⇒ 두 가지를 경과초와 함께 bootstrap.log 에 옮겨 적는다:
+#   ⑴rotate 가 쓰는 줄(표준 출력·오류 · 도착하는 대로) ⑵rotate 가 지금 부르고 있는 자식 명령 = 단계(Get-RotateStageOf).
+#   ⚠스트림은 줄 단위 비동기 읽기를 **들여다보기만** 한다 — 끝났는지는 프로세스로 가르고, 끝난 뒤엔 2초만 더 받는다.
+#     rotate 가 띄운 새 데몬이 파이프를 물려받아 쥐어도 이 창은 기다리지 않는다(0.3.29 [M] 교훈 · 맥은 파일로 받는다).
+#   ⚠cmd 로 감싸 파일로 받지 않는다 — 상한에 닿아 끊을 때 감싼 것만 죽고 rotate 는 산다(kill-the-worker-not-the-wrapper).
+$RotatePollMs = 1000   # 줄·단계 들여다보는 간격
+function Get-RotateStageOf([string]$CmdLine) {
+    # 순수 — rotate 가 부르는 자식 명령 한 줄 → 단계 표지(cys 1.1.2 run_rotate 순서 · 관측 표지일 뿐 그 단계를 여기서 하지 않는다)
+    if ($CmdLine -match '\sdrain(\s|$)') { return '1-drain' }
+    if ($CmdLine -match '\sdaemon\s+install(\s|$)|taskkill') { return '2-daemon' }
+    if ($CmdLine -match '\sidentify(\s|$)') { return '2-daemon-up' }
+    if ($CmdLine -match '\sinit-pack(\s|$)') { return '4-pack' }
+    if ($CmdLine -match '\srestore(\s|$)') { return '5-restore' }
+    return ''
+}
+function Get-ChildCmdLines([int]$ParentPid) {
+    # 그 프로세스가 지금 부르고 있는 자식들의 명령 줄 · 못 읽으면 빈 목록(단계 기록만 빠진다 · 설치는 이어 간다)
+    $r = @()
+    try {
+        if ([Environment]::OSVersion.Platform -eq [PlatformID]::Win32NT) {
+            $r = @(Get-CimInstance Win32_Process -Filter ('ParentProcessId=' + $ParentPid) -OperationTimeoutSec 3 -ErrorAction Stop | ForEach-Object { [string]$_.CommandLine })
+        } else {
+            $r = @(& ps -A -o 'ppid=,command=' 2>$null | ForEach-Object { if (($_ -match '^\s*(\d+)\s+(.*)$') -and ([int]$Matches[1] -eq $ParentPid)) { $Matches[2] } })
+        }
+    } catch { }
+    return ,$r
+}
+# v0.3.32(TICKET=installer-0332 · master 판정 0c0f5705 · 899 높음): cys 1.1.3 의 rotate ⑥ 부서 순회가 벽시계 상한(180s)에 중간 살해될 수 있다
+#   ⇒ 설치기는 rotate 에 **부서 순회 생략**을 넘긴다 — env CYS_ROTATE_SKIP_DEPTS=1 은 언제나(옛 cys 는 모르는 env 를 무시한다) ·
+#   인자 --skip-depts 는 cys 판번 1.1.3 이상일 때만(옛 cys 는 모르는 인자에 실패한다). 순수 — 맥 rotate_skip_depts_flag 와 글자까지 같다.
+function Get-RotateSkipDeptsFlag([string]$VersionLine) {
+    $m = [regex]::Match([string]$VersionLine, '([0-9]+)\.([0-9]+)\.([0-9]+)')
+    if (-not $m.Success) { return '' }
+    $a = [int]$m.Groups[1].Value; $b = [int]$m.Groups[2].Value; $c = [int]$m.Groups[3].Value
+    if (($a -gt 1) -or ($a -eq 1 -and $b -gt 1) -or ($a -eq 1 -and $b -eq 1 -and $c -ge 3)) { return '--skip-depts' }
+    return ''
+}
+function Get-CysRotateState([string]$Cli) {
+    # 돌려주는 것 = 「<판정>`t<rc>`t<rotate 마지막 알림 줄>」 한 줄(판정 = ok · observed-ok · held · absent · timeout · fail-<rc>) — 맥 cys_rotate_state 짝
+    try {
+        # v0.3.31: rotate 앞 기준선 — 데몬 pid 와 살아 있는 자리(관측 판정의 「바뀌었다」·「사라졌다」 기준)
+        $basePid = Get-CysDaemonPid $Cli
+        $baseRefs = @(Get-RotateAliveRefs ([string](Invoke-CysCapped $Cli 'list' $DaemonProbeCapMs))) -join ' '
+        Write-Log ('rotate baseline pid=' + $(if ($null -ne $basePid) { "$basePid" } else { '?' }) + ' seats=' + $(if ($baseRefs) { $baseRefs } else { '(none)' }))
+        $obsAt = 0; $observed = $false; $drainExt = $false
+        $psi = New-Object System.Diagnostics.ProcessStartInfo
+        $psi.FileName = $Cli
+        $skipFlag = Get-RotateSkipDeptsFlag ([string](Invoke-CysCapped $Cli '--version' $DaemonProbeCapMs))
+        $psi.Arguments = 'rotate --timeout ' + $RotateDrainTimeoutSec + $(if ($skipFlag) { ' ' + $skipFlag } else { '' })
+        $psi.EnvironmentVariables['CYS_ROTATE_SKIP_DEPTS'] = '1'
+        $psi.UseShellExecute = $false
+        $psi.RedirectStandardOutput = $true
+        $psi.RedirectStandardError = $true
+        $psi.StandardOutputEncoding = New-Object System.Text.UTF8Encoding($false)
+        $psi.StandardErrorEncoding = New-Object System.Text.UTF8Encoding($false)
+        $psi.CreateNoWindow = $true
+        $p = [System.Diagnostics.Process]::Start($psi)
+        $sw = [System.Diagnostics.Stopwatch]::StartNew()
+        Write-Log ('rotate start pid=' + $p.Id + ' --timeout ' + $RotateDrainTimeoutSec + ' skip-depts=env' + $(if ($skipFlag) { '+arg' } else { '' }) + ' cap=' + [int]($RotateWallCapMs / 1000) + 's')
+        $readers = @($p.StandardOutput, $p.StandardError)
+        $tasks = @($readers[0].ReadLineAsync(), $readers[1].ReadLineAsync())
+        $lines = @((New-Object System.Collections.Generic.List[string]), (New-Object System.Collections.Generic.List[string]))
+        $stage = ''; $stageAt = 0; $lastLine = ''; $timedOut = $false; $graceSw = $null
+        while ($true) {
+            foreach ($i in 0, 1) {
+                while ($tasks[$i] -and $tasks[$i].IsCompleted) {
+                    $ln = $null
+                    try { $ln = $tasks[$i].Result } catch { }
+                    if ($null -eq $ln) { $tasks[$i] = $null; break }
+                    $lines[$i].Add($ln)
+                    if ($ln.Trim()) { $lastLine = $ln; Write-Log ('rotate [t=' + [int]$sw.Elapsed.TotalSeconds + 's] ' + $ln) }
+                    $tasks[$i] = $readers[$i].ReadLineAsync()
+                }
+            }
+            if ($p.HasExited) {
+                # 끝난 뒤 남은 줄을 2초만 더 받는다(새 데몬이 파이프를 쥐어도 여기서 끝낸다)
+                if (-not $graceSw) { $graceSw = [System.Diagnostics.Stopwatch]::StartNew() }
+                if ((-not $tasks[0] -and -not $tasks[1]) -or $graceSw.ElapsedMilliseconds -ge 2000) { break }
+                Start-Sleep -Milliseconds 100
+                continue
+            }
+            foreach ($c in (Get-ChildCmdLines $p.Id)) {
+                $st = Get-RotateStageOf $c
+                if ($st -and $st -ne $stage) { $stage = $st; $stageAt = [int]$sw.Elapsed.TotalSeconds; Write-Log ('rotate stage ' + $stage + ' [t=' + $stageAt + 's]') }
+            }
+            # v0.3.31: 드레인 뒤(단계 2 이후)에만 10초마다 관측 — 성공이면 rotate 를 끊고 결과를 성공으로 본다.
+            #   ⛔단계를 모르거나 1-drain 이면 관측도 끊기도 하지 않는다(저장 도중에 끊지 않는다).
+            if (($sw.ElapsedMilliseconds - $obsAt * 1000) -ge $RotateObserveMs -and $stage -and $stage -ne '1-drain') {
+                $obsAt = [int]$sw.Elapsed.TotalSeconds
+                if ((Invoke-RotateObserve $Cli $basePid $baseRefs $obsAt $false) -eq 'ok') {
+                    [void](Invoke-RotateObserve $Cli $basePid $baseRefs $obsAt $true)
+                    Write-Log ('rotate observed-ok at stage ' + $stage + ' [t=' + $obsAt + 's] — rotate 를 끊는다(pid=' + $p.Id + ')')
+                    try { $p.Kill() } catch { }
+                    $observed = $true; break
+                }
+            }
+            if ($sw.ElapsedMilliseconds -ge $RotateWallCapMs) {
+                # 상한 — 1-drain 이면 드레인이 끝날 때까지 연장(안전 한도 안) · 연장 뒤 드레인이 끝났으면 관측 1회 · 그 밖엔 끊는다.
+                $el = [int]$sw.Elapsed.TotalSeconds
+                if ($stage -eq '1-drain' -and $sw.ElapsedMilliseconds -lt $RotateDrainHardMs) {
+                    if (-not $drainExt) { $drainExt = $true; Write-Log ('rotate cap ' + [int]($RotateWallCapMs / 1000) + 's reached during 1-drain [t=' + $el + 's] — 드레인이 끝날 때까지 더 기다린다(한도 ' + [int]($RotateDrainHardMs / 1000) + 's)') }
+                } elseif ($drainExt -and $stage -ne '1-drain') {
+                    if ((Invoke-RotateObserve $Cli $basePid $baseRefs $el $true) -eq 'ok') {
+                        Write-Log ('rotate observed-ok after drain extension at stage ' + $stage + ' [t=' + $el + 's] — rotate 를 끊는다(pid=' + $p.Id + ')')
+                        try { $p.Kill() } catch { }
+                        $observed = $true; break
+                    }
+                    Write-Log ('rotate left running at stage ' + $stage + ' [t=' + $el + 's] — 데몬 교체 도중에 끊지 않는다 · 폴백 안내로 간다')
+                    return "timeout`t`t"
+                } else { $timedOut = $true; break }
+            }
+            Start-Sleep -Milliseconds $RotatePollMs
+        }
+        if ($timedOut) {
+            try { $p.Kill() } catch { }
+            Write-Log 'rotate: timeout'
+            $where = if ($stage) { $stage + ' (since t=' + $stageAt + 's · ' + ([int]$sw.Elapsed.TotalSeconds - $stageAt) + 's in it)' } else { 'unknown (no child command seen)' }
+            Write-Log ('rotate stopped at: ' + $where + ' · last line: ' + $(if ($lastLine) { $lastLine } else { '(none)' }))
+            # v0.3.31: 상한에 닿아도 관측을 한 번 더 한다 — 결과가 이미 성공이면 폴백 안내를 내지 않는다.
+            if ((Invoke-RotateObserve $Cli $basePid $baseRefs ([int]$sw.Elapsed.TotalSeconds) $true) -eq 'ok') { return "observed-ok`t`t자비스가 새 판으로 다시 깨어났습니다." }
+            return "timeout`t`t"
+        }
+        if ($observed) {
+            Write-Log ('rotate rc=(stopped by observe) [t=' + [int]$sw.Elapsed.TotalSeconds + 's] last stage=' + $stage)
+            return "observed-ok`t`t자비스가 새 판으로 다시 깨어났습니다."
+        }
+        # 끝났다(HasExited) — 스트림 끝(EOF)은 기다리지 않는다
+        $sout = ($lines[0] -join "`n"); $out = $sout + "`n" + ($lines[1] -join "`n")
+        # 사후 알림 1줄 = 표준 출력의 마지막 빈 줄 아닌 줄(단계 진행은 오류 쪽)
+        $note = ''
+        foreach ($ln in $lines[0]) { if ($ln.Trim()) { $note = $ln } }
+        $rc = $p.ExitCode
+        Write-Log ('rotate rc=' + $rc + ' [t=' + [int]$sw.Elapsed.TotalSeconds + 's] last stage=' + $(if ($stage) { $stage } else { '(none seen)' }))
+        if ($rc -eq 0 -or $rc -eq 21) { return ("ok`t" + $rc + "`t" + $note) }
+        if ($rc -eq 25) { return ("held`t" + $rc + "`t" + $note) }
+        if ($out -match 'unrecognized subcommand|unexpected argument|invalid subcommand') { return ("absent`t" + $rc + "`t" + $note) }
+        return ('fail-' + $rc + "`t" + $rc + "`t" + $note)
+    } catch {
+        Write-Log ('rotate error: ' + $_.Exception.Message)
+        return "absent`t`t"
+    }
+}
+function Get-MasterSeatRef([string]$Cli) {
+    # 살아 있는 master 자리 번호(surface:N) 하나 · 없으면 '' — cys list 한 줄 = <surface:N>`trole=<역할>`tpid=…`texited=<bool>`t…
+    try {
+        foreach ($ln in @(Invoke-CysProbe $Cli @('list'))) {
+            $c = ([string]$ln) -split "`t"
+            if ($c.Count -ge 4 -and $c[1] -eq 'role=master' -and $c[3] -ne 'exited=true') { return $c[0] }
+        }
+    } catch { }
+    return ''
+}
+function Test-SeatClaimDenied([string]$Answer) {
+    if (-not $Answer) { return $false }
+    if ($Answer -match 'claim_denied') { return $true }
+    # 문구가 바뀌어도 뜻이 같은 답을 놓치지 않는다 — 「살아 있는 자리가 master 를 쥐고 있다」.
+    if (($Answer -match '(?i)master') -and ($Answer -match '(?i)held by a live surface')) { return $true }
+    return $false
+}
+# 창(GUI)을 여는 실행 파일 — 명령줄용 cys.exe 가 아니다(그것을 띄우면 창이 안 뜬다).
+#   ⚠이름을 하나로 박지 않는다: 제품 이름이 cys → cysr 로 바뀌면서 설치 폴더·실행 파일 이름이 함께 옮겨 갔다.
+function Get-CysAppExe {
+    $roots = New-Object System.Collections.ArrayList
+    try {
+        $b = Test-CysBody
+        if ($b.Path) { [void]$roots.Add($b.Path) }
+        if ($b.Reg -and $b.Reg.InstallLocation) { [void]$roots.Add($b.Reg.InstallLocation) }
+    } catch { }
+    foreach ($r in @((Join-Path $env:LOCALAPPDATA 'cysr'), (Join-Path $env:LOCALAPPDATA 'Programs\cysr'),
+                     (Join-Path $env:LOCALAPPDATA 'cys'),  (Join-Path $env:LOCALAPPDATA 'Programs\cys'),
+                     (Join-Path $env:ProgramFiles 'cysr'), (Join-Path $env:ProgramFiles 'cys'))) {
+        [void]$roots.Add($r)
+    }
+    foreach ($r in $roots) {
+        if (-not $r -or -not (Test-Path $r)) { continue }
+        foreach ($n in @('cys-app.exe', 'cysr.exe')) {
+            $f = Get-ChildItem -LiteralPath $r -Filter $n -Recurse -ErrorAction SilentlyContinue | Select-Object -First 1
+            if ($f) { return $f.FullName }
+        }
+    }
+    return ''
+}
+# 앱 창을 띄운다 — 이미 떠 있으면 **재기동하지 않고 앞으로만** 가져온다(살아 있는 자리를 죽이지 않는다 ·
+#   맥판 raise_cys_app_window 가 2026-09-17 연수 2건에서 같은 까닭으로 생겼다).
+#   돌려주는 값 = 'raised'(이미 떠 있던 창을 앞으로) · 'started'(새로 띄웠다) · ''(못 했다).
+function Start-CysAppWindow {
+    $running = @(Get-Process -Name 'cys-app', 'cysr' -ErrorAction SilentlyContinue)
+    if ($running.Count -gt 0) {
+        try {
+            $sh = New-Object -ComObject WScript.Shell
+            [void]$sh.AppActivate($running[0].Id)
+        } catch { Write-Log ('cys app raise failed (fail-open): ' + $_.Exception.Message) }
+        Write-Log ('cys app raise: pid=' + $running[0].Id)
+        return 'raised'
+    }
+    $exe = Get-CysAppExe
+    if (-not $exe) { Write-Log 'cys app start: exe not found'; return '' }
+    try {
+        [void](Start-Process -FilePath $exe -ErrorAction Stop)
+        Write-Log ('cys app start: ' + (Redact $exe))
+        return 'started'
+    } catch {
+        Write-Log ('cys app start failed: ' + $_.Exception.Message)
+        return ''
+    }
+}
+
 # ── 하는 일 9 — 자비스 깨우기 ─────────────────────────────────────
 # cys 안에서 세션을 여는 것이 기본이고, 그것이 안 되면 이 창에서 바로 띄운다.
 function Step-Wake {
@@ -3337,14 +3951,13 @@ function Step-Wake {
     if ($Mode -eq 'dry') {
         Say '[9/10] (dry-run) 자비스를 띄우지 않았습니다.'
         Say "     (지금까지 사람 손이 필요했던 횟수: $($script:HumanHands)번)"
-        [void](Step-Fleet '')
+        [void](Invoke-StepFleet '')
         return
     }
     Say '[9/10] 자비스를 깨웁니다.'
     Say "     (지금까지 사람 손이 필요했던 횟수: $($script:HumanHands)번)"
     $cli = if ($script:CysCli) { $script:CysCli } else { 'cys' }
-    # 창 이름도 같은 이유로 ASCII 다 — 이 이름이 거절당한 자리다.
-    $surfaceTitle = 'jarvis'
+    # v0.3.29: 창 이름을 넘기지 않는다 — cys 가 역할대로 「번호 · master」로 짓는다(재시작 뒤 이름과 같게).
     # 여는 명령에 문장을 실으면 안 된다(2026-09-05 두 번 실측).
     #   1차 = 우리말이 깨져 「알 수 없는 인자」 · 2차 = 명령 안의 따옴표가 벗겨져 문장이 조각나
     #   그 조각 하나가 「알 수 없는 인자」로 갔다. 두 번 다 원인은 「문장을 인자로 넘긴 것」이다.
@@ -3354,6 +3967,7 @@ function Step-Wake {
     # ★지난 설치가 남긴 표지를 먼저 치운다 — 남아 있으면 이번 마스터가 아무 일도 안 해도 「시작했다」로 읽힌다.
     #   (시각 검사도 함께 두지만, 지우는 쪽이 먼저다 — 검사 하나에만 기대면 그 검사가 눈이 멀 때 거짓 초록이 된다.)
     Clear-MasterMark
+    Move-OldRound
     Set-FleetBaseline $cli
     $wakeFile = Join-Path $JarvisHome 'wake.ps1'
     # 앞 단계에서 자리 잡기가 끝나지 않았으면 cys 안에 창을 열 수 없다.
@@ -3409,26 +4023,87 @@ function Step-Wake {
             # ⚠맥판은 이 두 줄을 함수 하나로 묶었는데, 이쪽은 검사 축이 「못 쓸 경로 판정 뒤에
             #   이 줄이 온다」를 줄 순서로 재기 때문에 부르는 자리에 그대로 둔다(같은 동작·다른 모양).
             if (Test-CysAgentFlag) {
-                $ref = (& $cli new-surface --role master --cwd $JarvisHome --title $surfaceTitle --agent claude --cmd $cmd 2>&1) -join ''
+                $ref = (& $cli new-surface --role master --cwd $JarvisHome --agent claude --cmd $cmd 2>&1) -join ''
             } else {
-                $ref = (& $cli new-surface --role master --cwd $JarvisHome --title $surfaceTitle --cmd $cmd 2>&1) -join ''
+                $ref = (& $cli new-surface --role master --cwd $JarvisHome --cmd $cmd 2>&1) -join ''
             }
         }
         if ($ref -match 'surface:') {
             Say "     cys 안에서 자비스를 열었습니다 ($ref). cys 창에서 이어서 이야기하십시오."
             # 깨우기가 **성공한 뒤에만** 세운다(검토 지적 · D1 기각) — 깨우기가 실패한 끝은 원격 해결이 돈다
             $script:ReachedWake = $true
+            Send-Progress '9/10' 'end' $null 'wake:cys-seat' $null
             $m = [regex]::Match($ref, 'surface:\d+')
             $script:WakeRef = $(if ($m.Success) { $m.Value } else { '' })
             # 창이 열렸으면 곧바로 동료들을 부른다. 여기서 부르는 까닭 = 아래 폴백(이 창에서 자비스를
             # 띄우는 길)로 내려가면 그 순간부터 이 스크립트는 자비스 화면에 갇혀 다음 줄을 못 간다.
-            [void](Step-Fleet $script:WakeRef)
+            [void](Invoke-StepFleet $script:WakeRef)
             return
         }
-        # 왜 못 열었는지를 화면과 기록 파일 양쪽에 남긴다. 이 값이 없으면 다음에도 원인을 모른다.
+        # 왜 못 열었는지를 기록 파일에 남긴다. 이 값이 없으면 다음에도 원인을 모른다.
+        Write-Log "new-surface failed: $ref"
+        # 🔴이미 살아 있는 지휘 자리가 있다는 답이면 **두 번째 자비스를 띄우지 않는다**(위 Test-SeatClaimDenied 머리 주석).
+        #   여기서 끝맺는 까닭 = 아래 폴백은 이 창을 자비스에게 넘겨 [10/10] 도, 끝맺음 한 줄도 오지 않게 한다.
+        if (Test-SeatClaimDenied $ref) {
+            Write-Log ('seat claim denied: ' + $ref)
+            Say ''
+            Say '     자비스는 이미 열려 있는 cysr 앱 안에 있습니다 — 여기서 또 띄우지 않습니다.'
+            $appState = Start-CysAppWindow
+            if ($appState -eq 'raised') { Say '     cysr 앱 창을 앞으로 가져왔습니다.' }
+            elseif ($appState) { Say '     cysr 앱을 띄웠습니다.' }
+            # 재설치·갱신이면 앱이 옛 자리를 들고 있다 — 새 판으로 도는 자리는 재시작 뒤에 선다.
+            #   앱의 [재시작] 을 사람 대신 누른다(같은 명령) — 되면 알림 1줄, 안 되면(옛 cys·실패) 종전 안내 1클릭으로 돌아간다.
+            # v0.3.30(TICKET=installer-0330 ②): [8/10] 에서 이미 새 데몬이 섰으면(Get-RotatePlan skip:*) rotate 를 또 부르지 않는다 —
+            #   09-21 18:19 윈 실기는 방금 되살아난 자리 위에서 rotate 를 불러 360초를 다 쓰고 [재시작] 1클릭을 부탁했다.
+            if ($script:RotatePlan -like 'skip:*') {
+                Write-Log ('reinstall rotate skipped: plan=' + $script:RotatePlan + ' pid ' + $script:DaemonPidBefore + '->' + $script:DaemonPidAfter)
+                $rotateParts = @('skipped-restarted', '', '자비스가 새 판으로 이미 다시 깨어났습니다.')
+            } else {
+                $rotateParts = @((Get-CysRotateState $cli) -split "`t", 3)
+            }
+            $rotateState = $rotateParts[0]
+            $rotateRc = if ($rotateParts.Count -gt 1) { $rotateParts[1] } else { '' }
+            $rotateNote = if ($rotateParts.Count -gt 2) { $rotateParts[2] } else { '' }
+            Write-Log ('reinstall rotate: ' + $rotateState)
+            if ($rotateState -eq 'ok' -or $rotateState -eq 'observed-ok' -or $rotateState -eq 'held' -or $rotateState -eq 'skipped-restarted') {
+                # 사후 알림 = rotate 가 스스로 쓴 마지막 줄 그대로(맥 짝) · 생략이면 「이미 다시 깨어났습니다」 1줄
+                if ($rotateNote) { Say ('     ' + $rotateNote) } else { Say '     자비스를 새 판으로 다시 깨웠습니다.' }
+                if ($rotateRc -eq '21') { Say '     저장 확인 일부 미완 — 대화는 복원됨' }
+                # 25 = 새 데몬은 섰고 복원만 덜 됐다 — [재시작] 을 또 누르게 하지 않는다.
+                if ($rotateState -eq 'held') { Say '     일부 창의 복원이 끝나지 않았습니다 — cysr 앱에서 창을 확인해 주세요.' }
+                if (-not $appState) { Say '     cysr 앱을 자동으로 띄우지 못했습니다 — 바탕화면의 cysr 아이콘을 눌러 실행해 주세요.' }
+            } else {
+                # 22 데몬 교체 · 23 새 데몬 무응답 · 24 팩 반영 = 도중에 멈춘 실패 — 앱이 다음 기동에 다시 시도한다(맥 짝).
+                if ($rotateState -in @('fail-22', 'fail-23', 'fail-24')) { Say '     자동 재시작을 끝내지 못했습니다 — 앱을 열면 다시 시도됩니다.' }
+                if ($appState) {
+                    Say '     앱 오른쪽 위의 [재시작] 을 한 번 눌러 주세요. 그러면 자비스가 새로 깨어납니다.'
+                } else {
+                    # 자동 실행이 실패한 이 한 갈래에서만 사람 손을 부탁한다(설계 원칙: 손 0 이 기본 · 안내는 실패한 갈래에서만 1줄).
+                    Say '     cysr 앱을 자동으로 띄우지 못했습니다 — 바탕화면의 cysr 아이콘을 눌러 실행해 주세요.'
+                    Say '     이미 열려 있으면 앱 오른쪽 위의 [재시작] 을 한 번 눌러 주세요.'
+                }
+            }
+            # v0.3.32(TICKET=installer-0332 B9 · 【관측】 progress.tsv sLqY6Au1 22:18:15 = 10/10 end 는 서버에 **도착해 있었다**):
+            #   이 갈래는 화면에 [10/10] 줄이 없어서, 뒤에 나가는 설치 끝 증거(post-install)가 「마지막 [n/10]」(Get-CurrentStep)을 따라
+            #   9/10 으로 붙었다 ⇒ 서버 목록의 마지막 행이 9/10 으로 보였다. 끝맺음 줄에 [10/10] 을 달아 단계를 사실대로 둔다.
+            Say '[10/10] 설치는 여기까지 끝났습니다. 이 창은 닫으셔도 됩니다.'
+            $script:ReachedWake = $true
+            $script:NextStep = '없습니다 — cysr 앱 창에서 자비스와 이어서 이야기하시면 됩니다.'
+            $script:ShowRerun = $false
+            # 끝을 서버도 알아야 한다 — 앞 판은 이 갈래에서 9/10·10/10 이 통째로 비어, 실기 기록만 보고는
+            #   「설치 창에서 멈췄다」와 「앱으로 넘겼다」를 가를 수 없었다(09-21 07:30).
+            Send-Progress '9/10' 'end' $null ('wake:claim-denied app=' + $(if ($appState) { $appState } else { 'none' })) $null
+            Send-Progress '10/10' 'start' $null 'awaken:claim-denied' $null
+            Send-Progress '10/10' 'end' $null ('awaken:app-' + $(if ($appState) { $appState } else { 'none' }) + ' rotate=' + $rotateState) $null
+            # v0.3.29: 첫 설치와 같은 끝 증거(post-install|10/10)를 재설치에도 보낸다(맥 09-21 맥 VM 재설치 실기 · 짝) — 재설치 표식을 싣는다.
+            Send-PostInstallEvidence $cli (Get-MasterSeatRef $cli) 'reinstall'
+            return
+        }
+        # v0.3.32(TICKET=installer-0332 C2 · 09-21 22:2x 윈 실기 사진): 프로그램이 답한 원문(영문)은 **자리 선점이 아닐 때만** 화면에 보인다 —
+        #   앞 판은 이 두 줄이 선점 판정보다 앞에 있어 「error: claim_denied: …」 영문이 정상 갈래에서도 창에 찍혔다(맥은 이미 이 순서).
+        #   선점 갈래의 원문은 위 Write-Log 두 줄(자리 열기 실패 기록 · 선점 기록)이 bootstrap.log 에 남긴다.
         Say '     cys 안에서 열지 못했습니다. 프로그램이 답한 내용은 이렇습니다:'
         foreach ($ln in ($ref -split "`n")) { if ($ln.Trim()) { Say "       $ln" } }
-        Write-Log "new-surface failed: $ref"
         # 그래도 길은 두 갈래로 남긴다.
         #  (1) 이 창에서 바로 띄운다 — 지금 바로 쓸 수 있다.
         #  (2) cys 창에서 마무리하고 싶으시면 칠 줄을 인쇄해 둔다.
@@ -3440,6 +4115,7 @@ function Step-Wake {
     }
     Set-Location -Path $JarvisHome -ErrorAction SilentlyContinue
     if (-not (Get-Command claude -ErrorAction SilentlyContinue)) {
+        Send-Progress '9/10' 'end' $null 'wake:no-claude' $null
         Say '[9/10] 자비스를 띄우지 못했습니다 — 클로드 명령을 찾지 못했습니다.'
         Say '     PowerShell 창을 새로 열고 아래 「다시 하시는 법」대로 다시 실행해 주십시오.'
         $script:ShowRerun = $true
@@ -3455,6 +4131,8 @@ function Step-Wake {
         $fallbackPrompt = $FleetTrigger + "`n" + $firstPrompt
         $fallbackExe = @(Get-Command claude -CommandType Application -ErrorAction SilentlyContinue | Where-Object { $_.Extension -eq '.exe' })[0]
         $fallbackExe = if ($fallbackExe) { $fallbackExe.Source } else { 'claude' }
+        # ★이 줄 뒤로 이 창은 자비스 것이다 — 끝 전송은 **여기가 마지막 기회**다.
+        Send-Progress '9/10' 'end' $null 'wake:window-fallback' $null
         & $fallbackExe --dangerously-skip-permissions $fallbackPrompt
         if ($global:LASTEXITCODE -eq 0) { $script:ReachedWake = $true }
     } catch {
@@ -3796,6 +4474,28 @@ function Confirm-ChildSeats([string]$Cli) {
     return $failed
 }
 function Get-MasterMarkPath { return (Join-Path $JarvisHome $MasterMarkName) }
+# ── 지난 라운드 잔재를 옮긴다(v0.3.29 · TICKET=installer-0329 ⑤ · master 판정 180d303e = B · 맥 archive_old_round 짝) ──
+#   재설치는 install-jarvis 를 다시 쓴다 — 그 안의 _round 가 남으면 새 자비스가 옛 라운드를 이어받는다(윈 노트북 실재).
+#   ⛔지우지 않는다 — _round\archive\<시각>\ 로 **옮기기만** 한다. 승인 Feed 의 옛 티켓은 데몬 쪽(feed.jsonl) 몫이다(판정 C).
+function Move-OldRound {
+    $r = Join-Path $JarvisHome '_round'
+    try {
+        if (-not (Test-Path -LiteralPath $r -PathType Container)) { Write-Log 'round archive: _round 없음'; return }
+        $ts = Get-Date -Format 'yyyyMMdd-HHmmss'
+        $dst = Join-Path (Join-Path $r 'archive') $ts
+        $moved = @()
+        foreach ($e in @(Get-ChildItem -LiteralPath $r -Force -ErrorAction Stop)) {
+            if ($e.Name -eq 'archive') { continue }
+            try {
+                if (-not (Test-Path -LiteralPath $dst)) { [void](New-Item -ItemType Directory -Path $dst -Force -ErrorAction Stop) }
+                Move-Item -LiteralPath $e.FullName -Destination $dst -Force -ErrorAction Stop
+                $moved += $e.Name
+            } catch { Write-Log ('round archive: 못 옮겼다 ' + $e.Name + ' (이어 간다) ' + $_.Exception.Message) }
+        }
+        if ($moved.Count -gt 0) { Write-Log ('round archive: _round\archive\' + $ts + ' 로 옮김 — ' + ($moved -join ' ')) }
+        else { Write-Log 'round archive: _round 에 옮길 것 없음' }
+    } catch { Write-Log ('round archive: 실패 (이어 간다) ' + $_.Exception.Message) }
+}
 function Clear-MasterMark {
     # 지운다 — 단 **우리 자비스 폴더 안의 그 이름 하나**만. 경로를 짐작하지 않는다.
     $f = Get-MasterMarkPath
@@ -3892,7 +4592,7 @@ function Write-MasterRequestCard {
     Human '자비스' '자비스가 아직 준비 작업을 시작하지 않아 한 줄만 부탁드립니다 — cys 창에서 입력해 주십시오'
     Say ''
     Say '   ┌───────────────────────────────────────────────────────────────┐'
-    Say '   │   cys 창(제목 jarvis)에 이렇게 입력해 주십시오:               │'
+    Say '   │   cys 창의 master 자리에 이렇게 입력해 주십시오:              │'
     Say '   │                                                               │'
     Say '   │     install-jarvis 폴더의 install-directive.md 를 읽고,       │'
     Say '   │     거기 적힌 준비 작업을 해 주세요.                          │'
@@ -3912,13 +4612,24 @@ function Get-MasterStateNow {
 function Write-MasterUnknownCard {
     # 「판정 못 함」은 「거절했다」가 아니다 — 우리 관측이 닿지 않았을 수도 있다. 그래서 문구가 다르다.
     Say ''
-    Say '   cys 창(제목 jarvis)을 열어 자비스가 무엇을 하고 있는지 보아 주십시오.'
+    Say '   cys 창의 master 자리를 열어 자비스가 무엇을 하고 있는지 보아 주십시오.'
     Say '   아무 말도 하지 않고 있으면 이렇게 입력해 주시면 됩니다: install-jarvis 폴더의 install-directive.md 를 읽고, 거기 적힌 준비 작업을 해 주세요.'
 }
 function Set-FleetNeedsMaster {
     # 끝맺음이 「예상 못 한 끝」으로 읽지 않게 하되, 「끝났습니다」라고도 하지 않는다 — 남은 일을 그대로 적는다.
-    $script:NextStep = 'cys 창(제목 jarvis)의 자비스에게 위 한 줄을 전해 주십시오. 그것으로 설치가 끝납니다.'
+    $script:NextStep = 'cys 창의 master 자리에 있는 자비스에게 위 한 줄을 전해 주십시오. 그것으로 설치가 끝납니다.'
     $script:ShowRerun = $false
+}
+# 🔴[10/10] 의 시작·끝 전송을 여기 한 곳에 모은다(설치기 0.3.28 · 2026-09-21).
+#   까닭: Step-Fleet 는 되돌아가는 길이 일곱이라 그 각각에 끝 전송을 붙이면 반드시 하나를 빠뜨린다.
+#   ⚠앞 판에는 [9/10]·[10/10] 의 start 가 **아예 없었다** — 실기 기록에서 「깨우기까지 갔는가」를 가를 수 없었다
+#   (09-21 07:30 실기에서 9/10·10/10 이 통째로 비어 「설치 창에서 멈췄다」와 구별되지 않았다).
+function Invoke-StepFleet([string]$SurfaceRef) {
+    Send-Progress '10/10' 'start' $null $null $null
+    $fleetSwAll = [System.Diagnostics.Stopwatch]::StartNew()
+    $rc = @(Step-Fleet $SurfaceRef)[-1]
+    Send-Progress '10/10' 'end' ([int]$fleetSwAll.Elapsed.TotalSeconds) ('rc=' + $rc) $null
+    return $rc
 }
 function Step-Fleet {
     param([string]$SurfaceRef)
@@ -3991,7 +4702,7 @@ function Step-Fleet {
     Human '자비스' '자비스가 저절로 깨어나지 않아 한마디만 부탁드립니다 — cys 창에서 입력해 주십시오'
     Say ''
     Say '   ┌──────────────────────────────────────────────────┐'
-    Say ("   │   cys 창(제목 jarvis)에 이렇게 입력해 주십시오:  │")
+    Say ("   │   cys 창의 master 자리에 이렇게 입력해 주십시오: │")
     Say ("   │                                                  │")
     Say ("   │        " + $FleetTrigger + "                             │")
     Say ("   │                                                  │")
@@ -4051,7 +4762,7 @@ function Step-Fleet {
     # ★여기서도 「아직 안 쳤다」를 단정하지 않는다 — 다만 근거는 **자식 좌석**이다(아래 함수).
     if (Test-DeclarationSeen $live) {
         Say '     자비스는 이미 깨어 있습니다(master 자리가 섰습니다) — 그 한마디는 들어갔습니다.'
-        Say '     남은 자리를 다시 세우려면 cysr 창의 jarvis 칸에 『너는 마스터다.』 한 줄을 다시 쳐 주십시오(이 설치 창이 아닙니다).'
+        Say '     남은 자리를 다시 세우려면 cysr 창의 master 자리에 『너는 마스터다.』 한 줄을 다시 쳐 주십시오(이 설치 창이 아닙니다).'
     } else {
         Say '     아직 그 한마디를 입력하지 않으셨다면, cys 창에서 지금 입력해 주시면 됩니다.'
         Say '     치셨는데도 서지 않았다면 cys 창의 자비스에게 물어보십시오 — 무엇이 걸렸는지 사람 말로 알려 줍니다.'
@@ -4071,7 +4782,7 @@ function Step-Fleet {
 #   글자 칸은 `\z` 로 끝을 못박아 다시 만든다. 이름·글자·판본 비교는 대소문자를 가르는 -ceq·-cmatch·-ccontains 만 쓴다.
 # ⚠PowerShell 은 `'true' -eq $true` 를 참으로 본다 ⇒ 칸마다 **형(type)을 먼저** 본다.
 # ⚠이 절은 맥에서 PowerShell 없이 **정적 검사 + 맥판과의 대조**로만 증명했다 — 윈도우 실기가 필요한 축은 내부 문서.
-$InstallerVersion       = '0.3.26'   # 보고의 installer_version · $BootstrapVersion 은 화면 머리글 용도 그대로(보내지 않는다)
+$InstallerVersion       = '0.3.35'   # 보고의 installer_version · $BootstrapVersion 은 화면 머리글 용도 그대로(보내지 않는다)
 $HelpApiUrl             = 'https://jarvis-install.godmeyou.kr'
 $RemoteHelpNoticeUrl    = 'jarvis-install.godmeyou.kr/help/notice'
 # [1/10] 고지 1줄 = /help/notice 정본이 인용하는 문장 그대로 + 끝에 자세한 안내 자리. ⛔문안 변경 금지(맥판과 글자가 같아야 한다).
@@ -5574,27 +6285,28 @@ function Send-CaptureEvidence([string]$Reason, [string]$Detail) {
 
 # ── 설치 완료 뒤(post-install) 증거 — [10/10] 각성 판정 직후 한 번 ────────────────────────────
 # 왜: 09-16 실기에서 설치는 성공으로 끝났는데 **첫 자리 화면에 훅 오류 3줄이 떠 있었다.** 설치기는 그것을 본 적이 없다.
-function Get-PostInstallText([string]$Cli, [string]$Ref) {
-    # 돌려주는 것 = 마스킹·상한을 거친 글자(못 읽으면 '')
-    if (-not $Ref) { return '' }
+function Get-PostInstallText([string]$Cli, [string]$Ref, [string]$Via = '') {
+    # 돌려주는 것 = 마스킹·상한을 거친 글자(못 읽으면 '' · 재설치면 표식 한 줄은 남긴다)
+    $mark = if ($Via -eq 'reinstall') { 'install=reinstall' + "`n" } else { '' }
+    if (-not $Ref) { return $mark }
     $scr = Invoke-CysCapped $Cli ('read-screen --surface ' + $Ref) $ChildReadCapMs
-    if ($null -eq $scr) { return '' }
+    if ($null -eq $scr) { return $mark }
     $lines = @(([string]$scr).TrimEnd() -split "`r?`n")
     $from = [math]::Max(0, $lines.Count - 40)
     $hook = @($lines | Where-Object { $_ -match $EvidenceHookErrorPattern }).Count
-    $body = 'seat=master' + "`n" + 'hook_errors=' + $hook + "`n" + (($lines[$from..($lines.Count - 1)]) -join "`n")
+    $body = $mark + 'seat=master' + "`n" + 'hook_errors=' + $hook + "`n" + (($lines[$from..($lines.Count - 1)]) -join "`n")
     return (Get-RemoteHelpTailBytes (Protect-EvidenceText $body) $EvidenceTextBytes)
 }
-function Send-PostInstallEvidence([string]$Cli, [string]$Ref) {
+function Send-PostInstallEvidence([string]$Cli, [string]$Ref, [string]$Via = '') {
     # fail-open · 설치당 한 번 · 설치를 막지 않는다(성공 끝맺음 뒤에 부른다).
     try {
         $key = 'post-install|10/10'
         if ($script:CaptureSent.ContainsKey($key)) { return }
         $script:CaptureSent[$key] = $true
-        $t = Get-PostInstallText $Cli $Ref
+        $t = Get-PostInstallText $Cli $Ref $Via
         $slot = Send-EvidenceEvent 'post-install' $t
         Send-EvidenceImages $slot @('app_window')
-        Write-Log ('evidence sent: ' + $key + ' text=' + [System.Text.Encoding]::UTF8.GetByteCount([string]$t) + 'B')
+        Write-Log ('evidence sent: ' + $key + $(if ($Via) { ' via=' + $Via } else { '' }) + ' text=' + [System.Text.Encoding]::UTF8.GetByteCount([string]$t) + 'B')
     } catch { Write-Log ('post-install evidence error (fail-open): ' + $_.Exception.Message) }
 }
 $script:CaptureReady = $true
@@ -5829,7 +6541,8 @@ try {
     Restore-ConsoleQuickEdit   # [3/10] 로그인 대기 — 빠른 편집 켜짐(주소를 긁을 수 있게)
     Step-Login; $rc = $script:LoginRc; if ($rc -ne 0) { exit $rc }   # 반환값을 받지 않는다(Step-Login 머리 주석 · v0.3.17)
     Disable-ConsoleQuickEdit   # [3/10] 로그인이 끝났다 — 다시 끈다(창 클릭 멈춤 방지)
-    Send-Progress '3/10' 'end' $null ('rc=' + $script:LoginRc) $null
+    # 승계 쓸기 결과를 함께 싣는다 — 「어느 자리를 물었고 각각 뭐라 답했나」가 다음 실기에서 원인을 확정한다(0.3.28).
+    Send-Progress '3/10' 'end' $null ('rc=' + $script:LoginRc + $(if ($script:LoginSweep) { ' sweep=' + $script:LoginSweep } else { '' })) $null
 
     $Rows.Clear()
     Invoke-DetectStage1
@@ -5839,9 +6552,11 @@ try {
     Send-Progress '4/10' 'start' $null $null $null
     $rc = Step-Prepare; Send-Progress '4/10' 'end' $null ('rc=' + $rc) $null; if ($rc -ne 0) { exit $rc }
 
-    # 여기서부터는 한 단이 막혀도 멈추지 않는다.
-    # 앞 단계(클로드 설치·로그인·자비스 준비)는 이미 성립했고, 막힌 자리를 사람에게 설명해 주는 것이
-    # 그 다음으로 할 수 있는 가장 쓸모 있는 일이기 때문이다. 막힌 단을 적어 두고 자비스를 깨운다.
+    # 🔴[5/10]~[8/10] 이 막히면 **자비스를 깨우지 않고 여기서 끝낸다**(dbg-D5 F3 윈 짝 · master 확정 2026-09-23 20:00 결정 A).
+    #   앞 판은 막힌 단을 적어 두고 이 창에서 자비스를 깨웠다 — 맥판 F3 와 같은 병이다: 이미 깔린 옛 cys 가 있으면
+    #   사람은 막힌 설치 뒤에 옛 판으로 깨어난 자비스를 새 판으로 믿는다(거짓 초록).
+    #   ⇒ 막히면 「설치가 끝나지 않았습니다 · 진단 코드」 한 줄로 끝내고, 진단 코드가 있으니 끝맺음의 원격 해결이 이어서 돕는다.
+    #   맥판 정본 = bootstrap.sh 본문의 `if [ -n "$BLOCKED_STEP" ]` 블록.
     foreach ($st in @(
         @{ Name = 'cys 설치 파일 받기'; Step = '5/10'; Fn = { Step-DownloadCys } },
         @{ Name = 'cys 설치';           Step = '6/10'; Fn = { Step-InstallCys } },
@@ -5858,7 +6573,29 @@ try {
         if (Test-StepSlow $st.Step $stepSec) { Send-CaptureEvidence 'slow' ($st.Step + ' ' + [int]$stepSec + 's > 2x ' + [int]$script:StepBaselineSec[$st.Step] + 's') }
         Invoke-CaptureRequested   # ⓕ④ v0.3.20 — 진행 답으로 받아 둔 촬영 요청을 여기서 처리한다(1회성 · 안 오면 아무 일도 안 한다)
         # ⓕ② v0.3.20 — 비치명 rc(여기서 안 멈추는 값)도 징후다. 멈추는 rc 는 아래 BlockedStep 이 받고 실패 증거가 따로 간다.
-        if ($rc -ne 0) { $script:BlockedStep = $st.Name; break }
+        if ($rc -ne 0) {
+            $script:BlockedStep = $st.Name
+            # 0.3.35(dbg-D5 F10 ①): 코드 없이 막힌 단계는 「end rc=N」 한 건뿐이었다 — 사유 칸이 빈 실패를 운영이 셀 수 있게 실패 이벤트(J-UNK-00)를 보낸다.
+            if (-not $script:JCode) { Write-Log ('blocked without jcode at ' + $st.Step + ' rc=' + $rc + ' → progress fail J-UNK-00'); Send-Progress $st.Step 'fail' $null 'J-UNK-00' $null }
+            break
+        }
+    }
+    if ($script:BlockedStep) {
+        # 진단 코드 없이 막힌 갈래도 있다 — 코드가 없으면 원격 해결도 안 돈다. 모르는 원인은 모른다고 적는다(J-UNK-00).
+        #   ⚠실패 이벤트는 위 루프가 이미 보냈다(F10 ①) — Write-JCode 를 부르면 두 번 나가므로 화면·기록·증거만 맞춘다(맥판 jcode 와 같은 세 자리).
+        if (-not $script:JCode) {
+            $script:JCode = 'J-UNK-00'
+            $blockedWhy = '「' + $script:BlockedStep + '」 단계에서 멈췄습니다'
+            Say ('     진단 코드: J-UNK-00 — ' + $blockedWhy)
+            Say ('     이 코드로 찾아보실 수 있습니다: ' + $HelpCodeUrl + 'J-UNK-00')
+            Write-Log ('jcode J-UNK-00 ' + $blockedWhy)
+            Send-EvidenceOnce 'fail'
+        }
+        Say ''
+        Say ('설치가 끝나지 않았습니다 — 「' + $script:BlockedStep + '」 단계에서 멈췄습니다 (진단 코드 ' + $script:JCode + ').')
+        if (-not $script:NextStep) { Set-NextStepRerun '아래 「다시 하시는 법」대로 다시 실행해 주십시오. 끝난 단계는 건너뛰고 막힌 자리부터 이어서 갑니다.' }
+        Send-Progress $st.Step 'info' $null ('blocked:no-wake ' + $script:JCode) $null
+        exit $rc   # 본문 finally 가 끝맺음(Write-ClosingNote · 원격 해결)을 그대로 돈다 — [2/10]~[4/10] 의 exit 와 같은 길
     }
 
     $Rows.Clear()
@@ -5866,6 +6603,7 @@ try {
     Invoke-DetectStage2
     Write-Report
 
+    Send-Progress '9/10' 'start' $null $null $null
     # 여기는 마지막 문장이라 반환값이 호출부로 갈 곳도 없다 — 그대로 호스트로 흘려보낸다.
     Step-Wake
 
