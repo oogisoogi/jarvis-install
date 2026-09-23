@@ -114,7 +114,7 @@ $DlDir         = Join-Path $JarvisHome 'dl'
 #   $CysDisplayName · $CysVersion · $CysWinFile(자산 이름이 바뀌면) · $CysWinBytes · $CysWinSha256 — 값은 발행 뒤 SHA256SUMS.txt 와 대조(tests/win-pin-release.sh).
 #   화면 머리글은 이 값으로 「<이름> <판> · 설치 도우미 <설치기 판>」 을 찍는다(설치기 판 = $InstallerVersion · 별도 semver).
 $CysDisplayName = 'cysr'
-$CysVersion     = '1.0.2'
+$CysVersion     = '1.1.0'
 $CysDownloadDir = "https://github.com/oogisoogi/cys-ro/releases/download/v${CysVersion}/"
 # ✅아래 세 값 = v1.0.2 발행(2026-09-18 11:23 · Latest) 뒤 **실측으로 채웠다**(installer-0325-r3 · 앞 판 값(v1.0.1)을 대신한다).
 #   출처 = 릴리스 SHA256SUMS.txt(그 파일 자신의 sha256 = 17ad2595213ae3868fb56820cd6c7aabca2d66f9c7130d618e4cc57d38f4897e) · 크기는 릴리스 자산 목록과 내려받은 파일 양쪽에서 쟀다.
@@ -123,8 +123,8 @@ $CysDownloadDir = "https://github.com/oogisoogi/cys-ro/releases/download/v${CysV
 #   `${CysVersion}` 를 그대로 두는 것이 정본이다 — 판을 올릴 때 이름이 함께 따라 오르고, 뮤턴트 M508 이 그 따라오름을 잰다.
 #   지금 값은 풀면 cysr_1.0.2_x64-setup.exe = 릴리스 자산 이름과 글자 그대로 같다.
 $CysWinFile     = "cysr_${CysVersion}_x64-setup.exe"
-$CysWinBytes    = 140031327
-$CysWinSha256   = '9e54bef7449a1762adca97aff5ffe7ecd21137ce08a7c2c0279af2e6367afb1c'   # 릴리스 SHA256SUMS.txt 의 줄
+$CysWinBytes    = 140385161
+$CysWinSha256   = '66f60d5240f9df1d086cd23d56def22a80f21e2ac7a184e451324c1a2520998f'   # 릴리스 SHA256SUMS.txt 의 줄
 $CysDownloadUrl = $CysDownloadDir + $CysWinFile
 
 $LoginPollInterval = 2     # 초 — 승인 프로세스가 끝난 뒤 로그인을 다시 확인하는 간격
@@ -3408,13 +3408,19 @@ function Step-Wake {
             # 모르는 인자라며 거절당해 자리 자체가 안 열린다(조건을 둔 유일한 까닭이다).
             # ⚠맥판은 이 두 줄을 함수 하나로 묶었는데, 이쪽은 검사 축이 「못 쓸 경로 판정 뒤에
             #   이 줄이 온다」를 줄 순서로 재기 때문에 부르는 자리에 그대로 둔다(같은 동작·다른 모양).
+            # 성공 = 종료 코드 0 **그리고** 답에 surface: — 실패한 답의 글에 그 글자가 섞여도 성공으로 읽지 않는다(검토 지적 · D1).
+            #   앞 명령의 종료 코드가 남아 있으면 성공으로 읽힌다 ⇒ 부르기 바로 전에 비운다.
             if (Test-CysAgentFlag) {
+                $global:LASTEXITCODE = -1
                 $ref = (& $cli new-surface --role master --cwd $JarvisHome --title $surfaceTitle --agent claude --cmd $cmd 2>&1) -join ''
             } else {
+                $global:LASTEXITCODE = -1
                 $ref = (& $cli new-surface --role master --cwd $JarvisHome --title $surfaceTitle --cmd $cmd 2>&1) -join ''
             }
+            $seatRc = $global:LASTEXITCODE
+            if ($seatRc -ne 0) { $ref = 'rc=' + $seatRc + ' ' + $ref }
         }
-        if ($ref -match 'surface:') {
+        if ($null -ne $seatRc -and $seatRc -eq 0 -and $ref -match 'surface:') {
             Say "     cys 안에서 자비스를 열었습니다 ($ref). cys 창에서 이어서 이야기하십시오."
             # 깨우기가 **성공한 뒤에만** 세운다(검토 지적 · D1 기각) — 깨우기가 실패한 끝은 원격 해결이 돈다
             $script:ReachedWake = $true
@@ -4071,7 +4077,7 @@ function Step-Fleet {
 #   글자 칸은 `\z` 로 끝을 못박아 다시 만든다. 이름·글자·판본 비교는 대소문자를 가르는 -ceq·-cmatch·-ccontains 만 쓴다.
 # ⚠PowerShell 은 `'true' -eq $true` 를 참으로 본다 ⇒ 칸마다 **형(type)을 먼저** 본다.
 # ⚠이 절은 맥에서 PowerShell 없이 **정적 검사 + 맥판과의 대조**로만 증명했다 — 윈도우 실기가 필요한 축은 내부 문서.
-$InstallerVersion       = '0.3.26'   # 보고의 installer_version · $BootstrapVersion 은 화면 머리글 용도 그대로(보내지 않는다)
+$InstallerVersion       = '0.3.27'   # 보고의 installer_version · $BootstrapVersion 은 화면 머리글 용도 그대로(보내지 않는다)
 $HelpApiUrl             = 'https://jarvis-install.godmeyou.kr'
 $RemoteHelpNoticeUrl    = 'jarvis-install.godmeyou.kr/help/notice'
 # [1/10] 고지 1줄 = /help/notice 정본이 인용하는 문장 그대로 + 끝에 자세한 안내 자리. ⛔문안 변경 금지(맥판과 글자가 같아야 한다).
@@ -4576,22 +4582,167 @@ function Get-RemoteHelpCysPath {
     return ''
 }
 
-function Invoke-RemoteHelpStreamRead([string]$Name, $Stream, [int]$Tail) {
-    # 연 핸들로 읽는다 — 이름을 다시 열지 않는다. 돌려주는 것 = Invoke-RemoteHelpLaunch 와 같다 · 핸들은 여기서 닫는다.
+# ── 핸들로 읽기 — 파일·폴더를 읽는 줄은 **연 핸들로만** 읽는다(검토 지적 BLOCKER) ──
+#   이름을 확인한 뒤 cmdlet(또는 다시 여는 호출)이 그 이름을 열면, 그 사이 **조상 폴더**를 정션으로 바꿔 끼운 것을 따라간다 —
+#   글자 경로(FullName)도 마지막 성분의 속성도 그대로라 이름만 보는 검사로는 못 막는다(검토 재현).
+#   ⇒ ①작업 폴더를 핸들로 연다 ②<path> 를 **이음줄을 따라가지 않고** 연다 ③**연 핸들의 최종 경로**(운영체제가 지금 푼 실제 자리)가
+#     작업 폴더 핸들의 최종 경로 아래이고 연 것 자체가 재분석점이 아닐 때만 ④읽기·목록은 그 핸들로 한다(이름을 다시 열지 않는다).
+#   공유 방식에 「지우기」가 없다 = 핸들이 열려 있는 동안 그 파일·폴더의 이름을 바꾸거나 지울 수 없다.
+#   .NET Framework 에는 「핸들의 최종 경로」와 「핸들로 폴더 목록 읽기」가 없다 ⇒ 운영체제 함수를 직접 부른다(Add-Type).
+#   ⚠Add-Type 을 못 쓰는 기계(제한 언어 모드·코드 실행 정책)는 이 줄들을 실행하지 않는다(path_outside · 닫힌 쪽 · 기록 한 줄).
+#   잔여(정직): 작업 폴더 안 **밖 파일의 하드 링크**는 같은 파일이라 통과한다 — 그것을 만들 계정은 명령 없이도 그 파일을 읽는다.
+$RemoteHelpFsSource = @'
+using System;
+using System.Collections.Generic;
+using System.ComponentModel;
+using System.Globalization;
+using System.Runtime.InteropServices;
+using System.Text;
+using Microsoft.Win32.SafeHandles;
+
+public static class JarvisRemoteHelpFs
+{
+    const uint GENERIC_READ = 0x80000000;
+    const uint FILE_SHARE_READ = 0x00000001;
+    const uint FILE_SHARE_WRITE = 0x00000002;
+    const uint OPEN_EXISTING = 3;
+    const uint FILE_FLAG_BACKUP_SEMANTICS = 0x02000000;
+    const uint FILE_FLAG_OPEN_REPARSE_POINT = 0x00200000;
+    const int FILE_BASIC_INFO_CLASS = 0;
+    const int FILE_ID_BOTH_DIR_INFO_CLASS = 10;
+    const int FILE_ID_BOTH_DIR_RESTART_INFO_CLASS = 11;
+    const int ERROR_NO_MORE_FILES = 18;
+    const int ATTR_DIRECTORY = 0x10;
+    const int ATTR_REPARSE_POINT = 0x400;
+
+    [DllImport("kernel32.dll", CharSet = CharSet.Unicode, SetLastError = true)]
+    static extern SafeFileHandle CreateFileW(string name, uint access, uint share, IntPtr security, uint disposition, uint flags, IntPtr template);
+
+    [DllImport("kernel32.dll", CharSet = CharSet.Unicode, SetLastError = true)]
+    static extern uint GetFinalPathNameByHandleW(SafeFileHandle handle, StringBuilder path, uint size, uint flags);
+
+    [DllImport("kernel32.dll", SetLastError = true)]
+    static extern bool GetFileInformationByHandleEx(SafeFileHandle handle, int infoClass, IntPtr buffer, uint size);
+
+    // 이음줄을 따라가지 않는다(FILE_FLAG_OPEN_REPARSE_POINT) · 폴더도 연다(FILE_FLAG_BACKUP_SEMANTICS) · 공유에 지우기 없음
+    public static SafeFileHandle Open(string path)
+    {
+        SafeFileHandle h = CreateFileW(path, GENERIC_READ, FILE_SHARE_READ | FILE_SHARE_WRITE, IntPtr.Zero, OPEN_EXISTING, FILE_FLAG_BACKUP_SEMANTICS | FILE_FLAG_OPEN_REPARSE_POINT, IntPtr.Zero);
+        if (h.IsInvalid) { int e = Marshal.GetLastWin32Error(); h.Dispose(); throw new Win32Exception(e); }
+        return h;
+    }
+
+    public static string FinalPath(SafeFileHandle h)
+    {
+        StringBuilder sb = new StringBuilder(1024);
+        uint n = GetFinalPathNameByHandleW(h, sb, (uint)sb.Capacity, 0);
+        if (n >= sb.Capacity) { sb = new StringBuilder((int)n + 1); n = GetFinalPathNameByHandleW(h, sb, (uint)sb.Capacity, 0); }
+        if (n == 0 || n >= sb.Capacity) throw new Win32Exception(Marshal.GetLastWin32Error());
+        string p = sb.ToString();
+        if (p.StartsWith(@"\\?\UNC\", StringComparison.Ordinal)) return @"\\" + p.Substring(8);
+        if (p.StartsWith(@"\\?\", StringComparison.Ordinal)) return p.Substring(4);
+        return p;
+    }
+
+    static int Attributes(SafeFileHandle h)
+    {
+        IntPtr buf = Marshal.AllocHGlobal(40);
+        try
+        {
+            if (!GetFileInformationByHandleEx(h, FILE_BASIC_INFO_CLASS, buf, 40)) throw new Win32Exception(Marshal.GetLastWin32Error());
+            return Marshal.ReadInt32(buf, 32);
+        }
+        finally { Marshal.FreeHGlobal(buf); }
+    }
+
+    public static bool IsReparse(SafeFileHandle h) { return (Attributes(h) & ATTR_REPARSE_POINT) != 0; }
+
+    public static bool IsDirectory(SafeFileHandle h) { return (Attributes(h) & ATTR_DIRECTORY) != 0; }
+
+    // 경로 성분 경계 — install-jarvis-evil 은 install-jarvis 아래가 아니다 · 대소문자는 가리지 않는다
+    public static bool Under(string path, string root)
+    {
+        string r = root.TrimEnd('\\');
+        return path.Equals(r, StringComparison.OrdinalIgnoreCase) || path.StartsWith(r + "\\", StringComparison.OrdinalIgnoreCase);
+    }
+
+    // 폴더 목록을 **그 핸들로** 읽는다(FILE_ID_BOTH_DIR_INFO · 이름 칸 = 104바이트 자리)
+    public static string[] List(SafeFileHandle h)
+    {
+        List<string> lines = new List<string>();
+        const int size = 65536;
+        IntPtr buf = Marshal.AllocHGlobal(size);
+        try
+        {
+            int infoClass = FILE_ID_BOTH_DIR_RESTART_INFO_CLASS;
+            while (true)
+            {
+                if (!GetFileInformationByHandleEx(h, infoClass, buf, size))
+                {
+                    int e = Marshal.GetLastWin32Error();
+                    if (e == ERROR_NO_MORE_FILES) break;
+                    throw new Win32Exception(e);
+                }
+                infoClass = FILE_ID_BOTH_DIR_INFO_CLASS;
+                int offset = 0;
+                while (true)
+                {
+                    IntPtr p = new IntPtr(buf.ToInt64() + offset);
+                    int next = Marshal.ReadInt32(p, 0);
+                    long written = Marshal.ReadInt64(p, 24);
+                    long length = Marshal.ReadInt64(p, 40);
+                    int attrs = Marshal.ReadInt32(p, 56);
+                    int nameBytes = Marshal.ReadInt32(p, 60);
+                    string name = Marshal.PtrToStringUni(new IntPtr(p.ToInt64() + 104), nameBytes / 2);
+                    if (name != "." && name != "..")
+                    {
+                        string mode = ((attrs & ATTR_DIRECTORY) != 0 ? "d" : "-") + ((attrs & ATTR_REPARSE_POINT) != 0 ? "l" : "-");
+                        lines.Add(mode + "  " + DateTime.FromFileTimeUtc(written).ToString("yyyy-MM-dd HH:mm", CultureInfo.InvariantCulture) + "Z  " + length.ToString(CultureInfo.InvariantCulture).PadLeft(12) + "  " + name);
+                    }
+                    if (next == 0) break;
+                    offset += next;
+                }
+            }
+        }
+        finally { Marshal.FreeHGlobal(buf); }
+        return lines.ToArray();
+    }
+}
+'@
+
+function Initialize-RemoteHelpFs {
+    if (-not ('JarvisRemoteHelpFs' -as [type])) { Add-Type -TypeDefinition $RemoteHelpFsSource -Language CSharp -ErrorAction Stop }
+}
+
+function Open-RemoteHelpLeaf([string]$Path) {
+    # 이음줄을 따라가지 않고 연다(시험 tests/remote-help-ps1-escape.ps1 이 이 자리를 바꿔 끼워 「여는 순간의 교체」를 재현한다)
+    return [JarvisRemoteHelpFs]::Open($Path)
+}
+
+function Invoke-RemoteHelpHandleRead([string]$Name, $Handle, [int]$Tail, [string]$Label) {
+    # 연 핸들로 읽는다 — 이름을 다시 열지 않는다. 돌려주는 것 = Invoke-RemoteHelpLaunch 와 같다 · 핸들은 부르는 쪽이 닫는다.
     #   60초 상한 = 같은 프로세스 안의 따로 도는 러너(핸들은 프로세스를 못 건넌다 — Start-Job 은 새 프로세스라 쓸 수 없다).
-    #   시간을 넘기면 핸들을 먼저 닫아 읽기를 끊고 러너를 멈춘다(.NET 호출 한가운데서는 즉시 안 멈출 수 있다 · 윈도우 실기 필요).
-    if ($null -eq $Stream) {
-        # 못 열었다(없는 이름·권한) — Test-Path 의 답은 「없다」 · 읽기 명령은 실패를 말한다(이름을 다시 열지 않는다)
+    #   시간을 넘기면 핸들을 먼저 닫아 읽기를 끊고 러너를 멈춘다(운영체제 호출 한가운데서는 즉시 안 멈출 수 있다 · 윈도우 실기 필요).
+    if ($null -eq $Handle) {
+        # 없는 이름(열지 않았다) · 못 열었다 — Test-Path 의 답은 「없다」 · 읽기 명령은 실패를 말한다
         if ($Name -ceq 'Test-Path') { return @{ Refused = ''; Rc = 0; TimedOut = $false; Output = "False`r`n" } }
         return @{ Refused = ''; Rc = 1; TimedOut = $false; Output = "cannot open`r`n" }
     }
+    if ($Name -ceq 'Test-Path') { return @{ Refused = ''; Rc = 0; TimedOut = $false; Output = "True`r`n" } }
     $runner = [System.Management.Automation.PowerShell]::Create()
     try {
         [void]$runner.AddScript({
-            param($name, $stream, $tail)
-            if ($name -ceq 'Test-Path') { return 'True' }
+            param($name, $handle, $tail, $label)
+            $folder = [JarvisRemoteHelpFs]::IsDirectory($handle)
+            if ($name -ceq 'Get-ChildItem') {
+                if ($folder) { return (@([JarvisRemoteHelpFs]::List($handle)) -join "`r`n") }
+                $fs = New-Object System.IO.FileStream($handle, [System.IO.FileAccess]::Read)
+                return ('--  ' + $fs.Length + '  ' + $label)
+            }
+            if ($folder) { throw ($label + ' is a directory') }
+            $stream = New-Object System.IO.FileStream($handle, [System.IO.FileAccess]::Read)
             if ($name -ceq 'Get-FileHash') { return (Get-FileHash -InputStream $stream -Algorithm SHA256 | Format-List Algorithm, Hash | Out-String -Width 160) }
-            # Get-Content -Tail 과 같은 뜻 — 5.1 기본 인코딩으로 읽고(BOM 이 있으면 그것) 끝 N줄만 남긴다
+            # 끝 N줄 — 5.1 기본 인코딩으로 읽고(BOM 이 있으면 그것) 끝 N줄만 남긴다
             $reader = New-Object System.IO.StreamReader($stream, [System.Text.Encoding]::Default, $true)
             $keep = New-Object System.Collections.Generic.Queue[string]
             while ($null -ne ($line = $reader.ReadLine())) {
@@ -4599,10 +4750,10 @@ function Invoke-RemoteHelpStreamRead([string]$Name, $Stream, [int]$Tail) {
                 if ($keep.Count -gt $tail) { [void]$keep.Dequeue() }
             }
             return (@($keep) -join "`r`n")
-        }).AddArgument($Name).AddArgument($Stream).AddArgument($Tail)
+        }).AddArgument($Name).AddArgument($Handle).AddArgument($Tail).AddArgument($Label)
         $async = $runner.BeginInvoke()
         if (-not $async.AsyncWaitHandle.WaitOne($RemoteHelpCmdTimeout * 1000)) {
-            $Stream.Dispose()
+            $Handle.Dispose()
             try { [void]$runner.BeginStop($null, $null) } catch { }
             return @{ Refused = ''; Rc = $null; TimedOut = $true; Output = '' }
         }
@@ -4611,8 +4762,46 @@ function Invoke-RemoteHelpStreamRead([string]$Name, $Stream, [int]$Tail) {
         $errors = ($runner.Streams.Error | Out-String -Width 160)
         return @{ Refused = ''; Rc = $(if ($runner.HadErrors) { 1 } else { 0 }); TimedOut = $false; Output = (($out | Out-String -Width 160) + $errors) }
     } finally {
-        $Stream.Dispose()
         $runner.Dispose()
+    }
+}
+
+function Invoke-RemoteHelpFsCommand([string]$Name, $Values, [string]$RealPath, [int]$PathIndex, [string]$Root) {
+    # 작업 폴더 목록(<path> 없음) · 폴더 목록 · 끝 N줄 · 지문 · 있음 — 돌려주는 것 = Invoke-RemoteHelpLaunch 와 같다
+    $rootHandle = $null
+    $handle = $null
+    try {
+        try {
+            Initialize-RemoteHelpFs
+            $rootHandle = [JarvisRemoteHelpFs]::Open($Root)
+        } catch {
+            Write-Log ('remote help: handle open unavailable - ' + $_.Exception.Message)
+            return @{ Refused = 'path_outside' }
+        }
+        if ([JarvisRemoteHelpFs]::IsReparse($rootHandle)) { return @{ Refused = 'path_outside' } }
+        $label = '.'
+        if ($PathIndex -lt 1) {
+            $handle = $rootHandle
+        } else {
+            $label = Split-Path -Leaf $RealPath
+            $leaf = Get-Item -LiteralPath $RealPath -Force -ErrorAction SilentlyContinue
+            if ($null -ne $leaf -and ($leaf.Attributes -band [System.IO.FileAttributes]::ReparsePoint)) { return @{ Refused = 'path_changed' } }
+            if ($null -ne $leaf) {
+                try { $handle = Open-RemoteHelpLeaf $RealPath } catch { $handle = $null }
+                if ($null -ne $handle) {
+                    # 연 뒤의 불일치 = path_outside(계약 9-4 ④ — 연 것이 작업 폴더 안의 그 이름이라고 말할 수 없다)
+                    $inside = $false
+                    try { $inside = (-not [JarvisRemoteHelpFs]::IsReparse($handle)) -and [JarvisRemoteHelpFs]::Under([JarvisRemoteHelpFs]::FinalPath($handle), [JarvisRemoteHelpFs]::FinalPath($rootHandle)) } catch { $inside = $false }
+                    if (-not $inside) { return @{ Refused = 'path_outside' } }
+                }
+            }
+        }
+        $tail = 0
+        for ($i = 0; $i + 1 -lt $Values.Count; $i += 2) { if ($Values[$i] -ceq '-Tail') { $tail = [int]$Values[$i + 1] } }
+        return (Invoke-RemoteHelpHandleRead $Name $handle $tail $label)
+    } finally {
+        if ($null -ne $handle -and -not [object]::ReferenceEquals($handle, $rootHandle)) { $handle.Dispose() }
+        if ($null -ne $rootHandle) { $rootHandle.Dispose() }
     }
 }
 
@@ -4623,38 +4812,13 @@ function Invoke-RemoteHelpLaunch($Entry, [string[]]$Argv, [string]$RealPath, [in
     if (-not $cwd) { return @{ Refused = 'path_outside' } }
     $values = New-Object System.Collections.Generic.List[string]
     for ($i = 1; $i -lt $Argv.Count; $i++) { $values.Add($Argv[$i]) }
-    $stream = $null
-    $isFolder = $false
-    if ($PathIndex -ge 1) {
-        # 경로 칸은 **먼저 열고 · 연 뒤에 다시 확인하고 · 연 핸들로 읽는다**(검토 지적 BLOCKER — 이름을 확인한 뒤 cmdlet 이 그 이름을
-        #   다시 열면 그 사이에 정션·링크로 바꿔 끼운 것을 따라간다).
-        #   ①마지막 성분이 재분석점이면 거부 ②파일이면 읽기 핸들을 연다 — 공유 = 읽기만(지우기·이름 바꾸기를 막는다 · 열린 파일이 든 폴더도
-        #   이름을 못 바꾼다) ③연 뒤 다시 — 재분석점이거나 실제 이름이 달라졌으면 거부 ④읽기는 그 핸들로(Invoke-RemoteHelpStreamRead).
-        #   ⚠폴더는 .NET 핸들을 열 수 없다 — 다시 확인까지만 하고 cmdlet 에 이름을 준다(잔여 · 윈도우 실기 필요).
-        $leaf = Get-Item -LiteralPath $RealPath -Force -ErrorAction SilentlyContinue
-        if ($null -ne $leaf -and ($leaf.Attributes -band [System.IO.FileAttributes]::ReparsePoint)) { return @{ Refused = 'path_changed' } }
-        if ($null -eq $leaf -or -not $leaf.PSIsContainer) {
-            try { $stream = [System.IO.File]::Open($RealPath, 'Open', 'Read', 'Read') } catch { $stream = $null }
-        }
-        $again = Get-Item -LiteralPath $RealPath -Force -ErrorAction SilentlyContinue
-        # 연 뒤의 불일치 = path_outside(계약 9-4 ④ — 연 것이 작업 폴더 안의 그 이름이라고 말할 수 없다)
-        if ($null -ne $again -and (($again.Attributes -band [System.IO.FileAttributes]::ReparsePoint) -or -not ($again.FullName -ieq $RealPath))) {
-            if ($null -ne $stream) { $stream.Dispose() }
-            return @{ Refused = 'path_outside' }
-        }
-        $isFolder = ($null -ne $again -and $again.PSIsContainer)
-        if ($null -ne $stream -and ($null -eq $again -or $isFolder)) { $stream.Dispose(); return @{ Refused = 'path_outside' } }
-        $values[$PathIndex - 1] = $RealPath
+    # 파일·폴더를 읽는 줄(<path> 가 있는 줄 · 작업 폴더 맨 위 목록)은 작업(Start-Job)으로 보내지 않고 **핸들로만** 읽는다
+    if ($Entry.exec -ceq 'cmdlet' -and ($PathIndex -ge 1 -or $Argv[0] -ceq 'Get-ChildItem')) {
+        return (Invoke-RemoteHelpFsCommand $Argv[0] $values $RealPath $PathIndex $cwd)
     }
     if ($Entry.exec -ceq 'cmdlet') {
         $params = @{}
         for ($i = 0; $i + 1 -lt $values.Count; $i += 2) { $params[$values[$i].Substring(1)] = $values[$i + 1] }
-        if ($PathIndex -ge 1 -and -not $isFolder -and ($Argv[0] -ceq 'Get-Content' -or $Argv[0] -ceq 'Get-FileHash' -or $Argv[0] -ceq 'Test-Path')) {
-            $tail = 0
-            if ($params.ContainsKey('Tail')) { $tail = [int]$params['Tail'] }
-            return (Invoke-RemoteHelpStreamRead $Argv[0] $stream $tail)
-        }
-        if ($null -ne $stream) { $stream.Dispose() }
         $job = Start-Job -ScriptBlock {
             param($name, $params, $cwd)
             Set-Location -LiteralPath $cwd

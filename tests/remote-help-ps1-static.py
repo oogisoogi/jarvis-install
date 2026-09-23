@@ -111,21 +111,36 @@ def checks(path):
        and ordered(cmd, "if ($first.Rule) { return (Send-RemoteHelpDecline $Seq $first.Rule) }", "Say ('     운영팀 명령: ", "$saved = Save-RemoteHelpExecuted $Seq")
        and "Split-Path -Parent $real" not in code(cmd), "없는 폴더 안의 이름을 표시·번호 기록 전에 거절하지 않는다")
     # TOCTOU(외부 검토 1차 BLOCKER) — 다시 풀어 같은지 · 파일은 **먼저 열고** 연 뒤 다시 확인하고 · 그 핸들로 읽는다(작업 뒤로 넘기지 않는다)
+    # TOCTOU(외부 검토 1차 BLOCKER · 2차 BLOCKER) — 다시 풀어 같은지 · 작업 폴더를 핸들로 열고 · <path> 를 이음줄을 따라가지 않고 열고 ·
+    #   **연 핸들의 최종 경로가 작업 폴더 핸들의 최종 경로 아래**일 때만 · 그 핸들로 읽는다
+    #   ⚠이 검사는 글자의 자리·순서까지만 증명한다 — 실제 탈출(조상 폴더 정션 교체)을 죽이는지는 tests/remote-help-ps1-escape.ps1(윈도우 실기)이 잰다
+    fscmd = fn(src, "Invoke-RemoteHelpFsCommand")
     ck("ps1-toctou", "if ($real.Rule -or -not ($real.Real -ieq $first.Real)) { return (Send-RemoteHelpDecline $Seq 'path_changed') }" in cmd
-       and ordered(code(launch), "[System.IO.FileAttributes]::ReparsePoint)) { return @{ Refused = 'path_changed' } }",
-                   "$stream = [System.IO.File]::Open($RealPath, 'Open', 'Read', 'Read')",
-                   "$again = Get-Item -LiteralPath $RealPath -Force -ErrorAction SilentlyContinue",
-                   "-not ($again.FullName -ieq $RealPath))) {",
-                   "return (Invoke-RemoteHelpStreamRead $Argv[0] $stream $tail)",
-                   "$job = Start-Job"),
-       "열기→다시 확인→핸들 읽기 순서가 아니다(또는 실행 직전 재계산이 없다)")
-    ck("ps1-handle-read", "($Argv[0] -ceq 'Get-Content' -or $Argv[0] -ceq 'Get-FileHash' -or $Argv[0] -ceq 'Test-Path')" in launch
-       and "return (Invoke-RemoteHelpStreamRead $Argv[0] $stream $tail)" in code(launch)
-       and "New-Object System.IO.StreamReader($stream, [System.Text.Encoding]::Default, $true)" in stream
-       and "Get-FileHash -InputStream $stream -Algorithm SHA256" in stream
-       and "$async.AsyncWaitHandle.WaitOne($RemoteHelpCmdTimeout * 1000)" in stream
-       and not re.search(r"LiteralPath|\$RealPath|Get-Content", code(stream)),
-       "파일 읽기 명령이 연 핸들이 아니라 이름으로 읽는다(또는 시간 상한이 없다)")
+       and ordered(code(fscmd), "$rootHandle = [JarvisRemoteHelpFs]::Open($Root)",
+                   "[System.IO.FileAttributes]::ReparsePoint)) { return @{ Refused = 'path_changed' } }",
+                   "$handle = Open-RemoteHelpLeaf $RealPath",
+                   "$inside = (-not [JarvisRemoteHelpFs]::IsReparse($handle)) -and [JarvisRemoteHelpFs]::Under([JarvisRemoteHelpFs]::FinalPath($handle), [JarvisRemoteHelpFs]::FinalPath($rootHandle))",
+                   "if (-not $inside) { return @{ Refused = 'path_outside' } }",
+                   "return (Invoke-RemoteHelpHandleRead $Name $handle $tail $label)")
+       and "return [JarvisRemoteHelpFs]::Open($Path)" in fn(src, "Open-RemoteHelpLeaf"),
+       "연 핸들의 최종 경로로 작업 폴더 소속을 증명하지 않는다(또는 실행 직전 재계산이 없다)")
+    fs_src = re.search(r"^\$RemoteHelpFsSource = @'\n(.*?)\n'@", src, re.S | re.M)
+    cs = fs_src.group(1) if fs_src else ""
+    ck("ps1-handle-open", "GetFinalPathNameByHandleW" in cs and "GetFileInformationByHandleEx" in cs
+       and "CreateFileW(path, GENERIC_READ, FILE_SHARE_READ | FILE_SHARE_WRITE, IntPtr.Zero, OPEN_EXISTING, FILE_FLAG_BACKUP_SEMANTICS | FILE_FLAG_OPEN_REPARSE_POINT, IntPtr.Zero)" in cs
+       and "FILE_SHARE_DELETE" not in cs and "Add-Type -TypeDefinition $RemoteHelpFsSource -Language CSharp -ErrorAction Stop" in fn(src, "Initialize-RemoteHelpFs"),
+       "이음줄을 따라가지 않고 · 지우기 공유 없이 열지 않거나 · 최종 경로를 묻지 않는다")
+    handle = fn(src, "Invoke-RemoteHelpHandleRead")
+    ck("ps1-handle-read", ordered(code(launch), "($PathIndex -ge 1 -or $Argv[0] -ceq 'Get-ChildItem')", "return (Invoke-RemoteHelpFsCommand $Argv[0] $values $RealPath $PathIndex $cwd)", "$job = Start-Job")
+       and "[JarvisRemoteHelpFs]::List($handle)" in handle and "New-Object System.IO.FileStream($handle, [System.IO.FileAccess]::Read)" in handle
+       and "Get-FileHash -InputStream $stream -Algorithm SHA256" in handle and "$async.AsyncWaitHandle.WaitOne($RemoteHelpCmdTimeout * 1000)" in handle
+       and not re.search(r"LiteralPath|\$RealPath|Get-Content|Set-Location|Get-ChildItem -", code(handle)),
+       "파일·폴더 읽기가 연 핸들이 아니라 이름으로 읽는다(또는 시간 상한이 없다)")
+    esc = os.path.join(HERE, "remote-help-ps1-escape.ps1")
+    esc_text = open(esc, encoding="utf-8-sig").read() if os.path.exists(esc) else ""
+    ck("ps1-escape-test", "New-Item -ItemType Junction" in esc_text and "function global:Open-RemoteHelpLeaf" in esc_text
+       and "if (-not `$inside) { return @{ Refused = 'path_outside' } }" in esc_text and "if (-not $inside) { return @{ Refused = 'path_outside' } }" in fscmd,
+       "윈도우 탈출 시험(조상 정션 교체 · 뮤턴트 앵커)이 없거나 설치기와 앵커가 어긋났다")
     readfn = fn(src, "Read-RemoteHelpExecuted")
     ck("ps1-seq-corrupt", readfn.count("catch { return $null }") == 2 and "if (-not ($parsed -is [array])) { return $null }" in readfn
        and "if ($null -eq $executed) { Say" in tick, "깨진 기록 파일을 닫힌 쪽으로 다루지 않는다")
@@ -163,7 +178,8 @@ def checks(path):
     wake = fn(src, "Step-Wake")
     # D1 기각 — ReachedWake 는 깨우기가 성공한 두 자리(cys 창을 열었다 · 이 창의 자비스가 종료 코드 0)에만
     ck("ps1-wire-wake", code(src).count("$script:ReachedWake = $true") == 2 and code(wake).count("$script:ReachedWake = $true") == 2
-       and re.search(r"if \(\$ref -match 'surface:'\) \{\n\s+Say \"     cys 안에서 자비스를 열었습니다[^\n]*\n(?:\s+#[^\n]*\n)*\s+\$script:ReachedWake = \$true\n", wake)
+       and re.search(r"if \(\$null -ne \$seatRc -and \$seatRc -eq 0 -and \$ref -match 'surface:'\) \{\n\s+Say \"     cys 안에서 자비스를 열었습니다[^\n]*\n(?:\s+#[^\n]*\n)*\s+\$script:ReachedWake = \$true\n", wake)
+       and code(wake).count("$global:LASTEXITCODE = -1\n                $ref = (& $cli new-surface") == 2 and "$seatRc = $global:LASTEXITCODE" in wake
        and ordered(wake, "$global:LASTEXITCODE = -1", "& $fallbackExe --dangerously-skip-permissions $fallbackPrompt", "if ($global:LASTEXITCODE -eq 0) { $script:ReachedWake = $true }"),
        "깨우기 성공 뒤에만 ReachedWake 를 세우지 않는다")
     close = fn(src, "Write-ClosingNote")
@@ -200,8 +216,11 @@ MUTANTS = [
     ("P12 고지 없이 보냄", "    if ($script:NoticeShown) { Invoke-RemoteHelp }", "    Invoke-RemoteHelp", "ps1-wire-closing"),
     ("P13 대소문자·끝 줄바꿈 무시", "-not ($v -cmatch $tokenPattern)", "-not ($v -match $tokenPattern)", "ps1-case"),
     ("P14 시간 상한 제거", "    $done = Wait-Job -Job $job -Timeout $RemoteHelpCmdTimeout", "    $done = Wait-Job -Job $job", "ps1-timeout"),
-    ("P15 연 뒤 다시 확인 제거", "        $again = Get-Item -LiteralPath $RealPath -Force -ErrorAction SilentlyContinue\n", "        $again = $leaf\n", "ps1-toctou"),
-    ("P16 핸들이 아니라 이름으로 읽음", "            return (Invoke-RemoteHelpStreamRead $Argv[0] $stream $tail)\n", "", "ps1-handle-read"),
+    ("P15 연 핸들의 작업 폴더 소속 판정 제거(외부 검토 2차 BLOCKER)", "                    if (-not $inside) { return @{ Refused = 'path_outside' } }\n", "", "ps1-toctou"),
+    ("P16 파일·폴더 줄을 작업(이름)으로 보냄", "        return (Invoke-RemoteHelpFsCommand $Argv[0] $values $RealPath $PathIndex $cwd)\n", "", "ps1-handle-read"),
+    ("P24 cys 종료 코드를 안 보고 surface: 글자로 성공 판정(D1)", "$null -ne $seatRc -and $seatRc -eq 0 -and $ref -match 'surface:'", "$ref -match 'surface:'", "ps1-wire-wake"),
+    ("P25 핸들 공유에 지우기 허용", "FILE_SHARE_READ | FILE_SHARE_WRITE, IntPtr.Zero, OPEN_EXISTING", "FILE_SHARE_READ | FILE_SHARE_WRITE | 4, IntPtr.Zero, OPEN_EXISTING", "ps1-handle-open"),
+    ("P26 이음줄을 따라가며 엶", "FILE_FLAG_BACKUP_SEMANTICS | FILE_FLAG_OPEN_REPARSE_POINT, IntPtr.Zero)", "FILE_FLAG_BACKUP_SEMANTICS, IntPtr.Zero)", "ps1-handle-open"),
     ("P17 기록 잠금 제거", "        if (-not $held) { return 'LOCKED' }\n", "", "ps1-seq-lock"),
     ("P18 CYS_NO_AUTOSTART 제거", "            $env:CYS_NO_AUTOSTART = '1'\n", "", "ps1-no-autostart"),
     ("P19 권한 없이 토큰 씀", "        Set-Acl -LiteralPath $full -AclObject $acl -ErrorAction Stop\n", "", "ps1-token"),

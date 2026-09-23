@@ -154,7 +154,10 @@ Save-RemoteHelpExecuted	remote_help_record	sh	실행 전 번호 기록 · 잠금
 Get-RemoteHelpCanonical	remote_help_confine	sh	링크 풀린 실제 경로 — cd -P·readlink 인라인
 Resolve-RemoteHelpPath	remote_help_confine	sh	작업 폴더 안 가두기 · path_missing·path_outside 같은 일
 Get-RemoteHelpCysPath	remote_help_cys_path	sh	같은 일(절대 경로 후보만)
-Invoke-RemoteHelpStreamRead	remote_help_launch,remote_help_open_leaf	sh	연 것을 명령에 주기 — 맥은 fd 3 으로 열어 /dev/fd/3 을 넘김
+Initialize-RemoteHelpFs	-	na	핸들 최종 경로·핸들 폴더 목록용 운영체제 함수(C#)를 한 번 올리기 — 맥은 fd 와 cd -P 가 같은 일을 하므로 올릴 것이 없다. (2026-09-11 79cd117)
+Open-RemoteHelpLeaf	remote_help_open_leaf	sh	마지막 성분을 이음줄을 따라가지 않고 연다 — 맥은 fd 3 으로 연다(시험이 이 자리를 바꿔 끼워 여는 순간의 교체를 재현)
+Invoke-RemoteHelpHandleRead	remote_help_launch	sh	연 것으로만 읽기(끝 N줄·지문·목록) — 맥은 /dev/fd/3 을 명령에 넘긴다
+Invoke-RemoteHelpFsCommand	remote_help_launch,remote_help_confine	sh	파일·폴더를 읽는 줄 = 작업 폴더 핸들 + 연 핸들의 최종 경로 소속 확인 뒤 핸들로 읽기 — 맥은 연 fd 의 정체(장치:아이노드) 대조
 Invoke-RemoteHelpLaunch	remote_help_launch	sh	같은 일(셸 없이 · 60초 상한 · 교체 감지)
 Send-RemoteHelpAck	remote_help_ack	sh	같은 일(ran)
 Send-RemoteHelpDecline	remote_help_ack	sh	같은 일(declined policy:<rule> · 410 이면 rc 3)

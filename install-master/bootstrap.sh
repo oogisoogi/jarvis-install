@@ -117,21 +117,35 @@ BLOCKED_STEP=""
 #   ⚠원작자 판으로 가는 길은 **둘뿐**이다: ⑴인텔 맥(우리 빌드는 arm64 전용) ⑵우리 자산이 404 일 때.
 # ★★릴리스 핀 자리(v0.3.18) — 다음 판(cysr 1.0.0 · 앱+팩 단일 판번)으로 올릴 때 고치는 곳은 **이 CYS_FORK_* 블록뿐**이다:
 #   CYS_DISPLAY_NAME · CYS_FORK_VERSION · CYS_FORK_FILE(자산 이름이 바뀌면) · CYS_FORK_BYTES · CYS_FORK_SHA256 · CYS_FORK_CDHASH.
+#   ★인텔 값은 바로 아래 CYS_FORK_X64_* 블록이다(같은 판본의 x64 자산 · 셋 다 실측으로 채워야 인텔 설치가 돈다).
 #   ⚠맥은 판번 대조에 CDHash(설치된 프로그램의 내용 지문)를 이미 함께 쓴다 — 판번이 같아도 CDHash 가 다르면 바꿔 넣는다(step_install_cys).
 #   화면 머리글 = 「<이름> <판> · 설치 도우미 <설치기 판>」(설치기 판 = INSTALLER_VERSION · 별도 semver).
 CYS_DISPLAY_NAME="cysr"
-CYS_FORK_VERSION="1.0.2"
+CYS_FORK_VERSION="1.1.0"
 CYS_FORK_DIR="https://github.com/oogisoogi/cys-ro/releases/download/v${CYS_FORK_VERSION}/"
 # 1.0.1 부터 zip 최상위 = cysr.app(안의 실행 파일 = Contents/MacOS/cys · cys-app · cysd · CFBundleName cysr · 로컬 빌드 실측 2026-09-16).
 CYS_FORK_FILE="cysr-macos-arm64-v${CYS_FORK_VERSION}.zip"
-# ✅아래 크기·지문·CDHash = v1.0.2 발행(2026-09-18 11:23 · Latest) 뒤 **실측으로 채웠다**(installer-0325-r3 · 앞 판 값(v1.0.1)을 대신한다).
-#   출처 = 릴리스 SHA256SUMS.txt(그 파일 자신의 sha256 = 17ad2595213ae3868fb56820cd6c7aabca2d66f9c7130d618e4cc57d38f4897e) · 크기는 릴리스 자산 목록과 내려받은 파일 양쪽에서 쟀다.
+# ✅아래 크기·지문·CDHash = **v1.1.0 태그가 가리키는 커밋 6460fe8f** 의 빌드 zip 에서 실측으로 채웠다(2026-09-20 · v110-vm-verify · 앞 판 값(v1.0.2)을 대신한다).
+#   출처 = 빌드 zip 실물(out-mac-v110-tag2) · 크기·sha256 은 그 파일에서, CDHash 는 풀어서(ditto -x -k) codesign -dvvv 로 쟀다(워커 독립 재검산 2026-09-20 21:5x · 8/8 일치).
+#   ⚠태그가 옮겨지면 이 값도 함께 바뀐다 — 이 라운드에만 f164dc30 → 1b974879 → d900a723 → 6460fe8f 로 세 번 옮겨졌다(그때마다 재검산했다).
 #   CDHash 는 **발행된 그 zip** 을 풀어(ditto -x -k) `codesign -dvvv` 로 쟀다(서명 = cys-local · zip 최상위 = cysr.app 하나).
-CYS_FORK_BYTES="471899457"
-CYS_FORK_SHA256="86ba5a68f9d07f4598094841209ee5471d3fa5396c2f5a93f49a787620ba389a"
+CYS_FORK_BYTES="207397105"
+CYS_FORK_SHA256="95f46ef4569317fee71be33c3ce91c1385fdc39f66933a2cd2e430a2debcf8d8"
 # 설치된 프로그램이 「바로 이 판」인가를 가르는 값. 판본 숫자는 원작자 판도 같은 숫자를 쓸 수 있어서
 #   숫자만 보면 **원작자 판을 우리 판으로 읽고 건너뛴다**(어제 원작자 판을 깐 맥이 그대로 남는다).
-CYS_FORK_CDHASH="17d240abc9d7a9261d410e58616ff1aeb1848c2e"
+CYS_FORK_CDHASH="2e8804f731942d7402ca29b5fffdacdd05d1fb49"
+
+# ★★인텔(x86_64) 맥 핀 — v1.1 부터 우리 판이 인텔 맥도 덮는다 (2026-09-20 · TICKET=v110-mac-x64).
+#   까닭: v1.0.2 까지 우리 맥 자산은 arm64 하나뿐이라 **인텔 맥만 원작자 판으로 갈라졌다**. 같은 날 같은 방에서
+#     두 참가자가 서로 다른 cys 를 쓰는 일이 실제로 있었다(2026-09-15 전환 주석의 그 사유) — 그 갈림을 여기서 닫는다.
+#   ✅아래 세 값은 v1.1.0 x64 발행 zip 에서 **실측으로 채웠다**(2026-09-20 · v110-vm-verify · Mach-O thin x86_64 · 서명 cys-local).
+#     ⚠실기 검증은 arm64 에서만 했다 — x64 는 Tart(arm64 호스트)에서 실행할 수 없어 **미검증**이다(로제타 스모크만 · v110-mac-x64 라운드).
+#   ⛔자리표가 남아 있는 동안 인텔 맥은 **원작자 판으로 돌아가지 않고 멈춘다**(cys_fork_x64_pin_ready · step_download_cys 머리).
+#     조용히 원작자 판을 깔면 이 바꿈이 없애려던 그 갈림이 그대로 되살아난다 — 말없이 다른 판을 까느니 멈춰서 말하는 쪽을 고른다.
+CYS_FORK_X64_FILE="cysr-macos-x64-v${CYS_FORK_VERSION}.zip"
+CYS_FORK_X64_BYTES="214997910"
+CYS_FORK_X64_SHA256="f96b3593321f38612553e02d9aa73f7ee0bf90dd1ae165d5515505bf4b785696"
+CYS_FORK_X64_CDHASH="1cd6f17c015d8d944b5814c507718f32057ddb22"
 # 저희 판이 놓이는 자리 = /Applications/cysr.app · 옛 이름 자리 = /Applications/cys.app(0.14.x·1.0.0 이 깔린 자리 · 원작자 판도 이 이름).
 CYS_FORK_APP="/Applications/cysr.app"
 CYS_OLD_APP="/Applications/cys.app"
@@ -155,12 +169,37 @@ cys_use_fork_pin() {
   CYS_MAC_FILE="$CYS_FORK_FILE"; CYS_MAC_BYTES="$CYS_FORK_BYTES"; CYS_MAC_SHA256="$CYS_FORK_SHA256"
   CYS_DOWNLOAD_URL="${CYS_FORK_DIR}${CYS_MAC_FILE}"
 }
+# 인텔 핀이 **실측값으로 채워졌는가**. 셋 다 모양이 맞아야 참이다 — 자리표·빈칸·길이 어긋남은 전부 거짓.
+#   ★모양만 본다(값이 발행된 zip 과 같은지는 tests/mac-pin-release.sh 가 릴리스를 때려서 잰다).
+#   ★로케일에 맡기지 않는다 — LC_ALL=C 로 지운 뒤 남는 글자가 없어야 16진이다(install_id_ensure 와 같은 잣대).
+cys_fork_x64_pin_ready() {
+  case "$CYS_FORK_X64_BYTES" in ''|*[!0-9]*) return 1 ;; esac
+  [ "$CYS_FORK_X64_BYTES" -gt 0 ] 2>/dev/null || return 1
+  [ ${#CYS_FORK_X64_SHA256} -eq 64 ] || return 1
+  [ -z "$(printf '%s' "$CYS_FORK_X64_SHA256" | LC_ALL=C tr -d '0-9a-f')" ] || return 1
+  [ ${#CYS_FORK_X64_CDHASH} -eq 40 ] || return 1
+  [ -z "$(printf '%s' "$CYS_FORK_X64_CDHASH" | LC_ALL=C tr -d '0-9a-f')" ] || return 1
+  return 0
+}
+# 인텔 자산으로 갈아끼운 뒤 애플 실리콘과 **같은 길**(zip 받기 → 풀기 → 격리 지우기 → 서명 확인 → 한 번에 바꿔 넣기)을 탄다.
+#   그래서 CYS_FORK_* 를 덮어쓴다 — 설치·판별 쪽(step_install_cys·cys_recheck 등)이 CDHash 를 이 이름으로 읽기 때문이다.
+#   ★값을 옮기지 않고 그쪽 코드에 칩 갈래를 또 만들면, 갈래가 늘어난 만큼 한쪽만 고치는 날이 온다.
+cys_use_fork_x64_pin() {
+  CYS_FORK_FILE="$CYS_FORK_X64_FILE"
+  CYS_FORK_BYTES="$CYS_FORK_X64_BYTES"
+  CYS_FORK_SHA256="$CYS_FORK_X64_SHA256"
+  CYS_FORK_CDHASH="$CYS_FORK_X64_CDHASH"
+  cys_use_fork_pin
+}
 # 원작자 판으로 간 까닭(intel · missing) — 사람에게 한 번 말하고 기록에 남긴다.
 CYS_VENDOR_WHY=""
+# 1 = 인텔인데 핀이 아직 자리표다 — **받기 전에 멈춘다**(원작자 판 폴백 없음 · step_download_cys 머리).
+CYS_X64_PIN_PENDING=0
 if [ "$(uname -m)" = "arm64" ]; then
   cys_use_fork_pin
 else
-  cys_use_vendor_pin; CYS_VENDOR_WHY="intel"
+  cys_use_fork_x64_pin
+  cys_fork_x64_pin_ready || CYS_X64_PIN_PENDING=1
 fi
 
 LOGIN_POLL_INTERVAL=3      # 초
@@ -1220,7 +1259,8 @@ help_way_lines() {   # help_way_lines <코드> — 두 번째 방법 줄들(정�
   esac
 }
 help_is_direct() {   # 다른 방법이 없는 코드 — 2회째부터 곧바로 담당자 안내(정본 direct)
-  case "$1" in J-DL-05) return 0 ;; esac
+  # J-DL-06(인텔용 판 준비 전)도 사람이 할 수 있는 일이 없다 — 두 번째부터 곧바로 담당자에게 잇는다.
+  case "$1" in J-DL-05|J-DL-06) return 0 ;; esac
   return 1
 }
 
@@ -2678,8 +2718,16 @@ cys_file_sha256() {
 step_download_cys() {
   mkdir -p "$DL_DIR"
   local dst got try code have fresh
-  if [ "$CYS_VENDOR_WHY" = "intel" ]; then
-    say "[5/10] 이 맥은 인텔 칩입니다 — 원작자 공식 판(${CYS_VERSION})을 받습니다(저희 판은 애플 실리콘 맥 전용입니다)."
+  # ⛔인텔 핀이 자리표인 동안은 **여기서 끝낸다**. 예전에는 이 자리에서 원작자 판으로 갈아탔는데,
+  #   그 조용한 갈아타기가 「같은 방에서 서로 다른 cys」 를 만든 바로 그 길이었다(2026-09-20 전환).
+  #   ★받을 자리도, 크기도, 지문도 아직 없는 상태다 — 이대로 내려가면 없는 파일을 받으러 간다.
+  if [ "${CYS_X64_PIN_PENDING:-0}" = "1" ]; then
+    say "[5/10] 이 맥은 인텔 칩입니다 — 인텔용 저희 판(${CYS_FORK_VERSION})이 아직 준비되지 않았습니다."
+    say "     준비되면 이 설치 도우미를 새로 받아 다시 실행해 주시면 끝까지 진행됩니다."
+    say "     (원작자 판으로 대신 깔지 않습니다 — 같은 방에서 서로 다른 프로그램을 쓰게 되기 때문입니다.)"
+    jcode "J-DL-06" "인텔용 저희 판이 아직 준비되지 않았습니다"
+    NEXT_STEP="이 진단 코드와 함께 알려 주십시오 — 인텔용 판이 준비되는 대로 안내드리겠습니다. 다시 실행하셔도 같습니다."
+    return 5
   fi
   dst="$DL_DIR/$CYS_MAC_FILE"
   if [ -f "$dst" ] && [ "$(wc -c < "$dst" | tr -d ' ')" = "$CYS_MAC_BYTES" ]; then
@@ -4035,7 +4083,7 @@ cys_open_master_seat() {   # $1 = 여는 명령 · 화면으로 나가는 것 = 
 # ── 하는 일 9 — 자비스 깨우기 ─────────────────────────────────────
 # cys 안에서 세션을 여는 것이 기본이고, 그것이 안 되면 이 창에서 바로 띄운다.
 step_wake() {
-  local first_prompt cli ref fleet_rc
+  local first_prompt cli ref fleet_rc seat_rc=""
   # 🔴**cys 에 넘기는 인자**는 ASCII 로만 쓴다(자리 여는 명령 · 창 이름) — 윈도우에서 우리말 인자가 깨져 거절당했다.
   #   첫 지시는 cys 를 지나지 않는다: wake.sh 안에 적혀 claude 에게 바로 가고, 이 창 폴백에서도 claude 의 인자로 바로 간다.
   # 🔴2026-09-16 개정(TICKET=installer-0322-awaken · 윈도우판과 같은 문구로 맞춘다).
@@ -4091,10 +4139,15 @@ ${first_prompt}"
       log "wake path unusable: $wake_file"
       ref=""
     else
-      ref="$(cys_open_master_seat "$cmd_line" | tr -d '\n')"
+      # 성공 = 종료 코드 0 **그리고** 답에 surface: — 실패한 답의 글에 그 글자가 섞여도 성공으로 읽지 않는다(검토 지적 · D1).
+      #   ⚠파이프로 이으면 종료 코드가 사라진다 ⇒ 먼저 받아 두고 코드를 잰 뒤에 줄바꿈을 뗀다.
+      ref="$(cys_open_master_seat "$cmd_line")"
+      seat_rc=$?
+      [ "$seat_rc" -eq 0 ] || ref="rc=$seat_rc $ref"
+      ref="$(printf '%s' "$ref" | tr -d '\n')"
     fi
-    case "$ref" in
-      *surface:*)
+    case "${seat_rc:-1}:$ref" in
+      0:*surface:*)
         [ "$CYS_APP_OPENED" = "1" ] && say "     cys 앱 창을 열었습니다 — 자비스는 그 창(제목 jarvis)에서 깨어납니다."
         say "     cys 안에서 자비스를 열었습니다 ($ref). cys 창에서 이어서 이야기하십시오."
         # 깨우기가 **성공한 뒤에만** 세운다(검토 지적 · D1 기각) — 깨우기가 실패한 끝은 원격 해결이 돈다.
@@ -4190,7 +4243,7 @@ raise_cys_app_window() {
 # ★언제 도는가 = 자비스를 깨우기 **전에** 진단 코드를 남기고 멈춘 끝. 자비스를 깨운 뒤에는 돌지 않는다
 #   (자비스가 이 창을 넘겨받으므로 두 쪽이 한 화면에 섞이지 않게).
 # ⚠JSON·재검사·스크럽은 macOS 기본 `osascript`(JavaScript)가 한다 — 깨끗한 맥에는 jq·python 이 없다.
-INSTALLER_VERSION="0.3.26"      # 보고의 installer_version · BOOTSTRAP_VERSION 은 화면 머리글 용도 그대로(보내지 않는다)
+INSTALLER_VERSION="0.3.27"      # 보고의 installer_version · BOOTSTRAP_VERSION 은 화면 머리글 용도 그대로(보내지 않는다)
 HELP_API_URL="https://jarvis-install.godmeyou.kr"
 REMOTE_HELP_NOTICE_URL="jarvis-install.godmeyou.kr/help/notice"
 # [1/10] 고지 1줄 = /help/notice 정본(page.ts)이 인용하는 문장 그대로 + 끝에 자세한 안내 자리(계약 7-1절). ⛔문안 변경 금지.
@@ -5044,14 +5097,15 @@ remote_help_cys_path() {   # 표 9-2절 「실행 대상」 — 절대 경로 �
 
 # ⑤ 실행 번호 기록 — 두 창(또는 두 번 뜬 설치기)이 같은 번호를 동시에 남기지 못하게 잠근다(검토 지적: 잠금 없이 둘이 함께 부르면 둘 다 OK).
 #   잠금 = `mkdir`(원자) · 못 잡으면 0.1초씩 최대 2초 · 그래도 못 잡으면 LOCKED(실행하지 않는다).
-#   끝나지 못한 잠금(프로세스가 강제로 죽은 자리)은 30초가 지나면 치운다 — 한 번의 기록은 1초 안에 끝난다(치우지 않으면 그 뒤 모든 명령이 거절된다).
+#   ⛔남은 잠금을 **추측으로 치우지 않는다**(검토 지적 — 「오래돼 보인다」는 주인이 죽었다는 증명이 아니다. 살아 있는 주인의 잠금을 치우면
+#     두 창이 같은 번호를 함께 OK 로 받는다). 강제 종료로 잠금이 남으면 그 뒤 명령은 seq_lock 으로 거절된다(닫힌 쪽 · 한계로 적는다).
+#     신호로 멈추는 길(HUP·INT·TERM)은 쥔 잠금을 풀고 나간다 — 남는 것은 SIGKILL·전원 단절이 기록 1초 안에 끼었을 때뿐이다.
 #   ⚠전원 단절 내구성(정직): 기록은 임시 파일에 쓴 뒤 이름을 바꾼다(반쯤 쓴 파일은 없다). `sync` 는 디스크 전체를 비우는 명령이라 쓰지 않는다 —
 #     쓴 직후 전원이 끊기면 기록이 사라져 재부팅 뒤 같은 번호가 한 번 더 돌 수 있다(표 v1 은 읽기뿐이다).
 remote_help_record() {   # <seq> → RH_RECORD = OK · ALREADY · LOCKED · FAIL
   local lock="$REMOTE_HELP_SEQ_FILE.lock" tries=0
   RH_RECORD=FAIL
   until mkdir "$lock" 2>/dev/null; do
-    [ -n "$(find "$lock" -maxdepth 0 -mtime +30s 2>/dev/null)" ] && rmdir "$lock" 2>/dev/null
     tries=$((tries + 1))
     [ "$tries" -le 20 ] || { RH_RECORD=LOCKED; return 0; }
     sleep 0.1
@@ -5167,7 +5221,12 @@ detect_stage2
 write_report
 note_old_cys_app
 progress_send '1/10' 'end' '' '' ''     # ps1 5651
-progress_send '1/10' 'info' '' '' env   # ps1 5652 — 환경 칸
+# 환경 칸에 **칩**을 함께 싣는다(2026-09-20 · TICKET=v110-mac-x64). 인텔 맥이 몇 대인지·어디서 멈추는지를
+#   운영팀이 지금은 셀 수 없다 — 맥 이벤트에 아키텍처 칸이 아예 없었다.
+#   ⚠새 env 열쇠(arch)를 만들지 않고 **detail**(서버가 이미 받는 자유 칸)에 싣는다: 서버가 받는 env 열쇠는
+#     claude_ver·cys_ver·win_build·ps_ver·av·browser·mac_ver·admin 로 **정해져 있어**(web-install telemetry.ts
+#     ENV_TEXT_KEYS) 새 열쇠는 서버를 함께 고쳐야 닿는다. 서버 쪽은 이 저장소 밖이라 여기서 못 고치고 못 잰다.
+progress_send '1/10' 'info' '' "arch:$(uname -m 2>/dev/null)" env   # ps1 5652 — 환경 칸
 
 if [ "$MODE" = "detect" ]; then
   say "감지만 하고 끝냅니다."

@@ -621,7 +621,7 @@ echo "== 단계 2 — cys 설치 대행 [5]~[9] =="
 # (installer-0321-pin) 1.0.1 발행(2026-09-16) 실측값이 채워졌다 — 아래 두 축은 이제 **초록이어야 한다**(자리표가 남으면 붉다).
 #   ⚠이 축은 **형식만** 본다(64자리인가·숫자인가). 한 글자 틀린 값도 여기서는 통과하므로, 값이 릴리스와 같은지는 tests/win-pin-release.sh 가 릴리스를 때려서 진다.
 codegrep "$PS" 'CysWinBytes    = [0-9]+$'; ck "[5] 설치 파일 크기 핀(= cysr v1.0.1 setup.exe · 숫자)" $? "받다 끊긴 파일을 정상으로 본다(자리표가 남았다)"
-codegrep "$PS" "CysVersion     = '1\\.0\\.2'"; ck "[5] 윈 판본 핀 정확값(= cysr v1.0.2)" $? "이름표만 새 판본이고 실제로 받는 판본은 옛것이다"
+codegrep "$PS" "CysVersion     = '1\\.1\\.0'"; ck "[5] 윈 판본 핀 정확값(= cysr v1.1.0)" $? "이름표만 새 판본이고 실제로 받는 판본은 옛것이다"
 codegrep "$PS" "CysWinSha256   = '[0-9a-f]{64}'"; ck "[5] 윈 설치 파일 sha256 핀(= 릴리스 SHA256SUMS 줄 · 64자리)" $? "지문이 없으면 모든 설치가 지문 불일치로 멈춘다(자리표가 남았다)"
 no_code "$PS" 'TBD-1\.0\.1' && no_code "$SH" 'TBD-1\.0\.1'
 ck "[v0320] 핀 자리표(TBD-1.0.1)가 두 설치기에 남지 않았다" $? "발행값이 아직 안 채워졌다 — 이대로 배포하면 cys 받기가 반드시 실패한다"
@@ -2204,7 +2204,7 @@ ck "[핀] 설치기(맥) 코드의 판본 문자열이 전부 핀 판본이다" 
 
 # ── ⓕ-2 맥 저희 판 전환 (2026-09-15) ────────────────────────────────
 #   애플 실리콘 맥은 우리 릴리스 zip 을 받아 풀어 넣는다. 인텔·자산 없음만 원작자 판으로 간다.
-codegrep "$SH" 'CYS_FORK_VERSION="1\.0\.2"'; ck "[전환] 맥 저희 판 판본 핀" $? "판본 핀이 없다"
+codegrep "$SH" 'CYS_FORK_VERSION="1\.1\.0"'; ck "[전환] 맥 저희 판 판본 핀" $? "판본 핀이 없다"
 codegrep "$SH" 'CYS_FORK_DIR="https://github\.com/oogisoogi/cys-ro/releases/download/v'; ck "[전환] 저희 판은 판본이 박힌 우리 릴리스 자리에서 받는다" $? "다른 자리를 가리킨다"
 # (installer-0321-pin) 1.0.1 발행(2026-09-16) 실측값이 채워졌다 — 아래 세 축은 이제 **초록이어야 한다**(자리표가 남으면 붉다 · 이 축도 형식만 본다).
 codegrep "$SH" 'CYS_FORK_BYTES="?[0-9]+"?$'; ck "[전환] 저희 판 크기 핀(숫자)" $? "크기가 안 맞아 매번 멈춘다(자리표가 남았다)"
@@ -2232,9 +2232,26 @@ codegrep "$SH" 'app="\$stage/cysr\.app"' && codegrep "$SH" '^CYS_FORK_APP="/Appl
 ck "[전환] 저희 판은 zip 안 cysr.app 을 /Applications/cysr.app 으로 넣는다" $? "옛 이름으로 풀거나 넣어 zip 을 못 찾는다"
 awk '/^[[:space:]]*cat > "\$swap" <<.EOF_SWAP.$/{f=1} f&&/^if mv "\$new" "\$dst"; then$/{m=NR} f&&m&&!o&&/mv "\$old" "\$oldprev"/{o=NR} f&&/^EOF_SWAP$/{exit} END{exit !(m&&o&&m<o)}' "$SH"
 ck "[전환] 옛 이름 cys.app 은 새 판을 넣은 뒤에만 보관 자리로 옮긴다" $? "넣기가 실패해도 쓰던 cys 가 사라진다"
-# 칩 갈래: arm64 만 저희 판, 그 밖은 원작자 판(intel 사유) — 순서까지 본다.
-awk '/^if \[ "\$\(uname -m\)" = "arm64" \]; then$/{f=1} f&&/^  cys_use_fork_pin$/{a=NR} f&&/^else$/{e=NR} f&&/cys_use_vendor_pin; CYS_VENDOR_WHY="intel"/{b=NR} f&&/^fi$/{exit} END{exit !(a&&e&&b&&a<e&&e<b)}' "$SH"
-ck "[전환] 애플 실리콘만 저희 판 · 인텔은 원작자 판" $? "칩 갈래가 뒤집히거나 사라졌다"
+# ── 칩 갈래 (2026-09-20 전환 · TICKET=v110-mac-x64) ─────────────────────────
+#   **두 칩 모두 저희 판**이다. 인텔은 x64 자산을 쓰고, 그 핀이 아직 자리표면 **멈춘다**
+#   (원작자 판으로 돌아가지 않는다 — 그 조용한 갈아타기가 「같은 방 다른 cys」 를 만들었다).
+#   ⚠옛 축("애플 실리콘만 저희 판 · 인텔은 원작자 판")은 이 전환으로 폐기됐다. 뮤턴트 M56 도 함께 재조준했다.
+awk '/^if \[ "\$\(uname -m\)" = "arm64" \]; then$/{f=1} f&&/^  cys_use_fork_pin$/{a=NR} f&&/^else$/{e=NR} f&&/^  cys_use_fork_x64_pin$/{b=NR} f&&/cys_fork_x64_pin_ready \|\| CYS_X64_PIN_PENDING=1/{c=NR} f&&/^fi$/{exit} END{exit !(a&&e&&b&&c&&a<e&&e<b&&b<c)}' "$SH"
+ck "[전환] 두 칩 모두 저희 판 · 인텔은 핀 준비까지 본다" $? "칩 갈래가 뒤집히거나 인텔이 저희 판에서 빠졌다"
+# 칩 갈래 **안에** 원작자 핀 호출이 없어야 한다 — 있으면 인텔이 조용히 원작자 판으로 샌다.
+awk '/^if \[ "\$\(uname -m\)" = "arm64" \]; then$/{f=1} f&&/cys_use_vendor_pin/{bad=1} f&&/^fi$/{exit} END{exit !(f&&!bad)}' "$SH"
+ck "[전환] 칩 갈래에 원작자 판 폴백이 없다" $? "인텔이 원작자 판으로 되돌아간다(전환 이전 상태)"
+# 인텔 핀 4칸이 실재하는가(형식) — 파일 이름은 판본이 박힌 꼴이어야 한다(고정 문자열 금지).
+codegrep "$SH" 'CYS_FORK_X64_FILE="cysr-macos-x64-v\$\{CYS_FORK_VERSION\}\.zip"'; ck "[전환] 인텔 자산 이름 핀(판본이 박힌 꼴)" $? "이름이 없거나 판본을 글자로 박았다(판 올릴 때 한 곳만 고치는 규율이 깨진다)"
+codegrep "$SH" '^CYS_FORK_X64_BYTES='; ck "[전환] 인텔 크기 핀 칸이 있다" $? "칸이 없다"
+codegrep "$SH" '^CYS_FORK_X64_SHA256='; ck "[전환] 인텔 지문 핀 칸이 있다" $? "칸이 없다"
+codegrep "$SH" '^CYS_FORK_X64_CDHASH='; ck "[전환] 인텔 CDHash 핀 칸이 있다" $? "칸이 없다"
+# 준비 판정은 **셋 다** 본다(하나라도 빠지면 자리표가 통과한다).
+awk '/^cys_fork_x64_pin_ready\(\) \{/{f=1} f&&/CYS_FORK_X64_BYTES/{b=1} f&&/CYS_FORK_X64_SHA256/{s=1} f&&/CYS_FORK_X64_CDHASH/{c=1} f&&/^\}$/{exit} END{exit !(f&&b&&s&&c)}' "$SH"
+ck "[전환] 인텔 핀 준비 판정이 크기·지문·CDHash 셋을 다 본다" $? "한 칸만 보고 자리표를 통과시킨다"
+# 자리표면 **받기 전에** 멈춘다 — J-DL-06 을 남기고, 받는 명령(curl)보다 앞에서 끝난다.
+awk '/^step_download_cys\(\) \{/{f=1} f&&!g&&/CYS_X64_PIN_PENDING:-0.* = "1"/{g=NR} f&&g&&!j&&/jcode "J-DL-06"/{j=NR} f&&j&&!r&&/^    return 5$/{r=NR} f&&!d&&/curl -fsSL --max-time 900/{d=NR} f&&/^\}$/{exit} END{exit !(g&&j&&r&&d&&g<j&&j<r&&r<d)}' "$SH"
+ck "[전환] 인텔 핀이 자리표면 받기 전에 멈춘다(J-DL-06)" $? "자리표인 채로 없는 파일을 받으러 가거나 원작자 판으로 샌다"
 # 저희 자산이 404 면 원작자 판으로 한 번 돌아간다(J-DL-05 보다 앞).
 awk '/^step_download_cys\(\) \{/{f=1} f&&/404\|410\)/{a=NR} f&&a&&!v&&/cys_use_vendor_pin; CYS_VENDOR_WHY="missing"/{v=NR} f&&/J-DL-05/{j=NR} f&&/^\}$/{exit} END{exit !(a&&v&&j&&a<v&&v<j)}' "$SH"
 ck "[전환] 저희 자산이 없으면 원작자 판으로 돌아간다" $? "자산이 없는 날 맥 설치가 멈춘다"
@@ -2260,6 +2277,9 @@ ck "[전환] 맥 재설치의 프로그램 남기기는 애플 실리콘에서�
 awk '/^[[:space:]]*cat > "\$swap" <<.EOF_SWAP.$/{f=1} f&&/moved=1$/{m=NR} f&&/^if mv "\$new" "\$dst"; then$/{a=NR} f&&a&&/^rm -rf "\$dst"$/{r=NR} f&&r&&/^\[ "\$moved" = "1" \] && \[ -e "\$prev" \] && mv "\$prev" "\$dst"$/{b=NR} f&&/^EOF_SWAP$/{exit} END{exit !(m&&a&&r&&b&&m<a&&a<r&&r<b)}' "$SH"
 ck "[전환] 넣기 실패 뒤 반쪽을 치우고 이번에 옮긴 옛 것만 되돌린다" $? "반쪽이 남아 되돌리기가 막히거나 지난 보관본이 올라온다"
 codegrep "$SH" "curl -sS -L -r 0-0 -o /dev/null -w '%\{http_code\}'"; ck "[핀] 자리 물음은 받기와 같은 GET(첫 1바이트)으로 한다" $? "HEAD 로 물으면 받기는 되는 자리를 없다고 읽을 수 있다"
+# 진행 이벤트에 **칩**이 실린다(2026-09-20) — 인텔 맥이 몇 대이고 어디서 멈추는지 운영팀이 셀 수 있게.
+#   ⚠env 새 열쇠가 아니라 detail 칸이다(서버 ENV_TEXT_KEYS 가 정해져 있어 새 열쇠는 서버를 함께 고쳐야 닿는다).
+codegrep "$SH" "progress_send '1/10' 'info' '' \"arch:\\\$\(uname -m 2>/dev/null\)\" env"; ck "[전환] 진행 이벤트가 칩(arch)을 싣는다" $? "인텔 맥을 셀 수 없다(맥 이벤트에 아키텍처 칸이 없다)"
 awk '/^  if \[ "\$KEEP_APP" = "1" \]; then$/{k=NR} /^    drop_dir "\$CYS_APP"$/{d=NR} END{exit !(k&&d&&k<d&&d-k<=4)}' "$RESET_SH"
 ck "[전환] 맥 지우개는 --keep-app 이면 프로그램을 안 지운다" $? "프로그램 남기기 갈래가 없다"
 
@@ -2622,8 +2642,8 @@ for f in "$PS" "$RESET" "$REIN_PS"; do
   codegrep "$f" '1\) ⊞ 윈도우 키\(키보드 왼쪽 아래, Ctrl과 Alt 사이\)를 누르고 powershell' && no_code "$f" '시작 단추를 누르고'; rc=$?
   ck "[v0317] 다시 하시는 법 첫 줄은 윈도우 키(사이트와 같은 말) · $(basename "$f")" "$rc" "(${GREP_WHY})"
 done
-codegrep "$PS" "^\\\$InstallerVersion *= '0\.3\.26'" && codegrep "$SH" '^INSTALLER_VERSION="0\.3\.26"'
-ck "[v0322] 판본 0.3.26(두 설치기 · 한 릴리스 = 한 판번)" $? "보고의 판본이 갈린다"
+codegrep "$PS" "^\\\$InstallerVersion *= '0\.3\.27'" && codegrep "$SH" '^INSTALLER_VERSION="0\.3\.27"'
+ck "[v0322] 판본 0.3.27(두 설치기 · 한 릴리스 = 한 판번)" $? "보고의 판본이 갈린다"
 # 확인 명령 한 번에도 상한 — 없으면 벤더 도구가 멈추는 순간 20분 상한까지 함께 멈춘다(이종 검토 1R 지적 채택).
 awk '/^function Get-LoginStatusText/{f=1}
      f&&/Start-Process -FilePath \$exe -ArgumentList .auth.,.status. .*-RedirectStandardOutput/{s=1}

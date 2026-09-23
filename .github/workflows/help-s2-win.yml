@@ -1,0 +1,142 @@
+# 원격 해결(도움 채널) 윈도우 안전 검사 — 무료 윈도우 러너에서 실제로 돌린다
+#
+# 왜 러너인가
+#   원격 해결 클라이언트의 윈도우 안전장치(작업 폴더 밖으로 새지 않기)는 정션·핸들 최종 경로·C# 컴파일에
+#   기대는데, 만든 기계(맥)에는 윈도우가 없어 **한 번도 실행되지 못했다**. 맥에서 잰 것은 「글이 그 자리에
+#   그 순서로 있는가」(정적 검사)까지다. 이 워크플로가 그 실행을 맡는다.
+#
+# 무엇을 재는가 (검체 → 무엇을 증명하는가)
+#   parse         세 ps1 이 이 엔진(Windows PowerShell 5.1 / PowerShell 7)에서 파싱 오류 0
+#   attempts      반복 막힘 단계별 안내(셈·단계·되돌림·깨진 파일·보고서 줄)가 윈도우에서 실제로 맞다
+#   escape        여는 순간 조상 폴더를 밖으로 가는 정션으로 바꿔 끼워도 밖의 내용이 결과에 안 닿는다
+#                 (파일 끝 N줄 · 파일 지문 · 폴더 목록) + 바꿔 끼우지 않으면 제대로 읽는다
+#   escape-mutant 「연 핸들이 작업 폴더 안인가」 판정을 지운 사본에서는 탈출이 **일어나야** 한다
+#                 — escape 의 초록이 「아무것도 안 재서」가 아님을 증명한다
+#   static        윈도우판이 같은 자리에 같은 관문을 두었는가(글자·순서) · 그 관문을 지우면 빨개지는가(뮤턴트)
+#
+# ⚠러너가 **못 보는 것** — 초록이 이것까지 보증하지 않는다
+#   · 백신 개입 · 우리말 계정 이름·공백 든 사용자 폴더(러너 계정은 영문) · 하드 링크 · 실제 서버 왕복
+#   · escape 에서 「교체 자체가 막힌」 사례는 통과로 센다(열린 핸들이 이름 바꾸기를 막은 것 = 안전 쪽).
+#     결과 표의 「교체 실패」 칸이 그 수다 — 3 이면 교체로는 한 번도 재지 못한 것이니 escape-mutant 를 함께 보라.
+#
+# 비밀 0 · 바깥 전송 0(시험은 설치기를 함수 묶음으로만 읽는다 · 진행 알림 레버 JARVIS_NO_PROGRESS=1).
+name: 원격 해결 윈도우 안전 검사
+
+on:
+  workflow_dispatch:
+  push:
+    paths:
+      - 'install-master/bootstrap.ps1'
+      - 'tests/remote-help-*'
+      - 'tests/help-attempts-run.ps1'
+      - 'tests/help-escalation.tsv'
+      - '.github/workflows/help-s2-win.yml'
+
+permissions:
+  contents: read
+
+jobs:
+  win:
+    name: windows-latest — ${{ matrix.engine }}
+    runs-on: windows-latest
+    timeout-minutes: 25
+    strategy:
+      fail-fast: false
+      matrix:
+        # powershell = Windows PowerShell 5.1(참가자 안내 명령이 부르는 엔진) · pwsh = PowerShell 7
+        engine: [powershell, pwsh]
+    env:
+      JARVIS_NO_PROGRESS: '1'
+      PYTHONUTF8: '1'
+    steps:
+      # 참가자가 받는 파일은 저장소 바이트 그대로(LF)다 — 체크아웃이 CRLF 로 바꾸면 여러 줄 앵커가 어긋난다.
+      - name: 줄바꿈을 바꾸지 않게
+        shell: pwsh
+        run: git config --global core.autocrlf false
+
+      - uses: actions/checkout@v4
+
+      - name: 검체 실행 · 결과 표
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Continue'
+          $engine = '${{ matrix.engine }}'
+          $out = Join-Path $env:RUNNER_TEMP 'help-s2-win'
+          New-Item -ItemType Directory -Force -Path (Join-Path $out 'logs') | Out-Null
+          $rows = New-Object System.Collections.Generic.List[string]
+          $script:bad = 0
+
+          function Invoke-Sample([string]$Name, [string]$Proves, [scriptblock]$Body, [int]$Want = 0) {
+            $log = Join-Path $out ('logs/' + $Name + '.txt')
+            $global:LASTEXITCODE = -1
+            $started = Get-Date
+            & $Body *>&1 | Tee-Object -FilePath $log | Out-Host
+            $rc = $global:LASTEXITCODE
+            $sec = [int]((Get-Date) - $started).TotalSeconds
+            $text = if (Test-Path -LiteralPath $log) { Get-Content -LiteralPath $log -Raw } else { '' }
+            if ($null -eq $text) { $text = '' }
+            $swapFail = ([regex]::Matches($text, '교체 실패')).Count
+            $failLines = ([regex]::Matches($text, '(?m)^\s*FAIL ')).Count
+            $ok = ($rc -eq $Want)
+            if (-not $ok) { $script:bad++ }
+            $verdict = if ($ok) { 'PASS' } else { 'FAIL' }
+            $rows.Add("| $Name | $engine | $rc (기대 $Want) | $verdict | $failLines | $swapFail | ${sec}s | $Proves |")
+          }
+
+          # 파싱 검사기 — ASCII 만 쓴다(5.1 은 BOM 없는 파일을 시스템 코드페이지로 읽는다)
+          $parse = Join-Path $out 'parse.ps1'
+          Set-Content -LiteralPath $parse -Encoding ascii -Value @'
+          $bad = 0
+          foreach ($f in $args) {
+            $t = $null; $e = $null
+            [void][System.Management.Automation.Language.Parser]::ParseFile((Resolve-Path $f).Path, [ref]$t, [ref]$e)
+            Write-Host ("{0} parse_errors={1}" -f $f, $e.Count)
+            foreach ($x in $e) { Write-Host ("  FAIL L{0}: {1}" -f $x.Extent.StartLineNumber, $x.Message) }
+            $bad += $e.Count
+          }
+          exit $bad
+          '@
+
+          & $engine -NoProfile -Command '$PSVersionTable.PSVersion.ToString()' | ForEach-Object { Write-Host "엔진 판본: $_" }
+
+          Invoke-Sample 'parse' '세 ps1 파싱 오류 0' {
+            & $engine -NoProfile -ExecutionPolicy Bypass -File $parse install-master/bootstrap.ps1 tests/help-attempts-run.ps1 tests/remote-help-ps1-escape.ps1
+          }
+          Invoke-Sample 'attempts' '반복 막힘 단계별 안내 실행 시험' {
+            & $engine -NoProfile -ExecutionPolicy Bypass -File tests/help-attempts-run.ps1 -Dir install-master
+          }
+          Invoke-Sample 'escape' '조상 폴더 정션 교체 탈출 0 · 폴더 목록도 핸들 · 교체 없으면 제대로 읽음' {
+            & $engine -NoProfile -ExecutionPolicy Bypass -File tests/remote-help-ps1-escape.ps1 -Dir install-master
+          }
+          Invoke-Sample 'escape-mutant' '소속 판정을 지운 사본에서 탈출이 잡힌다(escape 가 헛돌지 않음)' {
+            & $engine -NoProfile -ExecutionPolicy Bypass -File tests/remote-help-ps1-escape.ps1 -Dir install-master -Mutant
+          }
+          if ($engine -eq 'powershell') {
+            # 정적 검사는 엔진과 무관하다 — 한 번만
+            Invoke-Sample 'static' '윈도우판 관문의 자리·순서(글자)' { python tests/remote-help-ps1-static.py }
+            Invoke-Sample 'static-mutants' '관문을 지우면 그 자리 검사가 빨개진다' { python tests/remote-help-ps1-static.py --mutants }
+          }
+
+          $head = @(
+            "## 원격 해결 윈도우 안전 검사 — $engine",
+            '',
+            "커밋 $env:GITHUB_SHA · 러너 $env:RUNNER_OS $env:ImageOS $env:ImageVersion",
+            '',
+            '| 검체 | 엔진 | 종료 코드 | 판정 | FAIL 줄 | 교체 실패 | 시간 | 증명하는 것 |',
+            '|---|---|---|---|---|---|---|---|'
+          )
+          $table = ($head + $rows) -join "`n"
+          Set-Content -LiteralPath (Join-Path $out 'results.md') -Value $table -Encoding utf8
+          Add-Content -LiteralPath $env:GITHUB_STEP_SUMMARY -Value $table -Encoding utf8
+          Write-Host $table
+          if ($script:bad -gt 0) { Write-Host "::error::검체 $script:bad 개가 기대와 다르다 — 결과 표와 logs 를 보라"; exit 1 }
+          exit 0
+
+      - name: 결과 표 · 기록 올리기
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: help-s2-win-${{ matrix.engine }}
+          path: ${{ runner.temp }}/help-s2-win/
+          if-no-files-found: error
+          retention-days: 30

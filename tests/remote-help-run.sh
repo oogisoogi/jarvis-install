@@ -465,6 +465,21 @@ EOF
   [ "$(ack_line 1)" = '1 declined null "policy:seq_lock"' ] && [ -z "$(seqfile)" ]
   check "seq-lock-busy 잠금을 못 잡으면 실행하지 않고 policy:seq_lock" $? "$(acks) seq=$(seqfile)"
   rmdir "$H/remote-help-executed.json.lock" 2>/dev/null
+
+  # 외부 검토 2차 재현 — 주인이 살아 있는 잠금의 시각만 늙힌다. 「오래됐다」로 치우면 두 창이 같은 번호를 함께 OK 로 받는다.
+  fresh seq
+  inst <<'EOF'
+:
+EOF
+  mkdir "$H/remote-help-executed.json.lock"
+  touch -t 202601010000 "$H/remote-help-executed.json.lock"
+  inst <<'EOF'
+remote_help_record 9
+echo "$RH_RECORD" > "$T_SB/old-lock-result"
+EOF
+  [ "$(cat "$SB/old-lock-result" 2>/dev/null)" = "LOCKED" ] && [ -d "$H/remote-help-executed.json.lock" ] && [ -z "$(seqfile)" ]
+  check "seq-lock-old 오래돼 보이는 잠금도 치우지 않는다(주인 사망 증명 없음) — LOCKED · 잠금 그대로 · 기록 0" $? "$(cat "$SB/old-lock-result" 2>/dev/null) seq=$(seqfile)"
+  rmdir "$H/remote-help-executed.json.lock" 2>/dev/null
 }
 
 t_display() {
@@ -545,16 +560,19 @@ remote_help_http GET /api/help/TEST2345
 remote_help_tick
 remote_help_http POST /api/help/TEST2345/close
 EOF
-  python3 - "$STATE/requests.jsonl" "$login" <<'PY' > "$SB/report-verdict" 2>&1
+  # installer_version 기대값 = 잰 설치기의 INSTALLER_VERSION(판번이 오를 때마다 시험을 고치지 않게 · 비면 적색)
+  iv="$(sed -n 's/^INSTALLER_VERSION="\([^"]*\)".*/\1/p' "$SRC" | head -1)"
+  python3 - "$STATE/requests.jsonl" "$login" "$iv" <<'PY' > "$SB/report-verdict" 2>&1
 import json, sys
 reqs = [json.loads(l) for l in open(sys.argv[1], encoding="utf-8")]
 login = sys.argv[2]
+iv = sys.argv[3]
 rep = [json.loads(r["body"]) for r in reqs if r["method"] == "POST" and r["path"] == "/api/help"]
 out = []
 if len(rep) != 1:
     print("report count", len(rep)); sys.exit(1)
 b = rep[0]
-shape = (b.get("code") == "J-NET-02" and b.get("step") == "5/10" and b.get("os") == "mac" and b.get("installer_version") == "0.3.17"
+shape = (b.get("code") == "J-NET-02" and b.get("step") == "5/10" and b.get("os") == "mac" and iv != "" and b.get("installer_version") == iv
          and b.get("notice_shown") is True and len(b.get("log_tail", "").split("\n")) <= 200 and "line 300" in b.get("log_tail", ""))
 text = b.get("env_report", "") + b.get("log_tail", "")
 secrets = ["hongkd", "hong.kd@example.com", "abc.def-ghi", "sk-abcdefgh12345", login]
@@ -748,6 +766,25 @@ EOF
   [ "$(grep -c '"path": "/api/help"' "$STATE/requests.jsonl")" = "1" ] && grep -q 'REACHED_WAKE=0' "$SB/wake" && ! grep -q 'WAKE_RC=0' "$SB/wake" &&
     grep -q '막혔을 때' "$SB/window.txt"
   check "wake-failed 막힌 단(J-DL-04) 뒤 자비스 깨우기가 실패하면 원격 해결이 돈다(보고 1건)" $? "$(cat "$SB/wake" 2>/dev/null) · 보고 $(grep -c '"path": "/api/help"' "$STATE/requests.jsonl")건"
+
+  # 외부 검토 2차 재현 — cys 가 **실패하면서** 답에 surface: 를 섞는다(rc 1 · 「error: could not open surface:42」).
+  #   글자만 보면 성공으로 읽혀 REACHED_WAKE=1 → 원격 해결이 안 돈다. 종료 코드까지 보면 실패 → 보고 1건.
+  #   ⚠작업 폴더 경로에 공백이 있으면 cys 안에서 여는 갈래 자체를 건너뛴다 ⇒ 이 시험만 공백 없는 자리를 쓴다.
+  fresh gate
+  echo 410 > "$STATE/poll.status"
+  printf '#!/bin/bash\nexit 1\n' > "$SB/fake-cys"
+  chmod +x "$SB/fake-cys"
+  inst <<'EOF'
+MODE=full; J_CODE=J-DL-04; NOTICE_SHOWN=1; BLOCKED_STEP="cys 설치 파일 받기"
+CYS_CLI="$T_SB/fake-cys"; PATH="/usr/bin:/bin:/usr/sbin:/sbin"
+JARVIS_HOME="$(mktemp -d -t rhwake)"
+cys_open_master_seat() { printf 'error: could not open surface:42\n'; return 1; }
+step_wake
+echo "WAKE_RC=$? REACHED_WAKE=$REACHED_WAKE" > "$T_SB/wake"
+closing_note
+EOF
+  [ "$(grep -c '"path": "/api/help"' "$STATE/requests.jsonl")" = "1" ] && grep -q 'REACHED_WAKE=0' "$SB/wake" && grep -q 'rc=1 error: could not open surface:42' "$SB/window.txt"
+  check "wake-seat-failed cys 가 실패하면서 답에 surface: 를 섞어도 성공으로 읽지 않는다 — 원격 해결이 돈다(보고 1건)" $? "$(cat "$SB/wake" 2>/dev/null) · 보고 $(grep -c '"path": "/api/help"' "$STATE/requests.jsonl")건"
 
   fresh gate
   echo 410 > "$STATE/poll.status"

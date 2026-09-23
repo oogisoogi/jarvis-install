@@ -226,10 +226,33 @@ MUTANTS = [
   ["[핀] 지문을 두 자리에서 본다(남아 있던 것·방금 받은 것)"]),
 
  # ── 맥 저희 판 전환으로 선 축들 (2026-09-15) ────────────────────
- ("M56 칩 갈래를 없애 인텔도 저희 판을 받는다", "install-master/bootstrap.sh",
-  'if [ "$(uname -m)" = "arm64" ]; then\n  cys_use_fork_pin\nelse',
-  'if true; then\n  cys_use_fork_pin\nfi\nif false; then',
-  ["[전환] 애플 실리콘만 저희 판 · 인텔은 원작자 판"]),
+ # ★M56 재조준(2026-09-20 · TICKET=v110-mac-x64): 옛 M56 은 「인텔도 저희 판을 받는다」를 **결함**으로
+ #   겨눴다. 그 사이 오너 결정으로 **두 칩 모두 저희 판**이 정답이 됐다(인텔 갈림이 워크숍에서 실제 사고였다).
+ #   ⇒ 겨누는 방향을 뒤집는다: 이제 결함은 **인텔이 원작자 판으로 되돌아가는 것**이다.
+ #   옛 축 이름("애플 실리콘만 저희 판 · 인텔은 원작자 판")은 checks.sh 에서 함께 폐기했다.
+ ("M56 인텔을 원작자 판으로 되돌린다", "install-master/bootstrap.sh",
+  '  cys_use_fork_x64_pin\n  cys_fork_x64_pin_ready || CYS_X64_PIN_PENDING=1',
+  '  cys_use_vendor_pin; CYS_VENDOR_WHY="intel"',
+  ["[전환] 칩 갈래에 원작자 판 폴백이 없다", "[전환] 두 칩 모두 저희 판 · 인텔은 핀 준비까지 본다"]),
+ ("M56b 인텔 핀 준비 판정을 건너뛴다(자리표인 채 진행)", "install-master/bootstrap.sh",
+  '  cys_fork_x64_pin_ready || CYS_X64_PIN_PENDING=1', '  :',
+  ["[전환] 두 칩 모두 저희 판 · 인텔은 핀 준비까지 본다"]),
+ ("M56c 준비 판정이 CDHash 는 안 본다", "install-master/bootstrap.sh",
+  # ★두 줄을 함께 지운다 — 한 줄만 지우면 남은 줄에 이름이 남아 「셋을 다 본다」 축이 초록인 채다(눈먼 뮤턴트).
+  "  [ ${#CYS_FORK_X64_CDHASH} -eq 40 ] || return 1\n  [ -z \"$(printf '%s' \"$CYS_FORK_X64_CDHASH\" | LC_ALL=C tr -d '0-9a-f')\" ] || return 1",
+  "  :",
+  ["[전환] 인텔 핀 준비 판정이 크기·지문·CDHash 셋을 다 본다"]),
+ ("M56d 자리표인데도 받으러 간다(멈춤 가드 무력화)", "install-master/bootstrap.sh",
+  '  if [ "${CYS_X64_PIN_PENDING:-0}" = "1" ]; then', '  if false; then',
+  ["[전환] 인텔 핀이 자리표면 받기 전에 멈춘다(J-DL-06)"]),
+ ("M56e 진행 이벤트에서 칩(arch)을 뺀다", "install-master/bootstrap.sh",
+  "progress_send '1/10' 'info' '' \"arch:$(uname -m 2>/dev/null)\" env",
+  "progress_send '1/10' 'info' '' '' env",
+  ["[전환] 진행 이벤트가 칩(arch)을 싣는다"]),
+ ("M56f 인텔 자산 이름을 판본 없이 글자로 박는다", "install-master/bootstrap.sh",
+  'CYS_FORK_X64_FILE="cysr-macos-x64-v${CYS_FORK_VERSION}.zip"',
+  'CYS_FORK_X64_FILE="cysr-macos-x64-v1.0.2.zip"',
+  ["[전환] 인텔 자산 이름 핀(판본이 박힌 꼴)"]),
  ("M57 저희 자산 404 에 원작자 판으로 안 돌아간다", "install-master/bootstrap.sh",
   '            cys_use_vendor_pin; CYS_VENDOR_WHY="missing"',
   '            CYS_VENDOR_WHY="missing"',
