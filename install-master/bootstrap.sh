@@ -28,6 +28,9 @@
 # 규율: sudo 를 쓰지 않는다 · 시스템 설정을 바꾸지 않는다 · 외부 주소는 공식 2곳만 쓴다
 
 set -u
+# 🔴0.3.36 시험용 함수 묶음 표시를 **읽어 들인 순간에** 고정한다(이종 검토) — 시험이 읽은 뒤 JARVIS_LIB_ONLY 를 비워도
+#   라이브 차단(progress_url · HELP_API_URL)은 풀리지 않는다. 사람이 쓰는 설치(LIB_ONLY 없음)는 빈 값 = 무변화.
+JARVIS_LIB_ONLY_AT_LOAD="${JARVIS_LIB_ONLY:-}"
 
 BOOTSTRAP_VERSION="v1"
 REPORT_HEAD="[자비스] 환경 보고 v0"      # 첫 응답의 고정 첫 줄 — 기동 성공 판정에 쓴다
@@ -65,6 +68,7 @@ while [ "${JARVIS_HOME%/}" != "$JARVIS_HOME" ] && [ ${#JARVIS_HOME} -gt 1 ]; do
   JARVIS_HOME="${JARVIS_HOME%/}"
 done
 LOG_FILE="$JARVIS_HOME/bootstrap.log"
+STDOUT_WAS_TTY=0; [ -t 1 ] && STDOUT_WAS_TTY=1   # 0.3.36(F17): 끝맺음이 「창이 닫혔는가」를 가르는 기준(closing_note)
 # 지난 실행이 끝을 알리지 않고 사라졌으면 그때 남은 것은 기록 파일의 마지막 줄뿐이다 — 이번 실행이 한 줄이라도 적기 전에 떠 둔다(ps1 165~186).
 #   PREV_RUN_STATE = 마지막 머리글(=== 자비스 설치 도우미) 뒤에서 어디까지 갔나 · 뒤에 적힌 줄이 앞의 것을 이긴다
 #   '' 모름 · closed 끝맺음까지 · wait 원격 해결 대기 중 · answer 처방을 받은 뒤 · ended 원격 해결이 스스로 끝남
@@ -78,6 +82,7 @@ if [ -f "$LOG_FILE" ]; then
       my $s = "";
       for my $i ($from .. $#l) { my $ln = $l[$i];
         if    ($ln =~ /^\S+\s+다음에 할 일: /) { $s = "closed" }
+        elsif ($ln =~ /^\S+\s+창이 닫혀 끝났습니다/) { $s = "" }   # 0.3.36(F17): 창이 닫힌 끝 = 종전대로 J-AV-03
         elsif ($ln =~ /^\S+\s+remote help: report [A-Z2-9]{8}/) { $s = "wait" }
         elsif ($ln =~ /^\S+\s+처방(\(조치 [0-9]+\))?: /) { $s = "answer" }
         elsif ($ln =~ /^\S+\s+(원격 해결 시간\([0-9]+분\)이 끝나 멈춥니다|원격 해결이 끝났습니다)/) { $s = "ended" }
@@ -132,32 +137,38 @@ BLOCKED_STEP=""
 CYS_DISPLAY_NAME="cysr"
 # 0.3.34: 핀 = 1.1.5 드래프트 발행 자산 실측값(2026-09-23 · TICKET=v115-installer · 1.1.4 미발행 승계 · 9차 절단 fd356c06)
 # 0.3.35: 핀 값 = 1.1.5 11차 절단 발행 자산 실측값(태그 커밋 526325bf · SUMS 418a1b6e · 11차 재핀에서 채움) · 바뀐 것 = 맥: 저희 자산 404 의 원작자 판 폴백 제거(J-DL-05 · F1) · 재설치가 「지웁니다」를 묻지 않음(F2) · [5/10]~[8/10] 막힘 뒤 각성 금지(F3) / 윈: 배포 한 줄이 받기 실패면 옛 파일을 안 돌림(F5) · [2/10] 빠른 종료 판정 수리(F6) · 32비트 창 재실행 경로 인용(F7) · 끝맺음 오류 가르기 캐시(F9) · [5/10]~[8/10] 막힘 뒤 각성 금지(F3 짝 · r2 결정 A) / 양쪽: 코드 없는 실패 끝에도 실패 이벤트(F10①) · 맥 407 즉시 끝(F10③) · TICKET=installer-0335 dbg-D5
-CYS_FORK_VERSION="1.1.5"
+# 0.3.36: 핀 값 그대로(1.1.5 · 태그 커밋 526325bf) · SUMS 주석만 발행본 값으로 · 바뀐 것 = 재설치 끝 rc 25 뒤 60초 다시 보기(X-5) · 재설치 끝 안내를 「다음에 할 일」 한 줄로(F13)
+# 0.3.36(재절단 핀): 1.1.6 재절단 드래프트(2026-09-26 · 릴리스 id 396787705 · 대상 커밋 76d2b5e9 · build_id 76d2b5e9d2c2.20260925T1540Z) 자산 실측값으로 윈·맥 함께 교체
+CYS_FORK_VERSION="1.1.6"
 CYS_FORK_DIR="https://github.com/oogisoogi/cys-ro/releases/download/v${CYS_FORK_VERSION}/"
 # 1.0.1 부터 zip 최상위 = cysr.app(안의 실행 파일 = Contents/MacOS/cys · cys-app · cysd · CFBundleName cysr · 로컬 빌드 실측 2026-09-16).
 CYS_FORK_FILE="cysr-macos-arm64-v${CYS_FORK_VERSION}.zip"
-# ✅아래 크기·지문·CDHash = **v1.1.5 태그가 가리키는 커밋 526325bf**(태그 객체 15eb2155 · 11차 절단) 의 발행 zip 에서 실측으로 채웠다(2026-09-24 · 11차 재핀 · 10차 값(9d695ec8)을 대신한다).
-#   출처 = 드래프트 릴리스 v1.1.5 의 SHA256SUMS.txt(그 파일 자신의 sha256 = 418a1b6e0b45433c56299ad2eca35456b75c029dbdc125feb04e290f332750bd · 13행)와
+# ✅아래 크기·지문·CDHash = **v1.1.6 재절단 드래프트(릴리스 id 396787705 · 대상 커밋 76d2b5e9)** 의 zip 에서 실측으로 채웠다(2026-09-26 · 1.1.5 값(71e285ea · 207818466)을 대신한다).
+#   출처 = 릴리스 v1.1.6 의 SHA256SUMS.txt(그 파일 자신의 sha256 = ca54d259b460340f33541181b1711e0183e036dc6a1c3110771480c2496b4ff2 · 1157 B · 13행 · 재절단 드래프트 자산)와
+#         드래프트 자산 zip 실물(arm64·x64 · 인증 받기) — 크기·sha256 은 파일에서 셌고(릴리스 API digest·SUMS 줄과 3/3 일치), CDHash 는 풀어서(ditto -x -k) codesign -dvvv 로 쟀다.
+#   (이전 기록) 크기·지문·CDHash = **v1.1.5 태그가 가리키는 커밋 526325bf**(태그 객체 15eb2155 · 11차 절단) 의 발행 zip 에서 실측으로 채웠다(2026-09-24 · 11차 재핀 · 10차 값(9d695ec8)을 대신한다).
+#   (이전 기록 · 1.1.5 출처) 릴리스 v1.1.5 의 SHA256SUMS.txt(그 파일 자신의 sha256 = d424a3d72e8f5493bc8410129721c4507689007d0714259d57f02782ce02338c · 13행 · 2026-09-24 14:32 발행본 재측정 — 발행 뒤 알림 문구 정정으로 latest.json 줄 하나만 바뀌어 파일 지문이 드래프트 값 418a1b6e… → 발행 d9b61ee0… → 지금 값으로 옮겼다 · 설치 자산 줄 3개와 위 핀 값은 그대로)와
 #         발행 자산 zip 실물(arm64·x64 · gh release download) — 크기·sha256 은 파일에서 셌고(릴리스 API digest·SUMS 줄과 3/3 일치), CDHash 는 풀어서(ditto -x -k) codesign -dvvv 로 쟀다(지시값 6/6 일치).
 #   ⚠태그가 옮겨지면 이 값도 함께 바뀐다(v1.1.0 라운드에만 네 번 옮겨졌다) — 값을 문서에 복제하지 말고 발행 자산에서 다시 재라.
 #   CDHash 는 **발행된 그 zip** 을 풀어(ditto -x -k) `codesign -dvvv` 로 쟀다(서명 = cys-local · zip 최상위 = cysr.app 하나).
-CYS_FORK_BYTES="207818466"
-CYS_FORK_SHA256="71e285ea3c0ded1c8a43cbc897367180830e6ae63d54aa456bdf8e564186943c"
+CYS_FORK_BYTES="207995364"
+CYS_FORK_SHA256="317e4eb145e02764aac18f8ce3579db8205cf7c6b2ca043f329655707fea1142"
 # 설치된 프로그램이 「바로 이 판」인가를 가르는 값. 판본 숫자는 원작자 판도 같은 숫자를 쓸 수 있어서
 #   숫자만 보면 **원작자 판을 우리 판으로 읽고 건너뛴다**(어제 원작자 판을 깐 맥이 그대로 남는다).
-CYS_FORK_CDHASH="5840fa8bddc706e2de9544fb616dc8bea3f437ca"
+CYS_FORK_CDHASH="769ea31f9c8c7d0eeb1fc971760f99fe51c26ad9"
 
 # ★★인텔(x86_64) 맥 핀 — v1.1 부터 우리 판이 인텔 맥도 덮는다 (2026-09-20 · TICKET=v110-mac-x64).
 #   까닭: v1.0.2 까지 우리 맥 자산은 arm64 하나뿐이라 **인텔 맥만 원작자 판으로 갈라졌다**. 같은 날 같은 방에서
 #     두 참가자가 서로 다른 cys 를 쓰는 일이 실제로 있었다(2026-09-15 전환 주석의 그 사유) — 그 갈림을 여기서 닫는다.
-#   ✅아래 세 값은 v1.1.5 x64 발행 zip 에서 **실측으로 채웠다**(2026-09-24 · 11차 재핀 · 11차 절단 태그 커밋 526325bf · Mach-O thin x86_64 · 서명 cys-local).
+#   ✅아래 세 값은 v1.1.6 재절단 x64 드래프트 zip 에서 **실측으로 채웠다**(2026-09-26 · 릴리스 id 396787705 · 대상 커밋 76d2b5e9 · 1.1.5 값(45b629ff · 215440455)을 대신한다).
+#     (이전 기록) v1.1.5 x64 발행 zip 에서 실측(2026-09-24 · 11차 재핀 · 11차 절단 태그 커밋 526325bf · Mach-O thin x86_64 · 서명 cys-local).
 #     ⚠실기 검증은 arm64 에서만 했다 — x64 는 Tart(arm64 호스트)에서 실행할 수 없어 **미검증**이다(로제타 스모크만 · v110-mac-x64 라운드).
 #   ⛔자리표가 남아 있는 동안 인텔 맥은 **원작자 판으로 돌아가지 않고 멈춘다**(cys_fork_x64_pin_ready · step_download_cys 머리).
 #     조용히 원작자 판을 깔면 이 바꿈이 없애려던 그 갈림이 그대로 되살아난다 — 말없이 다른 판을 까느니 멈춰서 말하는 쪽을 고른다.
 CYS_FORK_X64_FILE="cysr-macos-x64-v${CYS_FORK_VERSION}.zip"
-CYS_FORK_X64_BYTES="215440455"
-CYS_FORK_X64_SHA256="45b629ff5cccfe970463df3495fcac418061eb4b9f564d95ce43d79c978090bd"
-CYS_FORK_X64_CDHASH="08236fb73b3a1e79b1dfcb0599a27092553ebafb"
+CYS_FORK_X64_BYTES="215639282"
+CYS_FORK_X64_SHA256="df86961012f26f47deafa118da60cc443493858edb940dc8753c76752e10f6a6"
+CYS_FORK_X64_CDHASH="99a455b4c354c9f1599201d067b6e3a5534c2b2f"
 # 저희 판이 놓이는 자리 = /Applications/cysr.app · 옛 이름 자리 = /Applications/cys.app(0.14.x·1.0.0 이 깔린 자리 · 원작자 판도 이 이름).
 CYS_FORK_APP="/Applications/cysr.app"
 CYS_OLD_APP="/Applications/cys.app"
@@ -310,7 +321,14 @@ CAPTURE_REQUESTED=""                      # 운영팀이 청한 촬영(계약 5�
 STEP_BASELINES=""                         # 「단계<탭>초」 줄 — ⛔코드에 고정표를 두지 않는다(계약 4절)
 STEP_BASELINE_NOTE="not-fetched"          # not-fetched | ok:<칸수> | http:<코드> | empty | error | skip:*
 
-progress_url() { printf '%s' "${JARVIS_PROGRESS_URL:-$HELP_API_URL/api/progress}"; }   # 흉내가 바꿔치면 그림·기준선도 같은 곳으로 간다
+progress_url() { # 흉내가 바꿔치면(JARVIS_PROGRESS_URL) 그림·기준선도 같은 곳으로 간다
+  # 🔴0.3.36: 시험이 이 파일을 함수 묶음으로 읽어 들인 셸(JARVIS_LIB_ONLY=1 · 사람이 쓰는 길이 아니다)은 라이브 서버로 못 보낸다 —
+  #   레버(JARVIS_NO_PROGRESS)를 풀거나 env -i 로 잃은 시험의 끝맺음 실패 이벤트가 라이브에 도착했다(2026-09-24 19:01 · 2건).
+  #   레버를 기억하는 대신 주소를 막는다: 주소를 따로 주지 않으면 닿지 않는 로컬 자리(tests/lib-only-no-live.sh 가 잰다).
+  if [ -n "${JARVIS_PROGRESS_URL:-}" ]; then printf '%s' "$JARVIS_PROGRESS_URL"
+  elif [ "${JARVIS_LIB_ONLY:-}" = "1" ] || [ "${JARVIS_LIB_ONLY_AT_LOAD:-}" = "1" ]; then printf '%s' "http://127.0.0.1:9/lib-only-no-live"
+  else printf '%s' "$HELP_API_URL/api/progress"; fi
+}
 
 progress_tmp() { # → PG_TMP(본인만 읽는 임시 폴더) · rc 1 = 못 만들었다
   PG_TMP=""
@@ -349,18 +367,35 @@ progress_warn_once() { # <무엇> — 윈판 문구 그대로(progress send fail
   log "progress send failed (fail-open) - $1"
 }
 
+env_mem_bytes() { /usr/sbin/sysctl -n hw.memsize 2>/dev/null | head -1; }                        # 꽂힌 메모리(바이트)
+env_disk_free_kib() { /bin/df -Pk "$HOME" 2>/dev/null | awk 'NR==2{print $4}'; }              # 집 폴더 볼륨 남은 공간(KiB)
+env_gb_round() { # env_gb_round <값> <단위 비트: 30=바이트 · 20=KiB> → 정수 GB(2^30 · 반올림) 글자 · 숫자가 아니거나 18자리를 넘으면 빈 값
+  local v="${1:-}" b="${2:-30}"
+  [[ "$v" =~ ^[0-9]{1,18}$ ]] || return 0
+  printf '%s' "$(( (10#$v + (1 << (b - 1))) >> b ))"
+}
+
 progress_env_fields() { # 살핌(info) 이벤트의 env 칸 — 계약 2절. 못 읽는 값은 넣지 않는다(fail-open).
-  # ⚠서버가 받는 열쇠는 claude_ver·cys_ver·win_build·ps_ver·av·browser·mac_ver·admin 이다(web-install telemetry.ts ENV_TEXT_KEYS).
+  # ⚠서버가 받는 열쇠는 claude_ver·cys_ver·win_build·ps_ver·av·browser·mac_ver·hw_model·mem_gb·disk_free_gb·admin 이다(web-install telemetry.ts ENV_TEXT_KEYS).
+  # 0.3.36: hw_model = 기기 모델명(hw.model · 예 Mac16,5 · 고지 목록 「기기 모델명」 · 2026-09-24 결정).
+  #   ⛔기기 고유번호(시리얼 · 하드웨어 UUID · 자산 태그)는 절대 싣지 않는다 — tests/hw-model-env.sh 가 잰다.
+  # 0.3.36: mem_gb = 메모리 크기 · disk_free_gb = 남은 디스크(집 폴더 볼륨) — 정수 GB 로 반올림한다(정밀 바이트 값은 기기
+  #   지문이 될 수 있다 · 진단에는 GB 정수로 충분 · 2026-09-24 결정). 못 읽으면 칸을 만들지 않는다(설치는 계속).
   #   맥의 운영체제 판본은 mac_ver 칸에 싣는다(서버 계약 칸 · web-install c14d66d) — win_build 에 맥 값을 넣지 않는다(이름이 거짓말이 된다).
-  local cv="" vv="" mv="" cli=""
+  local cv="" vv="" mv="" hm="" cli=""
   if command -v claude >/dev/null 2>&1; then cv="$(claude --version 2>/dev/null | head -1)"; fi
   for cli in "${CYS_CLI:-}" "$(cys_app_dir 2>/dev/null)/Contents/MacOS/cys"; do
     [ -n "$cli" ] && [ -x "$cli" ] && { vv="$(cys_version_line "$cli" 2>/dev/null)"; break; }
   done
   mv="$(/usr/bin/sw_vers -productVersion 2>/dev/null | head -1)"
+  hm="$(/usr/sbin/sysctl -n hw.model 2>/dev/null | head -1)"
+  PG_ENV_MEM_GB="$(env_gb_round "$(env_mem_bytes)" 30)"
+  [ "$PG_ENV_MEM_GB" = "0" ] && PG_ENV_MEM_GB=""   # 메모리 0 = 못 읽음(실재하지 않는 값 · 칸 없음 · 윈과 같은 뜻) — 디스크 0 은 실재 값이라 그대로
+  PG_ENV_DISK_FREE_GB="$(env_gb_round "$(env_disk_free_kib)" 20)"
   PG_ENV_CLAUDE_VER="$cv"
   PG_ENV_CYS_VER="$vv"
   PG_ENV_MAC_VER="$mv"
+  PG_ENV_HW_MODEL="$hm"
   if id -Gn 2>/dev/null | tr ' ' '\n' | grep -qx admin; then PG_ENV_ADMIN=true; else PG_ENV_ADMIN=false; fi
 }
 
@@ -369,15 +404,16 @@ progress_send() { # progress_send <단계> <event> [elapsed 초] [detail] [env] 
   # ⚠윈판의 여섯째 인자($extra)는 이 판에서 부르는 자리가 0 이라 옮기지 않았다(증거는 evidence_event_send 가 따로 보낸다).
   [ "$MODE" = "full" ] || return 0
   [ "${JARVIS_NO_PROGRESS:-}" = "1" ] && return 0   # 흉내 시험이 실제 서버로 나가지 않게 하는 레버(사람이 쓰는 길이 아니다)
+  [ "${NOTICE_SHOWN:-0}" = "1" ] || return 0        # 0.3.36: 첫 화면 진행 고지 전에는 보내지 않는다(고지 없이 보내지 않는다 · 윈 6584 짝 · 끝맺음 실패 이벤트 포함)
   {
     local step="${1:-}" ev="${2:-}" el="${3:-}" detail="${4:-}" withenv="${5:-}"
     install_id_ensure
     progress_tmp || { progress_warn_once "임시 폴더를 못 만들었다"; return 0; }
-    PG_ENV_CLAUDE_VER=""; PG_ENV_CYS_VER=""; PG_ENV_MAC_VER=""; PG_ENV_ADMIN=""
+    PG_ENV_CLAUDE_VER=""; PG_ENV_CYS_VER=""; PG_ENV_MAC_VER=""; PG_ENV_HW_MODEL=""; PG_ENV_MEM_GB=""; PG_ENV_DISK_FREE_GB=""; PG_ENV_ADMIN=""
     [ "$withenv" = "env" ] && progress_env_fields
     if PG_INSTALL_ID="$INSTALL_ID" PG_VERSION="$INSTALLER_VERSION" PG_STEP="$step" PG_EVENT="$ev" PG_ELAPSED="$el" \
          PG_DETAIL="$detail" PG_WITH_ENV="$withenv" PG_ENV_CLAUDE_VER="$PG_ENV_CLAUDE_VER" PG_ENV_CYS_VER="$PG_ENV_CYS_VER" PG_ENV_MAC_VER="$PG_ENV_MAC_VER" \
-         PG_ENV_ADMIN="$PG_ENV_ADMIN" PG_OUT="$PG_TMP/body.json" progress_js body; then
+         PG_ENV_HW_MODEL="$PG_ENV_HW_MODEL" PG_ENV_MEM_GB="$PG_ENV_MEM_GB" PG_ENV_DISK_FREE_GB="$PG_ENV_DISK_FREE_GB" PG_ENV_ADMIN="$PG_ENV_ADMIN" PG_OUT="$PG_TMP/body.json" progress_js body; then
       progress_post "$(progress_url)" "$PG_TMP/body.json" "$PG_TMP/resp" -H 'content-type: application/json; charset=utf-8'
       case "$PG_HTTP" in
         2??) capture_receive "$PG_TMP/resp" ;;   # 운영팀이 청한 촬영은 이 답에 실려 온다(계약 5절 ① · 하트비트가 곧 수신함)
@@ -419,6 +455,7 @@ evidence_event_send() { # evidence_event_send <이유> [글 파일] — 윈판 S
   EV_SEQ=""; EV_TOKEN=""
   [ "$MODE" = "full" ] || return 1
   [ "${JARVIS_NO_PROGRESS:-}" = "1" ] && return 1
+  [ "${NOTICE_SHOWN:-0}" = "1" ] || return 1        # 0.3.36: 고지 전에는 증거도 보내지 않는다(progress_send 와 같은 문)
   local reason="$1" tf="${2:-}" dir line
   install_id_ensure
   progress_tmp || return 1
@@ -647,6 +684,9 @@ step_is_slow() { # step_is_slow <단계> <초> → rc 0 = 기준선의 2배를 �
 capture_evidence() { # capture_evidence <이유> [사유 글] — 윈판 Send-CaptureEvidence · (이유 × 단계)마다 한 번 · 설치를 막지 않는다
   {
     local reason="$1" detail="${2:-}" key tf
+    # 0.3.36: 고지 전에는 촉발하지 않고 「한 번」 표시도 남기지 않는다(윈 Send-CaptureEvidence 짝) — 지난 실행 꼬리의 오류 줄이
+    #   고지 전에 이 단계의 표시를 먹으면, 고지 뒤 이번 실행의 진짜 오류 증거가 안 나갔다(tests/notice-before-send.sh ⓕ).
+    [ "${NOTICE_SHOWN:-0}" = "1" ] || return 0
     key="${reason}|$(current_step)"
     case "$CAPTURE_SENT" in *" $key "*) return 0 ;; esac
     CAPTURE_SENT="$CAPTURE_SENT$key "
@@ -905,6 +945,9 @@ function run(argv) {
       if (env("PG_ENV_CLAUDE_VER")) e.claude_ver = env("PG_ENV_CLAUDE_VER");
       if (env("PG_ENV_CYS_VER")) e.cys_ver = env("PG_ENV_CYS_VER");
       if (env("PG_ENV_MAC_VER")) e.mac_ver = env("PG_ENV_MAC_VER");
+      if (env("PG_ENV_HW_MODEL")) e.hw_model = env("PG_ENV_HW_MODEL");
+      if (/^[0-9]+$/.test(env("PG_ENV_MEM_GB"))) e.mem_gb = env("PG_ENV_MEM_GB");
+      if (/^[0-9]+$/.test(env("PG_ENV_DISK_FREE_GB"))) e.disk_free_gb = env("PG_ENV_DISK_FREE_GB");
       if (env("PG_ENV_ADMIN") === "true") e.admin = true;
       else if (env("PG_ENV_ADMIN") === "false") e.admin = false;
       f.env = e;
@@ -1052,7 +1095,8 @@ login_waiter() {
   #   앞 판은 본문이 `kill $LOGIN_WATCHER` 로 나만 죽였고, 그때 돌던 `sleep 60` 이 **고아로 남았다** —
   #   성공할 때마다 하나씩. ★자기가 만든 것을 자기가 치우지 않으면 아무도 안 치운다.
   trap 'kill "$sleep_pid" 2>/dev/null; exit 0' TERM INT
-  while [ -e "$mark" ]; do
+  # 0.3.36(F11): 본체가 끝났으면(Ctrl-C 로 끊겨 끝맺음이 나를 못 거둔 경우까지) 나도 끝난다 — 서브셸의 $$ = 본체 번호.
+  while [ -e "$mark" ] && kill -0 "$$" 2>/dev/null; do
     # 기다림을 **배경 자식**으로 둬야 위 trap 이 그것을 붙잡을 수 있다(앞에서 자면 못 데려간다).
     sleep "$LOGIN_SAY_INTERVAL" & sleep_pid=$!
     wait "$sleep_pid" 2>/dev/null
@@ -1216,8 +1260,12 @@ net_cause_code() {    # 원인 → 진단 코드
 #   $1 = 단계 표시(예: [5/10]) · $2 = 다시 해 볼 명령(문자열로 받아 그대로 실행한다)
 #   rc 0 = 성공(이어간다) · rc 1 = 상한 초과(정직 실패 — 부르는 쪽이 코드를 남기고 멈춘다)
 # ⚠기다리는 동안 **말을 한다.** 침묵은 사람에게 「멈췄다」로 읽히고, 그때 창을 닫는다.
+# 🔴0.3.36 F12: 지난 시간은 **벽시계로 잰다**(시작 시각 date +%s · 매 시도 뒤 다시 잰다). 앞 판은 쉬는 간격(30초)만
+#   더해, 다시 해 보는 명령 자체가 걸린 시간(받기 한 번에 최대 900초)을 빼먹었다 — 화면은 「N분 지남」인데
+#   실제로는 몇 시간을 기다릴 수 있었다. 상한(30분)과 화면의 분 수가 같은 벽시계를 본다.
 wait_for_connection() {
-  local tag="$1" cmd="$2" waited=0 cause words
+  local tag="$1" cmd="$2" waited=0 start cause words
+  start="$(date +%s)"
   while [ "$waited" -lt "$NET_WAIT_TIMEOUT" ]; do
     cause="$(net_cause)"
     words="$(net_cause_words "$cause")"
@@ -1225,11 +1273,11 @@ wait_for_connection() {
     say "     창을 닫지 말고 기다려 주십시오. 다른 작업을 하셔도 괜찮습니다."
     say "     ($(( waited / 60 ))분 지남 · 최대 $(( NET_WAIT_TIMEOUT / 60 ))분 · ${NET_WAIT_INTERVAL}초마다 다시 해 봅니다)"
     sleep "$NET_WAIT_INTERVAL"
-    waited=$(( waited + NET_WAIT_INTERVAL ))
     if eval "$cmd"; then return 0; fi
+    waited=$(( $(date +%s) - start ))
   done
   cause="$(net_cause)"
-  say "$tag $(( NET_WAIT_TIMEOUT / 60 ))분을 기다렸지만 연결되지 않았습니다."
+  say "$tag $(( waited / 60 ))분을 기다렸지만 연결되지 않았습니다."
   jcode "$(net_cause_code "$cause")" "$(net_cause_words "$cause") 진행하지 못했습니다"
   return 1
 }
@@ -1416,10 +1464,34 @@ help_last_report_save() {   # help_last_report_save <보고 번호>
 #   감지만·미리보기), 사람이 새 종료 자리를 만들 때마다 이 줄을 기억해서 붙여야 한다면
 #   언젠가 빠진다. 트랩은 **기억이 아니라 구조**다.
 CLOSING_DONE=0
+kill_own_child() { # kill_own_child <번호> [신호=TERM] — 그 번호가 지금 이 셸의 자식일 때만 신호를 보낸다(rc 0) · 아니면 손대지 않는다(rc 1)
+  # 0.3.36(적대 검토 지적): 감시자가 시간 상한으로 먼저 끝나면 그 번호를 다른 프로세스가 물려받을 수 있다 — 소유 확인 없이 죽이면 남을 친다.
+  local p="${1:-}" sig="${2:-TERM}"
+  case "$p" in ''|*[!0-9]*) return 1 ;; esac
+  [ "$(ps -o ppid= -p "$p" 2>/dev/null | tr -d ' ')" = "$$" ] || return 1
+  kill -"$sig" "$p" 2>/dev/null
+}
+
 closing_note() {
   local end_rc=$?   # EXIT 트랩에서 첫 명령으로 불리므로 이 값 = 스크립트의 끝 코드
   [ "$CLOSING_DONE" = "1" ] && return 0
   CLOSING_DONE=1
+  # 🔴0.3.36(F11): 로그인 대기 중 Ctrl-C 로 끝나면 배경 대기 감시자(login_waiter)가 20분 동안 고아로 남아 안내를 찍고
+  #   다음 실행의 표식·승인 번호 파일을 건드릴 수 있었다(비대화 셸의 배경 자식은 SIGINT 를 무시 · 가상 터미널 실측).
+  #   ⇒ 끝나는 자리가 어디든 표식이 아직 있으면 지우고 감시자에게 TERM(감시자 트랩이 자기 sleep 까지 데려간다).
+  # 🔴0.3.36(F17): 창이 닫힌 뒤(HUP) 사라진 터미널에 쓴 글이 버퍼에 남아 다음 기록 줄의 시각 자리에 섞여 들어갔다
+  #   (가상 터미널 재현: 기록 끝 줄이 시각 없이 「다음에 할 일: … 다음에 할 일: …」 → 다음 실행이 끝맺음을 못 알아보고 J-AV-03).
+  #   ⇒ 화면이 터미널이었는데 거기에 더는 못 쓰면(창이 닫힘) 화면 쓰기를 먼저 버린다 — 끝맺음은 기록 파일에만 온전히 남고,
+  #     「창이 닫혀 끝났습니다」 한 줄을 덧붙여 다음 실행이 종전대로 J-AV-03(갑자기 닫힘)으로 알아본다(진단은 지우지 않는다 · 윈과 같은 뜻).
+  #   ⛔HUP 에 트랩을 걸지 않는다 — 걸면 bash 가 앞에서 도는 명령이 끝날 때까지 기다려 창 없는 설치가 계속 돈다(가상 터미널 실측).
+  #   가르는 법 = 버리는 서브셸에서 줄 맨 앞으로(\r) 한 글자를 써 본다 — 실패한 쓰기의 버퍼는 서브셸과 함께 사라진다.
+  #   (/dev/tty 열기 · stty · [ -t 1 ] 은 창이 닫힌 뒤에도 성공해 못 가른다 — 가상 터미널 실측)
+  local window_gone=0
+  if [ "$STDOUT_WAS_TTY" = 1 ] && ! ( printf '\r' ) 2>/dev/null; then exec >/dev/null 2>&1; window_gone=1; fi
+  if [ -n "${LOGIN_WAIT_MARK:-}" ] && [ -e "$LOGIN_WAIT_MARK" ]; then
+    rm -f "$LOGIN_WAIT_MARK"
+    [ -n "${LOGIN_WATCHER:-}" ] && kill_own_child "$LOGIN_WATCHER" TERM
+  fi
   # 🔴0.3.35(dbg-D5 F10 ①): 진단 코드 없이 0 이 아닌 코드로 끝난 실패는 진행 이벤트가 한 건도 안 나갔다(운영이 셀 수 없음).
   #   ⇒ 그 끝에 한해 「어느 단계 · J-UNK-00」 실패 이벤트를 보낸다. 화면·안내는 바꾸지 않는다(윈 끝맺음의 J-UNK-00 채우기와 같은 자리).
   if [ "${end_rc:-0}" -ne 0 ] && [ -z "$J_CODE" ]; then
@@ -1432,6 +1504,7 @@ closing_note() {
   if [ -z "$NEXT_STEP" ]; then NEXT_STEP="아래 「다시 하시는 법」대로 다시 실행해 주십시오."; SHOW_RERUN=1; fi
   printf '%s\n' "다음에 할 일: $NEXT_STEP"
   log "다음에 할 일: $NEXT_STEP"   # 다음 실행의 show_prev_run_note 가 「끝맺음까지 갔다」를 가르는 줄(ps1 Say 는 화면·기록 둘 다 쓴다)
+  [ "$window_gone" = 1 ] && log "창이 닫혀 끝났습니다 — 끝맺음은 화면에 보이지 않았습니다."   # 0.3.36(F17): 다음 실행 = J-AV-03 유지
   # 반복 막힘 셈 — 끝맺음 이 한 자리에서 한 번만
   help_attempts_update
   if [ -n "$J_CODE" ]; then
@@ -2512,8 +2585,9 @@ step_login() {
   # 끝났으면 **표적을 먼저** 치운다 — 표식보다 먼저 지워야 감시자가 겨눌 것이 없다.
   rm -f "$LOGIN_PID_FILE"
   rm -f "$LOGIN_WAIT_MARK"
-  kill "$LOGIN_WATCHER" 2>/dev/null
+  kill_own_child "$LOGIN_WATCHER" TERM   # 0.3.36: 내 자식일 때만(먼저 끝났으면 번호를 남이 물려받았을 수 있다)
   wait "$LOGIN_WATCHER" 2>/dev/null || true
+  LOGIN_WATCHER=""   # 0.3.36(F11): 거둔 번호를 비운다 — 끝맺음이 다시 죽이려다 다른 프로세스가 물려받은 번호를 치지 않게
   login_w=$(( $(date +%s) - login_t0 ))
   feed="$(grep -o 'login feeder end: clipboard [0-9]* · terminal lines [0-9]*' "$LOG_FILE" 2>/dev/null | tail -1)"
   [ -n "$feed" ] && LOGIN_INFO_SEND="복사된 코드 $(printf '%s' "$feed" | sed -E 's/.*clipboard ([0-9]+).*/\1/')회 · 설치 창 입력 줄 $(printf '%s' "$feed" | sed -E 's/.*terminal lines ([0-9]+).*/\1/')회"
@@ -2711,6 +2785,75 @@ trust_rollback_words() {  # 단계 한 줄이 안에서 일어난 일을 그대�
     *)        printf '그 설정이 어떻게 됐는지 확인하지 못했고,' ;;
   esac
 }
+# 🔴**폴더 이름에 마침표가 있는 자리**(예: /Users/first.last)의 신뢰 칸(0.3.36 F15).
+#   `plutil` 키 경로는 마침표를 구분자로만 읽고 풀어 쓰는 방법이 없다 ⇒ 그 칸을 **가리킬 수가 없다.**
+#   앞 판은 그 자리를 건너뛰고 말로만 알렸다 ⇒ 그런 이름의 컴퓨터에서는 **모든 좌석**이 폴더 신뢰를 물었다.
+#   ⇒ 그 자리만 macOS 기본 `osascript`(JavaScript)로 JSON 을 읽어 폴더 이름을 **통째 한 열쇠**로 다룬다.
+#   (깨끗한 맥에는 jq 가 없고 /usr/bin/python3 는 설치 대화상자를 띄운다 — 이 파일의 다른 JSON 자리와 같은 까닭.)
+#   ★규칙은 plutil 자리와 같다: 작업 폴더 = 칸을 만들거나 우리 키를 세운다(set) ·
+#     홈 = 우리 키가 **없을 때만** 넣는다(add · 있으면 값이 무엇이든 그대로 — 명시한 false 도 그대로).
+#   ★바꾼 내용은 곁의 임시 파일에 쓰고, 제자리 이름 바꾸기(mv)로 한 번에 들인다 — 반쯤 쓴 설정 파일을 남기지 않는다.
+IFS= read -r -d '' TRUST_JS <<'EOF_TRUST_JS' || true
+ObjC.import("Foundation");
+function run(argv) {
+  var op = argv[0], cfg = argv[1], dir = argv[2], out = argv[3];
+  var raw = $.NSString.stringWithContentsOfFileEncodingError(cfg, $.NSUTF8StringEncoding, null);
+  if (raw.isNil()) throw new Error("read");
+  var txt = ObjC.unwrap(raw);
+  // 0.3.36 이종 검토 지적: JSON.parse 는 2^53 을 넘는 정수·긴 소수·1e400 을 뭉갠다 — 다시 쓰면 값이 바뀌는 수가 있으면 고쳐 쓰지 않고 물러난다(종전 안내 · 제거기 DIR_KEY_JS 와 같은 lossy).
+  // 다시 쓰면 값이 바뀌는 수가 있는가(이종 검토 3회차) — 자릿수가 아니라 「그 수를 읽어 다시 쓴 글자가 같은 값인가」로 잰다.
+  //   글자 칸("…") 안 숫자는 수가 아니므로 먼저 비운다. 1e000·정확한 16자리 정수는 통과 · 9.007199254740993e15·긴 소수·1e400 은 걸린다.
+  function lossy(t) {
+    function norm(s) {
+      var m = /^(-?)(\d+)(?:\.(\d+))?(?:[eE]([+-]?\d+))?$/.exec(s); if (!m) return null;
+      var f = m[3] || "", d = (m[2] + f).replace(/^0+/, ""), e = parseInt(m[4] || "0", 10) - f.length;
+      if (d === "") return "0";
+      var z = d.length - d.replace(/0+$/, "").length; return m[1] + d.slice(0, d.length - z) + "e" + (e + z);
+    }
+    var b = t.replace(/"(?:[^"\\]|\\.)*"/g, '""'), re = /-?\d+(?:\.\d+)?(?:[eE][+-]?\d+)?/g, m;
+    while ((m = re.exec(b))) if (norm(m[0]) !== norm(String(Number(m[0])))) return true;
+    return false;
+  }
+  if (lossy(txt)) throw new Error("bignum");
+  var o = JSON.parse(txt);
+  function isObj(v) { return v !== null && typeof v === "object" && !Array.isArray(v); }
+  var has = Object.prototype.hasOwnProperty;
+  if (!isObj(o)) throw new Error("shape");
+  if (!has.call(o, "projects")) o.projects = {};
+  var p = o.projects;
+  if (!isObj(p)) throw new Error("projects");
+  var e = has.call(p, dir) ? p[dir] : undefined;
+  if (e !== undefined && !isObj(e)) throw new Error("entry");
+  var r;
+  if (op === "add" && e !== undefined && has.call(e, "hasTrustDialogAccepted")) return "present";
+  if (op !== "set" && op !== "add") throw new Error("op");
+  if (e === undefined) { p[dir] = { hasTrustDialogAccepted: true }; r = "entry"; }
+  else { e.hasTrustDialogAccepted = true; r = "key"; }
+  if (!$(JSON.stringify(o, null, 2) + "\n").writeToFileAtomicallyEncodingError(out, false, $.NSUTF8StringEncoding, null)) throw new Error("write");
+  return r;
+}
+EOF_TRUST_JS
+TRUST_JSON_RESULT=""; TRUST_JSON_TMP=""
+trust_json_prepare() {  # trust_json_prepare <set|add> <설정파일> <폴더> — 결과 낱말(entry·key·present)은 TRUST_JSON_RESULT 에
+  TRUST_JSON_RESULT=""; TRUST_JSON_TMP=""
+  # ⚠이름 바꾸기는 바로가기(심볼릭 링크)를 보통 파일로 갈아 끼운다 — 그런 설정 파일은 손대지 않고 말로 알린다.
+  [ -f "$2" ] && [ ! -L "$2" ] || return 1
+  local tmp r
+  tmp="$(mktemp "$2.jarvis.XXXXXX" 2>/dev/null)" || return 1
+  r="$(/usr/bin/osascript -l JavaScript -e "$TRUST_JS" "$1" "$2" "$3" "$tmp" </dev/null 2>/dev/null)" || r=""
+  case "$r" in
+    entry|key) if [ -s "$tmp" ]; then TRUST_JSON_RESULT="$r"; TRUST_JSON_TMP="$tmp"; return 0; fi ;;
+    present) rm -f "$tmp"; TRUST_JSON_RESULT="present"; return 0 ;;
+  esac
+  rm -f "$tmp"; return 1
+}
+trust_json_commit() {  # trust_json_commit <설정파일> — 준비한 내용을 제자리로 들인다(권한은 원래 파일 것을 따른다)
+  [ -n "$TRUST_JSON_TMP" ] || return 1
+  chmod "$(stat -f %Lp "$1" 2>/dev/null || echo 600)" "$TRUST_JSON_TMP" 2>/dev/null
+  if mv -f "$TRUST_JSON_TMP" "$1" 2>/dev/null; then TRUST_JSON_TMP=""; return 0; fi
+  rm -f "$TRUST_JSON_TMP"; TRUST_JSON_TMP=""; return 1
+}
+trust_json_discard() { [ -n "$TRUST_JSON_TMP" ] && rm -f "$TRUST_JSON_TMP"; TRUST_JSON_TMP=""; return 0; }
 seed_all_profiles() {
   local p
   for p in $(profile_configs); do
@@ -2744,10 +2887,14 @@ seed_claude_prefs() {
   #   Yes, I trust this folder」에서 서고, ★기본 선택이 「No, exit」라 Enter 만 누르면 클로드가
   #   종료돼 좌석이 셸로 낙하한다. 홈도 심어 그 고리를 끊는다.
   #   ⚠사용자 폴더 이름에 마침표가 있으면 plutil 이 그 칸을 가리킬 수 없다(이 저장소가 아는 함정) —
+  #     그 자리는 JavaScript 로 다룬다(trust_json_prepare · 0.3.36 F15). 그것마저 실패하면
   #     조용히 지나가지 않고 화면에 말한다. 못 넘긴 질문은 사람이 한 번 누르면 끝난다.
   # ⑴자비스 작업 폴더 — 우리가 만든 자리다. 없으면 만들고, 있으면 우리 칸을 세운다.
   case "$JARVIS_HOME" in
-    *.*) say "     (폴더 이름에 마침표가 있어 $(redact "$JARVIS_HOME") 의 폴더 신뢰 질문은 미리 넘기지 못했습니다 — 한 번 [Yes] 를 눌러 주십시오.)" ;;
+    # 마침표 든 이름은 plutil 이 못 가리킨다 — JavaScript 로 같은 일을 한다. 그것마저 실패할 때만 말로 알린다.
+    *.*) if ! { trust_json_prepare set "$cfg" "$JARVIS_HOME" && trust_json_commit "$cfg"; }; then
+           say "     (폴더 이름에 마침표가 있어 $(redact "$JARVIS_HOME") 의 폴더 신뢰 질문은 미리 넘기지 못했습니다 — 한 번 [Yes] 를 눌러 주십시오.)"
+         fi ;;
     *) plutil -insert "projects.$JARVIS_HOME" -json '{"hasTrustDialogAccepted":true}' "$cfg" >/dev/null 2>&1 \
          || plutil -replace "projects.$JARVIS_HOME.hasTrustDialogAccepted" -bool true "$cfg" >/dev/null 2>&1 \
          || plutil -insert "projects.$JARVIS_HOME.hasTrustDialogAccepted" -bool true "$cfg" >/dev/null 2>&1 ;;
@@ -2761,7 +2908,29 @@ seed_claude_prefs() {
   #   ⚠값이 false 라 좌석이 신뢰 질문을 만나면 사람이 한 번 [Yes] 를 누르시면 된다 —
   #     남의 선택을 뒤집는 것보다 손 한 번이 싸다.
   case "$HOME" in
-    *.*) say "     (폴더 이름에 마침표가 있어 $(redact "$HOME") 의 폴더 신뢰 질문은 미리 넘기지 못했습니다 — 한 번 [Yes] 를 눌러 주십시오.)" ;;
+    # 마침표 든 홈 — 규칙은 아래 plutil 갈래와 같다(있으면 그대로 · 없을 때만 넣고 넣은 것만 적는다).
+    #   ⚠순서만 다르다: 바꾼 내용을 곁 파일에 준비 → **기록** → 제자리로 들인다. 기록이 실패하면
+    #   준비한 것을 버린다 ⇒ 들어간 적이 없으니 되돌릴 것도, 「키는 남고 기록은 없는」 상태도 생기지 않는다.
+    *.*) if ! trust_json_prepare add "$cfg" "$HOME"; then
+           say "     (폴더 이름에 마침표가 있어 $(redact "$HOME") 의 폴더 신뢰 질문은 미리 넘기지 못했습니다 — 한 번 [Yes] 를 눌러 주십시오.)"
+         elif [ "$TRUST_JSON_RESULT" = "present" ]; then
+           say "     (이 컴퓨터에는 홈 폴더 신뢰 설정이 이미 있어 그대로 두었습니다 — 우리가 바꾸지 않습니다.)"
+         elif ! printf '%s\t%s\n' "$cfg" "$HOME" >> "$TRUST_SEED_FILE" 2>/dev/null; then
+           trust_json_discard
+           TRUST_JOURNAL_FAILED=1
+           trust_set_rollback_state verified
+           say "     (홈 폴더 신뢰 기록을 남기지 못해 그 설정을 넣지 않았습니다 — 좌석이 폴더 신뢰를 한 번 물을 수 있습니다.)"
+           log "trust seed record FAILED -> not applied (dotted home): $(redact "$cfg") + $(redact "$HOME")"
+           return 1
+         elif trust_json_commit "$cfg"; then
+           log "trust seed record: $(redact "$cfg") + $(redact "$HOME") (dotted home)"
+         else
+           # 기록은 섰는데 들이지 못했다(같은 폴더 안 이름 바꾸기 실패 — 드문 자리). 없는 키의 기록은
+           #   제거기가 「없음」으로 읽고 지나간다. ⚠그 뒤 사람이 [Yes] 를 눌러 같은 칸이 true 가 되면
+           #   지울 때 그 칸도 빠진다 — 다음 설치에서 한 번 더 묻는 정도의 손해다. 로그에 남긴다.
+           say "     (폴더 이름에 마침표가 있어 $(redact "$HOME") 의 폴더 신뢰 질문은 미리 넘기지 못했습니다 — 한 번 [Yes] 를 눌러 주십시오.)"
+           log "trust seed commit FAILED (dotted home) — journal row points at an absent key: $(redact "$cfg") + $(redact "$HOME")"
+         fi ;;
     *) if plutil -extract "projects.$HOME.hasTrustDialogAccepted" raw -o - "$cfg" >/dev/null 2>&1; then
          say "     (이 컴퓨터에는 홈 폴더 신뢰 설정이 이미 있어 그대로 두었습니다 — 우리가 바꾸지 않습니다.)"
        else
@@ -2937,7 +3106,10 @@ step_download_cys() {
     else
       say "[5/10] cys 설치 파일을 받습니다 (잠시 걸립니다)."
     fi
-    if ! curl -fsSL --max-time 900 "$CYS_DOWNLOAD_URL" -o "$dst"; then
+    # 🔴0.3.36 F12: 멈춘 받기는 1분 안에 돌려받는다 — 초당 1KB 아래로 60초가 이어지면(--speed-limit/--speed-time) ·
+    #   연결 맺기 자체는 20초(--connect-timeout). 앞 판은 전체 상한(900초)만 있어, 흐름이 멎은 받기가
+    #   말 없이 최대 15분을 붙들었다. 다시 해 보는 명령(아래 wait_for_connection)도 같은 옵션을 쓴다.
+    if ! curl -fsSL --max-time 900 --connect-timeout 20 --speed-limit 1024 --speed-time 60 "$CYS_DOWNLOAD_URL" -o "$dst"; then
       # 🔴먼저 **까닭을 가른다**. 받을 자리가 「그런 파일 없다」고 답했으면 기다릴 일이 아니다.
       #   ⚠**404·410 만** 이 갈래다. 5xx(자리는 살아 있는데 잠시 탈이 난 것)도, 물어보지도 못한
       #     `000`(망 쪽)도 **여전히 기다리는 쪽**이다 — 새 갈래가 그 길까지 삼키면 안 된다.
@@ -2968,7 +3140,7 @@ step_download_cys() {
       # 두 번 해 보고 포기하지 않는다. 연결이 돌아오면 이어간다(같은 자리·같은 문장).
       # ⚠다시 해 보는 명령에도 상한이 있어야 한다 — 없으면 curl 이 응답 없는 연결에 매달려
       #   30분 상한이 있는 바깥 고리로 **돌아오지 못한다**(검토 지적 채택 2026-09-09).
-      if ! wait_for_connection "[5/10]" 'curl -fsSL --max-time 900 "$CYS_DOWNLOAD_URL" -o "$dst"'; then
+      if ! wait_for_connection "[5/10]" 'curl -fsSL --max-time 900 --connect-timeout 20 --speed-limit 1024 --speed-time 60 "$CYS_DOWNLOAD_URL" -o "$dst"'; then
         next_rerun "연결이 된 뒤 아래 「다시 하시는 법」대로 다시 실행해 주십시오. 받은 데까지는 건너뛰고 이어서 갑니다."
         rm -f "$dst"
         return 5
@@ -4407,6 +4579,7 @@ ROTATE_WALL_CAP_SEC=180        # 설치기가 rotate 전체를 기다리는 벽�
 #   0 전부 성공 · 21 끝까지(저장 일부 미확인) ⇒ ok        — 안내 = rotate 표준 출력 마지막 줄(사후 알림) 그대로
 #                                                            21 이면 「저장 확인 일부 미완 — 대화는 복원됨」 1줄을 덧붙인다
 #   25 끝까지(복원 실패·보류)                ⇒ held      — 「창을 확인해 주세요」 · [재시작] 을 부탁하지 않는다(이미 새 데몬)
+#                                                            v0.3.36: 그 전에 창 60초 동안 다시 본다 — 서면 observed-ok(rotate_held_recheck)
 #   22 데몬 교체 실패 · 23 새 데몬 무응답 · 24 팩 반영 실패 ⇒ fail-<rc> — 「앱을 열면 다시 시도됩니다」 + 폴백 안내
 #   옛 cys(모르는 하위명령)·실행 파일 없음 ⇒ absent · 상한 초과 ⇒ timeout · 그 밖 ⇒ fail-<rc>(폴백 안내)
 ROTATE_POLL_SEC=1   # 줄·단계 들여다보는 간격(v0.3.30)
@@ -4469,6 +4642,29 @@ rotate_observe() { # rotate_observe <cli> <기준 pid> <기준 자리> <경과�
   else
     log "rotate observe [t=${4}s] pong=$pong pid=${2:-?}->${pid:-?} old-alive=${old}/${oldn} role-alive=$(printf '%s' "$roles" | wc -w | tr -d ' ') verdict=$v"
   fi
+  echo "$v"
+}
+# ── rc 25 뒤 다시 보기 (v0.3.36 X-5 · 윈 Get-RotateHeldRecheck 짝) ──
+#   25 = rotate 가 자기 관측 창 안에 자리가 다 서는 것을 못 봤다는 뜻이지, 자리가 안 선다는 뜻이 아니다.
+#   실측(09-22 맥 VM 재설치 · bootstrap.log 191~202 · events-cys.jsonl): rc 25 가 17:42:12 에 왔고 늦던 cso 자리는
+#   17:42:32 에 섰다(20초 뒤 · 실제 3/3) ⇒ 설치 창은 「복원이 끝나지 않았습니다」라는 거짓 경고를 냈다.
+#   ⇒ 25 를 받으면 곧바로 경고하지 않고 이 창 동안 같은 세 축을 더 본다 — 서면 성공 · 끝내 안 서면 held(종전 경고).
+#   창 60초 = 실측 20초 + 늦는 자리가 다시 뜨는 간격(같은 로그: cso 자리가 8~10초 간격으로 세 번 다시 떴다) 두세 번.
+#   ⚠기준 데몬 pid 를 못 읽었으면 판정이 끝내 no:pid 라 기다려도 바뀌지 않는다 — 기다리지 않고 held 로 둔다.
+ROTATE_HELD_OBSERVE_SEC=60
+rotate_held_recheck() { # rotate_held_recheck <cli> <기준 pid> <기준 자리> <rotate 시작 SECONDS> → 마지막 판정(ok · no:…)을 찍는다
+  local v t1
+  case "$2" in ''|*[!0-9]*) log "rotate held recheck skipped — 기준 데몬 pid 를 못 읽었다"; echo no:pid; return 0 ;; esac
+  t1="$SECONDS"
+  while :; do
+    if [ $((SECONDS - t1)) -ge "$ROTATE_HELD_OBSERVE_SEC" ]; then
+      v="$(rotate_observe "$1" "$2" "$3" "$((SECONDS - $4))" 1)"; break
+    fi
+    v="$(rotate_observe "$1" "$2" "$3" "$((SECONDS - $4))" 0)"
+    if [ "$v" = ok ]; then rotate_observe "$1" "$2" "$3" "$((SECONDS - $4))" 1 >/dev/null; break; fi
+    sleep "$ROTATE_OBSERVE_SEC"
+  done
+  log "rotate held recheck: verdict=$v after $((SECONDS - t1))s (window ${ROTATE_HELD_OBSERVE_SEC}s)"
   echo "$v"
 }
 cys_rotate_state() { # cys_rotate_state <cli> → 찍는 값 = 「<판정>\t<rc>\t<rotate 마지막 알림 줄>」 한 줄(판정 = ok · observed-ok · held · absent · timeout · fail-<rc>)
@@ -4553,7 +4749,11 @@ cys_rotate_state() { # cys_rotate_state <cli> → 찍는 값 = 「<판정>\t<rc>
   [ "$observed" = 1 ] && { printf 'observed-ok\t%s\t%s\n' "$rc" '자비스가 새 판으로 다시 깨어났습니다.'; return 0; }
   case "$rc" in
     0|21) printf 'ok\t%s\t%s\n' "$rc" "$note"; return 0 ;;
-    25)   printf 'held\t%s\t%s\n' "$rc" "$note"; return 0 ;;
+    25)   # v0.3.36(X-5): 곧바로 held 로 말하지 않는다 — 늦게 서는 자리를 정해진 창 동안 더 본다(rotate_held_recheck 머리 주석).
+          v="$(rotate_held_recheck "${1:-cys}" "$base_pid" "$base_refs" "$t0")"
+          if [ "$v" != ok ]; then printf 'held\t%s\t%s\n' "$rc" "$note"
+          else printf 'observed-ok\t%s\t%s\n' "$rc" '자비스가 새 판으로 다시 깨어났습니다.'; fi
+          return 0 ;;
   esac
   case "$out" in
     *"unrecognized subcommand"*|*"unexpected argument"*|*"invalid subcommand"*) printf 'absent\t%s\t%s\n' "$rc" "$note"; return 0 ;;
@@ -4597,6 +4797,24 @@ start_cys_app_window() {
   log "cys app start failed: $app"
   printf ''; return 0
 }
+# ── wake.sh 쓰기(윈판 Get-WakeBody 짝 · 0.3.36) ──
+# 본부 자비스(master)의 claude 는 cys 좌석 기동 줄이 아니라 이 파일이 띄운다 ⇒ cys 가 동료 좌석(cso·worker)의 claude 에
+#   넣는 환경값 두 개가 여기에는 없었다(깨끗한 맥 VM 실측: 입력칸에 회색 제안 글 · 생각 깊이가 기본값).
+#   값·이름 = cys 좌석 주입과 같다: CLAUDE_CODE_EFFORT_LEVEL=high · CLAUDE_CODE_ENABLE_PROMPT_SUGGESTION=false.
+#   ★환경 키가 이미 있으면(빈 값 포함) 손대지 않는다 — cys 주입과 같은 규칙 ⇒ `${키-기본}`(쌍점 없음).
+#   ⚠지켜지는 것은 **환경 키**로 준 값뿐이다 — 설정 파일(effortLevel·promptSuggestionEnabled)·창 안 `/effort` 는 이 환경값에 진다
+#     (claude 가 환경값을 먼저 본다 · cys 동료 좌석과 같은 동작 · effort high 고정 정책과 같은 방향).
+WAKE_CLAUDE_ENV='export CLAUDE_CODE_EFFORT_LEVEL="${CLAUDE_CODE_EFFORT_LEVEL-high}"
+export CLAUDE_CODE_ENABLE_PROMPT_SUGGESTION="${CLAUDE_CODE_ENABLE_PROMPT_SUGGESTION-false}"'
+write_wake_file() { # write_wake_file <파일> <첫 프롬프트> — rc 0 = 썼다 (tests/wake-env-run.sh 가 만든 파일을 실제로 돌려 잰다)
+  local q
+  # 경로에 작은따옴표가 있으면(사용자 이름 등) 문자열이 거기서 닫혀 wake.sh 가 안 돈다 ⇒ '\'' 로 글자로 남긴다(ps1 Step-Wake 의 $wakeQuoted 와 같은 방어).
+  q="$(printf '%s' "$2" | sed "s/'/'\\\\''/g")"
+  printf '#!/bin/bash\n%s\nCLAUDE="$HOME/.local/bin/claude"\n[ -x "$CLAUDE" ] || CLAUDE=claude\nexec "$CLAUDE" --dangerously-skip-permissions %s\n' "$WAKE_CLAUDE_ENV" "'$q'" > "$1" 2>/dev/null || return 1
+  chmod +x "$1" 2>/dev/null
+  return 0
+}
+
 step_wake() {
   local first_prompt cli ref fleet_rc
   # 🔴**cys 에 넘기는 인자**는 ASCII 로만 쓴다(자리 여는 명령 · 창 이름) — 윈도우에서 우리말 인자가 깨져 거절당했다.
@@ -4611,7 +4829,7 @@ step_wake() {
   #   ⑴선언을 첫 프롬프트의 **첫 줄**로 싣고 ⑵[10/10] 이 표지 파일(awake-master.ok)로 마스터를 실제로 잰다.
   #   ⛔첫 줄 「너는 마스터다」는 인사말이 아니라 **팩 훅의 선언 트리거**다(javis_detect.py · 의뢰 문구 단독 = 선언 없음 실측).
   first_prompt="install-jarvis 폴더의 install-directive.md(${DIRECTIVE_FILE}) 를 읽고, 거기 적힌 준비 작업을 해 주세요."
-  local wake_prompt wake_quoted
+  local wake_prompt
   wake_prompt="${FLEET_TRIGGER}
 ${first_prompt}"
   if [ "$MODE" = "dry" ]; then
@@ -4631,10 +4849,9 @@ ${first_prompt}"
     #   보험이다. 결함을 메우는 것이 아니다 — cys 가 띄우는 창은 cysd 가 `~/.local/bin` 을 PATH 앞에 심어 줘서
     #   `claude` 만 써도 잡힌다(2026-09-06 깨끗한 맥 실측). 다만 그 주입은 **cys 쪽 구현이지 우리 계약이
     #   아니다.** 우리 창이 아닌 곳에서 도는 파일이므로, 남의 구현에 기대지 않고 우리가 아는 자리를 먼저 본다.
-    # 경로에 작은따옴표가 있으면(사용자 이름 등) 문자열이 거기서 닫혀 wake.sh 가 안 돈다 ⇒ '\'' 로 글자로 남긴다(ps1 3313 과 같은 방어).
-    wake_quoted="$(printf '%s' "$wake_prompt" | sed "s/'/'\\\\''/g")"
-    printf '#!/bin/bash\nCLAUDE="$HOME/.local/bin/claude"\n[ -x "$CLAUDE" ] || CLAUDE=claude\nexec "$CLAUDE" --dangerously-skip-permissions %s\n' "'$wake_quoted'" > "$wake_file" 2>/dev/null
-    chmod +x "$wake_file" 2>/dev/null
+    # 파일 모양·따옴표 방어·환경값 두 개 = write_wake_file(위) 한 곳 · 못 쓰면(파일이 없을 때) 아래 「경로를 쓸 수 없어」 갈래가 받는다(종전과 같다).
+    #   ⚠지난 설치의 wake.sh 가 남은 채 쓰기만 실패하면 옛 파일이 열린다 — 종전 동작 그대로(이번 판에서 바꾸지 않음).
+    write_wake_file "$wake_file" "$wake_prompt"
     # ★cys 앱 창을 **자리를 열기 전에** 연다(09-16 실기 「앱 창 미가시 · 사람이 open 을 쳤고 오타」 · 윈도우는 앱이 창과 함께 뜬다).
     #   앞에 두는 까닭 = 앱이 뜨며 편성 복구로 지난 자리를 세울 수 있다 — 기준선보다 앞이어야 그 자리가 「이번 설치의 것」으로 안 세어진다.
     open_cys_app
@@ -4695,31 +4912,42 @@ ${first_prompt}"
       rotate_rc="$(printf '%s' "$rotate_out" | cut -f2)"
       rotate_note="$(printf '%s' "$rotate_out" | cut -f3-)"
       log "reinstall rotate: $rotate_state"
+      # v0.3.36(F13 · 윈 짝 같은 자리): 한 화면에 「무엇을 해 주세요」와 「다음에 할 일: 없습니다」가 함께 나왔다
+      #   (재시작 실패 · 복원 보류 · 앱 못 띄움). ⇒ 위 줄들은 **있었던 일**만 말하고, 사람이 할 일은 끝맺음의 「다음에 할 일」 한 줄에만 둔다.
       if [ "$rotate_state" = ok ] || [ "$rotate_state" = observed-ok ] || [ "$rotate_state" = held ] || [ "$rotate_state" = skipped-restarted ]; then
         # 사후 알림 = rotate 가 스스로 쓴 마지막 줄 그대로(저장 일부 미확인이면 그렇다고 그 줄이 말한다 · rc 21).
-        if [ -n "$rotate_note" ]; then say "     $rotate_note"; else say "     자비스를 새 판으로 다시 깨웠습니다."; fi
+        #   held 는 rotate 알림 줄(「… 창을 확인하세요 …」 부탁이 든 원문)을 찍지 않는다 — 부탁은 「다음에 할 일」 한 줄에만(적대 검토 지적).
+        if [ -n "$rotate_note" ] && [ "$rotate_state" != held ]; then say "     $rotate_note"; else say "     자비스를 새 판으로 다시 깨웠습니다."; fi
         [ "$rotate_rc" = 21 ] && say "     저장 확인 일부 미완 — 대화는 복원됨"
-        # 25 = 새 데몬은 섰고 복원만 덜 됐다 — [재시작] 을 또 누르게 하지 않는다(되풀이해도 같은 자리에서 멈춘다).
-        [ "$rotate_state" = held ] && say "     일부 창의 복원이 끝나지 않았습니다 — cysr 앱에서 창을 확인해 주세요."
-        [ -n "$app_state" ] || say "     cysr 앱을 자동으로 띄우지 못했습니다 — 응용 프로그램 폴더의 cysr 을 눌러 실행해 주세요."
+        # 25 = 새 데몬은 섰고 복원만 덜 됐다(창 60초를 더 보고도) — [재시작] 을 또 누르게 하지 않는다(되풀이해도 같은 자리에서 멈춘다).
+        [ "$rotate_state" = held ] && say "     일부 창의 복원이 끝나지 않았습니다."
+        [ -n "$app_state" ] || say "     cysr 앱을 자동으로 띄우지 못했습니다."
+        say "[10/10] 설치는 여기까지 끝났습니다. 이 창은 닫으셔도 됩니다."
+        case "$rotate_state:${app_state:+app}" in
+          held:app) NEXT_STEP="cysr 앱에서 자비스 창이 모두 열려 있는지 확인해 주세요. 그다음 그 창에서 자비스와 이어서 이야기하시면 됩니다." ;;
+          held:)    NEXT_STEP="응용 프로그램 폴더의 cysr 을 눌러 실행한 뒤, 자비스 창이 모두 열려 있는지 확인해 주세요." ;;
+          *:app)    NEXT_STEP="없습니다 — cysr 앱 창에서 자비스와 이어서 이야기하시면 됩니다." ;;
+          *)        NEXT_STEP="응용 프로그램 폴더의 cysr 을 눌러 실행해 주세요. 그 창에서 자비스와 이어서 이야기하시면 됩니다." ;;
+        esac
       else
         # 22 데몬 교체 · 23 새 데몬 무응답 · 24 팩 반영 = 도중에 멈춘 실패 — 앱이 다음 기동에 다시 시도한다(24 는 표식을 남긴다).
         case "$rotate_state" in
-          fail-22|fail-23|fail-24) say "     자동 재시작을 끝내지 못했습니다 — 앱을 열면 다시 시도됩니다." ;;
+          fail-22|fail-23|fail-24) say "     자동 재시작을 끝내지 못했습니다." ;;   # 0.3.36: 처방은 「다음에 할 일」 한 가지만(앱이 다음 기동에 다시 시도하는 것은 그대로)
         esac
-        case "$app_state" in
-          raised|started) say "     앱 오른쪽 위의 [재시작] 을 한 번 눌러 주세요. 그러면 자비스가 새로 깨어납니다." ;;
-          *)       # 자동 실행이 실패한 이 한 갈래에서만 사람 손을 부탁한다(설계 원칙: 손 0 이 기본 · 안내는 실패한 갈래에서만 1줄).
-                   say "     cysr 앱을 자동으로 띄우지 못했습니다 — 응용 프로그램 폴더의 cysr 을 눌러 실행해 주세요."
-                   say "     이미 열려 있으면 앱 오른쪽 위의 [재시작] 을 한 번 눌러 주세요." ;;
-        esac
+        # 자동 실행이 실패한 이 갈래에서만 사람 손을 부탁한다(설계 원칙: 손 0 이 기본 · 안내는 실패한 갈래에서만 1줄 = 「다음에 할 일」).
+        [ -n "$app_state" ] || say "     cysr 앱을 자동으로 띄우지 못했습니다."
+        # 설치 자체는 끝났다 — 「끝났습니다 · 할 일 없음」 대신 남은 한 가지를 말한다(단계 표지 [10/10] 은 B9 그대로).
+        say "[10/10] 설치 파일은 모두 자리를 잡았습니다. 자비스를 새 판으로 깨우는 일 하나만 남았습니다."
+        if [ -n "$app_state" ]; then
+          NEXT_STEP="앱 오른쪽 위의 [재시작] 을 한 번 눌러 주세요. 그러면 자비스가 새로 깨어납니다."
+        else
+          NEXT_STEP="응용 프로그램 폴더의 cysr 을 눌러 실행한 뒤, 앱 오른쪽 위의 [재시작] 을 한 번 눌러 주세요. 그러면 자비스가 새로 깨어납니다."
+        fi
       fi
       # v0.3.32(TICKET=installer-0332 B9 · 【관측】 progress.tsv sLqY6Au1 22:18:15 = 10/10 end 는 서버에 **도착해 있었다**):
       #   이 갈래는 화면에 [10/10] 줄이 없어서, 뒤에 나가는 설치 끝 증거(post-install)가 「마지막 [n/10]」(current_step)을 따라
-      #   9/10 으로 붙었다 ⇒ 서버 목록의 마지막 행이 9/10 으로 보였다. 끝맺음 줄에 [10/10] 을 달아 단계를 사실대로 둔다.
-      say "[10/10] 설치는 여기까지 끝났습니다. 이 창은 닫으셔도 됩니다."
+      #   9/10 으로 붙었다 ⇒ 서버 목록의 마지막 행이 9/10 으로 보였다. 끝맺음 줄에 [10/10] 을 달아 단계를 사실대로 둔다(위 두 갈래 모두).
       REACHED_WAKE=1
-      NEXT_STEP="없습니다 — cysr 앱 창에서 자비스와 이어서 이야기하시면 됩니다."
       SHOW_RERUN=0
       # 끝을 서버도 알아야 한다 — 앞 판은 이 갈래에서 9/10·10/10 이 통째로 비었다(09-21 07:30).
       progress_send '9/10' 'end' '' "wake:claim-denied app=${app_state:-none}" ''
@@ -4756,6 +4984,8 @@ ${first_prompt}"
   # ★이 줄 뒤로 이 창은 자비스 것이다 — 끝 전송은 **여기가 마지막 기회**다.
   progress_send '9/10' 'end' '' 'wake:window-fallback' ''
   # 이 창에서 띄울 때도 선언을 첫 줄로 함께 넘긴다(ps1 3421 — cys 안에서 여는 wake.sh 와 같은 두 줄).
+  # 0.3.36: 이 창 폴백도 wake.sh 와 같은 환경값 두 개(키가 없을 때만 · 이 프로세스에서만 · 값 정본 = 위 WAKE_CLAUDE_ENV 한 곳).
+  eval "$WAKE_CLAUDE_ENV"
   exec "$claude_bin" --dangerously-skip-permissions "$wake_prompt"
 }
 
@@ -4817,10 +5047,21 @@ raise_cys_app_window() {
 # ★언제 도는가 = 자비스를 깨우기 **전에** 진단 코드를 남기고 멈춘 끝. 자비스를 깨운 뒤에는 돌지 않는다
 #   (자비스가 이 창을 넘겨받으므로 두 쪽이 한 화면에 섞이지 않게).
 # ⚠JSON·재검사·스크럽은 macOS 기본 `osascript`(JavaScript)가 한다 — 깨끗한 맥에는 jq·python 이 없다.
-INSTALLER_VERSION="0.3.35"      # 보고의 installer_version · BOOTSTRAP_VERSION 은 화면 머리글 용도 그대로(보내지 않는다)
-HELP_API_URL="https://jarvis-install.godmeyou.kr"
+INSTALLER_VERSION="0.3.36"      # 보고의 installer_version · BOOTSTRAP_VERSION 은 화면 머리글 용도 그대로(보내지 않는다)
+# 0.3.36: JARVIS_HELP_API_URL = CI·흉내가 도움 보고를 로컬로 돌리는 손잡이(JARVIS_PROGRESS_URL 과 같은 모양 · 사람이 쓰는 길이 아니다 ·
+#   없으면 종전 주소 그대로 — tests/help-url-lever.sh 가 잰다). CI(reinstall-matrix.yml)의 full 부분 설치가 라이브 도움 채널로 가던 길을 막는다.
+HELP_API_URL="${JARVIS_HELP_API_URL:-https://jarvis-install.godmeyou.kr}"
+# 🔴0.3.36(이종 검토): 시험용 함수 묶음은 도움 보고(/api/help)도 라이브로 못 보낸다 — 진행 주소(progress_url)와 같은 자리.
+#   시험이 가짜 서버를 쓰려면 읽은 뒤 HELP_API_URL 을 덮어쓴다(종전 관용구 그대로) · 손잡이를 주면 그 주소(progress_url 과 같은 순서).
+[ -z "${JARVIS_HELP_API_URL:-}" ] && [ "${JARVIS_LIB_ONLY_AT_LOAD:-}" = "1" ] && HELP_API_URL="http://127.0.0.1:9/lib-only-no-live"
 REMOTE_HELP_NOTICE_URL="jarvis-install.godmeyou.kr/help/notice"
 # [1/10] 고지 1줄 = /help/notice 정본(page.ts)이 인용하는 문장 그대로 + 끝에 자세한 안내 자리(계약 7-1절). ⛔문안 변경 금지.
+# 0.3.36: 첫 화면 진행 고지 = 확정 문구(윈 $ProgressNotice 첫 문장 · 서버 NOTICE_TEXT 첫 문장과 같은 글).
+#   맥은 이 한 줄만 — 창 그림은 맥 기본이 꺼짐이라 윈 문단의 그림 문장을 옮기지 않는다.
+PROGRESS_NOTICE="설치가 잘 되는지 보려고 진행 단계와 기기 정보(모델, 메모리, 남은 공간)를 자동으로 보냅니다."
+# 0.3.36: 창 글자 고지 반 줄 = 확정 문구(⛔글자 변경 금지 — tests/notice-before-send.sh ⓔ 가 글자를 잰다).
+#   맥은 막힘·이상(느림·오류 글·다시 시도)·끝에 설치 기록 끝부분(evidence_text_file)과 자비스 화면 끝(post_install_evidence)을 가려서 보낸다 — 그 고지다.
+CAPTURE_NOTICE="설치가 끝나거나 막히거나 이상이 보이면, 도와드리기 위해 이 창과 자비스 창의 글자를 운영팀에 보냅니다(개인정보는 가리고 30일 뒤 지웁니다)."
 REMOTE_HELP_NOTICE="막히면 진단이 서버로 가고 운영 자비스가 원격으로 해결합니다 · 창을 닫으면 멈춥니다 · 자세히: $REMOTE_HELP_NOTICE_URL"
 # 「막혔을 때」 절 = page.ts REMOTE_LINES 3줄에서 태그만 뗀 것. ⛔문안 변경 금지(시험이 글자를 잰다).
 REMOTE_HELP_LINES=(
@@ -5411,7 +5652,8 @@ remote_help() {
     say "     임시 자리를 만들지 못해 원격 해결을 시작하지 못했습니다."
     return 0
   fi
-  trap 'remote_help_on_signal' HUP INT TERM
+  trap 'exec >/dev/null 2>&1; remote_help_on_signal' HUP   # 0.3.36(F17): 창이 닫혔으면 화면 쓰기를 먼저 버린다(closing_note 머리 주석)
+  trap 'remote_help_on_signal' INT TERM
   if remote_help_report; then
     # 3회째 안내를 보인 실행만 — 보고가 실제로 전달된 순간에 그렇다고 말한다(D3)
     if [ "$HELP_STAGE3_SHOWN" = "1" ]; then
@@ -5786,6 +6028,10 @@ say "=== 자비스 설치 도우미 — ${CYS_DISPLAY_NAME} ${CYS_PIN_VERSION} �
 show_prev_run_note   # ps1 5640 — 머리글 앞머리(=== 자비스 설치 도우미 )는 지난 실행 읽기의 경계 표지다
 say "[1/10] 이 컴퓨터를 살펴봅니다."
 say "     $REMOTE_HELP_NOTICE"
+say "     $PROGRESS_NOTICE"   # 0.3.36: 첫 화면 진행 고지(윈 Say $ProgressNotice 짝 · 첫 전송보다 먼저 — tests/notice-before-send.sh)
+say "     $CAPTURE_NOTICE"    # 0.3.36: 창 글자 고지 반 줄(진행 고지 바로 다음 · 첫 전송보다 먼저 — 같은 시험 ⓔ)
+# 0.3.36: 전송 문(NOTICE_SHOWN)은 고지 세 줄을 **다 찍은 뒤에** 연다 — 앞 판은 첫 줄 뒤에 열어, 그다음 줄을 찍는 사이
+#   멈추면(Ctrl-C) 끝맺음의 실패 진행 기록(J-UNK-00 · 단계·이벤트만 · 창 글자 0)이 진행 고지 없이 나갈 틈이 있었다(이종 검토 반례 · 실측 정정).
 NOTICE_SHOWN=1
 progress_send '1/10' 'start' '' '' ''   # ps1 5645
 step_baselines_update                   # ps1 5646 — 단계 소요 기준선을 한 번 받는다(못 받으면 「평소의 두 배」 축은 잠든다)
@@ -5797,7 +6043,7 @@ progress_send '1/10' 'end' '' '' ''     # ps1 5651
 # 환경 칸에 **칩**을 함께 싣는다(2026-09-20 · TICKET=v110-mac-x64). 인텔 맥이 몇 대인지·어디서 멈추는지를
 #   운영팀이 지금은 셀 수 없다 — 맥 이벤트에 아키텍처 칸이 아예 없었다.
 #   ⚠새 env 열쇠(arch)를 만들지 않고 **detail**(서버가 이미 받는 자유 칸)에 싣는다: 서버가 받는 env 열쇠는
-#     claude_ver·cys_ver·win_build·ps_ver·av·browser·mac_ver·admin 로 **정해져 있어**(web-install telemetry.ts
+#     claude_ver·cys_ver·win_build·ps_ver·av·browser·mac_ver·hw_model·mem_gb·disk_free_gb(0.3.36)·admin 로 **정해져 있어**(web-install telemetry.ts
 #     ENV_TEXT_KEYS) 새 열쇠는 서버를 함께 고쳐야 닿는다. 서버 쪽은 이 저장소 밖이라 여기서 못 고치고 못 잰다.
 progress_send '1/10' 'info' '' "arch:$(uname -m 2>/dev/null)" env   # ps1 5652 — 환경 칸
 

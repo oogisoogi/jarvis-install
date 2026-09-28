@@ -62,6 +62,7 @@ if ($Scenario -eq 'progress-body') {
     # 실물 Send-Progress 가 evidence 추가 칸(text·reason·masked)을 본문에 싣는가 — 받는 쪽만 가짜(바깥 전송 0)
     try {
         $Mode = 'full'
+        $script:NoticeShown = $true   # 0.3.36: 전송 함수는 첫 화면 고지 뒤에만 보낸다 — 이 구역은 고지 뒤 상태를 몬다
         $env:JARVIS_NO_PROGRESS = ''
         $env:JARVIS_PROGRESS_URL = 'http://emu.invalid/api/progress'
         function Invoke-WebRequest {

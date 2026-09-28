@@ -85,8 +85,8 @@ MUTANTS = [
      "[맥 x21] rc 21(저장 일부 미확인) → ok", "emu"),
     #   25(복원 보류)를 held 로 못 가르면 새 데몬이 이미 섰는데 [재시작] 을 되풀이시킨다(같은 자리에서 또 멈춘다).
     ("win-rotate-rc25-drop", PS,
-     "        if ($rc -eq 25) { return (\"held`t\" + $rc + \"`t\" + $note) }",
-     "        if ($rc -eq 99) { return (\"held`t\" + $rc + \"`t\" + $note) }",
+     "        if ($rc -eq 25) {\n            # v0.3.36(X-5)",
+     "        if ($rc -eq 99) {\n            # v0.3.36(X-5)",
      "[윈 x25] rc 25(복원 보류) → held", "emu"),
 ]
 

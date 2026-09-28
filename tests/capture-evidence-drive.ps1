@@ -12,6 +12,7 @@ $env:JARVIS_NO_PROGRESS = ''      # 🔴이 구역은 레버를 **일부러 끈�
 $env:JARVIS_LIB_ONLY = '1'
 . $Src
 $env:JARVIS_LIB_ONLY = ''
+$script:NoticeShown = $true   # 0.3.36: 전송 함수는 첫 화면 고지 뒤에만 보낸다 — 이 흉내는 고지 뒤 상태를 몬다
 function Out-Fact($k, $v) { Add-Content -Path "$Sb/facts" -Value ("$k=$v") -Encoding utf8 }
 
 $jpg = [byte[]]::new(64)

@@ -35,8 +35,10 @@
 # 창이 갑자기 닫히면 백신이 PowerShell 을 종료한 것일 수 있다. 그때는 Show-RerunHow 가 인쇄한
 #   명령 전체를 다시 붙여넣으면 이어서 진행된다(사람에게 「같은 줄」이라고 말하지 않는다 - 아래 참조).
 
-param([switch]$WhatIf, [switch]$List, [switch]$Yes, [switch]$PurgeLogin, [switch]$UseUninstaller, [switch]$KeepApp)
+param([switch]$WhatIf, [switch]$List, [switch]$Yes, [switch]$PurgeLogin, [switch]$UseUninstaller, [switch]$KeepApp, [switch]$KeepHistory)
 # -KeepApp : cys 프로그램은 지우지 않는다(재설치 길 · reinstall.ps1 이 -Yes 와 함께 넘긴다).
+# -KeepHistory : 자비스 창의 로그인과 이전 대화는 지우지 않는다(재설치 길 · reinstall.ps1 이 늘 넘긴다 · 0.3.36 ·
+#   Get-HistoryKeeps 머리 주석). -KeepApp 과 따로 선다 — 혼자 돌리는 지우기에는 붙지 않는다(종전대로 지운다).
 #   그 길에서는 제거 프로그램 실행 · 설정 앱 안내 · Enter 고리 · 폴더 삭제 확인을 통째로 건너뛴다 — 사람 손 0.
 #   프로그램과 한 쌍인 시작 메뉴 바로가기 · 설치 목록 항목도 함께 남긴다(프로그램만 남고 그 둘이 사라지면 고아가 된다).
 #   프로세스 끄기 · 상시 가동 등록 떼기 · 설정 · 로그인 처리는 종전대로 한다.
@@ -97,9 +99,16 @@ $SettingsJs = Join-Path $ClaudeDir 'settings.json'
 $ClaudeCfgDir = if ($env:CLAUDE_CONFIG_DIR) { $env:CLAUDE_CONFIG_DIR } else { $ClaudeDir }
 $CredFile   = Join-Path $ClaudeCfgDir '.credentials.json'
 # 자비스 창(cys)이 띄우는 클로드는 CLAUDE_CONFIG_DIR 을 ~\.cys\claude 로 두고 뜬다.
-#   그 폴더는 아래에서 「cys 계정 자리」로 **통째로 지워진다** — 거기 든 로그인도 같이 사라진다.
-#   지우는 것을 바꾸지는 않는다(그것은 사람이 결정할 일이다). 다만 **말은 해 준다.**
+#   그 폴더는 아래에서 「cys 계정 자리」로 지워진다 — 혼자 돌리는 지우기에서는 거기 든 로그인도 같이 사라진다.
+#   ★재설치 길(-KeepHistory)에서는 로그인과 이전 대화를 **남긴다**(0.3.36 · 아래 Get-HistoryKeeps).
 $CysCredFile = Join-Path $CysHome 'claude\.credentials.json'
+# 🔴0.3.36(09-25 윈 실기): 재설치 한 줄 뒤 본부 세 자리가 전부 「Login expired」였다.
+#   앞 판은 재설치 길에서도 ~\.cys 를 통째로 지웠다 ⇒ 좌석들이 갱신해 온 **가장 새 로그인**(.credentials.json)이 사라지고,
+#   설치 도우미 [8/10] 이 첫 설치 때의 **옛 로그인**(~\.claude, 이미 못 쓰게 된 것)을 대신 이어 두었다. 대화 기록(projects\)도 함께 사라졌다.
+#   ⇒ 재설치 길에서는 아래 다섯 자리만 **제자리에** 남기고 나머지는 종전대로 지운다(동료가 그 자리에서 찾아야 하므로 옮기지 않는다).
+#   근거 = 공식 문서 code.claude.com/docs/en/claude-directory(CLAUDE_CONFIG_DIR 을 두면 그 아래로 온다) · 설계 = docs/install-master/DESIGN-login-keep-0336.md 1절.
+#   ⚠CLAUDE.md · settings.json · .claude.json · skills 는 남기지 않는다 — cys·설치 도우미가 다시 만든다(CLAUDE.md 는 「없을 때만」 만들어서, 남기면 새 판이 못 들어간다).
+$HistoryKeepNames = @('.credentials.json', 'projects', 'history.jsonl', 'file-history', 'agent-memory')
 # 받아 둔 설치기 사본 — 2026-09-06 부터 사용자 폴더에 받는다. 옛 자리(임시 폴더)도 함께 본다.
 $HomePs1    = Join-Path $env:USERPROFILE 'install-jarvis.ps1'
 $TempPs1    = Join-Path $env:TEMP 'install-jarvis.ps1'
@@ -317,6 +326,55 @@ function Initialize-PreserveCanon {
         }
     }
 }
+# 재설치 길에서 ~\.cys\claude 안에 남길 자리의 실경로(0.3.36 · $HistoryKeepNames 머리 주석).
+#   돌려주는 것 = @{ Canon = 실경로 목록; Fail = 있는데 실경로를 못 푼 자리 목록 }.
+#   ★「없다」와 「못 풀었다」를 가른다(Initialize-PreserveCanon 과 같은 규율) — 없는 것은 건너뛰고,
+#     있는데 못 푼 것이 하나라도 있으면 부르는 쪽이 ~\.cys 를 **하나도 지우지 않는다**.
+#   ⚠「있다」는 그 폴더의 **목록**으로 본다 — 지우는 쪽(Get-TreeItems)이 보는 것과 같은 눈이다.
+#     Test-Path 는 끊어진 링크를 「없다」로 답하고, Get-Item 은 읽기 실패도 「없다」와 같은 모양(예외)으로 낸다
+#     (시험 실측 2026-09-25: 바깥을 가리키는 링크를 Get-Item 이 못 읽어 「없다」로 넘어가고 그대로 지워졌다).
+#     ⇒ 목록을 못 읽으면 남길 것을 모르는 것이므로 **실패**로 돌려준다.
+function Get-HistoryKeeps {
+    $canon = @(); $fail = @()
+    $prof = Join-Path $CysHome 'claude'
+    if (-not (Test-Path -LiteralPath $prof)) { return @{ Canon = $canon; Fail = $fail } }
+    $kids = @()
+    try { $kids = @(Get-ChildItem -LiteralPath $prof -Force -ErrorAction Stop) }
+    catch { return @{ Canon = $canon; Fail = @($prof) } }
+    # ★남길 것은 **두 모양**으로 적는다(시험 실측 2026-09-25): ①그 자리 자체(부모 실경로 + 이름) ②그것이 가리키는 곳(실경로).
+    #   바로가기(projects → D:\data 등)는 실경로가 ~\.cys 밖이라 ②만 적으면 「이 안에 든 것」에서 빠지고, 지우는 쪽은
+    #   그 바로가기와 그것을 담은 폴더를 지운다(가리키던 자료는 남지만 동료가 찾는 자리가 사라진다). ①이 있어야 자리와 그 조상이 남는다.
+    $profCanon = Canon-Path $prof
+    $homeCanon = Canon-Path $CysHome
+    if ((-not $profCanon) -or (-not $homeCanon)) { return @{ Canon = @(); Fail = @($prof) } }
+    # 🔴교차 검토 1회차(09-25) 반영: ~\.cys 나 ~\.cys\claude 자체가 바로가기면 **못 풂**이다 — 지우는 쪽은 바로가기 이름표만 지우거나
+    #   (새 ~\.cys 에선 옛 로그인이 안 보인다) 그 안의 옛 CLAUDE.md 까지 통째로 남긴다(새 라우터가 못 들어간다). 어느 쪽도 「이어진다」가 아니다.
+    foreach ($lp in @($CysHome, $prof)) {
+        $li = $null
+        try { $li = Get-Item -LiteralPath $lp -Force -ErrorAction Stop } catch { $li = $null }
+        if ((-not $li) -or (Test-IsReparse $li)) { return @{ Canon = @(); Fail = @($lp) } }
+    }
+    # 바로가기가 가리키는 곳이 이 지우개가 지우는 다른 자리 안·그 조상이면 못 풂(그 자리를 지울 때 함께 사라진다 · 교차 검토).
+    $dropRoots = @($homeCanon)
+    foreach ($r in @($CysDir, $CysDirOld, $ClaudeBin, $JarvisDir)) { if ($r -and (Test-Path -LiteralPath $r)) { $rc = Canon-Path $r; if ($rc) { $dropRoots += $rc } } }
+    foreach ($kid in @($kids | Where-Object { $n = $_.Name; @($HistoryKeepNames | Where-Object { $_ -ieq $n }).Count -gt 0 })) {
+        $p = Join-Path $prof $kid.Name
+        $script:ReparseWhy = ''
+        $c = Canon-Path $p
+        if (-not $c) { $fail += $p; continue }
+        $at = Norm-Path ($profCanon + '\' + $kid.Name)
+        # 🔴검토 1회차(09-25) 반례: 바로가기가 ~\.cys 자신·그 조상·그 안의 다른 자리(pack 등)를 가리키면 그곳 전체가 「남길 곳」이 되어
+        #   아무것도 안 지우고도 「지움」 · rc 0 으로 끝났다(재설치가 병합 대기 위로 이어짐). ⇒ 그런 바로가기는 **못 풂**으로 센다(삭제 0 · 멈춤).
+        if (-not (Path-IsSame $c $at)) {
+            $clash = $false
+            foreach ($dr in $dropRoots) { if ((Path-IsSame $c $dr) -or (Path-IsUnder $dr $c) -or (Path-IsUnder $c $dr)) { $clash = $true } }
+            if ($clash) { $fail += $p; continue }
+        }
+        $canon += $at
+        if (-not (Path-IsSame $c $at)) { $canon += $c }
+    }
+    return @{ Canon = $canon; Fail = $fail }
+}
 # 이 자리 안에 있는 보존 경로들(실경로로 · 없으면 빈 배열).
 function Get-PreservedUnder($root) {
     $out = @()
@@ -347,6 +405,16 @@ function Get-ItemCanon($it, $rootLiteral, $rootCanon) {
         return (Canon-Path $it.FullName)   # 예상 밖의 모양이면 정직하게 비싼 길로
     }
     return (Norm-Path ($rootCanon + $full.Substring($rl.Length)))
+}
+# 항목의 **자리** 실경로(그 자신이 바로가기여도 풀지 않는다 · 0.3.36 · 교차 검토 반영).
+#   남길 폴더(projects 등) **안에 든 바로가기**는 Get-ItemCanon 이 가리키는 곳으로 풀어 비교하므로 남길 목록에 안 맞아 지워졌다.
+#   ⇒ 자리로도 한 번 더 본다 — 자리가 남길 곳 안이면 남긴다(더 남기는 쪽이라 참가 자리 판정에도 안전하다). 모양이 어긋나면 빈 값.
+#   ⚠바로가기 항목에만 값을 낸다(바로가기가 아니면 Get-ItemCanon 이 곧 자리다) · 부모 실경로 + 이름으로 낸다(글자 앞머리 비교는 모양이 어긋나면 빗나간다).
+function Get-ItemLoc($it, $rootLiteral, $rootCanon) {
+    if (-not (Test-IsReparse $it)) { return '' }
+    $pc = Canon-Path (Split-Path -Parent $it.FullName)
+    if (-not $pc) { return '' }
+    return (Norm-Path ($pc + '\' + $it.Name))
 }
 # 이 실경로를 남겨야 하는가 — 🔴**보존 목록과 맞아떨어질 때만** 참이다(5차 지적 채택).
 #   못 푼 것(빈 문자열)은 참이 아니다 — 「모르겠다」를 「남겨야 한다」로 번역하면 다음 줄에서 「없다」가 된다.
@@ -451,7 +519,7 @@ function Remove-ExceptPreserved($rootLiteral, $rootCanon, $keeps) {
         Write-Host ('         (이 자리의 목록을 끝까지 읽지 못했습니다 - 못 연 자리 ' + $script:EnumFail + '곳.)')
     }
     foreach ($it in $items) {
-        if (Test-KeepHit (Get-ItemCanon $it $rootLiteral $rootCanon) $keeps) { continue }
+        if ((Test-KeepHit (Get-ItemCanon $it $rootLiteral $rootCanon) $keeps) -or (Test-KeepHit (Get-ItemLoc $it $rootLiteral $rootCanon) $keeps)) { continue }
         try { Remove-OneItem $it } catch { }
     }
     # 검산 - 남은 것을 **다시 열거해서** 센다. 지우기 실패든 열거 실패든 결과 한 칸으로 모인다.
@@ -460,7 +528,7 @@ function Remove-ExceptPreserved($rootLiteral, $rootCanon, $keeps) {
     $rest = @(Get-TreeItems $rootLiteral)
     if ($script:EnumFail -gt 0) { $enumFail = 1 }
     foreach ($it in $rest) {
-        if (Test-KeepHit (Get-ItemCanon $it $rootLiteral $rootCanon) $keeps) { continue }
+        if ((Test-KeepHit (Get-ItemCanon $it $rootLiteral $rootCanon) $keeps) -or (Test-KeepHit (Get-ItemLoc $it $rootLiteral $rootCanon) $keeps)) { continue }
         $left++
         Add-TreeFailWhy $it.FullName '아직 남아 있습니다(다른 프로그램이 붙들고 있을 수 있습니다)'
     }
@@ -530,7 +598,8 @@ function Test-IsRegistryPath($p) {
     } catch { }
     return $true   # 접두는 맞는데 못 열었다 - 레지스트리로 다룬다(Drop 이 Test-Path 로 이미 걸렀다)
 }
-function Drop($label, $path) {
+# $histKeeps (0.3.36) = 이번에만 더 남길 실경로 목록(재설치 길의 로그인·이전 대화 · Get-HistoryKeeps). 없으면 종전과 같다.
+function Drop($label, $path, $histKeeps = @()) {
     if (-not (Test-Path $path)) { return }
     # 레지스트리 키 — 하위 키를 함께 지우려면 `-Recurse` 가 필요하다. 레지스트리엔 링크가 없어
     #   파일 쪽의 「두 번째 재귀」 위험이 없다. 이 파일에서 `-Recurse` 를 쓰는 유일한 자리다.
@@ -586,19 +655,31 @@ function Drop($label, $path) {
         return
     }
     $keeps = @(Get-PreservedUnder $t)
-    if ($keeps.Count -gt 0) {
-        $script:Preserved++
-        Write-Host ("  보존(중첩): " + (Short $path) + " 안에 참가 자리가 있어 그것만 남기고 지웁니다.")
-        foreach ($k in $keeps) { Write-Host ("           남기는 자리: " + (Short $k)) }
-        $fails = Remove-ExceptPreserved $path $t $keeps    # ★원문 경로로 열거하고, 실경로는 비교에만
+    # 0.3.36: 재설치 길에서 남길 로그인·이전 대화(참가 자리와 말을 갈라 적는다).
+    #   ⚠「이 안에 든 것」으로 거르지 않는다 — 바로가기가 가리키는 곳(②)은 밖에 있어도 비교에 있어야 그 바로가기가 남는다(Get-HistoryKeeps).
+    #     화면에는 이 자리 안의 것만 적는다.
+    $hist = @($histKeeps | Where-Object { $_ })
+    $histShow = @($hist | Where-Object { Path-IsUnder $_ $t })
+    if (($keeps.Count -gt 0) -or ($hist.Count -gt 0)) {
+        if ($keeps.Count -gt 0) {
+            $script:Preserved++
+            Write-Host ("  보존(중첩): " + (Short $path) + " 안에 참가 자리가 있어 그것만 남기고 지웁니다.")
+            foreach ($k in $keeps) { Write-Host ("           남기는 자리: " + (Short $k)) }
+        }
+        if ($hist.Count -gt 0) {
+            Write-Host ("  남김: " + (Short $path) + " 안의 자비스 창 로그인·이전 대화 (다시 까는 길이라 그것만 남기고 지웁니다)")
+            foreach ($k in $histShow) { Write-Host ("           남기는 자리: " + (Short $k)) }
+        }
+        $what = if ($hist.Count -eq 0) { '참가 자리' } elseif ($keeps.Count -eq 0) { '로그인·이전 대화' } else { '참가 자리와 로그인·이전 대화' }
+        $fails = Remove-ExceptPreserved $path $t (@($keeps) + @($hist))    # ★원문 경로로 열거하고, 실경로는 비교에만
         if ($fails -gt 0) {
             $script:KeptFail++
-            Write-Host ("  [일부 남음] " + (Short $path) + " - {0}가지를 지우지 못했습니다(참가 자리는 그대로입니다)." -f $fails)
+            Write-Host ("  [일부 남음] " + (Short $path) + " - {0}가지를 지우지 못했습니다({1}는 그대로입니다)." -f $fails, $what)
             Write-TreeFailWhy
             return
         }
         $script:Removed++
-        Write-Host ("  지움: " + (Short $path) + " (참가 자리는 그대로)")
+        Write-Host ("  지움: " + (Short $path) + " (" + $what + "는 그대로)")
         return
     }
     $fails = Remove-TreeSafe $path
@@ -760,7 +841,8 @@ function Invoke-Diagnose {
     $tk = @(Get-CysTasks)
     RowFlag 'cys 상시 가동 등록' ($tk.Count -gt 0) '작업 스케줄러'
     # footprint: W-CYSHOME
-    [void](Row 'cys 계정 자리' $CysHome)
+    if ($KeepHistory) { [void](Row 'cys 계정 자리(자비스 창 로그인·이전 대화는 남깁니다)' $CysHome) }
+    else { [void](Row 'cys 계정 자리' $CysHome) }
     # footprint: W-CLAUDEBIN
     [void](Row '클로드 실행 파일' $ClaudeExe)
     # footprint: W-JARVISHOME
@@ -794,8 +876,18 @@ function Invoke-Diagnose {
         Write-Host ('  [있음] 자비스 창 전용 로그인 · ' + (Short $CysCredFile))
         # 🔴v0.3.18 — 화면 줄에 기호 이모지(⚠ U+26A0)를 쓰지 않는다. 윈 4차 실기(2026-09-15): Windows PowerShell 5.1 콘솔이 이 글자 뒤 칸 폭을 잘못 세어
         #   이 절의 뒤 줄들이 「남남깁깁니니다다」로 겹쳐 찍혔다(이 글자가 없는 다른 절은 정상) — 인코딩이 아니라 글자 폭 문제다. ⇒ 글자로 쓴다.
-        Write-Host '         주의: 이것은 위의 「cys 계정 자리」 안에 들어 있어 **함께 지워집니다.**'
-        Write-Host '         자비스 창에서 하신 로그인은 다시 하셔야 합니다 — 윈도우에서 하신 로그인과는 별개입니다.'
+        if ($KeepHistory) {
+            # 0.3.36: 재설치 길에서는 이 로그인을 남긴다($HistoryKeepNames 머리 주석) — 앞 판의 「다시 하셔야 합니다」는 이 길에서 거짓이다.
+            Write-Host '         다시 까는 길이라 이 로그인은 지우지 않고 그대로 둡니다 — 자비스 창에서 로그인을 다시 하지 않으셔도 됩니다.'
+        } else {
+            Write-Host '         주의: 이것은 위의 「cys 계정 자리」 안에 들어 있어 **함께 지워집니다.**'
+            Write-Host '         자비스 창에서 하신 로그인은 다시 하셔야 합니다 — 윈도우에서 하신 로그인과는 별개입니다.'
+        }
+    }
+    # 0.3.36: 자비스 창의 이전 대화(재설치 길에서만 남긴다) — 남긴다고 말하는 것이 사실일 때만 적는다.
+    $cysProjects = Join-Path $CysHome 'claude\projects'
+    if ($KeepHistory -and (Test-Path -LiteralPath $cysProjects)) {
+        Write-Host ('  [있음] 자비스 창 이전 대화 · ' + (Short $cysProjects) + ' (다시 까는 길이라 남깁니다)')
     }
     if (Test-Path $ClaudeDir) { Write-Host ('  [있음] 클로드 대화·기록 · ' + (Short $ClaudeDir) + ' (남깁니다)') }
     else { Write-Host ('  [없음] 클로드 대화·기록 · ' + (Short $ClaudeDir)) }
@@ -1021,6 +1113,106 @@ function Test-SafeJarvisDir($p) {
         $script:SafeWhy = '표식의 내용이 우리 것이 아닙니다'; return $false
     }
     return $true
+}
+
+# ── 작업 폴더 보관 이동(0.3.36 · 맥 keep_jarvis_dir 짝) — 지우지 않고 같은 자리 옆 「install-jarvis-backup-<날짜-시각>」 으로 옮긴다 ──
+#   ★이름 바꾸기만 쓴다([IO.Directory]::Move — 같은 드라이브 안에서만 되고, 다른 드라이브면 복사하지 않고 실패한다).
+#     안 되면(다른 드라이브·잠긴 파일·권한) **아무것도 지우지 않고 그 자리에 둔다** — 못 지운 것으로 세지 않는다(재설치는 그 위에 이어서 간다).
+#   ★옮긴 뒤 파일 수·총 바이트를 옮기기 전과 대조 — 다르면 「보관 확인 실패」로 알리고 어느 쪽도 지우지 않는다.
+#   ★보관본의 마지막 칸은 install-jarvis 가 아니다 ⇒ Test-SafeJarvisDir(이름 관문)가 다음 지우기에서 보관본을 겨냥하지 않는다.
+#   ★정리 = 최근 $JarvisBackupKeep 개만 · 대상 = 이름 꼴 ∧ 우리 표식 ∧ 바로가기 아님 ∧ **설치기가 만든 이름만**(모르는 이름이 있으면 늘 남긴다 · 맥 짝)
+#     · 정리 실패는 못 지움으로 세지 않는다(재설치를 멈추지 않는다) · 다시 받는 것은 알려진 설치기 산출물 이름만 뺀다(dl 안 claude-*·cys* · backup 안 cys*).
+$JarvisBackupPrefix = 'install-jarvis-backup-'
+$JarvisBackupKeep   = 3
+$JarvisBackupInstallerNames = @('.jarvis-owned','bootstrap.log','env-report.md','install-directive.md','trust-seed.tsv','wake.sh','wake.ps1','install-id','help-attempts.json','remote-help-executed.json','remote-help-executed.json.lock','remote-help-client-token','claude-install.log','awake-master.ok','install-done.txt','transcript.txt','.rotate-out','.rotate-err','.login-wait','.login-pid','.login-capped')
+$script:BackupNote  = ''
+function Get-TreeStat($p) {   # 「파일 수 총바이트」 · 하나라도 못 읽으면 $null
+    try {
+        $items = @(Get-ChildItem -LiteralPath $p -Recurse -Force -ErrorAction Stop | Where-Object { -not $_.PSIsContainer })
+        $bytes = [long]0
+        foreach ($i in $items) { $bytes += [long]$i.Length }
+        return ('{0} {1}' -f $items.Count, $bytes)
+    } catch { return $null }
+}
+function Test-JarvisBackup($p) {   # 이름 꼴 ∧ 진짜 폴더(바로가기 아님) ∧ 우리 표식
+    $leaf = [string](Split-Path $p -Leaf)
+    if ($leaf -notmatch ('^' + [regex]::Escape($JarvisBackupPrefix) + '[0-9]{8}-[0-9]{6}(-[0-9]+)?$')) { return $false }
+    try { $it = Get-Item -LiteralPath $p -Force -ErrorAction Stop } catch { return $false }
+    if (-not $it.PSIsContainer) { return $false }
+    if (($it.Attributes -band [System.IO.FileAttributes]::ReparsePoint) -eq [System.IO.FileAttributes]::ReparsePoint) { return $false }
+    $body = Read-TextUtf8 (Join-Path $p '.jarvis-owned')
+    return ($null -ne $body -and $body -match [regex]::Escape($JarvisOwnerMark))
+}
+function Test-InstallerOnlyBackup($p) {   # 설치기가 만든 이름만 들어 있는가(그때만 정리 대상) · 못 세면 $false
+    try { $items = @(Get-ChildItem -LiteralPath $p -Force -ErrorAction Stop) } catch { return $false }
+    foreach ($i in $items) {
+        if (($i.Attributes -band [System.IO.FileAttributes]::ReparsePoint) -eq [System.IO.FileAttributes]::ReparsePoint) { return $false }
+        if ($JarvisBackupInstallerNames -contains $i.Name) { continue }
+        if ((-not $i.PSIsContainer) -and ($i.Name -like 'capture-*.jpg' -or $i.Name -like 'login-cap-*.jpg' -or $i.Name -like '.progress.*')) { continue }   # login-cap-N.jpg = 로그인 대기 캡처(설치기)
+        return $false
+    }
+    return $true
+}
+function Remove-OldJarvisBackups($parent, $fresh) {   # 최근 Keep 개만 남긴다(방금 것은 늘 남긴다)
+    $all = @()
+    try { $all = @(Get-ChildItem -LiteralPath $parent -Force -Directory -ErrorAction Stop | Where-Object { (Test-JarvisBackup $_.FullName) -and (Test-InstallerOnlyBackup $_.FullName) } | Sort-Object Name) } catch { return }
+    $drop = $all.Count - $JarvisBackupKeep
+    foreach ($d in $all) {
+        if ($drop -le 0) { break }
+        if ($d.FullName -eq $fresh) { continue }
+        # 정리 실패는 못 지움으로 세지 않는다 — 셈을 되돌리고 한 줄만(재설치가 7 로 멈추지 않게 · 적대 검토 반례)
+        $kf = $script:KeptFail
+        Drop '오래된 자비스 보관본' $d.FullName
+        if ($script:KeptFail -gt $kf) { $script:KeptFail = $kf; Write-Host ('  [남김] ' + (Short $d.FullName) + ' - 오래된 보관본을 정리하지 못했습니다(자료는 그대로입니다).') }
+        $drop--
+    }
+}
+function Keep-JarvisDir($src) {   # 보관 이동 · 마지막 안내 1줄 = $script:BackupNote
+    $src = ([string]$src).TrimEnd('\')
+    if ($script:PreserveCanonFail.Count -gt 0 -or @(Get-PreservedUnder (Resolve-RealPath $src)).Count -gt 0 -or (Test-PreserveCovers (Resolve-RealPath $src))) {
+        Write-Host ('  [남김] ' + (Short $src) + ' - 안에 따로 두신 자리가 있어 옮기지 않고 그대로 두었습니다.')
+        $script:BackupNote = ('이전 자비스 자료는 ' + (Short $src) + ' 에 그대로 두었습니다. 지운 것은 없습니다.')
+        return
+    }
+    $parent = Split-Path $src -Parent
+    $stamp = (Get-Date).ToString('yyyyMMdd-HHmmss')
+    $dest = Join-Path $parent ($JarvisBackupPrefix + $stamp); $n = 1
+    while (Test-Path -LiteralPath $dest) { $n++; $dest = Join-Path $parent ($JarvisBackupPrefix + $stamp + '-' + $n) }
+    $before = Get-TreeStat $src
+    $moved = $false
+    if ($before) {
+        try { [System.IO.Directory]::Move($src, $dest); $moved = $true } catch { $moved = $false }
+    }
+    if (-not $moved) {
+        Write-Host ('  [남김] ' + (Short $src) + ' - 다른 곳으로 옮기지 못해 그 자리에 그대로 두었습니다(지운 것 없음).')
+        $script:BackupNote = ('이전 자비스 자료는 옮기지 못해 ' + (Short $src) + ' 에 그대로 두었습니다. 지운 것은 없습니다.')
+        return
+    }
+    $after = Get-TreeStat $dest
+    if ($after -ne $before) {
+        Write-Host ('  [남음] 보관 확인 실패: ' + (Short $dest) + ' - 옮기기 전과 파일 수·크기가 달라 아무것도 지우지 않았습니다(전 ' + $before + ' · 뒤 ' + $after + ').')
+        $script:BackupNote = ('이전 자비스 자료를 ' + (Short $dest) + ' 로 옮겼지만 빠짐없이 옮겨졌는지 확인하지 못했습니다. 아무것도 지우지 않았습니다.')
+        return
+    }
+    # 다시 받는 것 = 알려진 설치기 산출물 이름만(dl: claude-*·cys* · backup: cys*) · 사용자가 둔 다른 파일은 그대로 · 빈 폴더가 되면 폴더만 치운다
+    foreach ($pair in @(@('dl', 'claude-*'), @('dl', 'cys*'), @('backup', 'cys*'))) {
+        $cd = Join-Path $dest $pair[0]
+        try {
+            $it = Get-Item -LiteralPath $cd -Force -ErrorAction Stop
+            if (-not $it.PSIsContainer -or (($it.Attributes -band [System.IO.FileAttributes]::ReparsePoint) -eq [System.IO.FileAttributes]::ReparsePoint)) { continue }
+            foreach ($f in @(Get-ChildItem -LiteralPath $cd -Force -Filter $pair[1] -ErrorAction Stop)) {
+                if ($f.PSIsContainer -and (($f.Attributes -band [System.IO.FileAttributes]::ReparsePoint) -ne [System.IO.FileAttributes]::ReparsePoint)) { [System.IO.Directory]::Delete($f.FullName, $true) }
+                else { [System.IO.File]::Delete($f.FullName) }
+            }
+        } catch { }
+    }
+    foreach ($c in @('dl', 'backup')) {
+        $cd = Join-Path $dest $c
+        try { if (@(Get-ChildItem -LiteralPath $cd -Force -ErrorAction Stop).Count -eq 0) { [System.IO.Directory]::Delete($cd, $false) } } catch { }
+    }
+    Write-Host ('  [보관] ' + (Short $src) + ' -> ' + (Short $dest) + ' (파일 ' + ($before -split ' ')[0] + '개 · 옮긴 뒤 수·크기 같음)')
+    Remove-OldJarvisBackups $parent $dest
+    $script:BackupNote = ('이전 자비스 자료는 ' + (Short $dest) + ' 에 그대로 보관해 두었습니다.')
 }
 
 # 우리가 홈에 **새로 넣은** 신뢰 키의 목록을 읽는다 — 설치기가 적어 둔 TSV(설정파일<탭>키).
@@ -1415,7 +1607,24 @@ function Invoke-Purge {
     }
 
     # footprint: W-CYSHOME
-    if ($agoraMigrateOk) { Drop 'cys 계정 자리' $CysHome }
+    # 0.3.36: 재설치 길(-KeepHistory)이면 로그인·이전 대화 자리를 남기고 지운다($HistoryKeepNames 머리 주석).
+    #   🔴남길 자리가 있는데 실경로를 못 풀었으면 ~\.cys 를 **하나도 지우지 않고** 못 지움으로 센다(재설치는 여기서 멈춘다).
+    #   ⚠~\.cys 를 남긴 채 설치를 이어 가면 팩이 「병합 대기」(.new)로 남아 새 판이 안 들어간다 — 그래서 이어 가지 않는다.
+    $histKeeps = @()
+    $histOk = $true
+    if ($KeepHistory -and $agoraMigrateOk) {
+        $hk = Get-HistoryKeeps
+        if ($hk.Fail.Count -gt 0) {
+            $histOk = $false
+            $script:KeptFail++
+            Write-Host ('  [남음] ' + (Short $CysHome) + ' - 남겨야 할 로그인·이전 대화 자리를 확인하지 못해 아무것도 지우지 않았습니다.')
+            foreach ($bad in $hk.Fail) { Write-Host ('         확인 못한 자리: ' + (Short $bad)) }
+            Write-Host '         확인할 수 없는 채로 지우면 로그인이나 이전 대화를 잃을 수 있습니다(바로가기가 끊겼거나 권한이 없을 수 있습니다).'
+        } else {
+            $histKeeps = @($hk.Canon)
+        }
+    }
+    if ($agoraMigrateOk -and $histOk) { Drop 'cys 계정 자리' $CysHome $histKeeps }
     # footprint: W-CLAUDEBIN
     # ★지우기 직전에 그 자리에서 도는 클로드를 끈다(Stop-ClaudeUnderBin 참조) — 「다시 해 봅니다(1/3)」도 이 자리를 다시 지난다.
     $claudeAlive = @()
@@ -1450,7 +1659,7 @@ function Invoke-Purge {
         Write-Host '         이 폴더 안의 기록(trust-seed.tsv)이 있어야 다시 해 볼 수 있습니다.'
         Write-Host '         그 칸을 쓰고 있는 프로그램(클로드 창 등)을 닫으신 뒤 아래 「다시 하시는 법」대로 다시 실행해 주십시오.'
     } elseif (Test-SafeJarvisDir $JarvisDir) {
-        Drop '자비스 작업 폴더' $JarvisDir
+        Keep-JarvisDir $JarvisDir   # 0.3.36: 지우지 않고 보관 이동(위 Keep-JarvisDir)
     } elseif (Test-Path $JarvisDir) {
         $script:KeptFail++
         Write-Host ('  [남음] ' + (Short $JarvisDir) + ' - 안전 확인을 통과하지 못해 지우지 않았습니다.')
@@ -1493,6 +1702,7 @@ function Invoke-Purge {
     }
     if ($script:KeptFail -eq 0) {
         Write-Host ("=== 끝났습니다 — {0} 가지를 지웠고, 못 지운 것은 없습니다. ===" -f $script:Removed)
+        if ($script:BackupNote) { Write-Host ('    ' + $script:BackupNote) }   # 0.3.36: 마지막 안내 1줄(보관 자리)
         return 0
     }
     # 사실만 말한다. 「거의 다 됐다」로 얼버무리면 다음 단계가 그 위에 얹힌다.
@@ -1500,6 +1710,7 @@ function Invoke-Purge {
     Write-Host '    위에 [남음] 으로 표시된 자리가 있습니다. 그대로 두고 다시 설치하면 뒤엉킵니다.'
     Write-Host '    까닭은 보통 셋 중 하나입니다: 프로그램이 아직 돌고 있다 · 백신이 그 파일을 붙들고 있다 · cys 제거를 아직 안 하셨다'
     Write-Host '    아래 「다시 하시는 법」대로 한 번 더 해 보시고, 그래도 남으면 이 화면을 사진으로 남겨 알려 주십시오.'
+    if ($script:BackupNote) { Write-Host ('    ' + $script:BackupNote) }
     return 7
 }
 

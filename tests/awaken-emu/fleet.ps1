@@ -29,6 +29,7 @@ $fakeClaude = @'
 SB="$(cd "$(dirname "$0")/.." && pwd)"
 : > "$SB/claude-args"
 for a in "$@"; do printf '%s' "$a" | base64 | tr -d '\n' >> "$SB/claude-args"; echo >> "$SB/claude-args"; done
+printf 'EFFORT=%s SUGG=%s\n' "${CLAUDE_CODE_EFFORT_LEVEL-<unset>}" "${CLAUDE_CODE_ENABLE_PROMPT_SUGGESTION-<unset>}" > "$SB/claude-env"   # 0.3.36 wake 환경값
 echo "EMU-CLAUDE-INLINE"
 exit 0
 '@
@@ -45,6 +46,7 @@ $env:JARVIS_LIB_ONLY = '1'
 if ($Scenario -eq 'master-prior-mark') { Set-Content -Path (Join-Path $jh 'awake-master.ok') -Value "prior`npid=1111" }
 . $Src
 $env:JARVIS_LIB_ONLY = ''
+$script:NoticeShown = $true   # 0.3.36: 전송 함수는 첫 화면 고지 뒤에만 보낸다 — 깨우기는 [9/10] 뒤라 고지 뒤 상태다
 $script:CysCli = 'cys'
 # 실물 상한을 줄이기 전에 적어 둔다(시험이 상한 값 자체를 재게)
 Write-Log ("TEST default awake cap=" + ($FleetAwakeTries * $FleetPollSec) + "s")

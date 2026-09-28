@@ -12,6 +12,7 @@
 #   bash reset-clean.sh --yes      묻지 않는다 (재설치 한 줄이 안에서 쓴다)
 #   bash reset-clean.sh --purge-login   로그인까지 지운다 (기본은 로그인을 남긴다)
 #   bash reset-clean.sh --keep-app      cys 프로그램은 남긴다 (재설치 한 줄이 안에서 쓴다)
+#   bash reset-clean.sh --keep-history  자비스 창의 이전 대화는 남긴다 (재설치 한 줄이 안에서 늘 쓴다 · 0.3.36)
 # 되돌릴 수 없다.
 #
 # ★로그인은 기본으로 남긴다. 재설치 뒤 로그인 손 한 번을 아끼기 위해서다.
@@ -20,13 +21,14 @@
 #   그것은 `--purge-login` 을 일부러 붙였을 때만 한다.
 set -u
 
-MODE="run"; ASSUME_YES=0; PURGE_LOGIN=0; KEEP_APP=0
+MODE="run"; ASSUME_YES=0; PURGE_LOGIN=0; KEEP_APP=0; KEEP_HISTORY=0
 for a in "$@"; do
   case "$a" in
     --list|--dry-run) MODE="list" ;;
     --yes|-y)         ASSUME_YES=1 ;;
     --purge-login)    PURGE_LOGIN=1 ;;
     --keep-app)       KEEP_APP=1 ;;
+    --keep-history)   KEEP_HISTORY=1 ;;
     -h|--help)        sed -n '1,25p' "$0"; exit 0 ;;
   esac
 done
@@ -334,9 +336,21 @@ hook_present() { # 각성 훅이 남의 settings.json 에 병합돼 있는가
 CLAUDE_CFG_DIR="${CLAUDE_CONFIG_DIR:-$HOME/.claude}"
 CRED_FILE="$CLAUDE_CFG_DIR/.credentials.json"
 # 자비스 창(cys)이 띄우는 클로드는 CLAUDE_CONFIG_DIR 을 ~/.cys/claude 로 두고 뜬다. 그 폴더는
-#   아래에서 「cys 계정 자리」로 **통째로 지워진다** — 거기 든 로그인도 같이 사라진다.
-#   지우는 것을 바꾸지는 않는다(그것은 사람이 결정할 일이다). 다만 **말은 해 준다.**
+#   아래에서 「cys 계정 자리」로 지워진다 — 혼자 돌리는 지우기에서는 거기 든 것이 같이 사라진다.
+#   ★재설치 길(--keep-history)에서는 이전 대화를 **남긴다**(0.3.36 · 아래 HISTORY_KEEP_NAMES).
 CYS_CRED_FILE="$HOME/.cys/claude/.credentials.json"
+# 🔴0.3.36(09-25 윈 실기 · 윈 $HistoryKeepNames 의 짝): 앞 판은 재설치 길에서도 ~/.cys 를 통째로 지웠다
+#   ⇒ 자비스 창의 대화 기록(projects/)이 사라졌다(윈은 좌석들의 가장 새 로그인까지 사라져 세 자리 모두 로그인을 다시 물었다).
+#   맥 로그인은 열쇠고리 항목(「Claude Code-credentials-<경로 지문>」)이라 이 도구가 원래 안 지운다(purge_login_first 는 기본 이름 하나 · --purge-login 때만).
+#   ⇒ 재설치 길에서는 아래 다섯 자리만 **제자리에** 남기고 나머지는 종전대로 지운다. 이름·근거는 두 OS 같다
+#   (공식 문서 code.claude.com/docs/en/claude-directory · 설계 = docs/install-master/DESIGN-login-keep-0336.md 1절).
+#   ⚠CLAUDE.md · settings.json · .claude.json · skills 는 남기지 않는다 — cys·설치 도우미가 다시 만든다(CLAUDE.md 는 「없을 때만」 만든다).
+#   (.credentials.json 은 맥에 보통 없다 — 있으면 윈과 같이 남긴다.) 한 줄에 한 이름.
+HISTORY_KEEP_NAMES=".credentials.json
+projects
+history.jsonl
+file-history
+agent-memory"
 # 🔴🔴**「없다」와 「못 물어봤다」를 가른다**(4차 BLOCK N1 확정 2026-09-10).
 #   앞 판은 `find-generic-password` 가 **어떤 까닭으로든** 0 이 아니면 「없다」로 읽었다. 그런데
 #   열쇠고리가 잠겼거나 조회가 거부되면 rc 는 0 도 44 도 아닌 값이다 ⇒ **항목이 남아 있는데도**
@@ -421,7 +435,8 @@ diagnose() {
   # footprint: M-DAEMON
   [ -f "$HOME/Library/LaunchAgents/com.cysjavis.cysd.plist" ]; row $? 'cys 상시 가동 등록' "$HOME/Library/LaunchAgents/com.cysjavis.cysd.plist"
   # footprint: M-CYSHOME
-  [ -d "$HOME/.cys" ]; row $? 'cys 계정 자리' "$HOME/.cys"
+  if [ "$KEEP_HISTORY" = "1" ]; then [ -d "$HOME/.cys" ]; row $? 'cys 계정 자리(자비스 창 이전 대화는 남깁니다)' "$HOME/.cys"
+  else [ -d "$HOME/.cys" ]; row $? 'cys 계정 자리' "$HOME/.cys"; fi
   # footprint: M-CYSSTATE
   [ -d "$HOME/.local/state/cys" ]; row $? 'cys 실행 상태' "$HOME/.local/state/cys"
   # footprint: M-CLAUDEBIN
@@ -457,8 +472,17 @@ diagnose() {
   fi
   if [ -f "$CYS_CRED_FILE" ]; then
     say "  [있음] 자비스 창 전용 로그인 · $(short "$CYS_CRED_FILE")"
-    say "         ⚠이것은 위의 「cys 계정 자리」 안에 들어 있어 함께 지워집니다."
-    say "         자비스 창에서 하신 로그인은 다시 하셔야 합니다 — 따로 하신 로그인과는 별개입니다."
+    if [ "$KEEP_HISTORY" = "1" ]; then
+      # 0.3.36: 재설치 길에서는 이 로그인을 남긴다(HISTORY_KEEP_NAMES) — 앞 판의 「다시 하셔야 합니다」는 이 길에서 거짓이다.
+      say "         다시 까는 길이라 이 로그인은 지우지 않고 그대로 둡니다 — 자비스 창에서 로그인을 다시 하지 않으셔도 됩니다."
+    else
+      say "         ⚠이것은 위의 「cys 계정 자리」 안에 들어 있어 함께 지워집니다."
+      say "         자비스 창에서 하신 로그인은 다시 하셔야 합니다 — 따로 하신 로그인과는 별개입니다."
+    fi
+  fi
+  # 0.3.36: 자비스 창의 이전 대화(재설치 길에서만 남긴다) — 남긴다고 말하는 것이 사실일 때만 적는다.
+  if [ "$KEEP_HISTORY" = "1" ] && [ -d "$HOME/.cys/claude/projects" ]; then
+    say "  [있음] 자비스 창 이전 대화 · $(short "$HOME/.cys/claude/projects") (다시 까는 길이라 남깁니다)"
   fi
   # footprint: M-CLAUDEUSER
   [ -d "$HOME/.claude" ] && say "  [있음] 클로드 대화·기록 · $(short "$HOME/.claude") (남깁니다)" \
@@ -554,6 +578,88 @@ preserved_under() {
     case "$c" in "$root"/*) printf '%s\n' "$c" ;; esac
   done
 }
+# root_clash <실경로> <뿌리들(한 줄에 하나)> → rc 0 = 그 뿌리 자신·안·조상이다(0.3.36 · history_keeps).
+root_clash() {
+  local c="$1" r
+  while IFS= read -r r; do
+    [ -n "$r" ] || continue
+    case "$c" in "$r"|"$r"/*) return 0 ;; esac
+    case "$r" in "$c"/*) return 0 ;; esac
+  done <<< "$2"
+  return 1
+}
+# 재설치 길에서 ~/.cys/claude 안에 남길 자리의 실경로(0.3.36 · HISTORY_KEEP_NAMES 머리 주석) → HIST_KEEPS(한 줄에 하나).
+#   ★「없다」와 「못 풀었다」를 가른다(resolve_preserve_paths 와 같은 규율) — 없는 것은 건너뛰고,
+#     있는데 못 푼 것이 하나라도 있으면 rc 1 · HIST_KEEP_BAD 에 담는다(부르는 쪽이 ~/.cys 를 하나도 지우지 않는다).
+#   ⚠「있다」는 `-e` 만이 아니라 `-L` 도 본다 — 끊어진 바로가기는 `-e` 가 거짓이다(그러면 남길 것을 모른 채 지운다).
+#   ★남길 것은 **두 모양**으로 적는다(윈 Get-HistoryKeeps 와 같은 까닭 · 시험 실측 2026-09-25): ①그 자리 자체(부모 실경로/이름)
+#     ②그것이 가리키는 곳(실경로). 바깥을 가리키는 바로가기는 ②만으로는 「이 안」에서 빠져 바로가기와 그 부모가 지워진다.
+HIST_KEEPS=""; HIST_KEEP_BAD=""
+#   🔴검토 1회차(09-25) 반례 셋을 막는다: ⑴바로가기가 ~/.cys 자신·조상·그 안의 다른 자리(pack 등)를 가리키면 그곳 전체가 남아
+#     「지움」 · 못 지움 0 으로 끝났다 → **못 풂**으로 센다(삭제 0) ⑵`canon` 은 파일 바로가기를 풀지 않아 가리키는 곳(pack 안)이 지워졌다
+#     → 바로가기는 perl Cwd::abs_path 로 끝까지 푼다(못 풀면 못 풂 · 윈과 같아짐) ⑶APFS 는 대소문자를 안 가르는데 비교는 가른다 —
+#     `Projects` 가 지워졌다 → 실제 이름을 목록에서 대소문자 무시로 찾아 그 이름으로 적는다.
+history_keeps() {
+  local n p c pc hc real
+  HIST_KEEPS=""; HIST_KEEP_BAD=""
+  [ -e "$HOME/.cys/claude" ] || [ -L "$HOME/.cys/claude" ] || return 0
+  # 🔴교차 검토 1회차(09-25) 반영 — 아래는 전부 **못 풂**(삭제 0): ⓐ홈 경로에 줄바꿈(남길 목록이 줄 단위라 쪼개진다)
+  #   ⓑ~/.cys 나 ~/.cys/claude 자체가 바로가기(이름표만 지우면 새 ~/.cys 에선 안 보이고 · 통째로 남기면 옛 CLAUDE.md 가 새 라우터를 막는다)
+  #   ⓒ~/.cys/claude 목록을 못 읽음(find 실패를 「남길 것 없음」으로 읽으면 안 된다)
+  case "$HOME" in *$'\n'*) HIST_KEEP_BAD="(홈 경로에 줄바꿈)
+"; return 1 ;; esac
+  if [ -L "$HOME/.cys" ] || [ -L "$HOME/.cys/claude" ]; then HIST_KEEP_BAD="$HOME/.cys/claude
+"; return 1; fi
+  ls -A "$HOME/.cys/claude/" >/dev/null 2>&1 || { HIST_KEEP_BAD="$HOME/.cys/claude
+"; return 1; }
+  pc="$(canon "$HOME/.cys/claude")" && [ -n "$pc" ] || { HIST_KEEP_BAD="$HOME/.cys/claude
+"; return 1; }
+  hc="$(canon "$HOME/.cys")" && [ -n "$hc" ] || { HIST_KEEP_BAD="$HOME/.cys
+"; return 1; }
+  # 바로가기가 가리키는 곳이 이 지우개가 지우는 다른 자리 안·그 조상이면 못 풂(그 자리를 지울 때 함께 사라진다 · 교차 검토).
+  local roots="$hc" r rc2
+  for r in "$HOME/.local/state/cys" "$HOME/.local/share/claude" "$HOME/.local/bin" "$JARVIS_HOME"; do
+    [ -e "$r" ] || continue
+    rc2="$(canon "$r")" && [ -n "$rc2" ] && roots="$roots
+$rc2"
+  done
+  while IFS= read -r n; do
+    [ -n "$n" ] || continue
+    while IFS= read -r -d '' real; do
+      real="${real##*/}"
+      p="$HOME/.cys/claude/$real"
+      if [ -L "$p" ]; then
+        c="$(perl -MCwd=abs_path -e '$r = abs_path($ARGV[0]); (defined $r && -e $r) or exit 1; print $r' "$p" 2>/dev/null)" || c=""
+      else
+        c="$(canon "$p")" || c=""
+      fi
+      if [ -z "$c" ]; then
+        HIST_KEEP_BAD="${HIST_KEEP_BAD}${p}
+"; continue
+      fi
+      if [ "$c" != "$pc/$real" ] && root_clash "$c" "$roots"; then
+        HIST_KEEP_BAD="${HIST_KEEP_BAD}${p}
+"; continue
+      fi
+      HIST_KEEPS="${HIST_KEEPS}${pc}/${real}
+"
+      [ "$c" = "$pc/$real" ] || HIST_KEEPS="${HIST_KEEPS}${c}
+"
+    done < <(find "$HOME/.cys/claude/" -mindepth 1 -maxdepth 1 -iname "$n" -print0 2>/dev/null)
+  done <<HIST_LIST
+$HISTORY_KEEP_NAMES
+HIST_LIST
+  [ -z "$HIST_KEEP_BAD" ]
+}
+# 목록(한 줄에 하나) 가운데 이 자리 **안에** 든 것만 찍는다(0.3.36 · drop_dir 의 남길 목록).
+#   ⚠함수로 둔다 — 맥 기본 bash 3.2 는 `$( … case … in 무늬) … esac … )` 를 잘못 읽는다(시험 실측 2026-09-25).
+paths_under() {
+  local root="$1" k
+  printf '%s\n' "$2" | while IFS= read -r k; do
+    [ -n "$k" ] || continue
+    case "$k" in "$root"/*) printf '%s\n' "$k" ;; esac
+  done
+}
 # 이 자리 **자신이** 보존 대상이거나 보존 경로의 아래인가(그러면 손대지 않는다).
 preserve_covers() {
   local t="$1" c
@@ -567,12 +673,14 @@ preserve_covers() {
 prune_keep_hit() {
   local p="$1" keeps="$2" k
   [ -n "$p" ] || return 1          # 실경로를 못 푼 것은 「남겨야 한다」가 아니다
-  printf '%s\n' "$keeps" | while IFS= read -r k; do
+  # 0.3.36: 파이프(하위 셸)가 아니라 here-string 으로 돈다 — 뜻은 같고 항목마다 프로세스를 띄우지 않는다
+  #   (검토 실측: 재설치 길에서 이 함수가 ~/.cys 전 항목에 두 번씩 불려 4천 항목에 26초).
+  while IFS= read -r k; do
     [ -n "$k" ] || continue
-    case "$p" in "$k"|"$k"/*) exit 9 ;; esac   # 보존 경로 자신 또는 그 아래
-    case "$k" in "$p"/*) exit 9 ;; esac        # 보존 경로의 조상
-  done
-  [ $? -eq 9 ]
+    case "$p" in "$k"|"$k"/*) return 0 ;; esac   # 보존 경로 자신 또는 그 아래
+    case "$k" in "$p"/*) return 0 ;; esac        # 보존 경로의 조상
+  done <<< "$keeps"
+  return 1
 }
 # 항목의 실경로를 **싸게** 낸다. `find` 는 링크를 따라가지 않으므로 루트 아래 조상 마디에는
 #   링크가 없다 ⇒ 「루트 실경로 + 나머지 마디」. 항목 **자신이** 링크일 때만 따로 푼다.
@@ -610,8 +718,12 @@ prune_except() {
   #   남으면 사용자는 어느 파일을 풀어야 하는지 알 수 없다. ⇒ 까닭을 최대 5줄 모아 인쇄한다.
   PRUNE_WHY=""
   while IFS= read -r -d '' p; do
-    c="$(item_canon "$p" "$root" "$root_canon")" || c=""
+    # 0.3.36: 링크가 아니면 item_canon 과 같은 값을 프로세스 없이 낸다(「루트 실경로 + 나머지 마디」 — item_canon 머리 주석)
+    if [ ! -L "$p" ] && [ "${p#"$root"/}" != "$p" ]; then c="$root_canon${p#"$root"}"
+    else c="$(item_canon "$p" "$root" "$root_canon")" || c=""; fi
     prune_keep_hit "$c" "$keeps" && continue
+    # 0.3.36 교차 검토: 바로가기는 **자리**로도 본다 — 남길 폴더 안에 든 바로가기가 가리키는 곳으로만 비교돼 지워졌다.
+    [ -L "$p" ] && [ "${p#"$root"/}" != "$p" ] && prune_keep_hit "$root_canon${p#"$root"}" "$keeps" && continue
     why="$(rm -rf "$p" 2>&1)"
     if [ -n "$why" ]; then
       PRUNE_WHY="$(printf '%s%s\n' "$PRUNE_WHY" "$why")"
@@ -621,8 +733,11 @@ prune_except() {
   : > "$list"
   find "$root" -depth -mindepth 1 -print0 > "$list" 2>/dev/null || enum_fail=1
   while IFS= read -r -d '' p; do
-    c="$(item_canon "$p" "$root" "$root_canon")" || c=""
+    if [ ! -L "$p" ] && [ "${p#"$root"/}" != "$p" ]; then c="$root_canon${p#"$root"}"
+    else c="$(item_canon "$p" "$root" "$root_canon")" || c=""; fi
     prune_keep_hit "$c" "$keeps" && continue
+    # 0.3.36 교차 검토: 바로가기는 **자리**로도 본다 — 남길 폴더 안에 든 바로가기가 가리키는 곳으로만 비교돼 지워졌다.
+    [ -L "$p" ] && [ "${p#"$root"/}" != "$p" ] && prune_keep_hit "$root_canon${p#"$root"}" "$keeps" && continue
     left=$((left+1))
   done < "$list"
   rm -f "$list"
@@ -660,10 +775,11 @@ tree_same() {
 }
 
 PRUNE_FAIL=0
+# $2 (0.3.36) = 이번에만 더 남길 실경로 목록(재설치 길의 로그인·이전 대화 · history_keeps · 한 줄에 하나). 없으면 종전과 같다.
 drop_dir()  {
   [ -e "$1" ] || [ -L "$1" ] || return 0
   # 🔴지우기 전에 보존 경로와의 중첩을 먼저 본다(검토 지적 채택 2026-09-09).
-  local t covers keeps
+  local t covers keeps hist what
   # ★남겨야 할 자리 가운데 **있는데 실경로를 못 푼 것**이 있으면 아무것도 지우지 않는다.
   #   무엇을 남겨야 하는지 모르는 채로 지우면 그것이 이 도구의 가장 나쁜 실패다.
   #   (까닭은 위 `resolve_preserve_paths` 참조. 사람이 볼 설명은 purge 가 한 번만 인쇄한다.)
@@ -700,16 +816,26 @@ drop_dir()  {
     return 0
   fi
   keeps="$(preserved_under "$t")"
-  if [ -n "$keeps" ]; then
-    PRESERVED=$((PRESERVED+1))
-    say "  보존(중첩): $(short "$1") 안에 참가 자리가 있어 **그것만 남기고** 지웁니다."
-    printf '%s\n' "$keeps" | while IFS= read -r k; do [ -n "$k" ] && say "           남기는 자리: $(short "$k")"; done
-    if prune_except "$1" "$t" "$keeps"; then
-      REMOVED=$((REMOVED+1)); say "  지움: $(short "$1") (참가 자리는 그대로)"
+  # 0.3.36: 재설치 길에서 남길 로그인·이전 대화 — 이 자리 안에 든 것만 받는다(참가 자리와 말을 갈라 적는다).
+  #   ⚠「이 안에 든 것」으로 거르지 않는다 — 바로가기가 가리키는 곳(②)은 밖에 있어도 비교에 있어야 그 바로가기가 남는다(history_keeps).
+  hist="$(printf '%s' "${2:-}" | grep -v '^$')"
+  if [ -n "$keeps" ] || [ -n "$hist" ]; then
+    if [ -n "$keeps" ]; then
+      PRESERVED=$((PRESERVED+1))
+      say "  보존(중첩): $(short "$1") 안에 참가 자리가 있어 **그것만 남기고** 지웁니다."
+      printf '%s\n' "$keeps" | while IFS= read -r k; do [ -n "$k" ] && say "           남기는 자리: $(short "$k")"; done
+    fi
+    if [ -n "$hist" ]; then
+      say "  남김: $(short "$1") 안의 자비스 창 이전 대화 (다시 까는 길이라 그것만 남기고 지웁니다)"
+      paths_under "$t" "$hist" | while IFS= read -r k; do [ -n "$k" ] && say "           남기는 자리: $(short "$k")"; done
+    fi
+    if [ -z "$hist" ]; then what='참가 자리'; elif [ -z "$keeps" ]; then what='이전 대화'; else what='참가 자리와 이전 대화'; fi
+    if prune_except "$1" "$t" "$(printf '%s\n%s\n' "$keeps" "$hist")"; then
+      REMOVED=$((REMOVED+1)); say "  지움: $(short "$1") (${what}는 그대로)"
       return 0
     fi
     KEPT_FAIL=$((KEPT_FAIL+1))
-    say "  🔴일부 남음: $(short "$1") — ${PRUNE_FAIL}가지를 지우지 못했습니다(참가 자리는 그대로입니다)."
+    say "  🔴일부 남음: $(short "$1") — ${PRUNE_FAIL}가지를 지우지 못했습니다(${what}는 그대로입니다)."
     return 1
   fi
   # 🔴2026-09-10 수리(R2) — 앞 판은 `2>/dev/null` 로 **까닭을 통째로 버렸다.** 화면에 남는 것이
@@ -767,20 +893,123 @@ strip_profile_marker() { # 우리 표식 블록 2줄만 뺀다 — 사용자의 
   done
 }
 
+# 🔴**폴더 이름에 마침표가 있는 신뢰 칸**(0.3.36 F15 · 설치기 trust_json_prepare 와 짝).
+#   `plutil` 키 경로는 마침표를 구분자로만 읽어 /Users/first.last 같은 칸을 **가리킬 수가 없다**
+#   (2026-09-08 실측: extract·remove 둘 다 실패). 설치기가 이제 그 칸을 JavaScript 로 넣으므로,
+#   제거기도 같은 방법으로 빼야 한다 — 짝이 안 맞으면 넣은 칸이 **지울 수 없는 자국**이 된다.
+#   ⇒ macOS 기본 `osascript`(JavaScript)로 폴더 이름을 **통째 한 열쇠**로 다룬다(jq·python 없이).
+#   ops: get = 신뢰 키 값(「present=값」 또는 absent) · strip = 신뢰 키만 빼고 빈 칸이면 칸째 ·
+#        drop = 그 폴더 칸을 칸째(자비스 작업 폴더 — 처음부터 끝까지 우리 것) · top = 최상위 칸 하나(dir 자리에 키 이름).
+IFS= read -r -d '' DIR_KEY_JS <<'EOF_DIR_KEY_JS' || true
+ObjC.import("Foundation");
+function run(argv) {
+  var op = argv[0], cfg = argv[1], dir = argv[2], out = argv[3];
+  var raw = $.NSString.stringWithContentsOfFileEncodingError(cfg, $.NSUTF8StringEncoding, null);
+  if (raw.isNil()) throw new Error("read");
+  var txt = ObjC.unwrap(raw);
+  // 다시 쓰면 값이 바뀌는 수가 있는가(이종 검토 3회차) — 자릿수가 아니라 「그 수를 읽어 다시 쓴 글자가 같은 값인가」로 잰다.
+  //   글자 칸("…") 안 숫자는 수가 아니므로 먼저 비운다. 1e000·정확한 16자리 정수는 통과 · 9.007199254740993e15·긴 소수·1e400 은 걸린다.
+  function lossy(t) {
+    function norm(s) {
+      var m = /^(-?)(\d+)(?:\.(\d+))?(?:[eE]([+-]?\d+))?$/.exec(s); if (!m) return null;
+      var f = m[3] || "", d = (m[2] + f).replace(/^0+/, ""), e = parseInt(m[4] || "0", 10) - f.length;
+      if (d === "") return "0";
+      var z = d.length - d.replace(/0+$/, "").length; return m[1] + d.slice(0, d.length - z) + "e" + (e + z);
+    }
+    var b = t.replace(/"(?:[^"\\]|\\.)*"/g, '""'), re = /-?\d+(?:\.\d+)?(?:[eE][+-]?\d+)?/g, m;
+    while ((m = re.exec(b))) if (norm(m[0]) !== norm(String(Number(m[0])))) return true;
+    return false;
+  }
+  if (/^\s*$/.test(txt)) return "absent";   // 빈 설정 파일 = 칸 없음(이종 검토 — 못 읽음으로 세면 재설치가 영영 막힌다)
+  // 0.3.36 이종 검토 지적: JSON.parse 는 2^53 을 넘는 정수·긴 소수·1e400 을 뭉갠다 — 다시 쓰면 값이 바뀌는 수가 있으면 고쳐 쓰지 않는다(위 lossy).
+  //   ⚠읽기·「뺄 것 없음」은 막지 않는다 — 뭉개지는 것은 **실제로 고쳐 쓸 때뿐**이다(아래 쓰기 바로 앞에서 잰다 · 정밀 디버깅:
+  //     앞에서 재면 뺄 칸이 없는 성한 설정도 「못 읽음」 으로 세어 재설치가 막혔다).
+  var o = JSON.parse(txt);
+  function isObj(v) { return v !== null && typeof v === "object" && !Array.isArray(v); }
+  var has = Object.prototype.hasOwnProperty;
+  var p = isObj(o) && has.call(o, "projects") ? o.projects : undefined;
+  var e = isObj(p) && has.call(p, dir) ? p[dir] : undefined;
+  var flag = isObj(e) && has.call(e, "hasTrustDialogAccepted");
+  if (op === "get") return flag ? "present=" + String(e.hasTrustDialogAccepted) : "absent";
+  if (op === "strip") {
+    if (!flag) return "absent";
+    delete e.hasTrustDialogAccepted;
+    if (Object.keys(e).length === 0) delete p[dir];
+  } else if (op === "drop") {
+    if (e === undefined) return "absent";
+    delete p[dir];
+  } else if (op === "top") {   // 최상위 칸 하나(plutil 이 못 읽는 성한 설정의 대체 길 · strip_json_key)
+    if (!isObj(o) || !has.call(o, dir)) return "absent";
+    delete o[dir];
+  } else throw new Error("op");
+  if (lossy(txt)) return "lossy";   // 고쳐 쓰면 남의 수가 바뀐다 — 쓰지 않는다(호출부가 까닭을 따로 말한다)
+  if (!$(JSON.stringify(o, null, 2) + "\n").writeToFileAtomicallyEncodingError(out, false, $.NSUTF8StringEncoding, null)) throw new Error("write");
+  return "removed";
+}
+EOF_DIR_KEY_JS
+REAL=""
+real_path() { # real_path <경로> → REAL = 바로가기(심볼릭 링크)를 끝까지 푼 자리(40단) · rc 1 = 고리·너무 깊음·못 읽음
+  #   ⚠운영체제는 32단까지만 따라간다 — `[ -f 링크 ]` 가 33단 이상에서 「없음」 이 되어 정리를 조용히 건너뛰었다(이종 검토 3회차).
+  #   ⇒ 파일 검사는 언제나 푼 자리에 한다. 끊긴 링크는 REAL = 없는 자리(rc 0 · 호출부가 「칸 없음」 으로 본다).
+  local l n=0
+  REAL="$1"
+  while [ -L "$REAL" ]; do
+    [ "$n" -lt 40 ] || return 1
+    l="$(readlink "$REAL")" || return 1
+    case "$l" in /*) REAL="$l" ;; *) REAL="$(dirname "$REAL")/$l" ;; esac
+    n=$((n+1))
+  done
+  return 0
+}
+DIR_KEY_RESULT=""
+dir_key_json() { # dir_key_json <get|strip|drop|top> <파일> <폴더|키> — 결과 낱말은 DIR_KEY_RESULT 에 · rc 1 = 못 읽었다 · rc 2 = 뺄 것을 못 썼다 · rc 3 = 고쳐 쓰면 다른 수가 바뀌어 쓰지 않았다
+  local tmp r f
+  DIR_KEY_RESULT=""
+  # ⚠이름 바꾸기는 바로가기(심볼릭 링크)를 보통 파일로 갈아 끼운다 ⇒ 링크면 **실제 파일**을 풀어 그 자리에서 다룬다
+  #   (이종 검토: 설치 뒤 dotfile 도구로 링크가 된 설정을 거절하면 정리 실패가 영구 → 재설치 거부). 링크는 그대로 남는다.
+  real_path "$2" || return 1
+  f="$REAL"
+  [ -f "$f" ] && [ ! -L "$f" ] || return 1
+  tmp="$(mktemp "$f.jarvis.XXXXXX" 2>/dev/null)" || return 1
+  r="$(/usr/bin/osascript -l JavaScript -e "$DIR_KEY_JS" "$1" "$f" "$3" "$tmp" </dev/null 2>/dev/null)" || r=""
+  case "$r" in
+    removed)
+      # 바꾼 내용은 곁 파일에 있다 — 제자리 이름 바꾸기로 한 번에 들인다(권한은 원래 파일 것을 따른다).
+      chmod "$(stat -f %Lp "$f" 2>/dev/null || echo 600)" "$tmp" 2>/dev/null
+      if [ -s "$tmp" ] && mv -f "$tmp" "$f" 2>/dev/null; then DIR_KEY_RESULT="removed"; return 0; fi
+      rm -f "$tmp"; return 2 ;;
+    absent|present*) rm -f "$tmp"; DIR_KEY_RESULT="$r"; return 0 ;;
+    lossy) rm -f "$tmp"; DIR_KEY_RESULT="lossy"; return 3 ;;
+  esac
+  rm -f "$tmp"; return 1
+}
+
 strip_json_key() { # strip_json_key <파일> <키> — 파일은 남기고 우리 칸만 뺀다
-  [ -f "$1" ] || return 0
+  if ! real_path "$1"; then KEPT_FAIL=$((KEPT_FAIL+1)); say "  🔴못 살핌: $(short "$1") 의 $2 칸 — 바로가기(링크)를 끝까지 풀지 못했습니다(고리 또는 너무 깊음)."; return 0; fi
+  [ -f "$REAL" ] || return 0   # 없는 파일·끊긴 링크 = 칸 없음
+  [ -s "$REAL" ] || return 0   # 빈 설정 파일 = 칸 없음(이종 검토)
   #   ⚠`plutil` 은 키 경로에서 마침표를 구분자로 읽는다. 사용자 폴더 이름에 마침표가 있으면
   #   (예: /Users/first.last) 그 칸을 **가리킬 수가 없다**(2026-09-08 실측: extract·remove 둘 다 실패).
-  #   설치기도 같은 방식으로 넣으므로 애초에 안 들어갔을 수 있다. 어느 쪽이든 우리가 할 수 있는 것은
-  #   **모른다고 말하는 것**뿐이다 — 조용히 지나가면 「다 지웠다」가 거짓이 된다.
-  case "$2" in
-    projects.*)
-      case "${2#projects.}" in
-        *.*) say "  ⚠못 살핌: $(short "$1") 의 $2 칸 — 사용자 폴더 이름에 마침표가 있어 이 칸은 다루지 못합니다."
-             return 0 ;;
-      esac ;;
-  esac
-  plutil -extract "$2" raw -o - "$1" >/dev/null 2>&1 || return 0
+  #   ⇒ 그 칸은 위 dir_key_json 으로 뺀다(설치기도 같은 방법으로 넣는다). plutil 만 못 읽는 성한 설정
+  #   (짝 없는 서로게이트 · 1e400 — 이종 검토)도 같은 길로 한 번 더 본다. 그것마저 못 하면
+  #   **못 지운 것으로 센다** — 조용히 지나가면 「다 지웠다」가 거짓이 된다(B-Z28 과 같은 병 · 이종 검토).
+  local op=top k="$2" js=""
+  case "$2" in projects.*) op=drop; k="${2#projects.}"; case "$k" in *.*) js=1 ;; esac ;; esac
+  [ -z "$js" ] && ! plutil -convert json -o /dev/null "$1" >/dev/null 2>&1 && js=1
+  if [ -n "$js" ]; then
+    dir_key_json "$op" "$1" "$k"
+    case "$?" in
+      0) [ "$DIR_KEY_RESULT" = "removed" ] && { REMOVED=$((REMOVED+1)); say "  지움: $(short "$1") 의 $2 칸 (파일은 그대로)"; } ;;
+      2) KEPT_FAIL=$((KEPT_FAIL+1)); say "  🔴못 지움: $(short "$1") 의 $2 칸" ;;
+      3) KEPT_FAIL=$((KEPT_FAIL+1)); say "  🔴못 지움: $(short "$1") 의 $2 칸 — 고쳐 쓰면 그 파일의 다른 수가 바뀌어 손대지 않았습니다(그 칸을 손으로 빼 주십시오)." ;;
+      *) # 못 읽었다(잘린 파일 등) — 그 키 이름이 글자로도 없으면 우리 칸은 없다(다시 해도 같은 영구 실패를 만들지 않는다 · 이종 검토 3회차).
+         #   작업 폴더 키는 plutil 이 쓴 꼴(/ → \/)로도 찾는다.
+         if ! grep -qF "\"$k\"" "$REAL" 2>/dev/null && ! grep -qF "\"$(printf '%s' "$k" | sed 's#/#\\/#g')\"" "$REAL" 2>/dev/null; then return 0; fi
+         KEPT_FAIL=$((KEPT_FAIL+1)); say "  🔴못 살핌: $(short "$1") 의 $2 칸 — 설정 파일이 깨져 있어 그 칸을 뺄 수 없습니다(파일을 고치거나 그 줄을 손으로 빼 주십시오)." ;;
+    esac
+    return 0
+  fi
+  plutil -extract "$2" raw -o - "$1" >/dev/null 2>&1 || return 0   # 파일은 읽힌다(위에서 확인) ⇒ 칸 없음
   if plutil -remove "$2" "$1" >/dev/null 2>&1; then REMOVED=$((REMOVED+1)); say "  지움: $(short "$1") 의 $2 칸 (파일은 그대로)"
   else KEPT_FAIL=$((KEPT_FAIL+1)); say "  🔴못 지움: $(short "$1") 의 $2 칸"; fi
 }
@@ -841,6 +1070,120 @@ safe_jarvis_dir() { # safe_jarvis_dir <경로> → rc 0 = 지워도 된다 · �
   return 0
 }
 
+# ── 작업 폴더 보관 이동(0.3.36) — 지우지 않고 같은 자리 옆 「install-jarvis-backup-<날짜-시각>」 으로 옮긴다 ──
+#   까닭: 재설치·삭제 뒤에도 이전 자비스 자료가 남아 있어야 한다(사용자 손 0 · 자료 보존이 우선).
+#   ★이름 바꾸기만 쓴다(perl rename = 시스템 rename 한 번) — `mv` 는 다른 볼륨이면 복사한 뒤 원본을 지운다.
+#     이름 바꾸기가 안 되면(다른 볼륨·잠김·권한) **아무것도 지우지 않고 그 자리에 둔다** — 못 지운 것으로 세지 않는다
+#     (재설치는 그 폴더 위에 이어서 간다 · 새 설치는 표식이 있는 폴더를 그대로 쓴다).
+#   ★옮긴 뒤 파일 수·총 바이트를 옮기기 전과 대조한다 — 다르면 「보관 확인 실패」로 알리고 어느 쪽도 지우지 않는다.
+#   ★보관본의 마지막 칸은 `install-jarvis` 가 아니다 ⇒ safe_jarvis_dir(이름 관문)가 다음 지우기에서 보관본을 절대 겨냥하지 않는다.
+#   ★정리는 최근 JARVIS_BACKUP_KEEP 개만 남긴다 — 단 **설치기가 만든 이름만 든 보관본**만 정리한다(적대 검토 반례: 연속 재설치로
+#     진짜 작업이 든 보관본이 밀려 지워졌다). 모르는 이름(사용자·자비스가 만든 것 · _round 등)이 하나라도 있으면 늘 남긴다 — 모르는 것은 보관 쪽.
+#     대상 = 이름 꼴 ∧ 우리 표식 ∧ 진짜 폴더 ∧ 설치기 이름뿐 · 정리 실패는 못 지움으로 세지 않는다(재설치를 멈추지 않는다 · 안내 1줄).
+#   다시 받을 수 있는 것은 **알려진 설치기 산출물 이름만** 뺀다(dl 안 claude-*·cys* · backup 안 cys* — 자국 표 M-JARVISHOME·M-APP) ·
+#     그 밖의 파일(사용자가 둔 것)은 그대로 · 빈 폴더가 되면 폴더만 치운다.
+JARVIS_BACKUP_PREFIX="install-jarvis-backup-"
+JARVIS_BACKUP_KEEP=3
+JARVIS_BACKUP_INSTALLER_NAMES=".jarvis-owned bootstrap.log env-report.md install-directive.md trust-seed.tsv wake.sh wake.ps1 install-id help-attempts.json remote-help-executed.json remote-help-executed.json.lock remote-help-client-token claude-install.log awake-master.ok install-done.txt transcript.txt .rotate-out .rotate-err .login-wait .login-pid .login-capped"
+BACKUP_NOTE=""
+tree_stat() { # tree_stat <폴더> → 「파일 수 총바이트」(폴더 제외 · 링크는 따라가지 않고 그 자신) · 하나라도 못 읽으면 rc 1
+  perl -MFile::Find -e '
+    use warnings;
+    my ($e, $n, $b) = (0, 0, 0);
+    local $SIG{__WARN__} = sub { $e = 1 };
+    find({ no_chdir => 1, wanted => sub {
+      my @s = lstat($_); unless (@s) { $e = 1; return }
+      return if -d _;
+      $n++; $b += $s[7];
+    } }, $ARGV[0]);
+    exit 2 if $e;
+    print "$n $b\n";' "$1" 2>/dev/null   # use warnings 가 없으면 File::Find 의 「못 엶」 경고가 안 나와 못 읽은 하위를 조용히 뺀다(적대 검토 반례)
+}
+is_jarvis_backup() { # is_jarvis_backup <경로> → rc 0 = 이름 꼴 ∧ 진짜 폴더 ∧ 우리 표식(두 축)
+  local b
+  b="$(basename "$1")"
+  printf '%s' "$b" | grep -qE "^${JARVIS_BACKUP_PREFIX}[0-9]{8}-[0-9]{6}(-[0-9]+)?\$" || return 1
+  [ -d "$1" ] && [ ! -L "$1" ] || return 1
+  [ -f "$1/.jarvis-owned" ] && grep -qF "$JARVIS_OWNER_MARK" "$1/.jarvis-owned" 2>/dev/null
+}
+installer_only_backup() { # installer_only_backup <보관본> → rc 0 = 설치기가 만든 이름만 들어 있다(그때만 정리 대상) · 못 세면 rc 1
+  local d="$1" e b
+  [ -r "$d" ] && [ -x "$d" ] || return 1
+  for e in "$d"/* "$d"/.[!.]* "$d"/..?*; do
+    [ -e "$e" ] || [ -L "$e" ] || continue
+    b="$(basename "$e")"
+    case " $JARVIS_BACKUP_INSTALLER_NAMES " in *" $b "*) [ -L "$e" ] && return 1; continue ;; esac
+    case "$b" in capture-*.jpg) [ -f "$e" ] && [ ! -L "$e" ] && continue ;; .progress.*) { [ -f "$e" ] || [ -d "$e" ]; } && [ ! -L "$e" ] && continue ;; esac   # .progress.* = mktemp -d 폴더
+    return 1
+  done
+  return 0
+}
+prune_jarvis_backups() { # prune_jarvis_backups <부모 폴더> <방금 만든 보관본> — 최근 KEEP 개만 남긴다(방금 것은 늘 남긴다)
+  local parent="$1" fresh="$2" all n drop p
+  all="$(find "$parent" -mindepth 1 -maxdepth 1 -name "${JARVIS_BACKUP_PREFIX}*" 2>/dev/null | LC_ALL=C sort)" || return 0
+  n=0
+  while IFS= read -r p; do [ -n "$p" ] && is_jarvis_backup "$p" && installer_only_backup "$p" && n=$((n+1)); done <<BK_COUNT
+$all
+BK_COUNT
+  drop=$((n - JARVIS_BACKUP_KEEP))
+  [ "$drop" -gt 0 ] || return 0
+  while IFS= read -r p; do
+    [ "$drop" -gt 0 ] || break
+    [ -n "$p" ] && [ "$p" != "$fresh" ] && is_jarvis_backup "$p" && installer_only_backup "$p" || continue
+    # 정리 실패는 못 지움으로 세지 않는다 — 셈을 되돌리고 한 줄만 알린다(재설치가 rc 7 로 멈추지 않게 · 적대 검토 반례)
+    #   실패해도 한 번 시도한 것으로 센다 — 대신 더 새 보관본을 지우지 않는다(윈 짝)
+    #   ⚠drop_dir 는 실패해도 rc 0 으로 끝나는 갈래가 있다 — 반환 코드가 아니라 셈이 늘었는지로 가른다(적대 검토 2회차 반례 · 윈 짝)
+    local kf="$KEPT_FAIL"
+    drop_dir "$p"
+    if [ "$KEPT_FAIL" -gt "$kf" ]; then KEPT_FAIL="$kf"; say "  남김: $(short "$p") — 오래된 보관본을 정리하지 못했습니다(자료는 그대로입니다)."; fi
+    drop=$((drop-1))
+  done <<BK_DROP
+$all
+BK_DROP
+  return 0
+}
+keep_jarvis_dir() { # keep_jarvis_dir <작업 폴더(안전 확인 통과)> — 보관 이동 · 마지막 안내 1줄 = BACKUP_NOTE
+  local src="${1%/}" parent stamp dest n before after c f
+  # 링크면 종전대로 이름표만 지운다(가리키던 자리 = 실제 자료는 그대로 남는다).
+  if [ -L "$src" ]; then drop_dir "$src"; return; fi
+  # 참가 자리(보존 경로)가 안에 있으면 옮기지 않는다 — 옮기면 그 자리도 함께 옮겨진다(보존 규율 · 옮겼다 되돌리기 금지).
+  if [ "${PRESERVE_CANON_FAIL:-0}" -ne 0 ] || [ -n "$(preserved_under "$(canon "$src" 2>/dev/null)")" ] || [ -n "$(preserve_covers "$(canon "$src" 2>/dev/null)")" ]; then
+    say "  남김: $(short "$src") — 안에 따로 두신 자리가 있어 옮기지 않고 그대로 두었습니다."
+    BACKUP_NOTE="이전 자비스 자료는 $(short "$src") 에 그대로 두었습니다. 지운 것은 없습니다."
+    return 0
+  fi
+  parent="$(dirname "$src")"
+  stamp="$(date +%Y%m%d-%H%M%S)"
+  dest="$parent/${JARVIS_BACKUP_PREFIX}${stamp}"; n=1
+  while [ -e "$dest" ] || [ -L "$dest" ]; do n=$((n+1)); dest="$parent/${JARVIS_BACKUP_PREFIX}${stamp}-$n"; done
+  if ! before="$(tree_stat "$src")" || [ -z "$before" ] || ! perl -e 'rename($ARGV[0], $ARGV[1]) or exit 1' "$src" "$dest" 2>/dev/null; then
+    say "  남김: $(short "$src") — 다른 곳으로 옮기지 못해 그 자리에 그대로 두었습니다(지운 것 없음)."
+    BACKUP_NOTE="이전 자비스 자료는 옮기지 못해 $(short "$src") 에 그대로 두었습니다. 지운 것은 없습니다."
+    return 0
+  fi
+  after="$(tree_stat "$dest")"
+  if [ "$before" != "$after" ]; then
+    say "  🔴보관 확인 실패: $(short "$dest") — 옮기기 전과 파일 수·크기가 달라 아무것도 지우지 않았습니다(전 $before · 뒤 ${after:-못 셈})."
+    BACKUP_NOTE="이전 자비스 자료를 $(short "$dest") 로 옮겼지만 빠짐없이 옮겨졌는지 확인하지 못했습니다. 아무것도 지우지 않았습니다."
+    return 0
+  fi
+  # 다시 받는 것 = 알려진 설치기 산출물 이름만(dl: claude-*·cys* · backup: cys*) · 사용자가 둔 다른 파일은 그대로(적대 검토 반례)
+  #   ⚠부모 dl·backup 이 링크면 들어가지 않는다 — 따라 들어가 바깥(예: 받은 파일 폴더)의 claude-*·cys* 를 지운다(적대 검토 2회차 반례 · 윈 짝)
+  for c in dl backup; do
+    [ -d "$dest/$c" ] && [ ! -L "$dest/$c" ] || continue
+    for f in "$dest/$c"/claude-* "$dest/$c"/cys*; do
+      [ "$c" = backup ] && case "$(basename "$f")" in claude-*) continue ;; esac
+      [ -e "$f" ] || [ -L "$f" ] || continue
+      rm -rf "$f" 2>/dev/null
+    done
+  done
+  for c in dl backup; do [ -d "$dest/$c" ] && [ ! -L "$dest/$c" ] && rmdir "$dest/$c" 2>/dev/null; done
+  say "  보관: $(short "$src") → $(short "$dest") (파일 ${before% *}개 · 옮긴 뒤 수·크기 같음)"
+  prune_jarvis_backups "$parent" "$dest"
+  BACKUP_NOTE="이전 자비스 자료는 $(short "$dest") 에 그대로 보관해 두었습니다."
+  return 0
+}
+
 # 우리가 홈에 **새로 넣은** 신뢰 키의 기록을 읽는다 — 설치기가 적어 둔 TSV(설정파일<탭>키).
 #   ⚠파일이 없으면 빈 목록이다 ⇒ 홈 신뢰 칸에는 **손대지 않는다.** 모르는 것을 지우지 않는다.
 #     (설치기가 그 키를 넣었다면 기록도 함께 남는다 — 기록이 없다는 것은 안 넣었다는 뜻이다.)
@@ -861,16 +1204,50 @@ read_trust_seed_record() {
 
 # 폴더 신뢰 씨앗만 도로 뺀다 (2026-09-10 · 설치기가 홈에도 심기 시작했다)
 strip_trust_seed() { # strip_trust_seed <파일> <자리>
-  local f="$1" d="$2" left
-  [ -f "$f" ] || return 0
-  case "$d" in
-    *.*) say "  ⚠못 살핌: $(short "$f") 의 $(short "$d") 폴더 신뢰 칸 — 폴더 이름에 마침표가 있어 다루지 못합니다."
+  local f="$1" d="$2" left js=""
+  if ! real_path "$f"; then
+    KEPT_FAIL=$((KEPT_FAIL+1)); TRUST_CLEANUP_FAIL=$((TRUST_CLEANUP_FAIL+1))
+    say "  🔴못 살핌: $(short "$f") 의 $(short "$d") 폴더 신뢰 칸 — 바로가기(링크)를 끝까지 풀지 못했습니다(고리 또는 너무 깊음 · 기록을 남깁니다)."
+    return 0
+  fi
+  [ -f "$REAL" ] || return 0   # 없는 파일·끊긴 링크 = 칸 없음
+  [ -s "$REAL" ] || return 0   # 빈 설정 파일 = 칸 없음(이종 검토 — 못 읽음으로 세면 폴더가 남고 재설치가 영영 막힌다)
+  # 마침표 든 이름은 plutil 이 못 가리킨다 — 같은 규칙(값이 우리 것일 때만 · 키 하나만 · 빈 칸이면 칸째)을
+  #   dir_key_json 으로 한다(0.3.36 F15). plutil 만 못 읽는 성한 설정(서로게이트 · 1e400)도 같은 길로 한 번 더 본다(이종 검토).
+  case "$d" in *.*) js=1 ;; esac
+  [ -z "$js" ] && ! plutil -convert json -o /dev/null "$f" >/dev/null 2>&1 && js=1
+  case "$js" in
+    #   🔴0.3.36(B-Z28): 설정을 **읽지 못한 것도 정리 실패**다 — 세지 않으면 게이트가 기록(trust-seed.tsv)이 든 폴더를
+    #     지워 되돌릴 근거가 사라지고, 우리 칸은 남은 채 요약이 「완료」 로 읽힌다(잠시 깨진 설정 재현).
+    1) if ! dir_key_json get "$f" "$d"; then
+           KEPT_FAIL=$((KEPT_FAIL+1)); TRUST_CLEANUP_FAIL=$((TRUST_CLEANUP_FAIL+1))
+           say "  🔴못 살핌: $(short "$f") 의 $(short "$d") 폴더 신뢰 칸 — 설정 파일을 읽지 못했습니다(기록을 남겨 다시 해 볼 수 있게 둡니다)."
+           return 0
+         fi
+         case "$DIR_KEY_RESULT" in
+           absent) return 0 ;;
+           present=true|present=1|present=YES|present=yes) ;;
+           *) say "  남김: $(short "$f") 의 $(short "$d") 폴더 신뢰 칸 (우리가 넣은 값과 달라 손대지 않습니다: ${DIR_KEY_RESULT#present=})"
+              return 0 ;;
+         esac
+         if dir_key_json strip "$f" "$d" && [ "$DIR_KEY_RESULT" = "removed" ]; then
+           REMOVED=$((REMOVED+1)); say "  지움: $(short "$f") 의 $(short "$d") 폴더 신뢰 칸 (나머지 칸은 그대로)"
+         else
+           KEPT_FAIL=$((KEPT_FAIL+1)); TRUST_CLEANUP_FAIL=$((TRUST_CLEANUP_FAIL+1))
+           say "  🔴못 지움: $(short "$f") 의 $(short "$d") 폴더 신뢰 칸"
+         fi
          return 0 ;;
   esac
   # 🔴**우리가 넣은 값과 같을 때만 지운다**(2차 N4 확정). 기록한 뒤 사람이 그 값을 손수 바꿨다면
   #   그것은 이제 그분의 선택이다 — 기록이 있다고 남의 결정을 되돌리지 않는다.
   local cur
-  cur="$(plutil -extract "projects.$d.hasTrustDialogAccepted" raw -o - "$f" 2>/dev/null)" || return 0
+  if ! cur="$(plutil -extract "projects.$d.hasTrustDialogAccepted" raw -o - "$f" 2>/dev/null)"; then
+    # 칸이 없는 것(할 일 없음)과 파일을 못 읽은 것(정리 실패 · B-Z28)을 가른다 — 파일 전체를 읽어 보면 된다.
+    plutil -convert json -o /dev/null "$f" >/dev/null 2>&1 && return 0
+    KEPT_FAIL=$((KEPT_FAIL+1)); TRUST_CLEANUP_FAIL=$((TRUST_CLEANUP_FAIL+1))
+    say "  🔴못 살핌: $(short "$f") 의 $(short "$d") 폴더 신뢰 칸 — 설정 파일을 읽지 못했습니다(기록을 남겨 다시 해 볼 수 있게 둡니다)."
+    return 0
+  fi
   case "$cur" in
     true|1|YES|yes) ;;
     *) say "  남김: $(short "$f") 의 $(short "$d") 폴더 신뢰 칸 (우리가 넣은 값과 달라 손대지 않습니다: $cur)"
@@ -1084,8 +1461,20 @@ purge() {
   fi
 
   # footprint: M-CYSHOME   (M-CYSPROFILE 은 이 안에 들어 있다)
+  # 0.3.36: 재설치 길(--keep-history)이면 이전 대화 자리를 남기고 지운다(HISTORY_KEEP_NAMES 머리 주석).
+  #   🔴남길 자리가 있는데 실경로를 못 풀었으면 ~/.cys 를 **하나도 지우지 않고** 못 지움으로 센다(재설치는 여기서 멈춘다).
+  #   ⚠~/.cys 를 남긴 채 설치를 이어 가면 팩이 「병합 대기」(.new)로 남아 새 판이 안 들어간다 — 그래서 이어 가지 않는다.
   if [ "$AGORA_MIGRATE_OK" = "1" ]; then
-    drop_dir "$HOME/.cys"
+    if [ "$KEEP_HISTORY" = "1" ] && ! history_keeps; then
+      KEPT_FAIL=$((KEPT_FAIL+1))
+      say "  🔴못 지움: $(short "$HOME/.cys") — 남겨야 할 이전 대화 자리를 확인하지 못해 **아무것도 지우지 않았습니다.**"
+      printf '%s' "$HIST_KEEP_BAD" | while IFS= read -r bad; do [ -n "$bad" ] && say "         확인 못한 자리: $(short "$bad")"; done
+      say "         확인할 수 없는 채로 지우면 이전 대화를 잃을 수 있습니다(바로가기가 끊겼거나 권한이 없을 수 있습니다)."
+    elif [ "$KEEP_HISTORY" = "1" ]; then
+      drop_dir "$HOME/.cys" "$HIST_KEEPS"
+    else
+      drop_dir "$HOME/.cys"
+    fi
   fi
   # footprint: M-CYSSTATE
   drop_dir "$HOME/.local/state/cys"
@@ -1124,7 +1513,7 @@ EOF_TRUST_ROWS
     say "         이 폴더 안의 기록(trust-seed.tsv)이 있어야 다시 해 볼 수 있습니다."
     say "         그 칸을 쓰고 있는 프로그램(클로드 창 등)을 닫으신 뒤 아래 「다시 하시는 법」대로 다시 실행해 주십시오."
   elif safe_jarvis_dir "$JARVIS_HOME"; then
-    drop_dir "$JARVIS_HOME"
+    keep_jarvis_dir "$JARVIS_HOME"   # 0.3.36: 지우지 않고 보관 이동(위 keep_jarvis_dir)
   elif [ -e "$JARVIS_HOME" ]; then
     KEPT_FAIL=$((KEPT_FAIL+1))
     say "  🔴못 지움: $(short "$JARVIS_HOME") — 안전 확인을 통과하지 못해 지우지 않았습니다."
@@ -1185,12 +1574,14 @@ EOF_TRUST_ROWS
   [ "$PRESERVED" -gt 0 ] && say "    (참가 자리와 겹쳐 그대로 둔 자리 $PRESERVED 곳이 있습니다 — 위 「보존(중첩)」 줄)"
   if [ "$KEPT_FAIL" -eq 0 ]; then
     say "=== 끝났습니다 — $REMOVED 가지를 지웠고, 못 지운 것은 없습니다. ==="
+    [ -n "$BACKUP_NOTE" ] && say "    $BACKUP_NOTE"   # 0.3.36: 마지막 안내 1줄(보관 자리)
     return 0
   fi
   # 🔴사실만 말한다. 「거의 다 됐다」로 얼버무리면 다음 단계가 그 위에 얹힌다.
   say "=== 끝났습니다 — $REMOVED 가지를 지웠고, $KEPT_FAIL 가지를 못 지웠습니다. ==="
   say "    위에 🔴로 표시된 자리가 남아 있습니다. 그대로 두고 다시 설치하면 뒤엉킵니다."
   say "    아래 「다시 하시는 법」대로 한 번 더 해 보시고, 그래도 남으면 이 화면을 사진으로 남겨 알려 주십시오."
+  [ -n "$BACKUP_NOTE" ] && say "    $BACKUP_NOTE"
   return 7
 }
 

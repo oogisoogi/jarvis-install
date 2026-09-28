@@ -26,7 +26,7 @@
 - **종류** — 이 세 갈래를 섞지 않는 것이 이 표의 핵심이다.
   | 종류 | 뜻 | 제거기가 하는 일 |
   |---|---|---|
-  | **전부 우리 것** | 우리가 만들었고 우리 것만 들어 있다 | **통째로 지운다** |
+  | **전부 우리 것** | 우리가 만들었고 우리 것만 들어 있다 | **통째로 지운다** — 단 자비스 작업 폴더(`M-JARVISHOME`·`W-JARVISHOME`)는 0.3.36 부터 **지우지 않고 보관 이동**(아래 그 행) |
   | **남의 파일 속 우리 줄** | 사용자·다른 프로그램의 파일에 우리가 몇 줄·몇 칸을 더했다 | ⛔**우리가 넣은 것만** 도로 뺀다. 파일을 지우지 않는다 |
   | **손대지 않음** | 우리가 만들지 않았다 | ⛔**아무것도 안 한다**(목록에만 적어 사람이 알게 한다) |
 - **근거** — `코드`(스크립트를 읽어 확인) · `실측`(깨끗한 기계에서 실제로 관측) · `미확인`.
@@ -41,10 +41,11 @@
 | `M-APP` | cys 프로그램 | `/Applications/cysr.app`(애플 실리콘 · 1.0.1~) · `/Applications/cys.app`(인텔·원작자 판 · 1.0.0 이하 옛 이름) | 전부 우리 것 | `bootstrap.sh` `[6/10]`(애플 실리콘 = 우리 릴리스 zip 을 풀어 한 번에 바꿔 넣기 · 옛 이름 cys.app 은 넣은 뒤 `backup/cys.app.prev` 로 한 벌 보관 · 인텔·자산 없음 = 원작자 원자 설치기 호출) | 실측 09-06 · zip 경로 09-15 · cysr.app 09-16 |
 | `M-DAEMON` | cys 상시 가동 등록 | `~/Library/LaunchAgents/com.cysjavis.cysd.plist` | 전부 우리 것 | `[8/10]` `cys daemon install` | 실측 09-06 |
 | `M-CYSHOME` | cys 계정 자리(팩·설정·상태) | `~/.cys/`(`pack`·`claude`·`state`) | 전부 우리 것 | `[8/10]` `cys init-pack` (팩 460항목) | 실측 09-06 |
+| `M-CYSHOME-KEEP` | 🔵재설치 길에서 남기는 자비스 창 대화·로그인(0.3.36) | `~/.cys/claude/` 안의 `.credentials.json`(맥엔 보통 없음 — 로그인은 열쇠고리 「Claude Code-credentials-<경로 지문>」이고 제거기가 원래 안 지운다) · `projects/` · `history.jsonl` · `file-history/` · `agent-memory/` | 재설치 길(`--keep-history` · reinstall.sh 가 칩과 무관하게 늘 넘긴다)에서만 **제자리에 남김** · 나머지 `M-CYSHOME` 은 종전대로 지운다 · 남길 자리를 못 열면 `~/.cys` 삭제 0 · 혼자 돌리는 지우기 = 종전(통째로) | `M-CYSHOME` 안(클로드가 만든다) | 코드(tests/login-keep-run.sh) · 공식 문서 code.claude.com/docs/en/claude-directory |
 | `M-CYSSTATE` | cys 실행 상태·소켓 | `~/.local/state/cys/` | 전부 우리 것 | cys 데몬이 만든다 | 실측 09-06 |
 | `M-CLAUDEBIN` | 클로드 실행 파일(지름길) | `~/.local/bin/claude` → `~/.local/share/claude/versions/<판본>` | 전부 우리 것 | `[2/10]` 공식 설치기 | 실측 09-06 |
 | `M-CLAUDESHARE` | 클로드 실물 | `~/.local/share/claude/` | 전부 우리 것 | `[2/10]` 공식 설치기 | 실측 09-06 |
-| `M-JARVISHOME` | 자비스 작업 폴더 | `~/install-jarvis/`(`bootstrap.log`·`env-report.md`·`install-directive.md`·`dl/`·`wake.sh` · 원격 해결 실행 번호 `remote-help-executed.json`(기록하는 순간만 잠금 폴더 `remote-help-executed.json.lock`) · 출처 토큰 `remote-help-client-token`(600) · 반복 막힘 횟수 `help-attempts.json`(v0.3.15) · 바꿔 넣기 전 cys 보관본 `backup/cys.app.prev`(한 벌)) | 전부 우리 것 | 스크립트 첫머리 `mkdir -p` | 실측 09-06 |
+| `M-JARVISHOME` | 자비스 작업 폴더 | `~/install-jarvis/`(`bootstrap.log`·`env-report.md`·`install-directive.md`·`dl/`·`wake.sh` · 원격 해결 실행 번호 `remote-help-executed.json`(기록하는 순간만 잠금 폴더 `remote-help-executed.json.lock`) · 출처 토큰 `remote-help-client-token`(600) · 반복 막힘 횟수 `help-attempts.json`(v0.3.15) · 바꿔 넣기 전 cys 보관본 `backup/cys.app.prev`(한 벌)) · 🔵**제거기 = 보관 이동(0.3.36)**: 같은 부모 아래 `install-jarvis-backup-<YYYYMMDD-HHMMSS>`(겹치면 `-2`…)로 이름 바꾸기만 · 옮긴 뒤 파일 수·총 바이트 대조가 같을 때만 다시 받는 `dl/`·`backup/` 을 빼고 최근 3개만 남김(정리 대상 = 이름 꼴 ∧ 표식) · 옮기기 실패·대조 불일치 = 아무것도 안 지움 | 전부 우리 것 | 스크립트 첫머리 `mkdir -p` | 실측 09-06 · 보관 이동 = 코드(tests/keep-backup-run.sh) |
 | `M-SCRIPTCOPY` | 받아 둔 설치 스크립트 | `~/install-jarvis.sh` | 전부 우리 것 | 배포 한 줄의 `curl -o` | 실측 09-06 |
 | `M-AGORA` | 토론장 참가 열쇠·이름 | `~/.config/agora/` · 🔴**`AGORA_HOME` 으로 옮겨 둘 수 있다**(윈도우도 같은 해석) | **손대지 않음** — 🔴**삭제 루트 안에 있어도 지우지 않는다**(중첩 보존) | 🔴설치기가 만들지 않는다(v0.3.5 부터 뗐다). 토론장에 따로 참가하신 분이 만든 것 | 코드 + 러너 실측 |
 | `M-AGORASKILL` | 토론장 안내 가리키기 | 🔴**자리가 둘이고 운명이 다르다** — ⑴`~/.claude/skills/agora-delegate/` = **남는다** ⑵`~/.cys/claude/skills/agora-delegate/` = **`M-CYSHOME` 안**이라 cys 계정 자리를 지울 때 **함께 지워진다** | **손대지 않음**(⑴) · **`M-CYSHOME` 안**(⑵) | 🔴설치기가 만들지 않는다(v0.3.5 부터 뗐다) | 코드 |
@@ -72,8 +73,9 @@
 | `W-REG` | 설치 목록 항목 | `HKCU:\Software\Microsoft\Windows\CurrentVersion\Uninstall\cys` | 전부 우리 것 | cys 설치기 | 코드 |
 | `W-DAEMON` | cys 상시 가동 등록 | 작업 스케줄러 항목 | 전부 우리 것 | `[8/10]` `cys daemon install` | 미확인 |
 | `W-CYSHOME` | cys 계정 자리 | `%USERPROFILE%\.cys\` | 전부 우리 것 | `[8/10]` `cys init-pack` | 코드 |
+| `W-CYSHOME-KEEP` | 🔵재설치 길에서 남기는 자비스 창 로그인·대화(0.3.36) | `%USERPROFILE%\.cys\claude\` 안의 `.credentials.json`(좌석들이 갱신해 온 가장 새 로그인) · `projects\` · `history.jsonl` · `file-history\` · `agent-memory\` | 재설치 길(`-KeepHistory` · reinstall.ps1 이 늘 넘긴다)에서만 **제자리에 남김** · 나머지 `W-CYSHOME` 은 종전대로 지운다 · 남길 자리를 못 열면 `~\.cys` 삭제 0(rc 7) · 혼자 돌리는 지우기 = 종전(통째로) · 이어서 `[8/10]` 은 `keep:newer` 로 그대로 둔다 | `W-CYSHOME` 안(클로드가 만든다) | 코드(tests/login-keep-run.sh) · 09-25 윈 실기(재설치 뒤 「Login expired」) |
 | `W-CLAUDEBIN` | 클로드 실행 파일 | `%USERPROFILE%\.local\bin\claude.exe` | 전부 우리 것 | `[2/10]` 공식 설치기 · 상한에 닿으면 같은 공식 파일을 직접 받아 이 자리에 둔다(옮기는 동안만 `claude.exe.jarvis-new` · v0.3.16) | 실측 09-04 |
-| `W-JARVISHOME` | 자비스 작업 폴더 | `%JARVIS_HOME%`(없으면 `%USERPROFILE%\install-jarvis\`) · 🔴안에 **소유 표식 `.jarvis-owned`** 와 신뢰 기록 `trust-seed.tsv` 를 둔다 · 원격 해결 실행 번호 `remote-help-executed.json` · 출처 토큰 `remote-help-client-token`(본인만 읽게) · 반복 막힘 횟수 `help-attempts.json`(v0.3.15) · 클로드 직접 받기 `dl\claude-<판본>-win32-x64.exe`(받은 뒤 지운다 · v0.3.16) | 전부 우리 것 | 스크립트 첫머리 | 실측 |
+| `W-JARVISHOME` | 자비스 작업 폴더 | `%JARVIS_HOME%`(없으면 `%USERPROFILE%\install-jarvis\`) · 🔴안에 **소유 표식 `.jarvis-owned`** 와 신뢰 기록 `trust-seed.tsv` 를 둔다 · 원격 해결 실행 번호 `remote-help-executed.json` · 출처 토큰 `remote-help-client-token`(본인만 읽게) · 반복 막힘 횟수 `help-attempts.json`(v0.3.15) · 클로드 직접 받기 `dl\claude-<판본>-win32-x64.exe`(받은 뒤 지운다 · v0.3.16) · 🔵**제거기 = 보관 이동(0.3.36)**: 같은 부모 아래 `install-jarvis-backup-<yyyyMMdd-HHmmss>`(겹치면 `-2`…)로 이름 바꾸기만([IO.Directory]::Move — 다른 드라이브면 복사하지 않고 실패) · 대조 같을 때만 `dl`·`backup` 을 빼고 최근 3개만 남김(이름 꼴 ∧ 표식 ∧ 바로가기 아님) · 옮기기 실패·대조 불일치 = 아무것도 안 지움 | 전부 우리 것 | 스크립트 첫머리 | 실측 · 보관 이동 = 코드(tests/keep-backup-run.sh) |
 | `W-SCRIPTCOPY` | 받아 둔 설치 스크립트 | `%USERPROFILE%\install-jarvis.ps1` · 옛 자리 `%TEMP%\install-jarvis.ps1` | 전부 우리 것 | 배포 한 줄 | 실측 09-06 |
 | `W-PATH` | 실행 경로 등록 | **사용자** `Path` 환경변수의 `%USERPROFILE%\.local\bin` 조각 · cys 자리(`%LOCALAPPDATA%\cys` 등 · v0.3.18 · `-KeepApp` 이면 남김) | **남의 파일 속 우리 줄** | `[2/10]` `Seed-LocalBinPath`(F-W18) · `[7/10]` `Seed-CysPath` | 코드 |
 | `W-AGORA` | 토론장 참가 열쇠·이름 | `%USERPROFILE%\.config\agora\` · 🔴**`AGORA_HOME` 으로 옮겨 둘 수 있다**(맥과 같은 해석 — 앞 판은 윈도우만 이 값을 안 읽어 갈렸다) | **손대지 않음** — 🔴삭제 루트 안에 있어도 지우지 않는다(중첩 보존) | 🔴설치기가 만들지 않는다(v0.3.5 부터 뗐다) | 코드 + 러너 실측 |

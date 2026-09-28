@@ -30,8 +30,8 @@ MUTANTS = [
      "[재설치] 지운 뒤 설치 도우미까지 간다"),
     # -Yes 가 빠지면 「지웁니다」 확인을 사람에게 묻는다(흉내의 Read-Host 가 기록하고 빈 답 → 그만둠).
     ("yes-drop", RI,
-     "powershell -ExecutionPolicy Bypass -File $ResetFile -KeepApp -Yes\n",
-     "powershell -ExecutionPolicy Bypass -File $ResetFile -KeepApp\n",
+     "powershell -ExecutionPolicy Bypass -File $ResetFile -KeepApp -KeepHistory -Yes\n",
+     "powershell -ExecutionPolicy Bypass -File $ResetFile -KeepApp -KeepHistory\n",
      "[재설치] 재설치 길에서 사람에게 묻는 자리가 0"),
     # 편성 기록 지우기가 빠지면 프로그램 폴더 안의 topology.json 등이 남는다 → cys 가 켜지자마자 지난 동료 좌석을 되살린다(2026-09-15 윈 2차 재설치).
     ("state-drop-drop", RS,

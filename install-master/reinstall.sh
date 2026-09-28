@@ -87,9 +87,11 @@ fi
 #     (교차 검토 지적 채택 2026-09-15). 그래서 인텔은 종전처럼 프로그램까지 지우고 새로 깐다.
 KEEP_APP_ARG=""
 [ "$(uname -m)" = "arm64" ] && KEEP_APP_ARG="--keep-app"
+# ★--keep-history : 자비스 창의 이전 대화(맥 로그인은 열쇠고리라 원래 남는다)는 지우지 않는다 — **칩과 무관하게 늘** 넘긴다
+#   (0.3.36 · 윈 reinstall.ps1 -KeepHistory 와 같다). --keep-app 에 묶으면 인텔 맥만 대화 기록을 잃는다.
 
 if [ "$LIST_ONLY" = "1" ]; then
-  bash "$RESET_FILE" --list $KEEP_APP_ARG
+  bash "$RESET_FILE" --list --keep-history $KEEP_APP_ARG
   say ""
   say "(보기만 했습니다. 아무것도 지우지 않았고, 설치도 하지 않았습니다.)"
   exit 0
@@ -100,7 +102,7 @@ fi
 # ★사람 손 0(운영 결정 09-21 「묻는 단계 전부 삭제」 · 윈판 reinstall.ps1 -KeepApp -Yes 와 같은 끝 · dbg-D5 F2).
 #   --yes : 「지웁니다」 입력 · Enter 확인 · 다시 해 보기 질문을 묻지 않는다. 지울 목록은 지우기 도구가 먼저 한 번 보여 준다.
 #   이 한 줄을 붙여넣은 것이 곧 그 뜻이다. 막히면 지우기 도구가 [남음] 과 종료 코드로 말하고 아래에서 재설치로 넘어가지 않는다.
-bash "$RESET_FILE" --yes $KEEP_APP_ARG
+bash "$RESET_FILE" --yes --keep-history $KEEP_APP_ARG
 reset_rc=$?
 
 if [ "$reset_rc" = "1" ]; then

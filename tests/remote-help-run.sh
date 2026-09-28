@@ -792,8 +792,11 @@ PY
   else
     printf '  skip notice-canon — page.ts 없음(%s)\n' "$page"
   fi
-  awk '/^say "\[1\/10\] 이 컴퓨터를 살펴봅니다\."$/{a=NR} a && NR==a+1 && /^say "     \$REMOTE_HELP_NOTICE"$/{b=NR} b && NR==b+1 && /^NOTICE_SHOWN=1$/{ok=1} END{exit !ok}' "$SRC"
-  check "wire-notice 본문 [1/10] 바로 뒤에 고지를 찍고 그때만 NOTICE_SHOWN=1" $? "배선이 없다"
+  # 0.3.36: 고지 뒤 진행 고지·창 글자 고지 두 줄(주석 줄 포함)을 다 찍은 다음에 연다 — 그 사이에는 다른 명령이 없어야 한다.
+  awk '/^say "\[1\/10\] 이 컴퓨터를 살펴봅니다\."$/{a=NR} a && NR==a+1 && /^say "     \$REMOTE_HELP_NOTICE"$/{b=NR; next}
+       b && !done { if (/^say "     \$(PROGRESS|CAPTURE)_NOTICE"[[:space:]]*(#.*)?$/) { n++; next } if (/^[[:space:]]*(#.*)?$/) next
+                    done=1; if (n==2 && /^NOTICE_SHOWN=1[[:space:]]*(#.*)?$/) ok=1 } END{exit !ok}' "$SRC"
+  check "wire-notice 본문 [1/10] 바로 뒤에 고지를 찍고(진행·창 글자 고지까지) 그때만 NOTICE_SHOWN=1" $? "배선이 없다"
   # D1 기각(외부 검토 1차) — REACHED_WAKE=1 은 파일에 한 자리뿐 · cys 창에 자비스를 연 줄 바로 뒤(주석 건너뜀) · 그 다음이 함대 부르기
   awk '/^[[:space:]]*#/{next}
        /REACHED_WAKE=1/{n++; if (prev ~ /cys 안에서 자비스를 열었습니다/) at=1; want=1; prev=$0; next}

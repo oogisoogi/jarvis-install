@@ -10,6 +10,7 @@ $env:JARVIS_LIB_ONLY = '1'
 . $Src
 $env:JARVIS_LIB_ONLY = ''
 $Mode = 'full'
+$script:NoticeShown = $true   # 0.3.36: 전송 함수는 첫 화면 고지 뒤에만 보낸다 — 이 흉내는 고지 뒤 상태를 몬다
 $base = 'http://127.0.0.1:' + $Port
 $env:JARVIS_PROGRESS_URL = $base + '/api/progress'
 $HelpApiUrl = $base

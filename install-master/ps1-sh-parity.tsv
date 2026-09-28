@@ -2,7 +2,9 @@
 # 칸 = ps1함수<TAB>sh함수<TAB>상태<TAB>사유 · 상태 = sh(등가 실재) | na(OS 상 해당 없음 · 사유 필수)
 # ps1 = bootstrap.ps1 @5a1cd67 · 행 순서 = ps1 파일 순서
 # (표 밖 짝) 재설치 입구 reinstall.ps1 ↔ reinstall.sh: 지우기 도구를 묻지 않게 부른다 = 윈 -KeepApp -Yes · 맥 --yes(0.3.35 · TICKET=installer-0335 dbg-D5 F2 · 이 표는 bootstrap.ps1 함수만 대조하므로 주석 행)
+# (표 밖 짝) 재설치 길 로그인·이전 대화 남기기(0.3.36 · TICKET=installer-login-keep): reset-clean.ps1 -KeepHistory · $HistoryKeepNames · Get-HistoryKeeps · Drop 셋째 인자 ↔ reset-clean.sh --keep-history · HISTORY_KEEP_NAMES · history_keeps · drop_dir 둘째 인자(같은 다섯 이름 · 자리 자체+가리키는 곳 두 모양 · 못 풂 = ~/.cys 삭제 0) · 입구 = reinstall.ps1 -KeepApp -KeepHistory -Yes ↔ reinstall.sh --yes --keep-history $KEEP_APP_ARG(칩 무관) · 차이 1 = 맥 canon 은 끊어진 바로가기 파일을 「부모 실경로/이름」으로 풀어 남긴다(윈은 못 풂 = 삭제 0) — 둘 다 자료 손실 없음
 # (표 밖 짝) 배포 한 줄: 맥 = `curl … && bash …`(받기 실패면 안 돈다) · 윈 = 0.3.35 부터 `try { 옛 파일 지우기; irm … -ErrorAction Stop; powershell -File … } catch { 안내; exit 1 }`(받기 실패면 옛 파일을 안 돌린다 · dbg-D5 F5 · 앞 판은 `;` 로 이어 옛 파일이 돌았다)
+# (표 밖 짝) 도움 보고 주소 손잡이(0.3.36 · master#bdb927f2 A안): 맥 HELP_API_URL="${JARVIS_HELP_API_URL:-https://jarvis-install.godmeyou.kr}" ↔ 윈 $HelpApiUrl = $env:JARVIS_HELP_API_URL 이 있으면 그 값 · 없으면 같은 서버(변수라 이 함수 표 밖 · 두 OS 같은 뜻 = tests/help-url-lever.sh · LIB_ONLY 로 읽은 셸은 손잡이가 없을 때만 로컬)
 # ⚠「# todo」 줄 = 아직 이식하지 않은 함수(표에 행이 없으므로 checks 대조 축은 붉다 — 거짓 초록을 만들지 않으려고 상태를 지어내지 않았다)
 #   괄호 안 = 맡은 티켓 제안(T1 = 설치 단계 · T2 = 전송·증거·캡처)
 Test-Ps32OnWin64	-	na	64bit OS 위 32bit PowerShell(x86) 프로세스 판정 — bash 에는 이 구분이 없다(macOS 는 프로세스 비트수 갈래가 없음). TICKET=installer-0325 c8(2026-09-17 2d6f25b)
@@ -23,6 +25,7 @@ Test-UrlReachable	net_cause	sh	도달 판정 — net_cause 안의 curl -sS -I(-f
 Get-NetCause	net_cause	sh	같은 일(우리·바깥 먼저 · 둘 다 안 되면 중립 주소) · 단 윈판은 바깥에 cys 자산 주소도 넣음
 Get-NetCauseWords	net_cause_words	sh	같은 일
 Get-NetCauseCode	net_cause_code	sh	같은 일
+Get-NowSec	-	na	연결 대기의 지난 시간을 재는 시계(Stopwatch 틱 · 시험에서 바꿔 끼우는 자리) — 맥은 wait_for_connection 안에서 date +%s 를 인라인으로 쓴다. 0.3.36 F12(2026-09-24)
 Wait-ForConnection	wait_for_connection	sh	같은 일(30분 상한·30초 간격·상한 뒤 진단 코드)
 Get-HelpNow	help_attempts_update,help_last_report_save	sh	+0900 모양 시각 — 맥은 date '+%Y-%m-%dT%H:%M:%S%z' 인라인으로 같은 모양
 Read-HelpAttempts	help_attempts_read	sh	같은 일(고정 모양 JSON 줄 단위 정규식)
@@ -130,7 +133,8 @@ Get-MasterSeatRef	master_seat_ref	sh	cys list 에서 살아 있는(exited=true �
 Test-SeatClaimDenied	seat_claim_denied	sh	new-surface 답이 「이미 살아 있는 master 자리가 쥐고 있다」인지 판정(claim_denied · master+held by a live surface) — 순수 함수(답 글자만 받는다). TICKET=installer-0328(2026-09-21)
 Get-CysAppExe	cys_app_dir	sh	창(GUI)을 여는 대상을 고른다 — 윈은 설치 폴더에서 cys-app.exe·cysr.exe 를 찾고, 맥은 앱 번들 자리 하나라 cys_app_dir 이 같은 일을 한다. TICKET=installer-0328
 Start-CysAppWindow	start_cys_app_window	sh	앱 창을 띄운다 · 이미 떠 있으면 재기동 않고 앞으로만(윈 WScript.Shell AppActivate ↔ 맥 raise_cys_app_window osascript activate) · 찍는 값 raised|started|빈 글. TICKET=installer-0328
-Step-Wake	step_wake,cys_open_master_seat	sh	[9/10] 같은 일 · 단 윈판은 선언(너는 마스터다)을 첫 지시에 싣고 표지를 지우며, 맥은 일부러 싣지 않음(맥 실기 근거 0) · [5/10]~[8/10] 막힘 뒤: 맥·윈 = 각성에 들어가지 않고 「설치가 끝나지 않았습니다」+진단 코드로 즉시 끝(맥 0.3.35 dbg-D5 F3 · 윈 짝 0.3.35 r2 결정 A · 윈 행동 시험 tests/d5-f3w · 윈 실기 미실측) · 윈 Step-Wake 안의 막힌 단 갈래(이 창에서 띄움)는 도달 불가로 남음(지우지 않음 · 결정 C 와 같은 별건)
+Get-WakeBody	write_wake_file	sh	본부 자비스를 띄우는 wake 파일 본문 — 두 OS 같음: claude 앞에 CLAUDE_CODE_EFFORT_LEVEL=high · CLAUDE_CODE_ENABLE_PROMPT_SUGGESTION=false 를 환경 키가 없을 때만 넣는다(cys 좌석 주입과 같은 값·같은 규칙 · 맥 `${키-기본}` ↔ 윈 Test-Path Env: · 지키는 것은 환경 키 값뿐 — 설정 파일·/effort 는 이 값에 진다 · 윈은 프로세스 범위만) · 첫 프롬프트 작은따옴표 방어 유지 · 윈은 본문만 돌려주고 파일 쓰기(BOM)는 Step-Wake 에, 맥은 파일 쓰기까지(chmod 포함) · 시험 tests/wake-env-run.sh(만든 파일을 실제로 돌린다) · 0.3.36
+Step-Wake	step_wake,cys_open_master_seat	sh	[9/10] 같은 일 · 단 윈판은 선언(너는 마스터다)을 첫 지시에 싣고 표지를 지우며, 맥은 일부러 싣지 않음(맥 실기 근거 0) · [5/10]~[8/10] 막힘 뒤: 맥·윈 = 각성에 들어가지 않고 「설치가 끝나지 않았습니다」+진단 코드로 즉시 끝(맥 0.3.35 dbg-D5 F3 · 윈 짝 0.3.35 r2 결정 A · 윈 행동 시험 tests/d5-f3w · 윈 실기 미실측) · 윈 Step-Wake 안의 막힌 단 갈래(이 창에서 띄움)는 도달 불가로 남음(지우지 않음 · 결정 C 와 같은 별건) · wake 파일 본문 = Get-WakeBody ↔ write_wake_file(0.3.36 · 환경값 두 개)
 Get-SurfaceIds	set_fleet_baseline	sh	cys list 에서 surface 번호 모으기 — 윈판에서도 부르는 자리 0 · 맥은 set_fleet_baseline 인라인
 Set-FleetBaseline	set_fleet_baseline	sh	같은 일(못 찍으면 판정 안 함)
 Get-LiveRoles	live_roles	sh	같은 일(기준선 뒤 새 자리만)
@@ -193,6 +197,7 @@ Send-RemoteHelpReport	remote_help_report	sh	같은 일(보고 꾸리기·3회 �
 Watch-RemoteHelp	remote_help_loop	sh	같은 일(2시간 상한·20초 폴링)
 Invoke-RemoteHelp	remote_help,remote_help_on_signal	sh	원격 해결 진입·창 닫힘 시 close 같은 일 · 단 윈판의 보고 직후 증거·첨부 전송은 맥에 없음
 Get-InstallId	install_id_ensure	sh	같은 일 · $JARVIS_HOME/install-id · 모양 [0-9A-Za-z_-]{8,36} · 600 권한 · ps1 이 쓴 CRLF 도 읽음
+Get-ProgressUrl	progress_url	sh	같은 일(0.3.36) = JARVIS_PROGRESS_URL 이 있으면 그 주소 · 시험용 함수 묶음(LIB_ONLY)이면 닿지 않는 로컬 자리 · 아니면 서버 진행 주소
 Send-Progress	progress_send	sh	같은 인자 순서(step·event·elapsed·detail·env) · 3초 상한 · fail-open · 여섯째 $extra 는 ps1 도 부르는 자리 0 이라 옮기지 않음
 Protect-EvidenceText	evidence_mask_line	sh	마스킹 = JS maskEvidenceText(PROGRESS_JS) · 식은 tests/mask-vectors.json 과 글자 동일 · 셸 창구가 evidence_mask_line
 Get-EvidenceText	evidence_text_file	sh	기록 끝 60000B → 잘렸으면 첫 줄 버림 → 마스킹 → 32000B(윈판 설치 창 글자 = 맥은 say 가 같은 줄을 기록에 씀) · TICKET=installer-0325 c5(2026-09-18)로 윈판만 못 읽으면 빈 글 대신 사유코드([text:empty(...)]) 반환 — 맥 evidence_text_file 은 이 폴백 없음(09-17 10:01 실기는 윈 전용이라 이 라운드 범위 밖)
@@ -201,7 +206,9 @@ Get-EvidenceCaptureFailNote	evidence_once	sh	위와 짝 — 찍기 실패 사유
 Send-CapturedEvidenceImages	evidence_images_send	sh	이미 찍어 둔 그림만 올린다(Send-EvidenceImages 의 c5 대체 경로 · 윈 전용 신설)
 Send-EvidenceOnce	evidence_once	sh	같은 일 · (이유×단계) 한 번 · 글 뒤 설치 창 그림
 Get-CurrentStep	current_step	sh	같은 일(마지막 [n/10] · 맥은 기록 파일에서)
-Get-InstallEnv	progress_env_fields	sh	맥에서 채울 수 있는 칸 = claude_ver·cys_ver·mac_ver(sw_vers)·admin · win_build·ps_ver·av·browser 는 윈도우 전용 칸
+Get-InstallDiskFreeBytes	env_disk_free_kib	sh	같은 뜻(0.3.36) = 설치가 쓰는 볼륨의 사용자에게 남은 공간 · 윈 %LOCALAPPDATA% 드라이브 AvailableFreeSpace(바이트) ↔ 맥 df -Pk $HOME 남은 칸(KiB)
+ConvertTo-InstallGb	env_gb_round	sh	같은 일(0.3.36) = 정수 GB(2^30 · 반올림 = 올림) 글자 · 못 읽는 값 = 빈 글자
+Get-InstallEnv	progress_env_fields	sh	맥에서 채울 수 있는 칸 = claude_ver·cys_ver·mac_ver(sw_vers)·hw_model·mem_gb·disk_free_gb·admin · win_build·ps_ver·av·browser 는 윈도우 전용 칸
 Resize-Bitmap	evidence_kind_jpeg	sh	축소·재압축 = evidence_kind_jpeg 안 sips 네 걸음 (1280,60)→(1280,40)→(960,40)→(800,30) · 1.5MB 상한(.NET 그림 객체 대신)
 ConvertTo-Jpeg	evidence_kind_jpeg	sh	JPEG 변환 = screencapture -t jpg + sips 재압축(evidence_kind_jpeg 안)
 Get-ScreenJpeg	-	na	전체 화면 캡처 — 윈판에서도 부르는 자리 0(다른 창까지 찍혀 쓰지 않기로 한 함수)이라 이식 대상 아님
@@ -233,3 +240,4 @@ Get-RotateAliveRefs	rotate_alive_refs	sh	cys list 글 → 살아 있는(exited=f
 Get-RotateRoleRefs	rotate_role_refs	sh	cys list 글 → 살아 있는 역할 자리 번호들(역할 빈칸·-·none 제외) — 관측 성공의 「역할 자리 ≥3」 축. TICKET=installer-0331(2026-09-21)
 Get-RotateObserveVerdict	rotate_observe_verdict	sh	순수 — ok · no:pid · no:old-seats · no:role-seats(흉내 동형 축 · 여덟 입력 글자까지 같다) · 성공 = pid 바뀜 + 기준선 자리 0 + 역할 자리 ≥3. TICKET=installer-0331(2026-09-21)
 Invoke-RotateObserve	rotate_observe	sh	세 축(ping·데몬 pid·cys list · 각 상한 5초 · 무기동)을 한 번 재 판정을 돌려주고 bootstrap.log 에 남긴다(주기 = 1줄 · 마지막 = ①②③ 3줄 + verdict). 드레인 뒤(단계 2 이후)에만 주기 관측 · 성공이면 rotate 를 끊고 observed-ok · 상한 180 뒤 1회 더. TICKET=installer-0331(2026-09-21)
+Get-RotateHeldRecheck	rotate_held_recheck	sh	rc 25(복원 보류) 뒤 곧바로 held 로 말하지 않고 창 60초 동안 세 축을 10초마다 다시 본다 — 서면 observed-ok · 끝내 안 서면 held(종전 경고) · 기준 데몬 pid 를 못 읽었으면 기다리지 않는다(판정이 no:pid 로 굳음). 근거 = 09-22 맥 VM 재설치 rc 25 뒤 20초에 cso 자리가 섰다(실제 3/3 · 거짓 경고). 0.3.36 X-5(2026-09-24)

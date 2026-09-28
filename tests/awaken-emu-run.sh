@@ -103,8 +103,9 @@ PYEOF
       [ "$(cat "$SB/listcalls" 2>/dev/null || echo 0)" -ge 3 ]
       t $? "[성공] 자리 목록을 다시 본 뒤에 판정한다(기준선 1 + 조회 2회 이상)" "목록 조회 $(cat "$SB/listcalls" 2>/dev/null || echo 0)회"
       # wake.ps1 을 실제로 돌려 claude 가 받은 인자를 글자 그대로 대조한다(경로에 작은따옴표 · 두 줄 · 우리말)
-      rm -f "$SB/claude-args"
-      PATH="$SB/bin:$PATH" perl -e 'alarm shift; exec @ARGV' 60 "$PW" -NoProfile -File "$W" </dev/null >"$SB/wake-out.txt" 2>&1
+      rm -f "$SB/claude-args" "$SB/claude-env"
+      # 두 환경값 키를 지우고 돈다 — 이 시험을 돌리는 셸(클로드 좌석 등)에 이미 있으면 「있는 값 그대로」로 읽혀 공허해진다
+      env -u CLAUDE_CODE_EFFORT_LEVEL -u CLAUDE_CODE_ENABLE_PROMPT_SUGGESTION PATH="$SB/bin:$PATH" perl -e 'alarm shift; exec @ARGV' 60 "$PW" -NoProfile -File "$W" </dev/null >"$SB/wake-out.txt" 2>&1
       [ "$(head -c 3 "$W" 2>/dev/null | od -An -tx1 | tr -d ' \n')" = "efbbbf" ] \
         && python3 - "$SB/claude-args" "$JH" <<'PYEOF'
 import sys, base64
@@ -114,6 +115,9 @@ want = ["--dangerously-skip-permissions",
 sys.exit(0 if rows == want else 1)
 PYEOF
       t $? "[성공] 선언은 첫 프롬프트의 그 자체 첫 줄 · wake.ps1 을 돌리면 claude 가 두 줄 그대로 받는다(경로에 작은따옴표 포함 · BOM 파일)" "받은 인자 $(wc -l < "$SB/claude-args" 2>/dev/null | tr -d ' ')개 · wake 출력: $(head -c 160 "$SB/wake-out.txt" | tr '\n' '|')"
+      # 0.3.36: Step-Wake 가 **실제로 쓴** wake.ps1 이 claude 에 두 환경값을 싣는다(함수 단독 시험이 못 보는 덮어쓰기 변이 차단 · 적대 검토 반례)
+      [ "$(cat "$SB/claude-env" 2>/dev/null)" = "EFFORT=high SUGG=false" ]
+      t $? "[성공] Step-Wake 가 쓴 wake.ps1 이 claude 에 EFFORT=high · 제안 글 끄기를 싣는다" "$(cat "$SB/claude-env" 2>/dev/null)"
       [ -s "$SB/newsurface-args" ] && grep -qx -- '--cmd' "$SB/newsurface-args" && ! grep -q '마스터' "$SB/newsurface-args" \
         && ! grep -v "o'k" "$SB/newsurface-args" | LC_ALL=C grep -q '[^ -~]'
       t $? "[성공] 자리 여는 명령의 인자에는 우리말이 한 글자도 없다" "$(tr '\n' ' ' < "$SB/newsurface-args" 2>/dev/null | cut -c1-200)"
@@ -547,6 +551,7 @@ cp "$EMU/fake-cys.sh" "$SB/bin/cys"; chmod +x "$SB/bin/cys"
 cat > "$SB/bin/claude" <<CLAUDE_EOF
 #!/bin/bash
 printf '%s\n' "\$@" >> "$SB/claude-args"
+printf 'EFFORT=%s SUGG=%s\n' "\${CLAUDE_CODE_EFFORT_LEVEL-<unset>}" "\${CLAUDE_CODE_ENABLE_PROMPT_SUGGESTION-<unset>}" > "$SB/claude-env"
 exit 0
 CLAUDE_EOF
 chmod +x "$SB/bin/claude"
@@ -573,11 +578,14 @@ CMD_LINE="$(awk '/^--cmd$/{getline; print; exit}' "$SB/newsurface-args" 2>/dev/n
 [ -n "$CMD_LINE" ]
 t $? "[맥 c1] cys 에 넘긴 여는 명령(cmd_line)을 잡았다" "newsurface-args: $(cat "$SB/newsurface-args" 2>/dev/null | tr '\n' '|' | cut -c1-200)"
 # ★핵심 — cmd_line 이 다른 프로그램(터미널 창)에서 셈으로 다시 파싱돼도(bash -c 흉내) 안 끊기고 wake.sh 를 실제로 돈다
-PATH="$SB/bin:$PATH" HOME="$SB/home/O'Brien" bash -c "$CMD_LINE" >"$SB/replay.out" 2>"$SB/replay.err"
+env -u CLAUDE_CODE_EFFORT_LEVEL -u CLAUDE_CODE_ENABLE_PROMPT_SUGGESTION PATH="$SB/bin:$PATH" HOME="$SB/home/O'Brien" bash -c "$CMD_LINE" >"$SB/replay.out" 2>"$SB/replay.err"
 grep -q -- '--dangerously-skip-permissions' "$SB/claude-args" 2>/dev/null
 t $? "[맥 c1] cmd_line 을 다시 셈 파싱해도(bash -c) 끊기지 않고 claude 가 실제로 불린다(경로 작은따옴표 방어)" "replay err: $(cat "$SB/replay.err" 2>/dev/null | tr '\n' '|' | cut -c1-200) · claude-args: $(cat "$SB/claude-args" 2>/dev/null | tr '\n' '|' | cut -c1-160)"
 grep -q '^너는 마스터다$' "$SB/claude-args" 2>/dev/null
 t $? "[맥 c1] 다시 실행된 wake.sh 가 선언 첫 줄을 그대로 claude 에 넘긴다(경로 이스케이프가 프롬프트 내용을 훼손하지 않는다)" "$(cat "$SB/claude-args" 2>/dev/null | tr '\n' '|' | cut -c1-200)"
+# 0.3.36: step_wake 가 **실제로 쓴** wake.sh 가 claude 에 두 환경값을 싣는다(함수 단독 시험이 못 보는 덮어쓰기 변이 차단 · 적대 검토 반례)
+[ "$(cat "$SB/claude-env" 2>/dev/null)" = "EFFORT=high SUGG=false" ]
+t $? "[맥 c1] step_wake 가 쓴 wake.sh 가 claude 에 EFFORT=high · 제안 글 끄기를 싣는다" "$(cat "$SB/claude-env" 2>/dev/null)"
 
 printf '\n통과 %s · 실패 %s\n' "$pass" "$fail"
 [ "$fail" -eq 0 ] || exit 1

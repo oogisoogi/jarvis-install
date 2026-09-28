@@ -158,11 +158,18 @@ def checks(path):
        and ordered(report, "if (Save-RemoteHelpToken $token) {", "$script:RhClientToken = $token", "$script:RhClientToken = ''")
        and "출처 헤더 없음" in report and "client_token -cmatch '\\A[0-9a-f]{64}\\z'" in report,
        "권한을 먼저 건 빈 파일에 쓰지 않거나 · 실패 때 파일·토큰을 버리지 않는다")
-    ck("ps1-wire-notice", re.search(r"^    Say '\[1/10\] 이 컴퓨터를 살펴봅니다\.'\n    Say \('     ' \+ \$RemoteHelpNotice\)\n    \$script:NoticeShown = \$true$", src, re.M),
-       "[1/10] 바로 뒤 고지·NoticeShown 배선이 없다")
+    # 0.3.36: 전송 문은 고지 줄(원격 해결 · 진행·창 글자·그림)을 다 찍은 뒤에 연다(맥 NOTICE_SHOWN 짝 · 줄 끝 주석 허용)
+    ck("ps1-wire-notice", re.search(r"^    Say '\[1/10\] 이 컴퓨터를 살펴봅니다\.'\n    Say \('     ' \+ \$RemoteHelpNotice\)\n    Say \('     ' \+ \$ProgressNotice\)[ \t]*(#[^\n]*)?\n    \$script:NoticeShown = \$true[ \t]*(#[^\n]*)?$", src, re.M),
+       "[1/10] 바로 뒤 고지(원격 해결·진행 고지)·NoticeShown 배선이 없다")
     wake = fn(src, "Step-Wake")
-    # D1 기각 — ReachedWake 는 깨우기가 성공한 두 자리(cys 창을 열었다 · 이 창의 자비스가 종료 코드 0)에만
-    ck("ps1-wire-wake", code(src).count("$script:ReachedWake = $true") == 2 and code(wake).count("$script:ReachedWake = $true") == 2
+    # D1 기각 — ReachedWake 는 깨우기가 끝까지 간 세 자리에만: ①cys 창을 열었다 ②자리 선점(claim-denied · 0.3.28) — 자비스는 이미 앱 안에 있고
+    #   이 창은 [10/10] 끝맺음까지 말한다 ③이 창의 자비스가 종료 코드 0. (0.3.36 정리: 앞 판 검사는 2 를 기대해 0.3.28 부터 늘 적색이었다)
+    wc = code(wake)
+    cd_at = wc.find("if (Test-SeatClaimDenied $ref) {")
+    rw = [m.start() for m in re.finditer(re.escape("$script:ReachedWake = $true"), wc)]
+    fb_at = wc.find("& $fallbackExe --dangerously-skip-permissions $fallbackPrompt")
+    ck("ps1-wire-wake", code(src).count("$script:ReachedWake = $true") == 3 and len(rw) == 3
+       and 0 <= cd_at < rw[1] < fb_at and rw[0] < cd_at
        and re.search(r"if \(\$ref -match 'surface:'\) \{\n\s+Say \"     cys 안에서 자비스를 열었습니다[^\n]*\n(?:\s+#[^\n]*\n)*\s+\$script:ReachedWake = \$true\n", wake)
        and ordered(wake, "$global:LASTEXITCODE = -1", "& $fallbackExe --dangerously-skip-permissions $fallbackPrompt", "if ($global:LASTEXITCODE -eq 0) { $script:ReachedWake = $true }"),
        "깨우기 성공 뒤에만 ReachedWake 를 세우지 않는다")

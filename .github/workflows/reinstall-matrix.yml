@@ -25,6 +25,12 @@ jobs:
   cycle:
     name: ${{ matrix.os }} — 진단·삭제·재설치·멱등
     runs-on: ${{ matrix.os }}
+    # 🔴0.3.36: 이 job 은 두 OS 실제 부분 설치를 full 모드로 돌린다 — 진행 전송·도움 보고가 라이브 설치 기록·도움 채널로 가면
+    #   참가자 기록이 러너 기록으로 오염되고 가짜 도움 사례 경보가 뜬다. 닿지 않는 로컬 주소로 돌린다(전송 코드 경로는 그대로 돈다).
+    #   손잡이 = 두 설치기의 JARVIS_PROGRESS_URL · JARVIS_HELP_API_URL(tests/help-url-lever.sh 가 이 두 줄과 설치기 쪽을 잰다).
+    env:
+      JARVIS_PROGRESS_URL: http://127.0.0.1:9/ci
+      JARVIS_HELP_API_URL: http://127.0.0.1:9/ci
     strategy:
       fail-fast: false
       matrix:

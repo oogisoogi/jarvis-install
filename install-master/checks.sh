@@ -290,7 +290,7 @@ PYEOF
   mkdir -p "$LB/bin" "$LB/home-on" "$LB/home-off"
   for b in curl osascript; do printf '#!/bin/bash\necho "%s $*" >> "%s/calls"\nexit 7\n' "$b" "$LB" > "$LB/bin/$b"; done
   chmod +x "$LB/bin/"*
-  printf '%s\n' ". \"$SH\" >/dev/null 2>&1 || exit 9" 'MODE=full' "progress_send '1/10' 'start' '' '' ''" 'echo "TEST sent rc=$?"' > "$LB/run.sh"
+  printf '%s\n' ". \"$SH\" >/dev/null 2>&1 || exit 9" 'MODE=full' 'NOTICE_SHOWN=1' "progress_send '1/10' 'start' '' '' ''" 'echo "TEST sent rc=$?"' > "$LB/run.sh"
   PATH="$LB/bin:$PATH" HOME="$LB/home-on" JARVIS_HOME="$LB/home-on/install-jarvis" JARVIS_LIB_ONLY=1 JARVIS_NO_PROGRESS=1 JARVIS_PROGRESS_URL="http://127.0.0.1:9/progress" \
     perl -e 'alarm shift; exec @ARGV' 30 bash "$LB/run.sh" </dev/null >"$LB/on.txt" 2>&1
   local on_calls; on_calls="$(cat "$LB/calls" 2>/dev/null | wc -l | tr -d ' ')"; rm -f "$LB/calls"
@@ -517,6 +517,18 @@ axes_0332() {
   codegrep "$SH" '^INSTALLER_VERSION="0\.3\.3[2-9]"'; ck "[0332 판번] 맥 0.3.32 이상" $? "판번이 안 올랐다"
   codegrep "$PS" "^\\\$InstallerVersion       = '0\.3\.3[2-9]'"; ck "[0332 판번] 윈 0.3.32 이상" $? "판번이 안 올랐다"
 }
+if [ "${CHECKS_ONLY:-}" = "login-keep" ]; then
+  # 0.3.36(TICKET=installer-login-keep): 재설치 길 로그인·이전 대화 남기기 — 실물 윈 지우개 흉내 + 맥 함수 떼기 + 정적(약 3분 · pwsh 필요).
+  #   「되돌리면 붉어진다」는 tests/login-keep-mutate.py 가 잰다.
+  if command -v pwsh >/dev/null 2>&1 && [ -f "$DIR/../tests/login-keep-run.sh" ]; then
+    bash "$DIR/../tests/login-keep-run.sh" --dir "$DIR" >/dev/null 2>&1
+    ck "[login-keep] 흉내 실행 시험이 전건 통과한다(재설치 길 남김 5 · 옛 재설치·완전 삭제 불변 · 바로가기 · 못 풂 = 삭제 0 · [8/10] keep:newer · 두 OS)" $? "bash tests/login-keep-run.sh 로 자세히"
+  else
+    sk "[login-keep] 흉내 실행 시험" "pwsh 또는 시험 파일이 없다"
+  fi
+  printf '\n통과 %s · 실패 %s%s\n' "$pass" "$fail" "$([ "$skip" -gt 0 ] && printf ' · 건너뜀 %s' "$skip")"
+  [ "$fail" -eq 0 ]; exit $?
+fi
 if [ "${CHECKS_ONLY:-}" = "0332" ]; then
   axes_0332
   if command -v pwsh >/dev/null 2>&1 && [ -f "$DIR/../tests/v0332-emu-run.sh" ]; then
@@ -850,7 +862,7 @@ echo "== 단계 2 — cys 설치 대행 [5]~[9] =="
 # (installer-0321-pin) 1.0.1 발행(2026-09-16) 실측값이 채워졌다 — 아래 두 축은 이제 **초록이어야 한다**(자리표가 남으면 붉다).
 #   ⚠이 축은 **형식만** 본다(64자리인가·숫자인가). 한 글자 틀린 값도 여기서는 통과하므로, 값이 릴리스와 같은지는 tests/win-pin-release.sh 가 릴리스를 때려서 진다.
 codegrep "$PS" 'CysWinBytes    = [0-9]+$'; ck "[5] 설치 파일 크기 핀(= cysr v1.0.1 setup.exe · 숫자)" $? "받다 끊긴 파일을 정상으로 본다(자리표가 남았다)"
-codegrep "$PS" "CysVersion     = '1\\.1\\.5'"; ck "[5] 윈 판본 핀 정확값(= cysr v1.1.5)" $? "이름표만 새 판본이고 실제로 받는 판본은 옛것이다"
+codegrep "$PS" "CysVersion     = '1\\.1\\.6'"; ck "[5] 윈 판본 핀 정확값(= cysr v1.1.6)" $? "이름표만 새 판본이고 실제로 받는 판본은 옛것이다"
 codegrep "$PS" "CysWinSha256   = '[0-9a-f]{64}'"; ck "[5] 윈 설치 파일 sha256 핀(= 릴리스 SHA256SUMS 줄 · 64자리)" $? "지문이 없으면 모든 설치가 지문 불일치로 멈춘다(자리표가 남았다)"
 no_code "$PS" 'TBD-1\.0\.1' && no_code "$SH" 'TBD-1\.0\.1'
 ck "[v0320] 핀 자리표(TBD-1.0.1)가 두 설치기에 남지 않았다" $? "발행값이 아직 안 채워졌다 — 이대로 배포하면 cys 받기가 반드시 실패한다"
@@ -1679,7 +1691,9 @@ if [ -f "$REIN_SH" ]; then
   # 로그인은 건드리지 않는다(운영자 확정 2026-09-08) — 재설치 입구에 purge 옵션을 노출하지 않는다.
   no_code "$REIN_SH" 'purge-login'; ck "[재설치] 입구에 로그인 삭제를 안 내놓는다" $? "사용자 경로에 노출됐다"
   # ★사람 손 0 — 지우기 도구를 --yes 로 부른다(윈판 -KeepApp -Yes 와 같은 끝 · 운영 결정 09-21 · dbg-D5 F2).
-  codegrep "$REIN_SH" '^bash "\$RESET_FILE" --yes \$KEEP_APP_ARG$'; ck "[재설치] 지우기 도구를 묻지 않게(--yes) 부른다" $? "「지웁니다」 입력을 사람에게 요구한다"
+  codegrep "$REIN_SH" '^bash "\$RESET_FILE" --yes --keep-history \$KEEP_APP_ARG$'; ck "[재설치] 지우기 도구를 묻지 않게(--yes) 부른다" $? "「지웁니다」 입력을 사람에게 요구한다"
+  # 0.3.36(TICKET=installer-login-keep): 자비스 창 이전 대화를 남기는 표지는 칩과 무관하게 늘 넘긴다(동작 = tests/login-keep-run.sh · CHECKS_ONLY=login-keep).
+  codegrep "$REIN_SH" '^  bash "\$RESET_FILE" --list --keep-history \$KEEP_APP_ARG$'; ck "[login-keep] 맥 재설치가 목록·지우기 두 곳에 --keep-history 를 넘긴다" $? "재설치 뒤 자비스 창 이전 대화가 사라진다"
   if [ -f "$DIR/../tests/d5-f2-reinstall-no-question.sh" ]; then
     bash "$DIR/../tests/d5-f2-reinstall-no-question.sh" "$DIR" >/dev/null 2>&1
     ck "[재설치] 입력 닫힌 채 목록 → 지우기 → 설치 도우미까지 간다(행동 시험 · 가짜 루트 · 라이브 무접촉)" $? "묻는 줄에서 멈추거나 그만둔다(tests/d5-f2-reinstall-no-question.sh)"
@@ -1692,6 +1706,8 @@ fi
 if [ -f "$REIN_PS" ]; then
   [ "$(head -c3 "$REIN_PS" | xxd -p)" = "efbbbf" ]; ck "[재설치] ps1 = UTF-8 with BOM" $? "한글이 깨진다"
   codegrep "$REIN_PS" '\$resetRc'; ck "[재설치] ps1 지우기 결과를 받는다" $? "결과를 안 본다"
+  codegrep "$REIN_PS" '^powershell -ExecutionPolicy Bypass -File \$ResetFile -KeepApp -KeepHistory -Yes$' && codegrep "$REIN_PS" '[-]List -KeepApp -KeepHistory$'
+  ck "[login-keep] 윈 재설치가 목록·지우기 두 곳에 -KeepHistory 를 넘긴다" $? "재설치 뒤 동료 로그인·이전 대화가 사라진다(09-25 윈 실기 「Login expired」)"
   codegrep "$REIN_PS" 'exit \$resetRc'; ck "[재설치] ps1 지우기가 실패하면 거기서 끝낸다" $? "반쯤 지운 위에 설치가 얹힌다"
   awk '/resetRc -ne 0/{a=NR} /bootstrap\.ps1/{if(!b)b=NR} END{exit !(a&&b&&a<b)}' "$REIN_PS"
   ck "[재설치] ps1 실패 판정이 설치보다 먼저" $? "판정 전에 설치를 시작한다"
@@ -2019,6 +2035,10 @@ codegrep "$PS" 'hasTrustDialogAccepted -NotePropertyValue \$true -Force'; ck "[R
 # ⚠자리마다 이름이 다르다(작업 폴더는 $JARVIS_HOME · 홈은 $HOME) — 한 변수로 뭉뚱그리던 고리는 뺐다.
 codegrep "$SH" 'projects\.\$JARVIS_HOME\.hasTrustDialogAccepted'; ck "[R4] 맥 씨앗도 우리 칸만 세운다" $? "작업 폴더 칸을 객체째 덮는다"
 codegrep "$SH" '폴더 이름에 마침표가 있어'; ck "[R4] 맥은 마침표 든 폴더 이름을 사실대로 말한다" $? "못 넘긴 질문을 조용히 지나간다"
+# ★0.3.36 F15 — 마침표 든 이름도 plutil 대신 JavaScript 로 **넘긴다**. 말로 알리는 것(위 줄)은 그것마저 실패한 때의 뒷길이다.
+#   ⚠설치기와 제거기는 짝이다 — 한쪽만 고치면 넣은 칸이 지울 수 없는 자국이 된다(제거기 쪽은 아래 「맥 제거도 칸 하나만 뺀다」 줄 곁).
+codegrep "$SH" 'trust_json_prepare add "\$cfg" "\$HOME"'; ck "[F15] 맥이 마침표 든 홈도 없을 때만 넣는다" $? "마침표 든 홈을 건너뛰어 모든 좌석이 폴더 신뢰를 묻는다"
+codegrep "$SH" 'trust_json_prepare set "\$cfg" "\$JARVIS_HOME"'; ck "[F15] 맥이 마침표 든 작업 폴더도 신뢰를 세운다" $? "같음"
 # ★제거는 **기록에 적힌 것만** — 경로를 추측해 지우면 그것이 참가자의 값을 지우던 자리다.
 codegrep "$RESET"    'function Read-TrustSeedRecord'; ck "[R4] 윈 제거기가 기록을 읽는다" $? "추측으로 지운다"
 codegrep "$RESET_SH" 'read_trust_seed_record()';      ck "[R4] 맥 제거기도 기록을 읽는다" $? "같음"
@@ -2028,9 +2048,10 @@ codegrep "$RESET"    '우리가 넣은 기록이 없어 손대지 않습니다';
 codegrep "$RESET_SH" 'z "\$TRUST_SEED_ROWS" \]'; ck "[R4] 맥도 기록이 없으면 안 지운다" $? "기록이 없어도 지우는 길이 열렸다"
 codegrep "$RESET_SH" '우리가 넣은 기록이 없어 손대지 않습니다'; ck "[R4] 맥도 그 사실을 말한다" $? "같음"
 # ★기록은 자비스 폴더 안에 있다 — **그 폴더를 지우기 전에** 읽어야 한다(순서가 곧 안전장치다).
-awk '/Read-TrustSeedRecord/{if(!a)a=NR} /Drop .자비스 작업 폴더./{if(!b)b=NR} END{exit !(a&&b&&a<b)}' "$RESET"
+# 0.3.36: 작업 폴더는 지우지 않고 보관 이동(Keep-JarvisDir · keep_jarvis_dir) — 순서 규칙은 그대로(옮기면 기록도 함께 옮겨져 못 읽는다)
+awk '/^function /{next} /^[[:space:]]*#/{next} {sub(/#.*/,"")} /Read-TrustSeedRecord/{if(!a)a=NR} /Keep-JarvisDir \$JarvisDir/{if(!b)b=NR} END{exit !(a&&b&&a<b)}' "$RESET"   # 정의 줄은 건너뛴다(부르는 줄끼리 비교 · 적대 검토 반례)
 ck "[R4] 윈은 폴더를 지우기 전에 기록을 읽는다" $? "기록이 먼저 사라져 우리 것과 남의 것을 못 가른다"
-awk '/read_trust_seed_record/{if(!a)a=NR} /drop_dir "\$JARVIS_HOME"/{if(!b)b=NR} END{exit !(a&&b&&a<b)}' "$RESET_SH"
+awk '/^[a-z_]+\(\) *\{/{next} /^[[:space:]]*#/{next} {sub(/#.*/,"")} /read_trust_seed_record/{if(!a)a=NR} /keep_jarvis_dir "\$JARVIS_HOME"/{if(!b)b=NR} END{exit !(a&&b&&a<b)}' "$RESET_SH"
 ck "[R4] 맥도 폴더를 지우기 전에 기록을 읽는다" $? "같음"
 codegrep "$RESET"    'function Remove-TrustSeed'; ck "[R4] 윈 제거기가 신뢰 칸을 도로 뺀다" $? "설치기만 심고 제거기는 모른다(자국이 남는다)"
 # ★자비스 작업 폴더의 projects 칸은 처음부터 끝까지 우리 자국이다 ⇒ **칸째** 뺀다. 맥판은 원래 그랬고
@@ -2041,6 +2062,10 @@ codegrep "$RESET_SH" "strip_json_key .*'projects\.'"; ck "[R4] 맥도 자비스 
 codegrep "$RESET_SH" 'strip_trust_seed()';       ck "[R4] 맥 제거기도 같음" $? "같음"
 codegrep "$RESET"    "Properties.Remove\('hasTrustDialogAccepted'\)"; ck "[R4] 윈 제거는 칸 하나만 뺀다" $? "칸째 지워 남의 값을 날린다"
 codegrep "$RESET_SH" 'plutil -remove "projects\.\$d\.hasTrustDialogAccepted"'; ck "[R4] 맥 제거도 칸 하나만 뺀다" $? "같음"
+codegrep "$RESET_SH" 'dir_key_json strip "\$f" "\$d"'; ck "[F15] 맥 제거기가 마침표 든 홈 칸도 우리 키 하나만 뺀다" $? "설치기가 넣은 칸이 지울 수 없는 자국으로 남는다"
+# (0.3.36 이종 검토 뒤 strip_json_key 는 op 를 골라 한 줄로 부른다 — 작업 폴더 칸 = drop 갈래)
+codegrep "$RESET_SH" 'projects\.\*\) op=drop; k="\$\{2#projects\.\}"' && codegrep "$RESET_SH" 'dir_key_json "\$op" "\$1" "\$k"'
+ck "[F15] 맥 제거기가 마침표 든 작업 폴더 칸도 칸째 뺀다" $? "같음"
 # ★우리 칸만 있던 자리는 비므로 칸째 지운다 — 빈 칸을 남기면 다음 진단이 자국으로 센다.
 codegrep "$RESET"    'PSObject.Properties\).Count -eq 0'; ck "[R4] 윈은 빈 칸을 남기지 않는다" $? "빈 칸이 남아 「설치가 중간에 멈췄다」로 오보한다"
 codegrep "$RESET_SH" 'left" = "{}"';                       ck "[R4] 맥도 같음" $? "같음"
@@ -2258,9 +2283,9 @@ if [ -f "$DIR/../tests/agora-preserve.py" ]; then
   ck "[N3] 시험 씨앗이 소유 표식을 놓는다" $? "씨앗이 설치기와 달라 축이 옳은 동작을 손실로 읽는다"
 fi
 # ★표식을 확인하는 자리와 지우는 자리가 **같은 갈래**여야 한다 — 검사만 하고 그냥 지우면 소용없다.
-awk '/Test-SafeJarvisDir \$JarvisDir/{a=NR} /Drop .자비스 작업 폴더./{b=NR} END{exit !(a&&b&&a<b)}' "$RESET"
-ck "[N3] 윈은 검사를 통과한 갈래에서만 지운다" $? "검사 결과와 무관하게 지운다"
-awk '/safe_jarvis_dir "\$JARVIS_HOME"/{a=NR} /drop_dir "\$JARVIS_HOME"/{b=NR} END{exit !(a&&b&&a<b)}' "$RESET_SH"
+awk '/Test-SafeJarvisDir \$JarvisDir/{a=NR} /Keep-JarvisDir \$JarvisDir/{b=NR} END{exit !(a&&b&&a<b)}' "$RESET"
+ck "[N3] 윈은 검사를 통과한 갈래에서만 다룬다(0.3.36 보관 이동)" $? "검사 결과와 무관하게 지운다"
+awk '/safe_jarvis_dir "\$JARVIS_HOME"/{a=NR} /keep_jarvis_dir "\$JARVIS_HOME"/{b=NR} END{exit !(a&&b&&a<b)}' "$RESET_SH"
 ck "[N3] 맥도 같음" $? "같음"
 
 # ── 2차 검토 N2 이전 설치의 좌석을 이번 선언으로 세지 않는다 ────────────
@@ -2443,7 +2468,7 @@ ck "[핀] 설치기(맥) 코드의 판본 문자열이 전부 핀 판본이다" 
 
 # ── ⓕ-2 맥 저희 판 전환 (2026-09-15) ────────────────────────────────
 #   애플 실리콘 맥은 우리 릴리스 zip 을 받아 풀어 넣는다. 인텔·자산 없음만 원작자 판으로 간다.
-codegrep "$SH" 'CYS_FORK_VERSION="1\.1\.5"'; ck "[전환] 맥 저희 판 판본 핀(= cysr v1.1.5)" $? "판본 핀이 없다"
+codegrep "$SH" 'CYS_FORK_VERSION="1\.1\.6"'; ck "[전환] 맥 저희 판 판본 핀(= cysr v1.1.6)" $? "판본 핀이 없다"
 codegrep "$SH" 'CYS_FORK_DIR="https://github\.com/oogisoogi/cys-ro/releases/download/v'; ck "[전환] 저희 판은 판본이 박힌 우리 릴리스 자리에서 받는다" $? "다른 자리를 가리킨다"
 # (installer-0321-pin) 1.0.1 발행(2026-09-16) 실측값이 채워졌다 — 아래 세 축은 이제 **초록이어야 한다**(자리표가 남으면 붉다 · 이 축도 형식만 본다).
 codegrep "$SH" 'CYS_FORK_BYTES="?[0-9]+"?$'; ck "[전환] 저희 판 크기 핀(숫자)" $? "크기가 안 맞아 매번 멈춘다(자리표가 남았다)"
@@ -2514,7 +2539,7 @@ fi
 awk '/^cys_stop_old_app\(\) \{/{f=1} f&&/pkill|pgrep|command=|args=/{bad=1} f&&/^\}$/{exit} END{exit !(f&&!bad)}' "$SH"
 ck "[전환] 옛 cys 끄기에 명령줄 축이 없다" $? "편집기가 그 경로를 열기만 해도 꺼진다(또는 함수를 못 찾았다)"
 # 재설치 길은 프로그램을 남긴다 — 두 자리(보기·지우기) 모두.
-[ "$(grep -cE '^  bash "\$RESET_FILE" --list \$KEEP_APP_ARG$|^bash "\$RESET_FILE" --yes \$KEEP_APP_ARG$' "$REIN_SH")" -eq 2 ] \
+[ "$(grep -cE '^  bash "\$RESET_FILE" --list --keep-history \$KEEP_APP_ARG$|^bash "\$RESET_FILE" --yes --keep-history \$KEEP_APP_ARG$' "$REIN_SH")" -eq 2 ] \
   && grep -qE '^\[ "\$\(uname -m\)" = "arm64" \] && KEEP_APP_ARG="--keep-app"$' "$REIN_SH"
 ck "[전환] 맥 재설치가 지우개에 --keep-app 을 넘긴다(두 자리)" $? "재설치마다 470MB 를 다시 받는다"
 # 인텔은 남기지 않는다 — 원작자 판 경로는 「있으면 건너뛴다」라서 옛 판이 남는다(교차 검토 지적).
@@ -2889,8 +2914,8 @@ for f in "$PS" "$RESET" "$REIN_PS"; do
   codegrep "$f" '1\) ⊞ 윈도우 키\(키보드 왼쪽 아래, Ctrl과 Alt 사이\)를 누르고 powershell' && no_code "$f" '시작 단추를 누르고'; rc=$?
   ck "[v0317] 다시 하시는 법 첫 줄은 윈도우 키(사이트와 같은 말) · $(basename "$f")" "$rc" "(${GREP_WHY})"
 done
-codegrep "$PS" "^\\\$InstallerVersion *= '0\.3\.35'" && codegrep "$SH" '^INSTALLER_VERSION="0\.3\.35"'
-ck "[v0322] 판본 0.3.35(두 설치기 · 한 릴리스 = 한 판번)" $? "보고의 판본이 갈린다"
+codegrep "$PS" "^\\\$InstallerVersion *= '0\.3\.36'" && codegrep "$SH" '^INSTALLER_VERSION="0\.3\.36"'
+ck "[v0322] 판본 0.3.36(두 설치기 · 한 릴리스 = 한 판번)" $? "보고의 판본이 갈린다"
 # 확인 명령 한 번에도 상한 — 없으면 벤더 도구가 멈추는 순간 20분 상한까지 함께 멈춘다(이종 검토 1R 지적 채택).
 awk '/^function Get-LoginStatusText/{f=1}
      f&&/Start-Process -FilePath \$exe -ArgumentList .auth.,.status. .*-RedirectStandardOutput/{s=1}
@@ -2995,6 +3020,70 @@ else
     ck "[F9] 오류 기록 250건의 끝맺음 가르기가 20초 안에 끝나고 판정이 맞다(행동 시험)" $? "끝맺음이 분 단위로 멈춘 것처럼 보인다(tests/d5-f9-closing-error-scan-cost.sh)"
   fi
 fi
+# 기기 모델명·메모리·남은 디스크(0.3.36 · 2026-09-24 결정) — 진행 env 에 hw_model·mem_gb·disk_free_gb(정수 GB) · 기기 고유번호(시리얼·UUID·자산 태그)는 절대 안 실림(두 OS)
+if [ -f "$DIR/../tests/hw-model-env.sh" ]; then
+  bash "$DIR/../tests/hw-model-env.sh" --dir "$DIR" >/dev/null 2>&1
+  ck "[기기 모델명] 진행 env 에 hw_model(맥 hw.model · 윈 제조사+모델) · mem_gb·disk_free_gb(정수 GB · 못 읽으면 칸 없음) · 고유번호 0 · 열쇠 ⊆ 서버 목록(행동 시험 · 두 OS)" $? "모델명·메모리·디스크가 빠지거나 고유번호·정밀값이 실린다(tests/hw-model-env.sh)"
+fi
+# A2(0.3.36 결정 ①) — 설치기는 앱의 재시도 표식(.pending-restore)을 건드리지 않는다(자가치유 무손상 · 대조군 포함)
+if [ -f "$DIR/../tests/pending-restore-untouched.sh" ]; then
+  bash "$DIR/../tests/pending-restore-untouched.sh" --dir "$DIR" >/dev/null 2>&1
+  ck "[A2] 설치기 여섯 파일에 재시도 표식 자리 0곳(앱의 rc 24 재시도를 설치기가 죽이지 않는다)" $? "설치기가 표식을 만들거나 지운다(tests/pending-restore-untouched.sh)"
+fi
+# F12(0.3.36) — 연결 대기의 「N분 지남」·30분 상한은 시계로 잰 지난 시간 · 맥 [5/10] 받기에 멈춘 흐름 상한(두 OS)
+if [ -f "$DIR/../tests/d5-f12-wall-clock-wait.sh" ]; then
+  bash "$DIR/../tests/d5-f12-wall-clock-wait.sh" --dir "$DIR" >/dev/null 2>&1
+  ck "[F12] 연결 대기 — 900초 걸리는 시도도 30분 상한 안 2번 이하 · 화면 분 수 = 시계 · 맥 받기 전부에 --speed-limit/--speed-time(행동 시험 · 두 OS)" $? "화면은 몇 분인데 실제로는 몇 시간을 기다리거나 · 멈춘 받기가 15분 말 없이 붙든다(tests/d5-f12-wall-clock-wait.sh)"
+fi
+# F11 · F17(0.3.36) — 로그인 대기 중 Ctrl-C 뒤 감시자·표식 0 · 창을 닫아도 기록 끝 줄이 온전해 다음 실행이 끝맺음을 알아본다(가상 터미널)
+if [ -f "$DIR/../tests/d5-f11-f17-interrupt-close.sh" ]; then
+  bash "$DIR/../tests/d5-f11-f17-interrupt-close.sh" --dir "$DIR" >/dev/null 2>&1
+  ck "[F11·F17] Ctrl-C 뒤 고아 감시자 0 · 창 닫힘 뒤 기록 줄 전부 시각 · 다음 실행 = 끝맺음(J-AV-03 거짓 0)(행동 시험 · 맥)" $? "감시자가 남거나 거짓 J-AV-03(tests/d5-f11-f17-interrupt-close.sh)"
+fi
+# F11 보강(0.3.36 적대 검토 지적) — 감시자를 끝낼 때 내 자식인지 먼저 본다(먼저 끝난 감시자의 번호를 물려받은 남을 치지 않는다 · 맥)
+if [ -f "$DIR/../tests/d5-f11-kill-owner.sh" ]; then
+  bash "$DIR/../tests/d5-f11-kill-owner.sh" --dir "$DIR" >/dev/null 2>&1
+  ck "[F11 소유] 감시자 번호가 내 자식일 때만 끝낸다 · 대조군 = 내 자식은 끝냄(행동 시험 · 맥)" $? "남의 프로세스를 끝내거나 내 감시자를 못 끝낸다(tests/d5-f11-kill-owner.sh)"
+fi
+# F15(0.3.36) — 홈 이름에 마침표가 있어도(예: /Users/first.last) 폴더 신뢰를 미리 넘기고, 제거기가 우리가 넣은 칸만 뺀다(맥)
+if [ -f "$DIR/../tests/d5-f15-dotted-home-trust.sh" ]; then
+  bash "$DIR/../tests/d5-f15-dotted-home-trust.sh" --dir "$DIR" >/dev/null 2>&1
+  ck "[F15] 마침표 든 홈 — 작업 폴더·홈 신뢰를 넣고(있으면 그대로 · 명시한 false 그대로) 기록 · 제거기가 기록된 우리 키만 뺀다(행동 시험 · 맥)" $? "마침표 든 홈에서 모든 좌석이 폴더 신뢰를 묻거나 넣은 칸이 자국으로 남는다(tests/d5-f15-dotted-home-trust.sh)"
+fi
+# 첫 화면 진행 고지(박사님 확정 문구)가 두 OS 첫 전송보다 먼저 · 맥은 고지 전에 아무것도 안 보낸다(0.3.36 · master#ecd6c2b5)
+if [ -f "$DIR/../tests/notice-before-send.sh" ]; then
+  bash "$DIR/../tests/notice-before-send.sh" --dir "$DIR" >/dev/null 2>&1
+  ck "[고지 순서] 첫 화면 진행 고지 = 박사님 문구 · [1/10] → 고지 → 첫 전송(두 OS) · 맥 고지 전 전송 0 · 대조군 = 고지 뒤엔 보냄" $? "보내면서 알리지 않는 자리가 있다(tests/notice-before-send.sh)"
+fi
+if [ -f "$DIR/../tests/wake-env-run.sh" ]; then
+  bash "$DIR/../tests/wake-env-run.sh" --dir "$DIR" >/dev/null 2>&1
+  ck "[wake 환경값] 본부 자비스 wake.sh·wake.ps1 이 claude 에 EFFORT=high · 제안 글 끄기를 넣는다(키가 있으면 그대로) · 첫 프롬프트 글자 그대로(만든 파일을 실제로 돌림 · 두 OS)" $? "본부 자비스만 회색 제안 글·기본 생각 깊이로 뜬다(tests/wake-env-run.sh)"
+fi
+# 시험용 함수 묶음(JARVIS_LIB_ONLY=1)은 진행 전송을 라이브로 못 보낸다(0.3.36 · 시험 시간대 라이브 도착 2건 뒤 · 두 OS)
+if [ -f "$DIR/../tests/lib-only-no-live.sh" ]; then
+  bash "$DIR/../tests/lib-only-no-live.sh" --dir "$DIR" >/dev/null 2>&1
+  ck "[라이브 차단] LIB_ONLY 셸의 진행 전송·끝맺음 실패 이벤트가 라이브 주소로 가지 않는다 · 대조군 = 준 주소로는 간다(두 OS)" $? "시험이 라이브 텔레메트리를 오염시킬 수 있다(tests/lib-only-no-live.sh)"
+fi
+# 도움 보고 주소 손잡이(JARVIS_HELP_API_URL) · 없으면 종전 주소 · CI job env 에 두 로컬 주소(0.3.36 · master#bdb927f2 A안 · 두 OS)
+if [ -f "$DIR/../tests/help-url-lever.sh" ]; then
+  bash "$DIR/../tests/help-url-lever.sh" --dir "$DIR" >/dev/null 2>&1
+  ck "[라이브 차단] 도움 주소 손잡이 — 없으면 종전 주소(회귀 0) · 주면 그 값 · reinstall-matrix job env 에 PROGRESS·HELP 두 로컬 주소(두 OS)" $? "CI 부분 설치의 도움 보고가 라이브 도움 채널로 간다 · 또는 사람 설치 주소가 바뀌었다(tests/help-url-lever.sh)"
+fi
+# 0.3.36 — 제거기가 자비스 작업 폴더를 지우지 않고 보관 이동(두 OS · 최근 3개는 설치기 이름만 든 보관본만 · 실패 = 삭제 0 · 재설치 안 막음)
+if [ -f "$DIR/../tests/keep-backup-run.sh" ]; then
+  bash "$DIR/../tests/keep-backup-run.sh" --dir "$DIR" >/dev/null 2>&1
+  ck "[보관] 작업 폴더를 지우지 않고 보관 이동 · 내용 지문 같음 · 사용자 파일 보존 · 실패 = 삭제 0 · 재설치 안 막음(두 OS · 임시 홈)" $? "이전 자비스 자료가 지워지거나 재설치가 멈출 수 있다(tests/keep-backup-run.sh)"
+fi
+# B-Z28(0.3.36) — 제거기 신뢰 칸 정리가 설정을 못 읽으면 정리 실패로 센다(기록이 든 폴더를 지우지 않는다 · 거짓 「완료」 0 · 맥)
+if [ -f "$DIR/../tests/d5-bz28-trust-read-fail.sh" ]; then
+  bash "$DIR/../tests/d5-bz28-trust-read-fail.sh" --dir "$DIR" >/dev/null 2>&1
+  ck "[B-Z28] 신뢰 칸 설정을 못 읽으면 정리 실패(두 갈래 · 대조군 = 성한 설정은 지움·칸 없음은 할 일 없음)(행동 시험 · 맥)" $? "깨진 설정에서 기록 폴더가 지워지거나 성한 설정에서 거짓 실패(tests/d5-bz28-trust-read-fail.sh)"
+fi
+# X-5 · F13(0.3.36) — 재설치 끝: rc 25 뒤 늦게 서는 자리를 다시 보고(거짓 경고 0) · 사람 손 부탁은 「다음에 할 일」 한 줄에만(두 OS)
+if [ -f "$DIR/../tests/d5-x5-f13-reinstall-ending.sh" ]; then
+  bash "$DIR/../tests/d5-x5-f13-reinstall-ending.sh" --dir "$DIR" >/dev/null 2>&1
+  ck "[X-5·F13] 재설치 끝 — rc 25 뒤 다시 보기 · 재시작 실패면 「끝났습니다·할 일 없음」 0 · 부탁은 다음에 할 일 한 줄(행동 시험 · 두 OS)" $? "거짓 경고가 나거나 안내가 엇갈린다(tests/d5-x5-f13-reinstall-ending.sh)"
+fi
 if [ -f "$DIR/../tests/d5-f10-fail-events-and-407.sh" ]; then
   bash "$DIR/../tests/d5-f10-fail-events-and-407.sh" "$DIR" >/dev/null 2>&1
   ck "[F10] 코드 없는 실패도 실패 이벤트(J-UNK-00)를 남기고 · 맥 407 은 J-NET-01 로 곧바로 끝난다(행동 시험)" $? "운영이 실패를 못 세거나 맥이 프록시 막힘에 30분 기다린다(tests/d5-f10-fail-events-and-407.sh)"
@@ -3027,7 +3116,7 @@ codegrep "$PS" "'install-id'" && codegrep "$PS" '8,36' && codegrep "$PS" 'return
 ck "[텔레메트리] 설치 번호를 만들어 두고 재사용한다" $? "번호 자리·모양·재사용 검사 중 하나가 없다"
 # 첫 화면 고지 = 서버 정본 문안(계약 2절 정본 1곳) · [1/10] 에서 찍는다.
 codegrep "$PS" '^    Say \(.     . \+ \$ProgressNotice\)' \
-  && codegrep "$PS" '설치가 진행되는 동안 단계와 시각이 자동으로 전송됩니다\. 설치가 막히거나 이상이 보이거나 끝났을 때, 그리고 운영팀이 청할 때 설치 창·로그인 창·자비스 창·첫 자리 화면의 글자와 그림이 함께 보내집니다\(다른 창은 찍지 않습니다\)\. 글자에서는 로그인 코드·이메일·계정 이름을 가리지만, 그림은 가릴 수 없어 운영팀만 봅니다\. 보관 30일 뒤 자동 삭제됩니다\.'   # v0.3.18 새 정본(서버 df326ab)
+  && codegrep "$PS" '설치가 잘 되는지 보려고 진행 단계와 기기 정보\(모델, 메모리, 남은 공간\)를 자동으로 보냅니다\. 설치가 막히거나 이상이 보이거나 끝났을 때, 그리고 운영팀이 청할 때 설치 창·로그인 창·자비스 창·첫 자리 화면의 글자와 그림이 함께 보내집니다\(다른 창은 찍지 않습니다\)\. 글자에서는 로그인 코드·이메일·계정 이름을 가리지만, 그림은 가릴 수 없어 운영팀만 봅니다\. 보관 30일 뒤 자동 삭제됩니다\.'   # v0.3.18 새 정본(서버 df326ab)
 ck "[텔레메트리] 첫 화면 고지가 서버 정본 문안과 같다" $? "첫 화면에 고지를 안 찍거나 문안이 다르다(계약 2절)"
 # [1/10] 뒤 살핌(info) 이벤트에 환경 전체를 싣는다.
 codegrep "$PS" "Send-Progress '1/10' 'info' \\\$null \\\$null \(Get-InstallEnv\)"

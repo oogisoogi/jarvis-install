@@ -79,7 +79,7 @@ if (-not (Invoke-DownloadWithRetry ($Base + '/reset-clean.ps1') $ResetFile '지�
 }
 
 if ($List) {
-    powershell -ExecutionPolicy Bypass -File $ResetFile -List -KeepApp
+    powershell -ExecutionPolicy Bypass -File $ResetFile -List -KeepApp -KeepHistory
     Write-Host ''
     Write-Host '(보기만 했습니다. 아무것도 지우지 않았고, 설치도 하지 않았습니다.)'
     exit 0
@@ -90,8 +90,10 @@ if ($List) {
 #   -KeepApp : cys 프로그램은 지우지 않는다(설치 도우미가 [6/10] 에서 이미 깔린 프로그램을 그대로 쓴다).
 #              지우는 길에서 제거 프로그램 · 설정 앱 · Enter 를 사람에게 요구하던 자리가 통째로 없어진다.
 #   -Yes     : 「지웁니다」 입력 · Enter 확인 · 다시 해 보기 질문을 묻지 않는다. 이 한 줄을 붙여넣은 것이 곧 그 뜻이다.
+#   -KeepHistory : 자비스 창의 로그인과 이전 대화는 지우지 않는다(0.3.36 · 09-25 윈 실기 — 재설치 뒤 세 자리 모두 로그인을 다시 물었다).
+#              맥 reinstall.sh 의 --keep-history 와 같다(맥은 칩과 무관하게 늘 넘긴다 — 두 OS 같은 뜻).
 #   막히면 지우는 도구가 [남음] 과 종료 코드로 말하고, 아래에서 재설치로 넘어가지 않는다(종전과 같다).
-powershell -ExecutionPolicy Bypass -File $ResetFile -KeepApp -Yes
+powershell -ExecutionPolicy Bypass -File $ResetFile -KeepApp -KeepHistory -Yes
 $resetRc = $LASTEXITCODE
 
 if ($resetRc -eq 1) {

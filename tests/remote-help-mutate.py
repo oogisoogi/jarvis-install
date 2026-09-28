@@ -76,7 +76,7 @@ MUTANTS = [
      "    */ack|*/close) : ;;",
      "report", "client-token"),
     ("M14 창 닫힘 트랩 제거",
-     "  trap 'remote_help_on_signal' HUP INT TERM\n",
+     "  trap 'exec >/dev/null 2>&1; remote_help_on_signal' HUP   # 0.3.36(F17): 창이 닫혔으면 화면 쓰기를 먼저 버린다(closing_note 머리 주석)\n",
      "",
      "close", "window-close"),
     ("M15 시간 상한 제거",
