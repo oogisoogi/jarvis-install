@@ -139,6 +139,7 @@ CYS_DISPLAY_NAME="cysr"
 # 0.3.35: 핀 값 = 1.1.5 11차 절단 발행 자산 실측값(태그 커밋 526325bf · SUMS 418a1b6e · 11차 재핀에서 채움) · 바뀐 것 = 맥: 저희 자산 404 의 원작자 판 폴백 제거(J-DL-05 · F1) · 재설치가 「지웁니다」를 묻지 않음(F2) · [5/10]~[8/10] 막힘 뒤 각성 금지(F3) / 윈: 배포 한 줄이 받기 실패면 옛 파일을 안 돌림(F5) · [2/10] 빠른 종료 판정 수리(F6) · 32비트 창 재실행 경로 인용(F7) · 끝맺음 오류 가르기 캐시(F9) · [5/10]~[8/10] 막힘 뒤 각성 금지(F3 짝 · r2 결정 A) / 양쪽: 코드 없는 실패 끝에도 실패 이벤트(F10①) · 맥 407 즉시 끝(F10③) · TICKET=installer-0335 dbg-D5
 # 0.3.36: 핀 값 그대로(1.1.5 · 태그 커밋 526325bf) · SUMS 주석만 발행본 값으로 · 바뀐 것 = 재설치 끝 rc 25 뒤 60초 다시 보기(X-5) · 재설치 끝 안내를 「다음에 할 일」 한 줄로(F13)
 # 0.3.36(재절단 핀): 1.1.6 재절단 드래프트(2026-09-26 · 릴리스 id 396787705 · 대상 커밋 76d2b5e9 · build_id 76d2b5e9d2c2.20260925T1540Z) 자산 실측값으로 윈·맥 함께 교체
+# 0.3.37: 핀 값 그대로(cysr 1.1.6 재절단) · 바뀐 것 = 원격 해결만: 윈 파일·폴더 읽기는 연 핸들로만(연 핸들의 최종 경로가 작업 폴더 아래일 때만 · 이음줄을 따라가지 않고 엶) · 깨우기 성공 = 종료 코드 0 그리고 surface: · 오래돼 보이는 실행 기록 잠금을 추측으로 치우지 않음
 CYS_FORK_VERSION="1.1.6"
 CYS_FORK_DIR="https://github.com/oogisoogi/cys-ro/releases/download/v${CYS_FORK_VERSION}/"
 # 1.0.1 부터 zip 최상위 = cysr.app(안의 실행 파일 = Contents/MacOS/cys · cys-app · cysd · CFBundleName cysr · 로컬 빌드 실측 2026-09-16).
@@ -4816,7 +4817,7 @@ write_wake_file() { # write_wake_file <파일> <첫 프롬프트> — rc 0 = 썼
 }
 
 step_wake() {
-  local first_prompt cli ref fleet_rc
+  local first_prompt cli ref fleet_rc seat_rc=""
   # 🔴**cys 에 넘기는 인자**는 ASCII 로만 쓴다(자리 여는 명령 · 창 이름) — 윈도우에서 우리말 인자가 깨져 거절당했다.
   #   첫 지시는 cys 를 지나지 않는다: wake.sh 안에 적혀 claude 에게 바로 가고, 이 창 폴백에서도 claude 의 인자로 바로 간다.
   # 🔴2026-09-16 개정(TICKET=installer-0322-awaken · 윈도우판과 같은 문구로 맞춘다).
@@ -4872,10 +4873,15 @@ ${first_prompt}"
       log "wake path unusable: $wake_file"
       ref=""
     else
-      ref="$(cys_open_master_seat "$cmd_line" | tr -d '\n')"
+      # 성공 = 종료 코드 0 **그리고** 답에 surface: — 실패한 답의 글에 그 글자가 섞여도 성공으로 읽지 않는다(검토 지적 · D1).
+      #   ⚠파이프로 이으면 종료 코드가 사라진다 ⇒ 먼저 받아 두고 코드를 잰 뒤에 줄바꿈을 뗀다.
+      ref="$(cys_open_master_seat "$cmd_line")"
+      seat_rc=$?
+      [ "$seat_rc" -eq 0 ] || ref="rc=$seat_rc $ref"
+      ref="$(printf '%s' "$ref" | tr -d '\n')"
     fi
-    case "$ref" in
-      *surface:*)
+    case "${seat_rc:-1}:$ref" in
+      0:*surface:*)
         [ "$CYS_APP_OPENED" = "1" ] && say "     cys 앱 창을 열었습니다 — 자비스는 그 창의 master 자리에서 깨어납니다."
         say "     cys 안에서 자비스를 열었습니다 ($ref). cys 창에서 이어서 이야기하십시오."
         # 깨우기가 **성공한 뒤에만** 세운다(검토 지적 · D1 기각) — 깨우기가 실패한 끝은 원격 해결이 돈다.
@@ -5047,7 +5053,7 @@ raise_cys_app_window() {
 # ★언제 도는가 = 자비스를 깨우기 **전에** 진단 코드를 남기고 멈춘 끝. 자비스를 깨운 뒤에는 돌지 않는다
 #   (자비스가 이 창을 넘겨받으므로 두 쪽이 한 화면에 섞이지 않게).
 # ⚠JSON·재검사·스크럽은 macOS 기본 `osascript`(JavaScript)가 한다 — 깨끗한 맥에는 jq·python 이 없다.
-INSTALLER_VERSION="0.3.36"      # 보고의 installer_version · BOOTSTRAP_VERSION 은 화면 머리글 용도 그대로(보내지 않는다)
+INSTALLER_VERSION="0.3.37"      # 보고의 installer_version · BOOTSTRAP_VERSION 은 화면 머리글 용도 그대로(보내지 않는다)
 # 0.3.36: JARVIS_HELP_API_URL = CI·흉내가 도움 보고를 로컬로 돌리는 손잡이(JARVIS_PROGRESS_URL 과 같은 모양 · 사람이 쓰는 길이 아니다 ·
 #   없으면 종전 주소 그대로 — tests/help-url-lever.sh 가 잰다). CI(reinstall-matrix.yml)의 full 부분 설치가 라이브 도움 채널로 가던 길을 막는다.
 HELP_API_URL="${JARVIS_HELP_API_URL:-https://jarvis-install.godmeyou.kr}"
@@ -5913,14 +5919,15 @@ remote_help_cys_path() {   # 표 9-2절 「실행 대상」 — 절대 경로 �
 
 # ⑤ 실행 번호 기록 — 두 창(또는 두 번 뜬 설치기)이 같은 번호를 동시에 남기지 못하게 잠근다(검토 지적: 잠금 없이 둘이 함께 부르면 둘 다 OK).
 #   잠금 = `mkdir`(원자) · 못 잡으면 0.1초씩 최대 2초 · 그래도 못 잡으면 LOCKED(실행하지 않는다).
-#   끝나지 못한 잠금(프로세스가 강제로 죽은 자리)은 30초가 지나면 치운다 — 한 번의 기록은 1초 안에 끝난다(치우지 않으면 그 뒤 모든 명령이 거절된다).
+#   ⛔남은 잠금을 **추측으로 치우지 않는다**(검토 지적 — 「오래돼 보인다」는 주인이 죽었다는 증명이 아니다. 살아 있는 주인의 잠금을 치우면
+#     두 창이 같은 번호를 함께 OK 로 받는다). 강제 종료로 잠금이 남으면 그 뒤 명령은 seq_lock 으로 거절된다(닫힌 쪽 · 한계로 적는다).
+#     신호로 멈추는 길(HUP·INT·TERM)은 쥔 잠금을 풀고 나간다 — 남는 것은 SIGKILL·전원 단절이 기록 1초 안에 끼었을 때뿐이다.
 #   ⚠전원 단절 내구성(정직): 기록은 임시 파일에 쓴 뒤 이름을 바꾼다(반쯤 쓴 파일은 없다). `sync` 는 디스크 전체를 비우는 명령이라 쓰지 않는다 —
 #     쓴 직후 전원이 끊기면 기록이 사라져 재부팅 뒤 같은 번호가 한 번 더 돌 수 있다(표 v1 은 읽기뿐이다).
 remote_help_record() {   # <seq> → RH_RECORD = OK · ALREADY · LOCKED · FAIL
   local lock="$REMOTE_HELP_SEQ_FILE.lock" tries=0
   RH_RECORD=FAIL
   until mkdir "$lock" 2>/dev/null; do
-    [ -n "$(find "$lock" -maxdepth 0 -mtime +30s 2>/dev/null)" ] && rmdir "$lock" 2>/dev/null
     tries=$((tries + 1))
     [ "$tries" -le 20 ] || { RH_RECORD=LOCKED; return 0; }
     sleep 0.1
