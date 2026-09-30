@@ -93,6 +93,7 @@ function Move-OldRound { }
 function Set-FleetBaseline { }
 function Test-CysAgentFlag { return \$true }
 function Start-CysAppWindow { return 'raised' }
+function Get-CysAppExe { return 'C:\\emu\\cys-app.exe' }   # 0.3.38(ⓓ): [9/10] 진입 판정 = 창 실행 파일 실재 — 이 흉내의 기기에는 있다고 준다
 function Get-MasterSeatRef { return '' }
 function Invoke-StepFleet { return 0 }
 function Send-Progress(\$step, \$ev) { Add-Content -LiteralPath (Join-Path \$env:FAKE_CYS_STATE 'progress') -Value (\$step + ' ' + \$ev) -Encoding UTF8 }

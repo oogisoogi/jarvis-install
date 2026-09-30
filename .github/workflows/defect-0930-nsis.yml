@@ -1,0 +1,71 @@
+# 윈 설치기 결함 묶음 — 실제 cys 설치 파일(NSIS)로 재는 칸 (0.3.38)
+#
+# 왜 따로 두는가
+#   삭제-재설치 검증(reinstall-matrix.yml)의 윈 칸은 앞 단계에서 먼저 실패하면 뒤 칸이 안 돈다. 이 칸이 그 실패에 가려지지 않게
+#   별도 워크플로로 둔다. 흉내 시험(tests/defect-0930-run.sh)이 못 재는 것 — 실제 설치 파일이 우리가 준 자리(/D)에 까는가 — 만 잰다.
+#
+# ⚠러너가 못 보는 것(초록이 이것까지 보증하지 않는다)
+#   · 표준 사용자 권한 — 러너는 관리자라 「C:\Users 아래 폴더를 못 만듦」은 재현하지 못한다(그래서 기억 값을 없는 드라이브로 둔다).
+#   · 백신(V3) 개입 · 화면(GUI) — 러너에는 백신도 사람도 없다.
+name: 윈 설치 자리 검증 (결함 묶음)
+
+on:
+  workflow_dispatch:
+  push:
+    paths:
+      - 'install-master/bootstrap.ps1'
+      - 'tests/defect-0930-ci-win.ps1'
+      - '.github/workflows/defect-0930-nsis.yml'
+
+jobs:
+  nsis:
+    name: windows — ${{ matrix.case }}
+    runs-on: windows-latest
+    # 진행 전송·도움 보고가 라이브 기록으로 가지 않게 닿지 않는 로컬 주소로 돌린다(전송 코드 경로는 그대로 돈다).
+    env:
+      JARVIS_PROGRESS_URL: http://127.0.0.1:9/ci
+      JARVIS_HELP_API_URL: http://127.0.0.1:9/ci
+    strategy:
+      fail-fast: false
+      matrix:
+        # laptop-0930 = 설치 자리 기억 값이 없는 드라이브 · 설치 목록 없음 · cys-old 있음 / stale-uninstall = 설치 목록만 남아 없는 폴더를 가리킴
+        # raw-no-d = 대조군(같은 상태에서 /S 만 · 판정에 안 씀 · 기록만)
+        case: [laptop-0930, stale-uninstall, raw-no-d]
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: 실제 설치 파일로 [5/10]~[7/10] (Windows PowerShell 5.1)
+        shell: pwsh
+        timeout-minutes: 15
+        run: |
+          # 파이프로 받지 않는다 — 설치 파일이 띄운 자식이 출력을 물고 남으면 잡이 멈춘다. 출력은 파일로, 기다림은 프로세스에만.
+          $o = Join-Path $env:TEMP 'd0930.out'
+          $f = (Resolve-Path tests\defect-0930-ci-win.ps1).Path
+          $p = Start-Process -FilePath cmd -ArgumentList '/c', "powershell -ExecutionPolicy Bypass -File `"$f`" -Case ${{ matrix.case }} > `"$o`" 2>&1" -NoNewWindow -PassThru
+          if (-not $p.WaitForExit(840000)) { Write-Host '::error::14분 안에 안 끝났다'; Stop-Process -Id $p.Id -Force; exit 1 }
+          Get-Content $o -ErrorAction SilentlyContinue | Write-Host
+          exit $p.ExitCode
+
+      - name: 설치 기록 (판독용)
+        if: always()
+        shell: pwsh
+        run: |
+          $log = Join-Path $env:USERPROFILE 'install-jarvis\bootstrap.log'
+          if (Test-Path $log) { Get-Content $log | Select-Object -Last 80 | Write-Host } else { Write-Host '(설치 기록 없음)' }
+
+      - name: 공식 클로드 설치가 파일을 두는 자리 (기록만 · 판정에 안 씀)
+        if: matrix.case == 'raw-no-d'
+        shell: pwsh
+        timeout-minutes: 10
+        continue-on-error: true
+        run: |
+          # 백신 예외 안내에 넣을 폴더를 실측으로 정하려고 적는다 — ~\.local\share\claude 에 판 파일이 생기는가.
+          $o = Join-Path $env:TEMP 'claude-install.out'
+          $p = Start-Process -FilePath cmd -ArgumentList '/c', "powershell -ExecutionPolicy Bypass -Command `"irm https://claude.ai/install.ps1 | iex`" > `"$o`" 2>&1" -NoNewWindow -PassThru
+          if (-not $p.WaitForExit(480000)) { Write-Host '8분 안에 안 끝났다'; Stop-Process -Id $p.Id -Force }
+          Get-Content $o -ErrorAction SilentlyContinue | Select-Object -Last 20 | Write-Host
+          foreach ($d in @('.claude\downloads', '.local\bin', '.local\share\claude')) {
+            $full = Join-Path $env:USERPROFILE $d
+            Write-Host ("== ~\" + $d + " 있음=" + (Test-Path $full))
+            if (Test-Path $full) { Get-ChildItem -LiteralPath $full -Recurse -Force -ErrorAction SilentlyContinue | Select-Object -First 30 | ForEach-Object { Write-Host ('   ' + $_.FullName.Replace($env:USERPROFILE, '~') + ' ' + $(if ($_.PSIsContainer) { '<폴더>' } else { $_.Length })) } }
+          }

@@ -72,7 +72,7 @@ for s in ver-same ver-same-pin ver-same-exe ver-same-refresh-fail ver-old ver-ol
   r="$(sed -n 's/.*TEST //p' "$L" | grep '^r5=' | tail -1)"
   niwr="$(grep -c '^IWR ' "$SB/iwr.log" 2>/dev/null)"; niwr="${niwr:-0}"
   nrun="$(grep -c '^RUN ' "$SB/installer.log" 2>/dev/null)"; nrun="${nrun:-0}"
-  nsw="$(grep -c '^RUN .* \[/S\]$' "$SB/installer.log" 2>/dev/null)"; nsw="${nsw:-0}"
+  nsw="$(grep -c '^RUN .* \[/S /D=[^],]*\]$' "$SB/installer.log" 2>/dev/null)"   # 0.3.38: 조용한 설치 = 한 문자열 「/S /D=<자리>」; nsw="${nsw:-0}"
   nub="$(grep -c '^UNBLOCK ' "$SB/motw.log" 2>/dev/null)"; nub="${nub:-0}"
   stamp_pin="$(grep -c "\"setup_sha256\": *\"$(printf 'emu cys installer v0318' | shasum -a 256 | cut -d' ' -f1)\"" "$SB/cysdir/jarvis-cys-pin.json" 2>/dev/null)"; stamp_pin="${stamp_pin:-0}"
   why="$r · 받기 ${niwr} · 설치기 ${nrun}(/S ${nsw}) · 표식 지우기 ${nub} · 표지 핀 ${stamp_pin}"
@@ -87,14 +87,14 @@ for s in ver-same ver-same-pin ver-same-exe ver-same-refresh-fail ver-old ver-ol
       [ "$r" = "r5=0 r6=0" ] && [ "$niwr" = "1" ] && [ "$nsw" = "1" ] && has "$L" 'cys same version content exe-changed' && has "$L" '\[6/10\] 설치를 마쳤습니다' && has "$L" 'cys pin stamp: written'
       t $? "[이중 대조 · 깔린 파일 다름] 판번·핀이 같아도 깔린 cys.exe 실측 지문이 표지와 다르면 덮어 깐다" "$why" ;;
     ver-same-refresh-fail)
-      [ "$r" = "r5=0 r6=0" ] && [ "$nsw" = "1" ] && has "$L" 'cys refresh same version [0-9.]+ \(no-stamp\)' && ! has "$L" '설치를 마쳤습니다' && ! has "$L" 'cys pin stamp: written' && has "$L" 'cys upgrade failed - continue with'
-      t $? "[이중 대조 · 덮어 깔기 실패] 설치기가 성공(0)을 답하지 않으면 마쳤다고 하지 않고 표지도 쓰지 않는다(판번은 처음부터 같다)" "$why" ;;
+      [ "$r" = "r5=0 r6=6" ] && [ "$nsw" = "1" ] && has "$L" 'cys refresh same version [0-9.]+ \(no-stamp\)' && ! has "$L" '설치를 마쳤습니다' && ! has "$L" 'cys pin stamp: written' && has "$L" 'cys install not confirmed'
+      t $? "[이중 대조 · 덮어 깔기 실패] 설치기가 성공(0)을 답하지 않으면 마쳤다고 하지 않고 표지도 쓰지 않는다 · 실패로 끝낸다(0.3.38 rc 6)" "$why" ;;
     ver-old)
       [ "$r" = "r5=0 r6=0" ] && [ "$niwr" = "1" ] && [ "$nrun" = "1" ] && [ "$nsw" = "1" ] && has "$L" 'cys upgrade 0\.14\.30 -> ' && has "$L" '\[6/10\] 설치를 마쳤습니다' && has "$L" 'cys pin stamp: written'
       t $? "[① 옛 판] 판본이 다르면 받아서 조용한 설치(/S)로 덮어 깔고 표지를 남긴다" "$why" ;;
     ver-old-fail)
-      [ "$r" = "r5=0 r6=0" ] && [ "$nrun" = "1" ] && [ "$nsw" = "1" ] && ! has "$L" '설치를 마쳤습니다' && has "$L" 'cys upgrade failed - continue with 0\.14\.30'
-      t $? "[① 덮어 깔기 실패] 판본이 안 바뀌면 마쳤다고 하지 않고 · 설치 창을 띄우지 않고 · 쓰던 판으로 이어 간다" "$why" ;;
+      [ "$r" = "r5=0 r6=6" ] && [ "$nrun" = "1" ] && [ "$nsw" = "1" ] && ! has "$L" '설치를 마쳤습니다' && has "$L" 'cys install not confirmed.*from=0\.14\.30' && ! has "$L" 'continue with'
+      t $? "[① 덮어 깔기 실패] 판본이 안 바뀌면 마쳤다고 하지 않고 · 설치 창을 띄우지 않고 · 옛 판으로 이어 가지 않는다(0.3.38 rc 6 · master#2dbab34d ①)" "$why" ;;
     ver-fresh)
       [ "$r" = "r5=0 r6=0" ] && [ "$niwr" = "1" ] && [ "$nsw" = "1" ] && has "$L" '\[6/10\] 설치를 마쳤습니다'
       t $? "[① 새 기계] cys 가 없으면 종전대로 받아 설치한다" "$why"

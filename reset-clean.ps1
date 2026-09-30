@@ -1,14 +1,16 @@
 ﻿# 깨끗이 지우기 (윈도우) — 설치 도우미가 놓은 것을 도로 걷어 낸다
 #
 # 무엇을 하는가
-#   이 컴퓨터의 상태를 먼저 살펴 목록으로 보여 주고, 확인을 받은 뒤 지운다.
-#   지우는 것은 footprint.md 에 적힌 것뿐이다. 사진·문서 같은 개인 파일은 손대지 않는다.
+#   이 컴퓨터의 상태를 먼저 살펴 목록으로 보여 주고, 묻지 않고 치운다(0.3.37 · 사람 손 0).
+#   지우는 것은 footprint.md 에 적힌 것 가운데 **다시 받을 수 있는 프로그램 파일·등록뿐**이다.
+#   사람이 쌓은 자료(자비스 작업 폴더 · ~\.cys · 프로그램 폴더 안 실행 기록 · 부서 기록)는
+#   「install-jarvis-backup-<날짜-시각>」 보관 폴더로 옮긴다. 사진·문서 같은 개인 파일은 손대지 않는다.
 #
 # 쓰는 법
-#   powershell -ExecutionPolicy Bypass -File reset-clean.ps1
+#   powershell -ExecutionPolicy Bypass -File reset-clean.ps1              목록을 보여 주고 묻지 않고 치운다(자료는 보관 폴더로)
 #   powershell -ExecutionPolicy Bypass -File reset-clean.ps1 -List        살펴보기만 한다
 #   powershell -ExecutionPolicy Bypass -File reset-clean.ps1 -WhatIf      위와 같다(옛 이름)
-#   powershell -ExecutionPolicy Bypass -File reset-clean.ps1 -Yes         묻지 않는다(재설치가 안에서 쓴다)
+#   powershell -ExecutionPolicy Bypass -File reset-clean.ps1 -Yes         알림 뒤 5초를 기다리지 않는다(재설치가 안에서 쓴다 · 0.3.37 부터 묻는 단계는 없다)
 #   powershell -ExecutionPolicy Bypass -File reset-clean.ps1 -PurgeLogin  로그인까지 지운다
 #
 # 받아서 바로 돌리는 한 줄 (명령 프롬프트 창에서도 같다)
@@ -16,7 +18,7 @@
 #   내려받는 자리를 임시 폴더가 아니라 사용자 폴더로 둔 까닭은 설치 도우미와 같다:
 #   임시 폴더는 언제든 비워지고, 회사 컴퓨터는 그 자리에서의 실행 자체를 막아 두는 설정이 흔하다.
 #
-# 되돌릴 수 없다. 지우기 전에 목록을 보여 주고 한 번 묻는다.
+# 지운 프로그램은 다시 설치하면 돌아온다. 자료는 보관 폴더에 남는다 — 그래서 확인 질문을 두지 않는다(0.3.37).
 #
 # ★로그인은 기본으로 남긴다 (2026-09-08 개정 · 앞 판은 지웠다).
 #   앞 판은 %USERPROFILE%\.claude 폴더와 .claude.json 을 통째로 지웠다. 그 한 줄이 로그인과
@@ -27,11 +29,12 @@
 #   ⚠실험(깨끗한 기계 재설치 채점)에서 로그인까지 지우려면 -PurgeLogin 을 붙여야 한다.
 #     이 도구를 쓰는 사람이 둘이기 때문이다 — 재설치하는 사용자와, 손 개수를 재는 실험.
 #
-# cys 프로그램 자체는 이 스크립트가 지우지 않는다 — 윈도우 설정 앱에서 지우시게 안내한다.
+# cys 프로그램은 제거 프로그램(uninstall.exe)을 띄우지 않고 이 스크립트가 **프로그램 파일만** 직접 지운다(0.3.37).
 #   왜: 제거 프로그램을 이 스크립트가 직접 띄우면 백신이 그 행위를 막고 PowerShell 을 통째로
 #   종료시키는 일이 실제로 있었다(2026-09-05 · V3 · 진단명 Execution/MDP.Powershell.M1201).
 #   그때 스크립트는 아무 말도 남기지 못하고 사라지며 아무것도 지워지지 않는다.
-#   설정 앱은 사람이 원래 쓰는 길이고, 같은 일을 막히지 않고 한다. (-UseUninstaller 로 옛 방식 선택)
+#   앞 판은 설정 앱 제거를 사람에게 시켰다 — 0.3.37 부터는 공식 제거기가 하던 뒷정리(설치 목록 항목 · 바로가기 ·
+#   설치 위치 기록 · 자동 실행 값)를 **우리 설치 자리를 가리킬 때만** 우리가 한다(Remove-CysProgramFiles · Remove-OurShortcuts · Invoke-OurRegistryCleanup). (-UseUninstaller 로 옛 방식 선택)
 # 창이 갑자기 닫히면 백신이 PowerShell 을 종료한 것일 수 있다. 그때는 Show-RerunHow 가 인쇄한
 #   명령 전체를 다시 붙여넣으면 이어서 진행된다(사람에게 「같은 줄」이라고 말하지 않는다 - 아래 참조).
 
@@ -39,10 +42,11 @@ param([switch]$WhatIf, [switch]$List, [switch]$Yes, [switch]$PurgeLogin, [switch
 # -KeepApp : cys 프로그램은 지우지 않는다(재설치 길 · reinstall.ps1 이 -Yes 와 함께 넘긴다).
 # -KeepHistory : 자비스 창의 로그인과 이전 대화는 지우지 않는다(재설치 길 · reinstall.ps1 이 늘 넘긴다 · 0.3.36 ·
 #   Get-HistoryKeeps 머리 주석). -KeepApp 과 따로 선다 — 혼자 돌리는 지우기에는 붙지 않는다(종전대로 지운다).
-#   그 길에서는 제거 프로그램 실행 · 설정 앱 안내 · Enter 고리 · 폴더 삭제 확인을 통째로 건너뛴다 — 사람 손 0.
+#   그 길에서는 프로그램 걷기(프로그램 파일 지우기 · 설치 목록 항목 · 바로가기)를 통째로 건너뛴다 — 사람 손 0.
 #   프로그램과 한 쌍인 시작 메뉴 바로가기 · 설치 목록 항목도 함께 남긴다(프로그램만 남고 그 둘이 사라지면 고아가 된다).
 #   프로세스 끄기 · 상시 가동 등록 떼기 · 설정 · 로그인 처리는 종전대로 한다.
-#   ⚠프로그램 폴더 안의 **지난 편성 기록**(동료 좌석을 되살리는 기록)은 지운다 — Get-CysStateItems 머리 주석.
+#   ⚠프로그램 폴더 안의 **지난 편성 기록**(동료 좌석을 되살리는 기록)은 보관 폴더로 옮긴다(0.3.37 · 앞 판은 지웠다) — Get-CysStateItems 머리 주석.
+#   0.3.37: -KeepHistory 길은 ~\.cys 를 통째로 보관 폴더로 옮긴 뒤 남길 것(로그인·대화 · 부서 기록)만 제자리로 되옮긴다(Invoke-CysHomeReinstall).
 
 $ErrorActionPreference = 'Continue'
 try { [Console]::OutputEncoding = [System.Text.Encoding]::UTF8 } catch { }
@@ -52,11 +56,24 @@ $CysDir     = Join-Path $env:LOCALAPPDATA 'cys'
 $CysDirOld  = Join-Path $env:LOCALAPPDATA 'Programs\cys'
 $UninstExe  = Join-Path $CysDir 'uninstall.exe'
 $RegKey     = 'HKCU:\Software\Microsoft\Windows\CurrentVersion\Uninstall\cys'
+# 0.3.37: 1.1.x 의 설치 목록 항목 이름은 cysr 다(설치 템플릿 UNINSTKEY = Uninstall\<제품 이름> · installer.nsi:66 · tauri.conf.json:3 productName).
+#   옛 이름 cys 항목은 새 판 설치가 지운다(nsis-hooks.nsh:862~868) — 둘 다 보되 **우리 설치 자리를 가리킬 때만** 지운다.
+$RegKeyR    = 'HKCU:\Software\Microsoft\Windows\CurrentVersion\Uninstall\cysr'
+# 설치 위치 기록 = Software\<제조사>\<제품 이름> 의 기본값(installer.nsi:67~68·708). 제조사 = tauri.conf.json 에 publisher 가 없어
+#   기본값 「식별자의 둘째 칸」(tauri-utils config.rs publisher 설명 · 식별자 com.cysjavis.terminal) = cysjavis.
+$ManuKey    = 'HKCU:\Software\cysjavis'
+$RunKey     = 'HKCU:\Software\Microsoft\Windows\CurrentVersion\Run'
+# 앱 화면(웹뷰) 자료 — 설치 템플릿의 「앱 데이터 삭제」 칸이 지우는 자리(installer.nsi:910~911 · 식별자 = tauri.conf.json:5).
+#   완전 삭제에서 보관 폴더로 옮긴다(지우지 않는다). 재설치 길은 무접촉.
+$WebviewRoaming = Join-Path $env:APPDATA 'com.cysjavis.terminal'
+$WebviewLocal   = Join-Path $env:LOCALAPPDATA 'com.cysjavis.terminal'
+# 닫은 부서 휴지통(cys 가 부서를 닫을 때 옮겨 두는 자리) — 완전 삭제 = 보관 · 재설치 = 제자리.
+$CysTrash   = Join-Path $env:USERPROFILE '.local\state\cys-trash'
 # 🔴재설치 길(-KeepApp)에서 프로그램과 함께 남으면 안 되는 것 = cys 의 **지난 편성 기록**이다(2026-09-15 윈 2차 재설치).
 #   윈도우 기본 cys 의 상태 자리가 곧 프로그램 폴더다(cys 코드: 상태 자리 = %LOCALAPPDATA%\cys).
 #   cys 는 켜지자마자 그 자리의 편성 기록으로 지난 동료 좌석을 되살린다. 프로그램만 남기려다 이것까지 남기면,
 #   로그인·첫 실행 설정이 지워진 빈 자리로 동료 셋이 설치 도우미보다 먼저 떠서 첫 실행 질문 앞에 선다.
-#   ⇒ 프로그램 파일은 남기고 **아래 이름만** 지운다(이름은 cys 코드에서 읽었다 — 모르는 것은 지우지 않는다).
+#   ⇒ 프로그램 파일은 남기고 **아래 이름만** 보관 폴더로 옮긴다(0.3.37 · 앞 판은 지웠다 · 이름은 cys 코드에서 읽었다 — 모르는 것은 건드리지 않는다).
 function Get-CysStateItems {
     $out = New-Object System.Collections.ArrayList
     foreach ($n in @('topology.json', 'phoenix', 'boot-intents', 'dept_tombstones.json')) {
@@ -174,12 +191,30 @@ function Get-StartMenuLinks {
     #   2026-09-09 · 남의 것을 지울 위험은 「있으면 함께 지운다」의 편의보다 무겁다).
     # ⚠전체 사용자 공용 시작 메뉴(C:\ProgramData\...)는 **후보에 넣지 않는다** — 그 자리는 관리자
     #   영역이고, 이 스크립트는 관리자 권한을 쓰지 않는다(HKLM 을 안 건드리는 것과 같은 규율).
+    # 0.3.37: 1.1.x 의 제품 이름은 cysr 다(설치 템플릿 installer.nsi:66·853~877 = $SMPROGRAMS\<제품 이름>.lnk · 폴더 안 <제품 이름>.lnk).
+    #   앞 판은 cys.lnk 만 보아 1.1.x 기계에서 cysr.lnk 가 고아로 남았다. 지우는 쪽은 **대상이 우리 설치 자리일 때만** 지운다(Remove-OurShortcuts).
     $out = New-Object System.Collections.ArrayList
     $r = Join-Path $env:APPDATA 'Microsoft\Windows\Start Menu\Programs'
     if ($r) {
-        foreach ($c in @((Join-Path $r 'cys.lnk'), (Join-Path $r 'cys\cys.lnk'))) {
+        foreach ($c in @((Join-Path $r 'cys.lnk'), (Join-Path $r 'cys\cys.lnk'), (Join-Path $r 'cysr.lnk'), (Join-Path $r 'cysr\cysr.lnk'))) {
             if (Test-Path $c -PathType Leaf) { [void]$out.Add($c) }
         }
+    }
+    return $out.ToArray()
+}
+# 바탕화면 바로가기(설치 템플릿이 $DESKTOP\<제품 이름>.lnk 를 만든다 · installer.nsi:870~876 · 옛 이름 cys 포함 nsis-hooks.nsh:885~893).
+#   바탕화면 자리 = 이 계정의 셸 폴더 기록(User Shell Folders\Desktop · 원드라이브로 옮긴 바탕화면도 여기 적힌다) → 없으면 %USERPROFILE%\Desktop.
+#   ⚠[Environment]::GetFolderPath 를 쓰지 않는다 — 윈도우 밖(시험 흉내)에서는 그 값이 흉내 밖의 진짜 바탕화면을 가리킨다.
+function Get-DesktopLinks {
+    $out = New-Object System.Collections.ArrayList
+    $d = ''
+    try {
+        $o = Get-ItemProperty -LiteralPath 'HKCU:\Software\Microsoft\Windows\CurrentVersion\Explorer\User Shell Folders' -Name 'Desktop' -ErrorAction Stop
+        $d = [Environment]::ExpandEnvironmentVariables([string]$o.Desktop)
+    } catch { $d = '' }
+    if (-not $d) { $d = Join-Path $env:USERPROFILE 'Desktop' }
+    foreach ($c in @((Join-Path $d 'cys.lnk'), (Join-Path $d 'cysr.lnk'))) {
+        if (Test-Path -LiteralPath $c -PathType Leaf) { [void]$out.Add($c) }
     }
     return $out.ToArray()
 }
@@ -510,7 +545,24 @@ function Write-TreeFailWhy {
     Write-Host '         지우지 못한 자리:'
     foreach ($w in $script:TreeFailWhy) { Write-Host ('           ' + $w) }
 }
-function Remove-ExceptPreserved($rootLiteral, $rootCanon, $keeps) {
+# 0.3.37(DESIGN-0337 6-1절 ⑤): 남길 목록을 **둘로 가른다** —
+#   ⑴참가 자리($keeps) = 가리키는 곳(실경로)과 바로가기 **자리** 둘 다로 비교(0.3.36 그대로 · 모든 길 · 더 남기는 쪽)
+#   ⑵재설치 남길 것($hkeeps · 로그인·대화 · 부서 기록) = 바로가기는 **자리로만**(가리키는 곳으로 보지 않는다) — 앞 판은 가리키는 곳으로도 봐서
+#     `pack` 이 `projects` 안을 가리키는 바로가기면 pack 이름표가 남았다(반례 ⑤ · 옛 팩 → 병합 대기).
+function Test-KeepHitSplit($it, $rootLiteral, $rootCanon, $keeps, $hkeeps) {
+    $c = Get-ItemCanon $it $rootLiteral $rootCanon
+    if (Test-IsReparse $it) {
+        $loc = Get-ItemLoc $it $rootLiteral $rootCanon
+        if (Test-KeepHit $c $keeps) { return $true }
+        if ($loc -and (Test-KeepHit $loc $keeps)) { return $true }
+        if ($loc -and (@($hkeeps).Count -gt 0) -and (Test-KeepHit $loc $hkeeps)) { return $true }
+        return $false
+    }
+    if (Test-KeepHit $c $keeps) { return $true }
+    if ((@($hkeeps).Count -gt 0) -and (Test-KeepHit $c $hkeeps)) { return $true }
+    return $false
+}
+function Remove-ExceptPreserved($rootLiteral, $rootCanon, $keeps, $hkeeps = @()) {
     $script:TreeFailWhy = @()
     $enumFail = 0
     $items = @(Get-TreeItems $rootLiteral)
@@ -519,7 +571,7 @@ function Remove-ExceptPreserved($rootLiteral, $rootCanon, $keeps) {
         Write-Host ('         (이 자리의 목록을 끝까지 읽지 못했습니다 - 못 연 자리 ' + $script:EnumFail + '곳.)')
     }
     foreach ($it in $items) {
-        if ((Test-KeepHit (Get-ItemCanon $it $rootLiteral $rootCanon) $keeps) -or (Test-KeepHit (Get-ItemLoc $it $rootLiteral $rootCanon) $keeps)) { continue }
+        if (Test-KeepHitSplit $it $rootLiteral $rootCanon $keeps $hkeeps) { continue }
         try { Remove-OneItem $it } catch { }
     }
     # 검산 - 남은 것을 **다시 열거해서** 센다. 지우기 실패든 열거 실패든 결과 한 칸으로 모인다.
@@ -528,7 +580,7 @@ function Remove-ExceptPreserved($rootLiteral, $rootCanon, $keeps) {
     $rest = @(Get-TreeItems $rootLiteral)
     if ($script:EnumFail -gt 0) { $enumFail = 1 }
     foreach ($it in $rest) {
-        if ((Test-KeepHit (Get-ItemCanon $it $rootLiteral $rootCanon) $keeps) -or (Test-KeepHit (Get-ItemLoc $it $rootLiteral $rootCanon) $keeps)) { continue }
+        if (Test-KeepHitSplit $it $rootLiteral $rootCanon $keeps $hkeeps) { continue }
         $left++
         Add-TreeFailWhy $it.FullName '아직 남아 있습니다(다른 프로그램이 붙들고 있을 수 있습니다)'
     }
@@ -667,11 +719,12 @@ function Drop($label, $path, $histKeeps = @()) {
             foreach ($k in $keeps) { Write-Host ("           남기는 자리: " + (Short $k)) }
         }
         if ($hist.Count -gt 0) {
-            Write-Host ("  남김: " + (Short $path) + " 안의 자비스 창 로그인·이전 대화 (다시 까는 길이라 그것만 남기고 지웁니다)")
+            Write-Host ("  남김: " + (Short $path) + " 안의 자비스 창 로그인·이전 대화·부서 기록 (다시 까는 길이라 그것만 남기고 지웁니다)")
             foreach ($k in $histShow) { Write-Host ("           남기는 자리: " + (Short $k)) }
         }
         $what = if ($hist.Count -eq 0) { '참가 자리' } elseif ($keeps.Count -eq 0) { '로그인·이전 대화' } else { '참가 자리와 로그인·이전 대화' }
-        $fails = Remove-ExceptPreserved $path $t (@($keeps) + @($hist))    # ★원문 경로로 열거하고, 실경로는 비교에만
+        # ★원문 경로로 열거하고, 실경로는 비교에만 · 참가 자리와 재설치 남길 것은 갈라 넘긴다(0.3.37 · Test-KeepHitSplit)
+        $fails = Remove-ExceptPreserved $path $t @($keeps) @($hist)
         if ($fails -gt 0) {
             $script:KeptFail++
             Write-Host ("  [일부 남음] " + (Short $path) + " - {0}가지를 지우지 못했습니다({1}는 그대로입니다)." -f $fails, $what)
@@ -828,21 +881,51 @@ function Invoke-Diagnose {
     if ($KeepApp) {
         # 재설치 길 — 지울 목록에 넣지 않는다(개수에도 안 센다). 무엇을 남기는지는 말한다.
         Write-Host '  [남김] cys 프로그램 — 프로그램 파일은 지우지 않고 그대로 둡니다(다시 깔 때 이 프로그램을 씁니다)'
-        # 지난 편성 기록은 지운다(Get-CysStateItems 머리 주석) — 있으면 지울 목록에 센다.
-        foreach ($s in (Get-CysStateItems)) { [void](Row 'cys 지난 편성 기록(동료 좌석을 되살리는 기록)' $s) }
+        # 지난 편성 기록은 보관 폴더로 옮긴다(Get-CysStateItems 머리 주석 · 0.3.37) — 있으면 목록에 센다.
+        foreach ($s in (Get-CysStateItems)) { [void](Row 'cys 지난 편성 기록(동료 좌석을 되살리는 기록 · 보관 폴더로 옮깁니다)' $s) }
     } else {
-        [void](Row 'cys 프로그램' $CysDir)
+        [void](Row 'cys 프로그램(프로그램 파일은 지우고, 안의 실행 기록은 보관 폴더로 옮깁니다)' $CysDir)
         [void](Row 'cys 프로그램(옛 자리)' $CysDirOld)
-        foreach ($lnk in (Get-StartMenuLinks)) { [void](Row 'cys 시작 메뉴 바로가기' $lnk) }
+        foreach ($lnk in (Get-StartMenuLinks)) { [void](Row 'cys 시작 메뉴 바로가기(우리 설치 자리를 가리킬 때만 지웁니다)' $lnk) }
+        foreach ($lnk in (Get-DesktopLinks)) { [void](Row 'cys 바탕화면 바로가기(우리 설치 자리를 가리킬 때만 지웁니다)' $lnk) }
+    }
+    # 0.3.37: 부서 실행 상태(프로그램 폴더 안 cys-dept-<n>) · 닫은 부서 휴지통 · 앱 화면 자료 — 재설치는 제자리 · 완전 삭제는 보관
+    # footprint: W-DEPTSTATE
+    foreach ($ds in @(Get-ChildItem -LiteralPath $CysDir -Force -Directory -Filter 'cys-dept-*' -ErrorAction SilentlyContinue)) {
+        $dsp = Join-Path $CysDir $ds.Name
+        if ($KeepApp -or $KeepHistory) { Write-Host ('  [있음] 부서 실행 상태 · ' + (Short $dsp) + ' (제자리에 둡니다 - 부서가 그대로 이어집니다)') }
+        else { [void](Row '부서 실행 상태(보관 폴더로 옮깁니다)' $dsp) }
+    }
+    # footprint: W-TRASH
+    if (Test-Path -LiteralPath $CysTrash) {
+        if ($KeepApp -or $KeepHistory) { Write-Host ('  [있음] 닫은 부서 휴지통 · ' + (Short $CysTrash) + ' (제자리에 둡니다)') }
+        else { [void](Row '닫은 부서 휴지통(보관 폴더로 옮깁니다)' $CysTrash) }
+    }
+    # footprint: W-WEBVIEW
+    if ((-not $KeepApp) -and (-not $KeepHistory)) {
+        foreach ($w in @($WebviewRoaming, $WebviewLocal)) { if (Test-Path -LiteralPath $w) { [void](Row '앱 화면 자료(보관 폴더로 옮깁니다)' $w) } }
+    }
+    # 0.3.37: 지난 재설치의 되옮기기가 끊긴 보관본(이번 실행이 먼저 이어서 끝낸다)
+    foreach ($bk in @(Get-UnfinishedRestoreDirs)) {
+        $script:Found++
+        Write-Host ('  [있음] 끝나지 않은 되옮기기 · ' + (Short $bk) + ' (이번에 먼저 이어서 끝냅니다)')
+    }
+    # 0.3.37 r1 F4: 완전 삭제 보관본 속 로그인 파일 정리가 남은 것 — 찾은 자국으로 센다(안 세면 「지울 것이 없습니다」 로 끝나 비밀값이 남는다)
+    foreach ($hp in @(Get-CredPendingHomes)) {
+        $script:Found++
+        Write-Host ('  [있음] 보관본 속 로그인 파일 지우기가 남음 · ' + (Short $hp) + ' (이번에 이어서 지웁니다)')
     }
     # footprint: W-REG
-    if (-not $KeepApp) { [void](Row 'cys 설치 목록 항목' $RegKey) }
+    if (-not $KeepApp) {
+        [void](Row 'cys 설치 목록 항목(우리 설치 자리를 가리킬 때만 지웁니다)' $RegKeyR)
+        [void](Row 'cys 설치 목록 항목(옛 이름 · 우리 설치 자리를 가리킬 때만 지웁니다)' $RegKey)
+    }
     # footprint: W-DAEMON
     $tk = @(Get-CysTasks)
     RowFlag 'cys 상시 가동 등록' ($tk.Count -gt 0) '작업 스케줄러'
     # footprint: W-CYSHOME
-    if ($KeepHistory) { [void](Row 'cys 계정 자리(자비스 창 로그인·이전 대화는 남깁니다)' $CysHome) }
-    else { [void](Row 'cys 계정 자리' $CysHome) }
+    if ($KeepHistory) { [void](Row 'cys 계정 자리(로그인·이전 대화·부서 기록은 제자리로 되옮기고 나머지는 보관합니다)' $CysHome) }
+    else { [void](Row 'cys 계정 자리(보관 폴더로 옮깁니다)' $CysHome) }
     # footprint: W-CLAUDEBIN
     [void](Row '클로드 실행 파일' $ClaudeExe)
     # footprint: W-JARVISHOME
@@ -880,8 +963,8 @@ function Invoke-Diagnose {
             # 0.3.36: 재설치 길에서는 이 로그인을 남긴다($HistoryKeepNames 머리 주석) — 앞 판의 「다시 하셔야 합니다」는 이 길에서 거짓이다.
             Write-Host '         다시 까는 길이라 이 로그인은 지우지 않고 그대로 둡니다 — 자비스 창에서 로그인을 다시 하지 않으셔도 됩니다.'
         } else {
-            Write-Host '         주의: 이것은 위의 「cys 계정 자리」 안에 들어 있어 **함께 지워집니다.**'
-            Write-Host '         자비스 창에서 하신 로그인은 다시 하셔야 합니다 — 윈도우에서 하신 로그인과는 별개입니다.'
+            Write-Host '         주의: 이 로그인 파일은 보관 폴더에 넣지 않고 지웁니다(비밀값은 보관하지 않습니다).'
+            Write-Host '         자비스 창에서 하신 로그인은 다시 하셔야 할 수 있습니다 — 윈도우에서 하신 로그인과는 별개입니다.'
         }
     }
     # 0.3.36: 자비스 창의 이전 대화(재설치 길에서만 남긴다) — 남긴다고 말하는 것이 사실일 때만 적는다.
@@ -902,7 +985,7 @@ function Invoke-Diagnose {
     else { Write-Host ('  [없음] 토론장 안내 가리키기 · ' + (Short $AgoraSkill)) }
     if (Test-Path -LiteralPath $AgoraSkillInCys) {
         Write-Host ('  [있음] 토론장 안내 가리키기(자비스 창 쪽) · ' + (Short $AgoraSkillInCys))
-        Write-Host '         이것은 위의 「cys 계정 자리」 안에 들어 있어 함께 지워집니다(cys 설치의 일부입니다).'
+        Write-Host '         이것은 위의 「cys 계정 자리」 안에 들어 있어 그 자리와 함께 옮겨지거나 새로 만들어집니다(cys 설치의 일부입니다).'
         if (Test-Path -LiteralPath $AgoraSkill) {
             Write-Host ('         같은 안내가 ' + (Short $AgoraSkill) + ' 에도 있어 그쪽은 남습니다.')
         } else {
@@ -1127,11 +1210,26 @@ $JarvisBackupKeep   = 3
 $JarvisBackupInstallerNames = @('.jarvis-owned','bootstrap.log','env-report.md','install-directive.md','trust-seed.tsv','wake.sh','wake.ps1','install-id','help-attempts.json','remote-help-executed.json','remote-help-executed.json.lock','remote-help-client-token','claude-install.log','awake-master.ok','install-done.txt','transcript.txt','.rotate-out','.rotate-err','.login-wait','.login-pid','.login-capped')
 $script:BackupNote  = ''
 function Get-TreeStat($p) {   # 「파일 수 총바이트」 · 하나라도 못 읽으면 $null
+    #   0.3.37: 바로가기(symlink·junction)는 따라가지 않고 **이름표 하나(0 바이트)** 로 센다 — 옮기기 전후로 같은 값이 나와야 대조가 뜻을 가진다
+    #     (맥 tree_stat 의 lstat 셈과 같은 모양). 앞 판은 Get-ChildItem -Recurse 로 셌다: 트리 안 다른 자리를 가리키는 바로가기가
+    #     옮긴 뒤 끊어지면(가리키는 곳이 옛 자리) 폴더에서 파일 모양으로 바뀌어 수가 달라졌고(대조 실패 오보 · 시험 반례①⑤),
+    #     5.1 은 junction 안까지 따라 들어가 남의 자리 크기가 섞였다. ⚠이 함수는 혼자 선다(다른 함수를 부르지 않는다 · 보관 시험이 떼어 부른다).
     try {
-        $items = @(Get-ChildItem -LiteralPath $p -Recurse -Force -ErrorAction Stop | Where-Object { -not $_.PSIsContainer })
-        $bytes = [long]0
-        foreach ($i in $items) { $bytes += [long]$i.Length }
-        return ('{0} {1}' -f $items.Count, $bytes)
+        $root = Get-Item -LiteralPath $p -Force -ErrorAction Stop
+        if (($root.Attributes -band [System.IO.FileAttributes]::ReparsePoint) -ne 0) { return '1 0' }
+        if (-not $root.PSIsContainer) { return ('1 {0}' -f [long]$root.Length) }
+        $n = 0; $bytes = [long]0
+        $stack = New-Object System.Collections.Stack
+        $stack.Push([string]$root.FullName)
+        while ($stack.Count -gt 0) {
+            $d = [string]$stack.Pop()
+            foreach ($i in @(Get-ChildItem -LiteralPath $d -Force -ErrorAction Stop)) {
+                if (($i.Attributes -band [System.IO.FileAttributes]::ReparsePoint) -ne 0) { $n++; continue }
+                if ($i.PSIsContainer) { $stack.Push([string]$i.FullName); continue }
+                $n++; $bytes += [long]$i.Length
+            }
+        }
+        return ('{0} {1}' -f $n, $bytes)
     } catch { return $null }
 }
 function Test-JarvisBackup($p) {   # 이름 꼴 ∧ 진짜 폴더(바로가기 아님) ∧ 우리 표식
@@ -1189,7 +1287,10 @@ function Keep-JarvisDir($src) {   # 보관 이동 · 마지막 안내 1줄 = $sc
         return
     }
     $after = Get-TreeStat $dest
+    $script:ArchiveDest = $dest   # 0.3.37: 이번 실행의 보관 폴더 — 뒤의 cys 자료도 여기로 모은다(Set-ArchiveRoot)
     if ($after -ne $before) {
+        $script:ArchiveFail = 1   # 0.3.37: 대조가 어긋나면 뒤 단계(프로그램 지우기 등)를 하지 않는다(Invoke-Purge 의 보관 관문이 센다)
+        $script:ArchiveVerifyFail = 1
         Write-Host ('  [남음] 보관 확인 실패: ' + (Short $dest) + ' - 옮기기 전과 파일 수·크기가 달라 아무것도 지우지 않았습니다(전 ' + $before + ' · 뒤 ' + $after + ').')
         $script:BackupNote = ('이전 자비스 자료를 ' + (Short $dest) + ' 로 옮겼지만 빠짐없이 옮겨졌는지 확인하지 못했습니다. 아무것도 지우지 않았습니다.')
         return
@@ -1213,6 +1314,735 @@ function Keep-JarvisDir($src) {   # 보관 이동 · 마지막 안내 1줄 = $sc
     Write-Host ('  [보관] ' + (Short $src) + ' -> ' + (Short $dest) + ' (파일 ' + ($before -split ' ')[0] + '개 · 옮긴 뒤 수·크기 같음)')
     Remove-OldJarvisBackups $parent $dest
     $script:BackupNote = ('이전 자비스 자료는 ' + (Short $dest) + ' 에 그대로 보관해 두었습니다.')
+}
+
+# ── 0.3.37 보관 이동 넓히기 — 지우는 것은 다시 받는 프로그램 파일뿐 · 사람이 쌓은 자료는 보관 폴더로 옮긴다 ──
+#   설계 = docs/install-master/DESIGN-0337.md 3·4절 · 맥 reset-clean.sh 의 archive_move · cys_home_reinstall · prescan_links 와 짝.
+#   ★옮기기 = 같은 드라이브 안 이름 바꾸기 한 번([IO.Directory]::Move / [IO.File]::Move)뿐 — 복사하지 않는다.
+#     다른 드라이브면 옮기지 않고 멈춘다(ArchiveFail).
+#   ★옮긴 뒤 파일 수·총 바이트를 대조한다(Get-TreeStat) — 어긋나면 ArchiveFail · Invoke-Purge 가 그 뒤 단계(프로그램 지우기 등)를 하지 않는다.
+#   ★보관 폴더 = 작업 폴더 보관(Keep-JarvisDir)이 만든 것(ArchiveDest)에 모은다 — 없거나 사용자 폴더와 다른 드라이브면
+#     사용자 폴더에 같은 이름 꼴로 새로 만들고 우리 표식을 놓는다(ArchiveHome). 사람 자료가 든 보관본은 자동 정리 대상이 아니다
+#     (Test-InstallerOnlyBackup 이 설치기 이름 밖의 것을 보면 늘 남긴다 — 0.3.36 규칙 그대로).
+$script:ArchiveDest = ''
+$script:ArchiveHome = ''
+$script:ArchiveFail = 0
+# 옮긴 뒤 수·크기 대조가 어긋난 일(한 번이라도) — 스스로 다시 해 보기가 지우지 **않는다**(ArchiveFail 과 달리 되풀이 사이에 풀지 않는다).
+#   옮기기 실패(잠김)는 잠깐 뒤 풀릴 수 있어 다시 해 볼 뜻이 있지만, 대조 실패는 이미 옮긴 뒤라 다시 해도 같은 자리를 다시 재지 않는다 —
+#   풀어 버리면 두 번째 시도가 「못 지운 것 없음」으로 끝나며 프로그램을 지운다(시험 ⓓ 가 잡은 틈).
+$script:ArchiveVerifyFail = 0
+$script:Archived = 0
+$script:ArchiveLast = ''
+$script:CysHomeArchived = ''   # 완전 삭제에서 보관한 옛 ~\.cys 자리 — 회차 사이에 풀지 않는다(다시 해 보기가 그 안 로그인 파일을 다시 지운다)
+$script:ARoot = ''
+# 재설치 되옮기기 진행 표지(보관 폴더 맨 위) — UTF-8 · 칸마다 NUL 로 끝난다 · 첫 칸 = 보관 폴더 안 옛 ~\.cys 이름(cys-home · 겹치면 cys-home-2 …)
+#   · 나머지 = ~\.cys 기준 상대 이름(구분 = \). 다음 실행이 이 표지를 보고 이어서 끝낸다(Resume-UnfinishedRestore).
+$RestoreMark = '.jarvis-restore-pending'
+$CredMark = '.jarvis-cred-pending'   # 완전 삭제 보관본 속 로그인 파일 정리가 남았다(보관된 옛 ~\.cys 맨 위 · 빈 파일) — 다음 실행이 이어서 지운다(r1 F4)
+$script:ResumeLeft = $false   # 이 실행에서 지난 되옮기기를 끝내지 못했다(Resume-UnfinishedRestore) — 재설치 길을 이어 가지 않는다
+# 재설치 길에서 ~\.cys 바로 아래에서 제자리로 되옮길 부서 자료(DESIGN-0337 4-2절 · 맥 reinstall_keep_list 짝 · 이름 꼴 · 대소문자 무시)
+#   부서 등록부 · 카탈로그 · 임무 · 요청 · 닫기 스냅샷 · 부서 팩 사본 · 부서·계정별 좌석 프로필(claude-* 통째로).
+$ReinstallKeepTop = @('depts.json', 'dept-catalog.json', 'dept-missions', 'dept-requests', 'dept-snapshots', 'pack-dept-*', 'claude-*')
+# 프로그램 파일(다시 받을 수 있는 것) — 설치 폴더 **바로 아래** 이름으로만 판정한다. 근거 = 설치 템플릿 Section Uninstall(installer.nsi:818~848 ·
+#   주 실행 파일 · 부속 실행 파일 cys·cysd · 리소스 pack.tar.gz·pack-manifest.json·runtime-manifest.json·runtime\ · uninstall.exe) ·
+#   우리 훅 PREUNINSTALL(nsis-hooks.nsh:931~943 · *.new.exe · *.prev*.exe · cysr.exe · 판 표지 · 설치 실패 기록 · runtime\) ·
+#   잠금 스윕 잔해(nsis-hooks.nsh:660~685 · <이름>.exe|dll|pyd|node.prev<수>) · 설치 도우미 판 표지(jarvis-cys-pin.json · footprint W-APP).
+#   ★이 밖의 이름은 모두 자료로 친다(모르면 보관) — 편성·묘비·검색 기록(transcripts.db)·부서 상태(cys-dept-<n>\) 등.
+$CysProgramNames = @('uninstall.exe', 'cys-installed-version.txt', 'cys-install-failure.txt', 'jarvis-cys-pin.json', 'pack.tar.gz', 'pack-manifest.json', 'runtime-manifest.json')
+$CysProgramDirs  = @('runtime', 'resources')
+# 실행 파일(exe·dll)은 **설치기가 실제로 까는 이름만**(r1 F1 · 앞 판은 이름 꼴 *.exe·*.dll 전부 = 사람이 둔 exe 가 보관 없이 사라졌다) —
+#   주 실행 파일·부속 실행 파일 cys·cysd·cys-app·cysr(nsis-hooks.nsh:822~827 · tauri.conf.json externalBin) · 교체 슬롯 <이름>.new.exe ·
+#   <이름>.prev[<수>].exe(prev·prev2·prev3·tick = prev<GetTickCount> · nsis-hooks.nsh:246~277) · WebView2Loader.dll ·
+#   잠금 스윕 잔해 <그 이름>.exe|dll.prev<수>(nsis-hooks.nsh:620~644). ★이 밖의 exe·dll 은 자료로 친다(모르면 보관).
+$CysProgramExeRx = '(?i)^(cys|cysd|cys-app|cysr)(\.new|\.prev[0-9]*)?\.exe$|^webview2loader\.dll$'
+$CysProgramResidueRx = '(?i)^((cys|cysd|cys-app|cysr)\.exe|webview2loader\.dll)\.prev[0-9]*$'
+function Test-CysProgramItem($it) {
+    if (Test-IsReparse $it) { return $false }   # 바로가기는 프로그램 파일이 아니다(자료 쪽 = 이름표만 치운다)
+    $n = [string]$it.Name
+    if ($it.PSIsContainer) { return (@($CysProgramDirs | Where-Object { $_ -ieq $n }).Count -gt 0) }
+    if (@($CysProgramNames | Where-Object { $_ -ieq $n }).Count -gt 0) { return $true }
+    if ($n -match $CysProgramExeRx) { return $true }
+    if ($n -match $CysProgramResidueRx) { return $true }
+    return $false
+}
+function Norm-Slash($p) { return ([string]$p).Replace('/', '\').TrimEnd('\') }
+function Test-IsReparsePath($p) {   # 그 자리 자체가 바로가기(symlink·junction)인가 · 없거나 못 읽으면 $false
+    try { return (Test-IsReparse (Get-Item -LiteralPath $p -Force -ErrorAction Stop)) } catch { return $false }
+}
+# 있거나 이름표만 있는(끊어진 바로가기) 자리 → $true. 「없다」와 「못 읽었다」를 가르는 쪽은 부르는 곳이 Get-Item 으로 따로 본다.
+function Test-PathOrLink($p) {
+    if (Test-Path -LiteralPath $p) { return $true }
+    try { $null = Get-Item -LiteralPath $p -Force -ErrorAction Stop; return $true } catch { return $false }
+}
+function Get-VolumeRoot($p) {   # 그 자리의 드라이브 뿌리(C:\ · \\서버\공유\) · 못 풀면 ''
+    try { return [string][System.IO.Path]::GetPathRoot([System.IO.Path]::GetFullPath([string]$p)) } catch { return '' }
+}
+function Test-SameVolume($a, $b) {
+    $ra = Get-VolumeRoot $a
+    $rb = Get-VolumeRoot $b
+    return ([bool]$ra -and ($ra -ieq $rb))
+}
+function New-BackupDir($parent) {   # 새 보관 폴더(우리 표식 · 이름 꼴 install-jarvis-backup-<시각>[-n]) · 못 만들면 ''
+    $stamp = (Get-Date).ToString('yyyyMMdd-HHmmss')
+    $d = Join-Path $parent ($JarvisBackupPrefix + $stamp); $n = 1
+    while (Test-PathOrLink $d) { $n++; $d = Join-Path $parent ($JarvisBackupPrefix + $stamp + '-' + $n) }
+    try { [void][System.IO.Directory]::CreateDirectory($d) } catch { return '' }
+    try { [System.IO.File]::WriteAllText((Join-Path $d '.jarvis-owned'), ($JarvisOwnerMark + "`n"), (New-Object System.Text.UTF8Encoding($false))) }
+    catch { try { [System.IO.Directory]::Delete($d, $false) } catch { }; return '' }
+    return $d
+}
+function Set-ArchiveRoot {   # 보관 폴더를 정해 $script:ARoot 에 둔다 · 못 만들면 $false
+    $script:ARoot = ''
+    if ($script:ArchiveDest -and (Test-Path -LiteralPath $script:ArchiveDest -PathType Container) -and (Test-SameVolume $script:ArchiveDest $env:USERPROFILE)) {
+        $script:ARoot = $script:ArchiveDest
+        return $true
+    }
+    if ((-not $script:ArchiveHome) -or (-not (Test-Path -LiteralPath $script:ArchiveHome -PathType Container))) {
+        $script:ArchiveHome = New-BackupDir $env:USERPROFILE
+        if (-not $script:ArchiveHome) { return $false }
+    }
+    $script:ARoot = $script:ArchiveHome
+    return $true
+}
+function Get-FreeRel($root, $rel) {   # 비어 있는 이름(겹치면 -2, -3 …) — 다시 해 보기가 같은 이름을 또 쓸 때 덮지 않는다
+    $r = $rel; $n = 1
+    while (Test-PathOrLink (Join-Path $root $r)) { $n++; $r = $rel + '-' + $n }
+    return $r
+}
+# 이름 바꾸기 한 번(같은 드라이브) — 복사하지 않는다 · 실패 = 예외. 바로가기는 이름표째 옮긴다(가리키는 곳은 그대로).
+function Move-OneEntry($src, $dst) {
+    $it = Get-Item -LiteralPath $src -Force -ErrorAction Stop
+    if ($it.PSIsContainer) { [System.IO.Directory]::Move($src, $dst) } else { [System.IO.File]::Move($src, $dst) }
+}
+# 자료 한 자리를 보관 폴더로 옮긴다 — 돌려주는 값 = 성공($true: 옮김 · 없음 · 남김) / 실패($false: ArchiveFail · 못 지움 +1).
+#   바로가기면 종전대로 이름표만 지운다(가리키던 실제 자료는 무접촉 · Drop) · 참가 자리가 안에 있으면 옮기지 않고 그대로 둔다(옮겼다 되돌리기 금지).
+#   ⚠「목록을 못 읽었다」를 「없다」로 읽지 않는다 — Get-Item 이 실패했는데 Test-Path 가 있다고 하면 실패로 센다.
+function Archive-Move($src, $rel, $what) {
+    $it = $null
+    try { $it = Get-Item -LiteralPath $src -Force -ErrorAction Stop } catch { $it = $null }
+    if (-not $it) {
+        if (-not (Test-Path -LiteralPath $src)) { return $true }
+        $script:ArchiveFail = 1; $script:KeptFail++
+        Write-Host ('  [남음] ' + (Short $src) + ' - 이 자리를 읽지 못해 옮기지 않고 그대로 두었습니다(지운 것 없음).')
+        return $false
+    }
+    if (Test-IsReparse $it) {
+        $kf = $script:KeptFail
+        Drop $what $src
+        return ($script:KeptFail -eq $kf)
+    }
+    $c = Canon-Path $src
+    if (($script:PreserveCanonFail.Count -gt 0) -or (-not $c)) {
+        # 남겨야 할 자리를 확인하지 못했거나 이 자리의 실제 경로를 못 풀었다 — 옮기지도 지우지도 않고 못 지움으로 센다(Drop 과 같은 규율).
+        $script:KeptFail++
+        Write-Host ('  [남음] ' + (Short $src) + ' - 실제 경로나 남겨야 할 자리를 확인하지 못해 옮기지 않고 그대로 두었습니다(지운 것 없음).')
+        return $true
+    }
+    if ((@(Get-PreservedUnder $c).Count -gt 0) -or (Test-PreserveCovers $c)) {
+        $script:Preserved++
+        Write-Host ('  남김: ' + (Short $src) + ' - 안에 따로 두신 자리(참가 자리)가 있어 옮기지 않고 그대로 두었습니다(지운 것 없음).')
+        return $true
+    }
+    if (-not (Set-ArchiveRoot)) {
+        $script:ArchiveFail = 1; $script:KeptFail++
+        Write-Host ('  [남음] ' + (Short $src) + ' - 보관 폴더를 만들지 못해 옮기지 않고 그대로 두었습니다(지운 것 없음).')
+        return $false
+    }
+    if (-not (Test-SameVolume $script:ARoot (Split-Path -Parent $src))) {
+        $script:ArchiveFail = 1; $script:KeptFail++
+        Write-Host ('  [남음] ' + (Short $src) + ' - 보관 폴더와 다른 드라이브에 있어 옮기지 않았습니다(복사하지 않습니다 · 지운 것 없음).')
+        return $false
+    }
+    $dest = Join-Path $script:ARoot (Get-FreeRel $script:ARoot $rel)
+    $dp = Split-Path -Parent $dest
+    try { if (-not (Test-Path -LiteralPath $dp)) { [void][System.IO.Directory]::CreateDirectory($dp) } } catch { }
+    $before = Get-TreeStat $src
+    $moved = $false
+    if ($before) { try { Move-OneEntry $src $dest; $moved = $true } catch { $moved = $false } }
+    if (-not $moved) {
+        $script:ArchiveFail = 1; $script:KeptFail++
+        Write-Host ('  [남음] ' + (Short $src) + ' - 보관 폴더로 옮기지 못해 그대로 두었습니다(지운 것 없음 · 쓰고 있는 프로그램이 있을 수 있습니다).')
+        return $false
+    }
+    $after = Get-TreeStat $dest
+    if ($after -ne $before) {
+        $script:ArchiveFail = 1; $script:ArchiveVerifyFail = 1; $script:KeptFail++
+        Write-Host ('  [남음] 보관 확인 실패: ' + (Short $dest) + ' - 옮기기 전과 파일 수·크기가 다릅니다(전 ' + $before + ' · 뒤 ' + $after + '). 이 뒤로는 아무것도 지우지 않습니다.')
+        return $false
+    }
+    $script:Archived++
+    $script:ArchiveLast = $dest
+    Write-Host ('  보관: ' + $what + ' ' + (Short $src) + ' -> ' + (Short $dest))
+    return $true
+}
+# 완전 삭제 보관본에서는 자비스 창 전용 로그인 파일을 빼고 지운다(DESIGN-0337 결정 3 · 보관 폴더는 사람이 옮기고 나눠 줄 수 있는 자리 —
+#   비밀값이 남으면 안 된다). 보통 파일만 · 바로가기는 따라가지 않는다(그 파일도, 그것을 담은 폴더도 바로가기면 건드리지 않는다).
+#   r1 F4: 지우기 **전에** 그 보관본 맨 위에 「정리 남음」 표지($CredMark)를 먼저 둔다 — 창이 닫히거나 끝내 실패해도 **다음 실행**이
+#   진단에서 찾은 자국으로 세고 지우기 맨 앞에서 이어서 지운다(Resume-ArchivedCredentials). 다 지우면 표지를 치운다.
+#   (앞 판은 보관 자리를 이 실행의 변수로만 기억해, 회차 사이만 이어지고 새 실행은 「지울 것 없음」 → 비밀값이 보관본에 남았다.)
+#   파일을 읽지 못하면(권한) 「없음」 으로 넘기지 않는다 — 자리가 있으면 못 지움으로 센다(r1 F4-2).
+function Remove-ArchivedCredentials($h) {
+    if (-not $h) { return }
+    # 표지를 못 쓰면 다음 실행이 이어서 지울 근거가 없다 — 그때는 「이어서 지웁니다」 라고 약속하지 않는다(r3 M3)
+    $credNext = '다시 실행하시면 이어서 지웁니다.'
+    try { [System.IO.File]::WriteAllText((Join-Path $h $CredMark), '') } catch { $credNext = '그 폴더의 쓰기 권한을 확인해 주십시오(정리 표지를 쓰지 못해 다음 실행이 스스로 이어 지우지 못합니다): ' + (Short $h) }
+    $fail = $false
+    $dirs = @()
+    try { $dirs = @(Get-ChildItem -LiteralPath $h -Force -Directory -ErrorAction Stop) }
+    catch { $script:KeptFail++; Write-Host ('  [남음] 보관본 속 로그인 파일을 찾지 못했습니다: ' + (Short $h) + ' - ' + $credNext); return }
+    foreach ($d in $dirs) {
+        if (Test-IsReparse $d) { continue }
+        if (-not (($d.Name -ieq 'claude') -or ($d.Name -ilike 'claude-*'))) { continue }
+        $f = Join-Path (Join-Path $h $d.Name) '.credentials.json'
+        $fi = $null
+        $unread = $false
+        try { $fi = Get-Item -LiteralPath $f -Force -ErrorAction Stop }
+        catch [System.Management.Automation.ItemNotFoundException] { $fi = $null }
+        catch { $fi = $null; $unread = $true }   # 권한 등 — Test-Path 도 「없음」 으로 답하므로 예외 종류로 가른다
+        if ($unread) { $fail = $true; $script:KeptFail++; Write-Host ('  [남음] 보관본 속 로그인 파일을 읽지 못했습니다: ' + (Short $f) + ' - ' + $credNext); continue }
+        if (-not $fi) { continue }
+        if ($fi.PSIsContainer -or (Test-IsReparse $fi)) { continue }
+        try { [System.IO.File]::Delete($f) } catch { }
+        if (Test-PathOrLink $f) { $fail = $true; $script:KeptFail++; Write-Host ('  [남음] 보관본 속 로그인 파일 ' + (Short $f) + ' - ' + $credNext) }
+        else { Write-Host ('  지움: 보관본 속 자비스 창 로그인 파일 ' + (Short $f) + ' (비밀값은 보관하지 않습니다 - 다시 설치하실 때 이어서 로그인됩니다)') }
+    }
+    if (-not $fail) {
+        # 다 지웠는데 표지를 못 치우면 다음 실행마다 「남음」 으로 세게 된다 — 조용히 넘기지 않는다(r2 N4)
+        $cm = Join-Path $h $CredMark
+        try { [System.IO.File]::Delete($cm) } catch { }
+        if (Test-Path -LiteralPath $cm -PathType Leaf) { $script:KeptFail++; Write-Host ('  [남음] 보관본 속 정리 표지 ' + (Short $cm) + ' - 로그인 파일은 지웠습니다. 그 폴더의 쓰기 권한을 확인해 주십시오.') }
+    }
+}
+# 로그인 파일 정리가 남은 완전 삭제 보관본의 옛 ~\.cys(사용자 폴더 · 작업 폴더의 부모) — 되옮기기 표지가 있는 재설치 보관본은 뺀다(그 안 로그인은 되옮길 것)
+function Get-CredPendingHomes {
+    $parents = New-Object System.Collections.ArrayList
+    [void]$parents.Add([string]$env:USERPROFILE)
+    $jp = ''
+    try { $jp = [string](Split-Path -Parent $JarvisDir) } catch { $jp = '' }
+    if ($jp -and ((Norm-Slash $jp) -ine (Norm-Slash $env:USERPROFILE))) { [void]$parents.Add($jp) }
+    $out = New-Object System.Collections.ArrayList
+    foreach ($d in $parents) {
+        $cands = @()
+        try { $cands = @(Get-ChildItem -LiteralPath $d -Force -Directory -Filter ($JarvisBackupPrefix + '*') -ErrorAction Stop | Sort-Object Name) } catch { continue }
+        foreach ($c in $cands) {
+            $p = Join-Path $d $c.Name
+            if (-not (Test-JarvisBackup $p)) { continue }
+            if (Test-PathOrLink (Join-Path $p $RestoreMark)) { continue }
+            $hs = @()
+            try { $hs = @(Get-ChildItem -LiteralPath $p -Force -Directory -ErrorAction Stop | Where-Object { $_.Name -match '^cys-home(-[0-9]+)?$' }) } catch { continue }
+            foreach ($hh in $hs) {
+                if (Test-IsReparse $hh) { continue }
+                $hp = Join-Path $p $hh.Name
+                if (Test-Path -LiteralPath (Join-Path $hp $CredMark) -PathType Leaf) { [void]$out.Add($hp) }
+            }
+        }
+    }
+    return $out.ToArray()   # 부르는 쪽이 @(…) 로 받는다
+}
+function Resume-ArchivedCredentials {
+    foreach ($hp in @(Get-CredPendingHomes)) {
+        Write-Host ('  지난번에 끝나지 않은 보관본 속 로그인 파일 지우기를 이어서 합니다: ' + (Short $hp))
+        Remove-ArchivedCredentials $hp
+    }
+}
+# 재설치 길에서 ~\.cys 로 되옮길 것 = ~\.cys 기준 상대 이름 목록(구분 = \ · 한 층) — 목록을 못 읽으면 $null(「없음」과 가른다 · 0.3.36 반례 ④).
+#   본부 = claude\ 안 $HistoryKeepNames(대소문자 무시) · 부서 = $ReinstallKeepTop. ~\.cys\claude 가 바로가기면 그 안은 보지 않는다.
+function Get-ReinstallKeepList {
+    $out = New-Object System.Collections.ArrayList
+    $kids = $null
+    try { $kids = @(Get-ChildItem -LiteralPath $CysHome -Force -ErrorAction Stop) } catch { return $null }
+    foreach ($k in $kids) {
+        foreach ($pat in $ReinstallKeepTop) { if ($k.Name -ilike $pat) { [void]$out.Add([string]$k.Name); break } }
+    }
+    $prof = Join-Path $CysHome 'claude'
+    $pi = $null
+    try { $pi = Get-Item -LiteralPath $prof -Force -ErrorAction Stop } catch { $pi = $null }
+    if ($pi -and $pi.PSIsContainer -and -not (Test-IsReparse $pi)) {
+        $pk = $null
+        try { $pk = @(Get-ChildItem -LiteralPath $prof -Force -ErrorAction Stop) } catch { return $null }
+        foreach ($k in $pk) {
+            $n = [string]$k.Name
+            if (@($HistoryKeepNames | Where-Object { $_ -ieq $n }).Count -gt 0) { [void]$out.Add('claude\' + $n) }
+        }
+    } elseif ((-not $pi) -and (Test-Path -LiteralPath $prof)) { return $null }
+    return ,($out.ToArray())
+}
+# 예외 갈래(참가 자리가 ~\.cys 안 · DESIGN-0337 4-4절)의 부서 남길 것 — **자리** 실경로(바로가기도 자리로) · 목록 못 읽음·줄바꿈 = $null
+function Get-DeptKeeps {
+    $hc = Canon-Path $CysHome
+    if (-not $hc) { return $null }
+    $list = Get-ReinstallKeepList
+    if ($null -eq $list) { return $null }
+    $out = @()
+    foreach ($r in $list) {
+        if ([string]$r -match "[`r`n]") { return $null }
+        if (([string]$r).StartsWith('claude\', [System.StringComparison]::OrdinalIgnoreCase)) { continue }
+        $out += (Norm-Path ($hc + '\' + $r))
+    }
+    return ,$out
+}
+function Write-RestoreMark($mark, $recs) {   # 칸마다 NUL 로 끝난다(맥 printf '%s\0' 과 같은 모양) · UTF-8(BOM 없음)
+    $sb = New-Object System.Text.StringBuilder
+    foreach ($r in @($recs)) { [void]$sb.Append([string]$r); [void]$sb.Append([char]0) }
+    [System.IO.File]::WriteAllText($mark, $sb.ToString(), (New-Object System.Text.UTF8Encoding($false)))
+}
+# 표지 고쳐 쓰기(r1 F3) — 임시 파일에 다 쓴 뒤 이름 바꾸기. 도중에 끊기거나 못 쓰면 옛 표지가 그대로 남는다($false · 임시 파일 치움).
+function Save-RestoreMark($mark, $recs) {
+    $tmp = $mark + '.tmp'
+    try {
+        Write-RestoreMark $tmp $recs
+        if (Test-Path -LiteralPath $mark -PathType Leaf) { [System.IO.File]::Replace($tmp, $mark, $null) } else { [System.IO.File]::Move($tmp, $mark) }
+        return $true
+    } catch {
+        try { [System.IO.File]::Delete($tmp) } catch { }
+        return $false
+    }
+}
+# 되옮기기 표지에 적힌 것을 보관 폴더의 cys-home 에서 ~\.cys 로 이름 바꾸기로 되옮긴다.
+#   ~\.cys 에 같은 이름이 이미 있으면 덮지 않는다 — **되옮기기 실패와 같다**(r1 F2 · master#0337b3fa · DESIGN-0337 4절 5 · 10절):
+#     그 이름은 보관 폴더에 그대로 · 표지에 남김 · 쉬운 말 1줄 · $false → 재설치를 멈춘다(rc 7). 옛 판은 건너뛰고 표지를 지워 rc 0 이었다.
+#   하나라도 못 옮기면 표지에 남은 것만 적어 두고 못 지움 +1 · ArchiveFail · $false(다음 실행이 이어서 끝낸다) · 전부 끝나면 표지를 지운다.
+function Restore-From($root) {
+    $mark = Join-Path $root $RestoreMark
+    if (-not (Test-Path -LiteralPath $mark -PathType Leaf)) { return $true }
+    $recs = @()
+    try {
+        $text = (New-Object System.Text.UTF8Encoding($false, $true)).GetString([System.IO.File]::ReadAllBytes($mark))
+        $recs = @($text.Split([char]0) | Where-Object { $_ -ne '' })
+    } catch { $recs = @() }
+    $hname = ''
+    if ($recs.Count -gt 0) { $hname = [string]$recs[0] }
+    if ($hname -notmatch '^cys-home(-[0-9]+)?$') {
+        $script:KeptFail++; $script:ArchiveFail = 1
+        Write-Host ('  [남음] 되옮기기 표지를 읽지 못했습니다: ' + (Short $mark) + ' - 자료는 보관 폴더에 그대로 있습니다.')
+        return $false
+    }
+    if (-not (Test-PathOrLink $CysHome)) { try { [void][System.IO.Directory]::CreateDirectory($CysHome) } catch { } }
+    $left = New-Object System.Collections.ArrayList
+    [void]$left.Add($hname)
+    $fail = $false
+    for ($i = 1; $i -lt $recs.Count; $i++) {
+        $rel = [string]$recs[$i]
+        if ($rel -eq $hname) { continue }
+        # 표지는 우리가 쓴 것이지만 손으로 고쳐졌을 수 있다 — ~\.cys 밖을 가리키는 칸(뿌리 · ..)은 되옮기지 않는다
+        if ([System.IO.Path]::IsPathRooted($rel) -or ($rel -match '(^|[\\/])\.\.([\\/]|$)') -or ($rel -match ':')) {
+            $fail = $true; [void]$left.Add($rel)
+            Write-Host ('  [남음] 되옮기기 표지의 한 칸을 알아보지 못했습니다: ' + $rel + ' - 자료는 보관 폴더에 그대로 있습니다.')
+            continue
+        }
+        $src = Join-Path (Join-Path $root $hname) $rel
+        $dst = Join-Path $CysHome $rel
+        if (-not (Test-PathOrLink $src)) { continue }   # 이미 되옮겼다
+        # 되옮길 자리의 윗자리(~\.cys 안 · 예: ~\.cys\claude)가 바로가기면 따라가지 않는다 — 따라가면 ~\.cys 밖으로 옮겨진다(r2 N6)
+        $lnk = ''
+        $up = Split-Path -Parent ($rel -replace '/', '\')
+        while ($up) { if (Test-IsReparsePath (Join-Path $CysHome $up)) { $lnk = $up }; $up = Split-Path -Parent $up }
+        if ($lnk) {
+            $fail = $true; [void]$left.Add($rel)
+            Write-Host ('  [남음] ' + (Short (Join-Path $CysHome $lnk)) + ' 가 바로가기라 ' + (Short $dst) + ' 를 되옮기지 않았습니다 - 예전 자료는 보관 폴더에 그대로 있습니다: ' + (Short $src))
+            continue
+        }
+        if (Test-PathOrLink $dst) {
+            $fail = $true; [void]$left.Add($rel)
+            Write-Host ('  [남음] ' + (Short $dst) + ' - 같은 이름의 자료가 이미 있어 덮지 않았습니다. 예전 자료는 보관 폴더에 그대로 있습니다: ' + (Short $src))
+            Write-Host ('         새로 생긴 쪽(' + (Short $dst) + ')을 다른 이름으로 바꿔 두신 뒤 다시 실행하시면 예전 자료를 제자리로 옮깁니다 - 바꿔 둔 새 쪽은 그때 보관 폴더로 함께 옮겨집니다(어느 쪽도 지우지 않습니다).')
+            continue
+        }
+        $dp = Split-Path -Parent $dst
+        try { if (-not (Test-Path -LiteralPath $dp)) { [void][System.IO.Directory]::CreateDirectory($dp) } } catch { }
+        try {
+            Move-OneEntry $src $dst
+            Write-Host ('  되옮김: ' + (Short $dst))
+        } catch {
+            $fail = $true; [void]$left.Add($rel)
+            Write-Host ('  [남음] 되옮기지 못함: ' + (Short $src) + ' - 보관 폴더에 그대로 있습니다(지운 것 없음).')
+        }
+    }
+    if (-not $fail) { try { [System.IO.File]::Delete($mark) } catch { }; return $true }
+    if (-not (Save-RestoreMark $mark $left.ToArray())) {
+        Write-Host '  [남음] 되옮기기 표지를 고쳐 쓰지 못해 지난 표지를 그대로 두었습니다 - 자료는 보관 폴더에 그대로 있고, 다시 실행하시면 이어서 옮깁니다.'
+    }
+    $script:KeptFail++; $script:ArchiveFail = 1
+    return $false
+}
+# 끝나지 않은 되옮기기가 있는 우리 보관본(사용자 폴더 · 작업 폴더의 부모) — 오래된 것부터
+function Get-UnfinishedRestoreDirs {
+    $parents = New-Object System.Collections.ArrayList
+    [void]$parents.Add([string]$env:USERPROFILE)
+    $jp = ''
+    try { $jp = [string](Split-Path -Parent $JarvisDir) } catch { $jp = '' }
+    if ($jp -and ((Norm-Slash $jp) -ine (Norm-Slash $env:USERPROFILE))) { [void]$parents.Add($jp) }
+    $out = New-Object System.Collections.ArrayList
+    foreach ($d in $parents) {
+        $cands = @()
+        try { $cands = @(Get-ChildItem -LiteralPath $d -Force -Directory -Filter ($JarvisBackupPrefix + '*') -ErrorAction Stop | Sort-Object Name) } catch { continue }
+        foreach ($c in $cands) {
+            $p = Join-Path $d $c.Name
+            if (-not (Test-JarvisBackup $p)) { continue }
+            if (Test-Path -LiteralPath (Join-Path $p $RestoreMark) -PathType Leaf) { [void]$out.Add($p) }
+        }
+    }
+    return $out.ToArray()   # 부르는 쪽이 @(…) 로 받는다
+}
+# 지난 재설치의 되옮기기가 도중에 끊겼으면(창이 닫힘 · 전원) **그것부터** 이어서 끝낸다 — 자료는 보관 폴더에 온전하다.
+#   하나라도 못 끝내면 ResumeLeft — 이 실행의 ~\.cys 재설치 길은 이어 가지 않는다(r1 F2 · DESIGN-0337 10절 「이어 가지 않고 멈춘다」).
+function Resume-UnfinishedRestore {
+    $script:ResumeLeft = $false
+    foreach ($p in @(Get-UnfinishedRestoreDirs)) {
+        $hi = $null
+        try { $hi = Get-Item -LiteralPath $CysHome -Force -ErrorAction Stop } catch { $hi = $null }
+        if ($hi -and (Test-IsReparse $hi)) {
+            $script:KeptFail++; $script:ArchiveFail = 1; $script:ResumeLeft = $true
+            Write-Host ('  [남음] 되옮기기를 이어 가지 못했습니다: ' + (Short $CysHome) + ' 가 바로가기입니다 - 자료는 ' + (Short $p) + ' 에 그대로 있습니다.')
+            continue
+        }
+        Write-Host ('  지난번에 끝나지 않은 되옮기기를 이어서 합니다: ' + (Short $p))
+        if (-not (Restore-From $p)) { $script:ResumeLeft = $true }
+    }
+}
+# ~\.cys 재설치 길(DESIGN-0337 4절 · 통째 보관 후 되옮기기): 통째로 보관 폴더로 옮긴 뒤 남길 것만 되옮긴다 — 지우는 것 0.
+#   ★표지를 **옮기기 전에** 쓴다 — 옮긴 직후 멈춰도 다음 실행이 무엇을 되옮길지 안다.
+#   ★되옮기기 하나라도 실패하면 재설치를 멈춘다(rc 7) — 로그인이 빠진 채 이어 가면 좌석이 「Login expired」 로 선다(0.3.36 결함 A).
+function Invoke-CysHomeReinstall {
+    $hi = $null
+    try { $hi = Get-Item -LiteralPath $CysHome -Force -ErrorAction Stop } catch { $hi = $null }
+    if (-not $hi) {
+        if (-not (Test-Path -LiteralPath $CysHome)) { return $true }
+        $script:KeptFail++; $script:ArchiveFail = 1
+        Write-Host ('  [남음] ' + (Short $CysHome) + ' - 이 자리를 읽지 못해 아무것도 바꾸지 않았습니다.')
+        return $false
+    }
+    if (Test-IsReparse $hi) {
+        $script:KeptFail++
+        Write-Host ('  [남음] ' + (Short $CysHome) + ' - 바로가기라 이전 대화를 제자리로 되옮길 수 없어 아무것도 바꾸지 않았습니다.')
+        return $false
+    }
+    # ~\.cys\claude 자체가 바로가기면 못 푼다(0.3.36 규칙 그대로 · 맥 짝) — 이름표만 되옮기면 가리키는 곳의 옛 CLAUDE.md 가 새 판을 막고,
+    #   안 되옮기면 새 자리에서 이전 대화가 안 보인다 ⇒ 아무것도 바꾸지 않고 멈춘다(가리키는 곳의 자료는 원래 무접촉).
+    if (Test-IsReparsePath (Join-Path $CysHome 'claude')) {
+        $script:KeptFail++
+        Write-Host ('  [남음] ' + (Short (Join-Path $CysHome 'claude')) + ' - 바로가기라 이전 대화를 제자리로 되옮길 수 없어 아무것도 바꾸지 않았습니다.')
+        return $false
+    }
+    # 지난번 되옮기기를 이번 실행에서 끝내지 못했으면(겹침 · 못 옮김) ~\.cys 를 또 옮기지 않는다 — 옛 자료가 보관본 두 곳으로 갈라진다.
+    if ($script:ResumeLeft) {
+        $script:KeptFail++; $script:ArchiveFail = 1
+        Write-Host ('  [남음] 지난번 옮기기가 아직 끝나지 않아 이번에는 ' + (Short $CysHome) + ' 를 바꾸지 않았습니다.')
+        Write-Host '         예전 자료는 보관 폴더에 그대로 있고, 위 [남음] 줄의 까닭이 풀린 뒤 다시 실행하시면 이어서 제자리로 옮깁니다.'
+        return $false
+    }
+    $list = Get-ReinstallKeepList
+    if ($null -eq $list) {
+        $script:KeptFail++; $script:ArchiveFail = 1
+        Write-Host ('  [남음] ' + (Short $CysHome) + ' - 남길 자리의 목록을 읽지 못해 아무것도 바꾸지 않았습니다.')
+        return $false
+    }
+    if (-not (Set-ArchiveRoot)) {
+        $script:KeptFail++; $script:ArchiveFail = 1
+        Write-Host ('  [남음] ' + (Short $CysHome) + ' - 보관 폴더를 만들지 못해 그대로 두었습니다(지운 것 없음).')
+        return $false
+    }
+    $markPath = Join-Path $script:ARoot $RestoreMark
+    if (Test-PathOrLink $markPath) {
+        # 이 보관 폴더에 아직 끝나지 않은 되옮기기가 있다 — 덮어쓰면 그 목록을 잃는다(자료는 남아도 제자리로 못 돌아온다).
+        $script:KeptFail++; $script:ArchiveFail = 1
+        Write-Host ('  [남음] 지난번 옮기기가 아직 끝나지 않아 이번에는 ' + (Short $CysHome) + ' 를 바꾸지 않았습니다.')
+        Write-Host ('         자료는 ' + (Short $script:ARoot) + ' 에 그대로 있고, 다시 실행하시면 이어서 제자리로 옮깁니다.')
+        return $false
+    }
+    $hname = Get-FreeRel $script:ARoot 'cys-home'
+    try { Write-RestoreMark $markPath (@($hname) + @($list)) }
+    catch {
+        $script:KeptFail++; $script:ArchiveFail = 1
+        Write-Host ('  [남음] 되옮기기 표지를 쓰지 못해 ' + (Short $CysHome) + ' 를 그대로 두었습니다(지운 것 없음).')
+        return $false
+    }
+    $kf = $script:KeptFail
+    $ok = Archive-Move $CysHome $hname 'cys 계정 자리(다시 까는 길 - 남길 것은 곧 제자리로 되옮깁니다)'
+    if ((-not $ok) -or (Test-PathOrLink $CysHome)) {
+        # 원자리가 그대로면 아무것도 안 옮긴 것 — 표지를 거둔다(자료는 원자리에 온전). 재설치는 여기서 멈춘다(옛 ~\.cys 위에 이어 가지 않는다).
+        if (Test-PathOrLink $CysHome) { try { [System.IO.File]::Delete($markPath) } catch { } }
+        $script:ArchiveFail = 1
+        if ($script:KeptFail -eq $kf) { $script:KeptFail++ }
+        return $false
+    }
+    try { [void][System.IO.Directory]::CreateDirectory($CysHome) } catch { }
+    if (-not (Restore-From $script:ARoot)) { return $false }
+    Write-Host '  남김: 자비스 창 로그인·이전 대화는 그대로 · 부서 등록부·부서 좌석 기록도 그대로 (다시 까는 길이라 보관 폴더에서 제자리로 되옮겼습니다)'
+    return $true
+}
+# 완전 삭제 길 — 프로그램 폴더 안에서 프로그램 파일이 아닌 것(실행 기록 · 부서 상태 · 모르는 이름)을 보관 폴더로 옮긴다(DESIGN-0337 3-4절).
+#   프로그램 파일은 보관 관문 **뒤에서** 지운다(Remove-CysProgramFiles). 폴더 자체가 바로가기면 여기서는 손대지 않는다(뒤에서 이름표만).
+function Invoke-CysAppStateArchive($dir) {
+    $di = $null
+    try { $di = Get-Item -LiteralPath $dir -Force -ErrorAction Stop } catch { $di = $null }
+    if (-not $di) {
+        if (Test-Path -LiteralPath $dir) {
+            $script:ArchiveFail = 1; $script:KeptFail++
+            Write-Host ('  [남음] ' + (Short $dir) + ' - 이 자리를 읽지 못해 아무것도 옮기지 않았습니다.')
+        }
+        return
+    }
+    if (Test-IsReparse $di) { return }
+    $kids = $null
+    try { $kids = @(Get-ChildItem -LiteralPath $dir -Force -ErrorAction Stop) }
+    catch {
+        $script:ArchiveFail = 1; $script:KeptFail++
+        Write-Host ('  [남음] ' + (Short $dir) + ' - 안의 목록을 읽지 못해 아무것도 옮기지 않았습니다.')
+        return
+    }
+    foreach ($k in $kids) {
+        if (Test-CysProgramItem $k) { continue }
+        # 부서 실행 상태(cys-dept-<n>)는 맥과 같은 자리(cys-dept-state\) — 두 OS 보관 폴더 모양을 같게(DESIGN-0337 3-3절)
+        if ([string]$k.Name -ilike 'cys-dept-*') { [void](Archive-Move (Join-Path $dir $k.Name) ('cys-dept-state\' + $k.Name) '부서 실행 상태'); continue }
+        [void](Archive-Move (Join-Path $dir $k.Name) ('cys-app-state\' + $k.Name) 'cys 실행 기록')
+    }
+}
+# 보관 관문 뒤 — 프로그램 폴더에서 프로그램 파일만 지우고, 비었으면 폴더도 지운다(설치 템플릿 RMDir "$INSTDIR" 와 같다 · 비었을 때만).
+function Remove-CysProgramFiles($dir, $label) {
+    $di = $null
+    try { $di = Get-Item -LiteralPath $dir -Force -ErrorAction Stop } catch { $di = $null }
+    if (-not $di) {
+        if (Test-Path -LiteralPath $dir) { $script:KeptFail++; Write-Host ('  [남음] ' + $label + ' · ' + (Short $dir) + ' - 이 자리를 읽지 못해 지우지 않았습니다.') }
+        return
+    }
+    $kids = $null
+    try { $kids = @(Get-ChildItem -LiteralPath $dir -Force -ErrorAction Stop) }
+    catch { $script:KeptFail++; Write-Host ('  [남음] ' + $label + ' · ' + (Short $dir) + ' - 안의 목록을 읽지 못해 지우지 않았습니다.'); return }
+    foreach ($k in $kids) {
+        if (Test-CysProgramItem $k) { Drop ($label + ' 파일') (Join-Path $dir $k.Name) }
+    }
+    $rest = $null
+    try { $rest = @(Get-ChildItem -LiteralPath $dir -Force -ErrorAction Stop) } catch { $rest = $null }
+    if (($null -ne $rest) -and ($rest.Count -eq 0)) { Drop $label $dir }
+    elseif ($null -ne $rest) { Write-Host ('  남김: ' + (Short $dir) + ' - 프로그램 파일은 지웠고, 안에 남은 기록 ' + $rest.Count + '가지는 그대로 둡니다.') }
+}
+# ── 우리 설치 자리를 가리키는 등록·바로가기만 지운다(공식 제거기의 뒷정리 · installer.nsi:853~907 · 남의 같은 이름 항목 무접촉) ──
+function Test-OurInstallDir($p) {   # 이 자리가 우리 설치 자리(%LOCALAPPDATA%\cys · 옛 Programs\cys)인가 — 글자 비교(대소문자 무시 · 따옴표 뗌)
+    if (-not $p) { return $false }
+    $x = Norm-Slash ([Environment]::ExpandEnvironmentVariables(([string]$p).Trim().Trim('"')))
+    foreach ($d in @($CysDir, $CysDirOld)) { if ($d -and ($x -ieq (Norm-Slash $d))) { return $true } }
+    return $false
+}
+function Get-ExePathOf($cmd) {   # 명령 줄에서 실행 파일 자리만(따옴표 안 · 따옴표가 없으면 .exe 까지)
+    $s = ([string]$cmd).Trim()
+    if ($s -match '^"([^"]+)"') { return $Matches[1] }
+    if ($s -match '^(.+?\.exe)(\s|$)') { return $Matches[1] }
+    return $s
+}
+function Test-OurExe($exe) {   # 우리 설치 자리 **바로 안의** 실행 파일인가
+    if (-not $exe) { return $false }
+    $e = Norm-Slash ([Environment]::ExpandEnvironmentVariables([string]$exe))
+    if ($e -notmatch '(?i)\.exe$') { return $false }
+    $i = $e.LastIndexOf('\')
+    if ($i -le 0) { return $false }
+    return (Test-OurInstallDir $e.Substring(0, $i))
+}
+function Get-RegValue($key, $name) {   # 값이 없거나 못 읽으면 $null
+    try { $o = Get-ItemProperty -LiteralPath $key -Name $name -ErrorAction Stop; return $o.$name } catch { return $null }
+}
+function Test-OurUninstallKey($key) {   # 설치 목록 항목이 우리 설치 자리를 가리키는가(InstallLocation 또는 UninstallString 의 uninstall.exe 자리)
+    if (Test-OurInstallDir (Get-RegValue $key 'InstallLocation')) { return $true }
+    $exe = Get-ExePathOf (Get-RegValue $key 'UninstallString')
+    if ((Test-OurExe $exe) -and ((Split-Path -Leaf (Norm-Slash $exe)) -ieq 'uninstall.exe')) { return $true }
+    return $false
+}
+function Remove-RegKeyOurs($key, $label) {   # 이 계정(HKCU) 키만 · 하위 키째(레지스트리에는 링크가 없다)
+    if (([string]$key) -notmatch '^HKCU:\\') { $script:KeptFail++; Write-Host ('  [남음] ' + $label + ' · ' + $key + ' - 다룰 수 있는 자리 모양이 아닙니다(지우지 않았습니다).'); return $false }
+    try { Remove-Item -LiteralPath $key -Recurse -Force -ErrorAction Stop; $script:Removed++; Write-Host ('  지움: ' + $label + ' · ' + $key); return $true }
+    catch { $script:KeptFail++; Write-Host ('  [남음] ' + $label + ' · ' + $key + ' - ' + $_.Exception.Message); return $false }
+}
+function Invoke-OurRegistryCleanup {
+    # 0.3.37: 남겨야 할 자리를 확인하지 못한 실행은 프로그램 파일·바로가기를 안 지운다(Drop · Remove-OurShortcuts) —
+    #   등록만 지우면 설정 앱 항목 없는 고아 프로그램이 남는다 ⇒ 등록도 함께 남긴다(프로그램과 한 쌍).
+    if ($script:PreserveCanonFail.Count -gt 0) {
+        $script:KeptFail++
+        Write-Host '  [남음] cys 설치 목록 항목·설치 위치 기록·자동 실행 값 - 남겨야 할 자리를 확인하지 못해 프로그램과 함께 그대로 두었습니다.'
+        return
+    }
+    # 설치 목록 항목(설정 앱 목록 · installer.nsi:880~887 · 옛 이름 nsis-hooks.nsh:863~868)
+    foreach ($k in @($RegKeyR, $RegKey)) {
+        if (-not (Test-Path -LiteralPath $k)) { continue }
+        if (Test-OurUninstallKey $k) { [void](Remove-RegKeyOurs $k 'cys 설치 목록 항목') }
+        else { Write-Host ('  남김: ' + $k + ' - 우리 설치 자리를 가리키지 않아 손대지 않았습니다(다른 설치일 수 있습니다).') }
+    }
+    # 설치 위치 기록 Software\<제조사>\<제품 이름> 기본값(installer.nsi:708·902~907) — 값이 우리 설치 자리일 때만
+    $manuHit = $false
+    foreach ($n in @('cysr', 'cys')) {
+        $k = $ManuKey + '\' + $n
+        if (-not (Test-Path -LiteralPath $k)) { continue }
+        if (Test-OurInstallDir (Get-RegValue $k '(default)')) { if (Remove-RegKeyOurs $k 'cys 설치 위치 기록') { $manuHit = $true } }
+        else { Write-Host ('  남김: ' + $k + ' - 우리 설치 자리를 가리키지 않아 손대지 않았습니다.') }
+    }
+    # 제조사 키가 이제 비었으면(하위 키·값 없음) 지운다 — 설치 템플릿 DeleteRegKey /ifempty 와 같다(installer.nsi:906)
+    if ($manuHit -and (Test-Path -LiteralPath $ManuKey)) {
+        $sub = $null
+        try { $sub = @(Get-ChildItem -LiteralPath $ManuKey -Force -ErrorAction Stop) } catch { $sub = $null }
+        $vals = @('?')
+        try { $vals = @(@((Get-Item -LiteralPath $ManuKey -ErrorAction Stop).Property) | Where-Object { $_ }) } catch { $vals = @('?') }
+        if (($null -ne $sub) -and ($sub.Count -eq 0) -and ($vals.Count -eq 0)) { [void](Remove-RegKeyOurs $ManuKey 'cys 제조사 기록(빈 칸)') }
+    }
+    # 자동 실행 값 Run\<제품 이름>(installer.nsi:893~895) — 값이 우리 실행 파일일 때만
+    foreach ($n in @('cysr', 'cys')) {
+        $v = Get-RegValue $RunKey $n
+        if ($null -eq $v) { continue }
+        if (Test-OurExe (Get-ExePathOf $v)) {
+            try { Remove-ItemProperty -LiteralPath $RunKey -Name $n -ErrorAction Stop; $script:Removed++; Write-Host ('  지움: cys 자동 실행 값 (' + $n + ')') }
+            catch { $script:KeptFail++; Write-Host ('  [남음] cys 자동 실행 값 (' + $n + ') - ' + $_.Exception.Message) }
+        } else { Write-Host ('  남김: 자동 실행 값 ' + $n + ' - 우리 프로그램을 가리키지 않아 손대지 않았습니다.') }
+    }
+}
+function Get-ShortcutTarget($lnk) {   # 바로가기가 가리키는 실행 파일 · 못 읽으면 ''(그때 부르는 쪽은 지우지 않는다 = 모르면 남김)
+    try {
+        $sh = New-Object -ComObject WScript.Shell
+        return [string]$sh.CreateShortcut($lnk).TargetPath
+    } catch { return '' }
+}
+function Remove-OurShortcuts {   # 시작 메뉴 · 바탕화면 — 대상이 우리 설치 자리 실행 파일일 때만(installer.nsi:853~877)
+    $links = @(Get-StartMenuLinks) + @(Get-DesktopLinks)
+    if ($links.Count -eq 0) { Write-Host '  [없음] cys 시작 메뉴 바로가기'; return }
+    if ($script:PreserveCanonFail.Count -gt 0) {
+        $script:KeptFail++
+        Write-Host '  [남음] cys 바로가기 - 남겨야 할 자리를 확인하지 못해 이번에는 지우지 않았습니다.'
+        return
+    }
+    foreach ($lnk in $links) {
+        $li = $null
+        try { $li = Get-Item -LiteralPath $lnk -Force -ErrorAction Stop } catch { $li = $null }
+        if ((-not $li) -or $li.PSIsContainer -or (Test-IsReparse $li)) { continue }
+        $t = Get-ShortcutTarget $lnk
+        if (-not $t) { Write-Host ('  남김: ' + (Short $lnk) + ' - 가리키는 곳을 확인하지 못해 그대로 두었습니다(모르면 남깁니다).'); continue }
+        if (-not (Test-OurExe $t)) { Write-Host ('  남김: ' + (Short $lnk) + ' - 우리 설치 자리를 가리키지 않아 손대지 않았습니다.'); continue }
+        try { [System.IO.File]::Delete($lnk) } catch { }
+        if (Test-PathOrLink $lnk) { $script:KeptFail++; Write-Host ('  [남음] cys 바로가기 · ' + (Short $lnk)); continue }
+        $script:Removed++
+        Write-Host ('  지움: cys 바로가기 · ' + (Short $lnk))
+        # 폴더 안 바로가기(cys\cys.lnk · cysr\cysr.lnk)면 그 폴더도 — 비었을 때만(installer.nsi:861)
+        $pd = Split-Path -Parent $lnk
+        $pl = [string](Split-Path -Leaf $pd)
+        if (($pl -ieq 'cys') -or ($pl -ieq 'cysr')) {
+            try { if (@(Get-ChildItem -LiteralPath $pd -Force -ErrorAction Stop).Count -eq 0) { [System.IO.Directory]::Delete($pd, $false) } } catch { }
+        }
+    }
+}
+# ── 사전 훑기(읽기만 · 첫 변경 전 · DESIGN-0337 6-1절 ②③④) ──
+#   옮길 자료 자리 아래 바로가기가 이 실행이 **지우는** 프로그램 자리를 가리키거나(그곳 자료가 사라진다) · 경로에 줄바꿈이 있거나 ·
+#   목록을 못 읽으면 $false → 이 실행은 아무것도 바꾸지 않는다(rc 7).
+#   남길 것(재설치) 안 바로가기가 ~\.cys 의 남길 것 밖을 가리키면 PrescanNote(멈추지 않음 · 가리키던 자료는 보관 폴더에 있다 = 반례 ①) —
+#   단 참가 자리가 ~\.cys 안인 예외 갈래(남기고 지우기)에서는 그 자료가 지워지므로 못 풂(삭제 0).
+#   ★목록은 한 층씩 훑고 바로가기 안으로 들어가지 않는다(Get-TreeItems) · 읽기 실패 = 못 풂(「Get-Item 읽기 실패 = 없음 모양」 함정).
+$script:PrescanBad = ''
+$script:PrescanNote = @()
+function Test-UnderAny($p, $roots) {
+    foreach ($r in @($roots)) { if ($r -and ((Path-IsSame $p $r) -or (Path-IsUnder $p $r))) { return $true } }
+    return $false
+}
+function Invoke-Prescan {
+    $script:PrescanBad = ''
+    $script:PrescanNote = @()
+    foreach ($s in @([string]$env:USERPROFILE, [string]$JarvisDir)) {
+        if ($s -match "[`r`n]") { $script:PrescanBad = '(사용자 폴더나 작업 폴더 경로에 줄바꿈이 있습니다)'; return $false }
+    }
+    # 이 실행이 지우는 프로그램 자리(실경로)
+    $proots = @()
+    foreach ($p in @($ClaudeExe, $HomePs1, $TempPs1)) {
+        if (Test-PathOrLink $p) { $c = Canon-Path $p; if ($c) { $proots += $c } }
+    }
+    $dataRoots = New-Object System.Collections.ArrayList
+    foreach ($d in @($CysDir, $CysDirOld)) {
+        $di = $null
+        try { $di = Get-Item -LiteralPath $d -Force -ErrorAction Stop } catch { $di = $null }
+        if (-not $di) {
+            if (Test-Path -LiteralPath $d) { $script:PrescanBad = (Short $d) + ' (이 자리를 읽지 못했습니다)'; return $false }
+            continue
+        }
+        if (Test-IsReparse $di) { continue }
+        $kids = $null
+        try { $kids = @(Get-ChildItem -LiteralPath $d -Force -ErrorAction Stop) } catch { $script:PrescanBad = (Short $d) + ' (목록을 읽지 못했습니다)'; return $false }
+        $dc = ''
+        if (-not $KeepApp) { $dc = Canon-Path $d; if (-not $dc) { $script:PrescanBad = (Short $d) + ' (실제 경로를 확인하지 못했습니다)'; return $false } }
+        foreach ($k in $kids) {
+            if (Test-CysProgramItem $k) { if ($dc) { $proots += (Norm-Path ($dc + '\' + $k.Name)) } }
+            else { [void]$dataRoots.Add((Join-Path $d $k.Name)) }
+        }
+    }
+    # 재설치 길의 남길 것(반례 ① 판정용 · 실경로)
+    $keeps = @(); $hc = ''; $nested = $false
+    if ($KeepHistory) {
+        $hi = $null
+        try { $hi = Get-Item -LiteralPath $CysHome -Force -ErrorAction Stop } catch { $hi = $null }
+        if ((-not $hi) -and (Test-Path -LiteralPath $CysHome)) { $script:PrescanBad = (Short $CysHome) + ' (이 자리를 읽지 못했습니다)'; return $false }
+        if ($hi -and $hi.PSIsContainer -and -not (Test-IsReparse $hi)) {
+            $hc = Canon-Path $CysHome
+            if (-not $hc) { $script:PrescanBad = (Short $CysHome) + ' (실제 경로를 확인하지 못했습니다)'; return $false }
+            $list = Get-ReinstallKeepList
+            if ($null -eq $list) { $script:PrescanBad = (Short $CysHome) + ' (목록을 읽지 못했습니다)'; return $false }
+            foreach ($r in $list) {
+                if ([string]$r -match "[`r`n]") { $script:PrescanBad = '(남길 자리 이름에 줄바꿈이 있습니다)'; return $false }
+                $keeps += (Norm-Path ($hc + '\' + $r))
+            }
+            # 참가 자리가 ~\.cys 안인가(예외 갈래 · 4-4절) — 읽기만(보존 경로 실경로 풀기)
+            Initialize-PreserveCanon
+            $nested = (@(Get-PreservedUnder $hc).Count -gt 0)
+        }
+    }
+    foreach ($r in @($CysHome, $JarvisDir, $CysTrash)) { [void]$dataRoots.Add($r) }
+    foreach ($r in $dataRoots) {
+        $ri = $null
+        try { $ri = Get-Item -LiteralPath $r -Force -ErrorAction Stop } catch { $ri = $null }
+        if (-not $ri) {
+            if (Test-Path -LiteralPath $r) { $script:PrescanBad = (Short $r) + ' (이 자리를 읽지 못했습니다)'; return $false }
+            continue
+        }
+        if (Test-IsReparse $ri) { continue }   # 뿌리 자체가 바로가기 = 이름표만 다룬다(안으로 안 들어간다)
+        if (-not $ri.PSIsContainer) { continue }
+        $items = @(Get-TreeItems $r)
+        if ($script:EnumFail -gt 0) { $script:PrescanBad = (Short $r) + ' (목록을 끝까지 읽지 못했습니다)'; return $false }
+        foreach ($it in $items) {
+            if (-not (Test-IsReparse $it)) { continue }
+            $full = [string]$it.FullName
+            if ($full -match "[`r`n]") { $script:PrescanBad = (Short $full) + ' (경로에 줄바꿈이 있습니다)'; return $false }
+            $t = Canon-Path $full
+            if (-not $t) { continue }   # 끊긴 바로가기 = 뒤에 자료 없음
+            if ($t -match "[`r`n]") { $script:PrescanBad = (Short $full) + ' (경로에 줄바꿈이 있습니다)'; return $false }
+            if (Test-UnderAny $t $proots) {
+                $script:PrescanBad = (Short $full) + ' -> ' + (Short $t) + ' (지울 프로그램 자리를 가리킵니다)'
+                return $false
+            }
+            if ($keeps.Count -gt 0) {
+                # 바로가기 **자리**의 실경로 = 부모 실경로 + 이름(Canon-Path 는 바로가기를 따라가 버린다)
+                $pc = Canon-Path (Split-Path -Parent $full)
+                $loc = ''
+                if ($pc) { $loc = Norm-Path ($pc + '\' + $it.Name) }
+                if ($loc -and (Test-UnderAny $loc $keeps) -and (Test-UnderAny $t @($hc)) -and -not (Test-UnderAny $t $keeps)) {
+                    if ($nested) { $script:PrescanBad = (Short $full) + ' -> ' + (Short $t) + ' (남길 자리 밖을 가리킵니다)'; return $false }
+                    $script:PrescanNote += (Short $full)
+                }
+            }
+        }
+    }
+    return $true
+}
+# 끝 요약 한 줄 — 보관 폴더 자리와 크기(쉬운 말)
+function Get-HumanSize($bytes) {
+    $k = [long][Math]::Ceiling([double]$bytes / 1024)
+    if ($k -ge 1048576) { return ('약 {0}.{1}GB' -f [long][Math]::Floor($k / 1048576), [long][Math]::Floor(($k % 1048576) * 10 / 1048576)) }
+    if ($k -ge 1024) { return ('약 {0}MB' -f [long][Math]::Floor(($k + 1023) / 1024)) }
+    return '1MB 미만'
+}
+function Write-ArchiveSummary {
+    $seen = @()
+    foreach ($d in @($script:ArchiveDest, $script:ArchiveHome)) {
+        if (-not $d) { continue }
+        if (-not (Test-Path -LiteralPath $d -PathType Container)) { continue }
+        if (@($seen | Where-Object { $_ -ieq $d }).Count -gt 0) { continue }
+        $seen += $d
+        # 크기는 바로가기를 따라가지 않고 잰다(Get-TreeStat — junction 고리에서 끝없이 돌지 않는다) · 못 재면 크기 없이 말한다
+        $st = Get-TreeStat $d
+        $sz = ''
+        if ($st) { $sz = ' (' + (Get-HumanSize ([long](([string]$st -split ' ')[1]))) + ')' }
+        Write-Host ('    이전 자료는 ' + (Short $d) + ' 폴더에 모두 보관해 두었습니다' + $sz + '. 필요 없으시면 나중에 그 폴더를 지우셔도 됩니다.')
+    }
 }
 
 # 우리가 홈에 **새로 넣은** 신뢰 키의 목록을 읽는다 — 설치기가 적어 둔 TSV(설정파일<탭>키).
@@ -1373,6 +2203,10 @@ function Invoke-Purge {
     # 🔴**자비스 폴더를 지우기 전에** 신뢰 씨앗 기록을 읽어 둔다(1차 REVISE ④ 확정 2026-09-10).
     #   그 기록 파일은 자비스 작업 폴더 안에 있고, 아래에서 그 폴더를 지운다 — 순서를 뒤집으면
     #   기록이 먼저 사라져 「우리가 넣은 것」과 「참가자의 것」을 영영 구별할 수 없다.
+    # 0.3.37(맥 짝): 신뢰 칸 실패 깃발은 **이 회차가 다시 잰 값**이다 — 바로 아래 기록 읽기·칸 되돌리기가 이번 회차에 다시 돌며
+    #   실패하면 다시 세운다(무조건 풀기가 아니다). 앞 판은 회차 사이에 안 풀어, 1회차에 잠깐 잠겼던 칸이 풀려도
+    #   스스로 다시 해 보기 2·3회차가 늘 작업 폴더를 남기고 rc 7 로 끝났다.
+    $script:TrustCleanupFail = 0
     $script:TrustSeedRows = @(Read-TrustSeedRecord)
 
     # ★남겨야 할 자리의 실경로를 **먼저 한 번에** 푼다. 하나라도 못 풀면 이 실행은 파일을 지우지 않는다.
@@ -1386,6 +2220,11 @@ function Invoke-Purge {
         Write-Host '         무엇을 남겨야 하는지 모르는 채로 지우면 참가 열쇠를 잃을 수 있습니다.'
         Write-Host '         그 자리를 살펴보신 뒤(링크가 끊겼거나 권한이 없을 수 있습니다) 아래 「다시 하시는 법」대로 다시 실행해 주십시오.'
     }
+
+    # 0.3.37: 지난 재설치의 되옮기기가 도중에 끊겼으면(창이 닫힘 · 전원) **그것부터** 이어서 끝낸다(자료는 보관 폴더에 온전하다).
+    Resume-UnfinishedRestore
+    # r1 F4: 지난 실행에서 끝내지 못한 보관본 속 로그인 파일 지우기를 이어서 한다(어느 길이든 — 완전 삭제 보관본만)
+    Resume-ArchivedCredentials
 
     # ★순서가 중요하다 — 등록을 떼는 명령과 로그아웃 명령이 지울 대상 **안에** 들어 있다.
     Invoke-PurgeLoginFirst
@@ -1411,130 +2250,30 @@ function Invoke-Purge {
     # footprint: W-HOOK
     Remove-OurHooks $SettingsJs
 
-    # cys 프로그램 지우기 — 기본은 사람이 설정 앱에서 한다(위 머리글의 이유).
     # footprint: W-APP
-    # 🔴2026-09-09 실사용자 3호 실기 — 여기가 교착이 났던 자리다.
-    #   그 기계는 **폴더는 있는데 설치 목록 항목이 없었다**(지난 설치가 끝까지 못 간 흔한 자리).
-    #   설정 앱이 보는 곳이 바로 그 항목이므로, 설정 앱에는 cys 가 **아예 없었다.**
-    #   그런데 앞 판은 판별을 「uninstall.exe 가 있는가」 하나로만 했다 ⇒ 사람에게
-    #   **설정 앱에서 지우라고 8번 요구**했고, 사람은 할 수 없는 일이라 q 로 빠져나갈 수밖에 없었다.
-    #   ⇒ 판별을 두 축으로 가른다. **요구하기 전에 그 항목이 실제로 있는지 먼저 본다** —
-    #     사람이 할 수 없는 일을 요구하는 고리가 구조적으로 생기지 못하게.
+    # 0.3.37(DESIGN-0337 3-4절): 설정 앱 제거를 사람에게 시키지 않는다(사람 손 0) · 제거 프로그램도 띄우지 않는다(머리글의 까닭 ·
+    #   -UseUninstaller 를 붙이셨을 때만 옛 방식). 순서 = 자리 기준 끄기 → 자료 보관(작업 폴더 · ~\.cys · 실행 기록 · 휴지통 · 앱 화면 자료)
+    #   → 보관 관문 → 프로그램 파일 지우기 · 우리 설치 자리를 가리키는 설치 목록 항목 · 바로가기 · 설치 위치 기록 · 자동 실행 값.
+    #   🔴앞 판의 설정 앱 안내 · 「제거를 마치셨으면 Enter」 고리 · 「이 폴더를 지웁니다」 확인은 사람이 할 수 없는 일을 요구하다 막힌 일이 셋이었다
+    #     (설정 앱에 없는 항목을 여덟 번 요구 · Enter 만 믿고 뜯음 · 1.1.x 의 cysr 항목을 몰라 「설정 앱에는 cys 가 보이지 않습니다」 라는 틀린 말).
     $hasRegEntry = Test-Path $RegKey
-    if ($KeepApp) {
-        # 재설치 길(-KeepApp) — 이 절 전체를 건너뛴다. 제거 프로그램 · 설정 앱 안내 · Enter 고리 · 폴더 삭제 확인이 모두 없다.
-        #   이 절이 사람 손을 부르다 막힌 일이 셋이었다(제거 프로그램을 직접 실행하자 창이 꺼짐 · Enter 만 믿고 뜯음 ·
-        #   설정 앱에 없는 항목을 여덟 번 요구). 재설치는 곧바로 다시 까는 길이라 프로그램을 지울 까닭이 없다.
-        Write-Host '  남김: cys 프로그램 (재설치 — 지우지 않고 그대로 씁니다)'
-    } elseif ((Test-Path $UninstExe) -and $UseUninstaller) {
-        Write-Host '  cys 제거 프로그램을 실행합니다. (백신이 이 행위를 막을 수 있습니다)'
-        try {
-            $u = Start-Process -FilePath $UninstExe -ArgumentList '/S' -PassThru -ErrorAction Stop
-            if (-not $u.WaitForExit(180000)) { Write-Host '    제거 프로그램이 180초 안에 끝나지 않았습니다. 기다리기를 멈추고 나머지를 지웁니다.' }
-        } catch {
-            Write-Host ("    제거 프로그램을 실행하지 못했습니다: " + $_.Exception.Message)
-            Write-Host '    백신이 막았을 수 있습니다. 그 화면의 이름, 대상 파일, 조치(차단·격리·종료)를 알려 주십시오.'
-        }
-        Start-Sleep -Seconds 3
-    } elseif ((Test-Path $UninstExe) -and $hasRegEntry) {
-        Write-Host ''
-        Write-Host '  cys 프로그램은 윈도우 설정 앱에서 지워 주십시오 (이 스크립트가 직접 지우지 않습니다).'
-        Write-Host '    시작 단추 > 설정 > 앱 > 설치된 앱 > cys > 제거'
-        Write-Host '    제거 창이 나타나면 안내대로 진행하시고, 끝나면 이 창으로 돌아오십시오.'
-        Write-Host ''
-        # 건너뛰기는 없다 — cys 프로그램이 남으면 아래에서 [남음] 이 되고 재설치로 넘어가지 않는다.
-        #   (앞 판의 「건너뛰려면 그냥 Enter」는 Enter 만 믿고 곧바로 지우던 시절의 문구였다. 확인 단계가
-        #    생긴 뒤에도 그 문구가 남아 있어, 건너뛸 수 있다고 읽히면서 실제로는 멈추게 했다 — 2026-09-08 지적.)
-        #   그래서 지워질 때까지 같은 자리에서 다시 묻는다. 그만두고 싶으면 q — 그때는 사실대로 [남음] 으로 남긴다.
-        if (-not $Yes) {
-            while (Test-Path $UninstExe) {
-                $a = Read-Host '  제거를 마치셨으면 Enter 를 눌러 주십시오 (제거하지 않고 여기서 그만두려면 q)'
-                if ($a -eq 'q') { break }
-                if (Test-Path $UninstExe) { Write-Host '  아직 지워지지 않았습니다. 설정 앱에서 제거를 마친 뒤 이 창으로 돌아와 Enter 를 눌러 주십시오.' }
-            }
-        }
-        # 🔴교차 검토 지적 채택(2026-09-08): 앞 판은 Enter 만 믿고 곧바로 폴더와 등록 항목을 뜯어냈다.
-        #   사람이 설정 앱에서 지우지 않고 무심코 Enter 만 눌러도 그렇게 됐다 — 그러면 공식 제거기가
-        #   해 주는 뒷정리(시작 메뉴 바로가기 등)가 안 된 채 폴더만 사라져 **고아가 남는다.**
-        #   ⇒ 정말 지워졌는지 보고, 안 지워졌으면 **우리가 억지로 뜯지 않고** 사실대로 말한다.
-        if (Test-Path $UninstExe) {
-            $script:KeptFail++
-            Write-Host '  [남음] cys 프로그램 — 설정 앱에서 아직 지워지지 않았습니다.'
-            Write-Host '         우리가 폴더만 억지로 지우면 시작 메뉴 바로가기 같은 것이 남습니다.'
-            Write-Host '         설정 앱에서 제거를 마치신 뒤 아래 「다시 하시는 법」대로 다시 실행해 주십시오.'
-            $script:SkipCysDir = $true
-        }
-    } elseif ((Test-Path $CysDir) -or (Test-Path $CysDirOld)) {
-        # 정식 제거 경로를 쓸 수 없는 자리다. 까닭이 둘인데 **사람에게 하는 말이 달라야 한다** —
-        #   ⑴목록 항목이 없다  ⇒ 설정 앱에 cys 가 아예 안 보인다(3호가 만난 자리)
-        #   ⑵항목은 있는데 제거 프로그램이 없다 ⇒ 설정 앱에서 눌러도 그 자리에서 실패한다
-        #   ⛔한 문장으로 뭉뚱그리면 둘 중 하나는 **거짓말**이 된다(검토 지적 채택 2026-09-09 -
-        #     앞 판은 ⑵에서도 「항목이 없습니다」라고 적었다. 사람이 설정 앱을 열어 보면 항목이 있다).
-        #   ⇒ 이때만 우리가 직접 지운다. 대신 지우기 전에 두 가지를 확인한다 —
-        #     ⑴돌고 있지 않은가(돌고 있으면 폴더가 안 지워지고 [남음] 이 거짓이 된다)
-        #     ⑵사람이 지금 지워도 된다고 하는가(한 번만 묻는다 · 반복 요구 없음).
-        Write-Host ''
-        if ($hasRegEntry) {
-            Write-Host '  cys 폴더는 있는데 제거 프로그램이 없습니다 (지난 설치가 끝까지 못 간 자리입니다).'
-            Write-Host '    설정 앱에 항목은 보이지만 눌러도 그 자리에서 실패합니다 — 그래서 이번에는 이 스크립트가 직접 지웁니다.'
-        } else {
-            Write-Host '  cys 폴더는 있는데 설치 목록에는 항목이 없습니다 (지난 설치가 끝까지 못 간 자리입니다).'
-            Write-Host '    설정 앱에는 cys 가 보이지 않습니다 — 그래서 이번에는 이 스크립트가 직접 지웁니다.'
-        }
-        $alive = @(Stop-CysProcesses)
-        if ($alive.Count -gt 0) {
-            $script:KeptFail++
-            $script:SkipCysDir = $true
-            Write-Host '  [남음] cys 프로그램 — 아직 실행 중이라 폴더를 지울 수 없습니다.'
-            Write-AliveProcs $alive
-            Write-Host '         그 뒤 아래 「다시 하시는 법」대로 다시 실행해 주십시오.'
-        } elseif (-not $Yes) {
-            $a = Read-Host '  이 폴더를 지웁니다. 계속하시려면 Enter 를 눌러 주십시오 (그만두려면 q)'
-            if ($a -eq 'q') {
-                $script:KeptFail++
-                $script:SkipCysDir = $true
-                Write-Host '  [남음] cys 프로그램 — 지우지 않고 그만두셨습니다.'
-            }
-        }
+    # cys 가 돌고 있으면 폴더·기록이 옮겨지지 않는다 — 먼저 자리 기준으로 끈다(R1 · 고아가 된 python3.exe 가 정확히 이 자리에서 걸렸다).
+    #   ★끈 뒤에도 돌고 있으면(완전 삭제 길) 이번에는 아무것도 옮기지 않는다 — 스스로 다시 해 보기가 그 사이 창을 닫을 틈을 준다.
+    $procBlocked = $false
+    $alive = @(Stop-CysProcesses)
+    if (($alive.Count -gt 0) -and (-not $KeepApp)) {
+        $procBlocked = $true
+        $script:SkipCysDir = $true
+        $script:ArchiveFail = 1
+        $script:KeptFail++
+        Write-Host ('  [남음] cys 프로그램 — 아직 실행 중이라 옮기거나 지울 수 없어 이번에는 아무것도 옮기지 않았습니다(' + $alive.Count + '가지).')
+        Write-AliveProcs $alive
+        Write-Host '         cys 창을 모두 닫아 주십시오 — 닫힌 뒤 다시 해 보면 이어서 옮깁니다(자료는 원래 자리에 그대로 있습니다).'
+    } elseif ($alive.Count -gt 0) {
+        Write-Host ('  [주의] cys 자리에서 아직 ' + $alive.Count + '개가 돌고 있습니다 — 지난 편성 기록이 안 옮겨질 수 있습니다.')
+        Write-AliveProcs $alive
     }
 
-    # cys 가 돌고 있으면 폴더가 지워지지 않는다 — 먼저 멈춘다.
-    #   ★이름이 아니라 **자리**로 끈다(R1). 고아가 된 python3.exe 가 정확히 이 자리에서 걸렸다.
-    $stillAlive = @(Stop-CysProcesses)
-    if ($stillAlive.Count -gt 0 -and -not $script:SkipCysDir -and -not $KeepApp) {
-        Write-Host ('  [주의] cys 자리에서 아직 ' + $stillAlive.Count + '개가 돌고 있습니다 — 폴더가 안 지워질 수 있습니다.')
-        Write-AliveProcs $stillAlive
-    }
-
-    # 재설치 길(-KeepApp) — 프로그램은 남기되 지난 편성 기록은 지운다(Get-CysStateItems 머리 주석).
-    #   프로세스를 끈 **뒤에** 지운다 — cys 가 살아 있으면 끝나면서 기록을 다시 쓸 수 있다.
-    if ($KeepApp) {
-        foreach ($s in (Get-CysStateItems)) { Drop 'cys 지난 편성 기록' $s }
-    }
-    if ((-not $script:SkipCysDir) -and (-not $KeepApp)) {
-        Drop 'cys 프로그램' $CysDir
-        Drop 'cys 프로그램(옛 자리)' $CysDirOld
-        # 공식 제거기가 해 주던 뒷정리다. 우리가 폴더를 지운 길에서는 우리가 함께 지운다.
-        $links = @(Get-StartMenuLinks)
-        if ($links.Count -eq 0) { Write-Host '  [없음] cys 시작 메뉴 바로가기' }
-        else { foreach ($lnk in $links) { Drop 'cys 시작 메뉴 바로가기' $lnk } }
-    }
-    # footprint: W-REG
-    # 🔴2026-09-09 자기규명 — 앞 판은 이 줄이 **조건 없이** 돌았다. 그래서 사람이 설정 앱 제거를 미루고
-    #   q 를 누르면(폴더는 그대로 남는데) **목록 항목만 사라졌다.** 그 순간 설정 앱에서 cys 가 없어진다 —
-    #   우리가 「저기서 지우십시오」라고 가리킨 바로 그 길을 우리가 없앤 것이다. 다음 실행은 폴더만 남은
-    #   상태를 만나고, 앞 판은 거기서 또 설정 앱을 요구했다(= 3호가 만난 교착의 자가 생산 경로).
-    #   ⇒ 프로그램을 남겨 두기로 한 실행에서는 그 항목도 함께 남긴다. 둘은 한 쌍이다.
-    #   ⚠남긴다는 말은 **설정 앱에서 마저 지우실 수 있을 때만** 참이다. 항목이 애초에 없으면 그 문장은
-    #     앞의 안내와 정면으로 어긋난다(검토 지적 채택 - 「항목이 없습니다」라고 말해 놓고
-    #     「설정 앱에서 지우실 수 있게 둡니다」라고 적고 있었다).
-    if ($KeepApp) {
-        if ($hasRegEntry) { Write-Host '  남김: cys 설치 목록 항목 (프로그램과 한 쌍이라 함께 둡니다)' }
-    } elseif ($script:SkipCysDir -and $hasRegEntry) {
-        Write-Host '  남김: cys 설치 목록 항목 (프로그램이 남아 있어 설정 앱에서 지우실 수 있게 둡니다)'
-    } else {
-        Drop 'cys 설치 목록 항목' $RegKey
-    }
     # cys 계정 자리를 지우기 전에 토론장 안내 파일을 밖으로 옮겨 둔다(검토 지적 채택 2026-09-09).
     #   .cys\claude\skills\agora-delegate 는 cys 설치의 일부라 함께 사라지는 것이 맞다. 그런데 그대로 두면
     #   다시 깐 뒤 「아고라에 참가해」가 안 먹는 공백이 생긴다 - 참가 열쇠는 남았는데 쓰는 법만 없어진 꼴이다.
@@ -1606,31 +2345,6 @@ function Invoke-Purge {
         }
     }
 
-    # footprint: W-CYSHOME
-    # 0.3.36: 재설치 길(-KeepHistory)이면 로그인·이전 대화 자리를 남기고 지운다($HistoryKeepNames 머리 주석).
-    #   🔴남길 자리가 있는데 실경로를 못 풀었으면 ~\.cys 를 **하나도 지우지 않고** 못 지움으로 센다(재설치는 여기서 멈춘다).
-    #   ⚠~\.cys 를 남긴 채 설치를 이어 가면 팩이 「병합 대기」(.new)로 남아 새 판이 안 들어간다 — 그래서 이어 가지 않는다.
-    $histKeeps = @()
-    $histOk = $true
-    if ($KeepHistory -and $agoraMigrateOk) {
-        $hk = Get-HistoryKeeps
-        if ($hk.Fail.Count -gt 0) {
-            $histOk = $false
-            $script:KeptFail++
-            Write-Host ('  [남음] ' + (Short $CysHome) + ' - 남겨야 할 로그인·이전 대화 자리를 확인하지 못해 아무것도 지우지 않았습니다.')
-            foreach ($bad in $hk.Fail) { Write-Host ('         확인 못한 자리: ' + (Short $bad)) }
-            Write-Host '         확인할 수 없는 채로 지우면 로그인이나 이전 대화를 잃을 수 있습니다(바로가기가 끊겼거나 권한이 없을 수 있습니다).'
-        } else {
-            $histKeeps = @($hk.Canon)
-        }
-    }
-    if ($agoraMigrateOk -and $histOk) { Drop 'cys 계정 자리' $CysHome $histKeeps }
-    # footprint: W-CLAUDEBIN
-    # ★지우기 직전에 그 자리에서 도는 클로드를 끈다(Stop-ClaudeUnderBin 참조) — 「다시 해 봅니다(1/3)」도 이 자리를 다시 지난다.
-    $claudeAlive = @()
-    if (Test-Path $ClaudeExe) { $claudeAlive = @(Stop-ClaudeUnderBin) }
-    Drop '클로드 실행 파일' $ClaudeExe
-    if ((Test-Path $ClaudeExe) -and ($claudeAlive.Count -gt 0)) { Write-AliveProcs $claudeAlive }
     # 🔴**신뢰 키 정리를 작업 폴더 삭제보다 앞에 둔다**(2차 N4 확정 2026-09-10).
     #   기록 파일은 그 폴더 안에 있다. 폴더를 먼저 지우면, 키 정리가 실패했을 때 **다시 해 볼 근거가
     #   사라진다** — 재시도는 「기록 없음」으로 읽고 그 키를 영영 건너뛴다.
@@ -1653,7 +2367,9 @@ function Invoke-Purge {
     #   있다 — 지우면 **다시 해 볼 근거가 사라지고**, 다음 실행은 「기록 없음」으로 읽어 그 칸을
     #   영영 건너뛴다(참가자 컴퓨터에 우리 자국이 남는다).
     #   ★순서를 앞당긴 것만으로는 부족했다: 실패해도 그냥 이어서 지우고 있었다.
-    if ($script:TrustCleanupFail -gt 0) {
+    if ($procBlocked) {
+        Write-Host ('  [남김] ' + (Short $JarvisDir) + ' - cys 가 아직 돌고 있어 이번에는 옮기지 않았습니다(다음에 그대로 옮깁니다).')
+    } elseif ($script:TrustCleanupFail -gt 0) {
         $script:KeptFail++
         Write-Host ('  [남음] ' + (Short $JarvisDir) + ' - 폴더 신뢰 칸을 다 되돌리지 못해 일부러 남겼습니다.')
         Write-Host '         이 폴더 안의 기록(trust-seed.tsv)이 있어야 다시 해 볼 수 있습니다.'
@@ -1666,24 +2382,124 @@ function Invoke-Purge {
         Write-Host ('         까닭: ' + $script:SafeWhy)
         Write-Host '         그 자리는 손으로 확인해 주십시오. 확실하지 않은 자리를 재귀로 지우지 않습니다.'
     }
-    # footprint: W-SCRIPTCOPY
-    Drop '받아 둔 설치 스크립트' $HomePs1
-    Drop '받아 둔 설치 스크립트(옛 자리)' $TempPs1
-    # 남의 파일 속 우리 줄 — 파일을 지우지 않는다
-    # footprint: W-PATH
-    Remove-UserPathSeed
-    # footprint: W-CLAUDEJSON
-    Remove-JsonKey $ClaudeJson 'hasCompletedOnboarding'
-    # 큰 화면 권유 질문을 미리 넘기려고 설치기가 99 로 적어 둔 칸이다. 우리 자국이니 우리가 뺀다.
-    #   ⚠이 칸은 오래 전부터 심고 있었는데 표에 없어서 아무도 안 지웠다(2026-09-10 자국 표를 채우다 드러났다).
-    Remove-JsonKey $ClaudeJson 'fullscreenUpsellSeenCount'
-    # 폴더 신뢰 씨앗 — 설치기가 심은 자리를 되돌린다. **범위가 자리마다 다르다**(위 함수 머리글 참조).
-    #   ⑴자비스 작업 폴더(백슬래시·슬래시 2형) = 우리가 만든 칸이므로 칸째 뺀다(맥판과 같아진다).
-    Remove-ProjectEntry $ClaudeJson @($JarvisDir, ($JarvisDir -replace '\\','/'))
-    # footprint: W-CLAUDESETTINGS
-    Remove-JsonKey $SettingsJs 'theme'
-    Remove-JsonKey $SettingsJs 'skipDangerousModePermissionPrompt'
-    Remove-JsonKey $SettingsJs 'remoteControlAtStartup'
+
+    if (-not $procBlocked) {
+        # footprint: W-CYSHOME
+        # 0.3.37(DESIGN-0337 3·4절): 지우지 않고 보관 폴더로 옮긴다 — 완전 삭제 = 통째로 · 재설치(-KeepHistory) = 통째로 옮긴 뒤 남길 것만 되옮긴다.
+        #   ★작업 폴더 보관(위 Keep-JarvisDir)이 먼저다 — 그 보관 폴더에 모은다(Set-ArchiveRoot). 신뢰 칸 기록은 이미 위에서 다 썼다.
+        #   참가 자리가 ~\.cys 안이면(사람이 AGORA_HOME 을 옮겨 둔 드문 경우) 통째로 옮길 수 없다 — 재설치는 0.3.36 장치(남기고 지우기)에
+        #   부서 남길 것을 더해서, 완전 삭제는 옮기지 않고 그대로 둔다(Archive-Move 가 「남김」 으로 말한다 · 옮겼다 되돌리기 금지).
+        if ($agoraMigrateOk) {
+            $cysNested = $false
+            $hi = $null
+            try { $hi = Get-Item -LiteralPath $CysHome -Force -ErrorAction Stop } catch { $hi = $null }
+            if ($hi -and $hi.PSIsContainer -and -not (Test-IsReparse $hi)) {
+                $hcn = Canon-Path $CysHome
+                if ($hcn -and (@(Get-PreservedUnder $hcn).Count -gt 0)) { $cysNested = $true }
+            }
+            if ($KeepHistory -and $cysNested) {
+                # 🔴남길 자리가 있는데 실경로를 못 풀었으면 ~\.cys 를 **하나도 지우지 않고** 못 지움으로 센다(재설치는 여기서 멈춘다).
+                $hk = Get-HistoryKeeps
+                $dk = $null
+                if ($hk.Fail.Count -eq 0) { $dk = Get-DeptKeeps }
+                if ($hk.Fail.Count -gt 0) {
+                    $script:KeptFail++
+                    Write-Host ('  [남음] ' + (Short $CysHome) + ' - 남겨야 할 로그인·이전 대화 자리를 확인하지 못해 아무것도 지우지 않았습니다.')
+                    foreach ($bad in $hk.Fail) { Write-Host ('         확인 못한 자리: ' + (Short $bad)) }
+                    Write-Host '         확인할 수 없는 채로 지우면 로그인이나 이전 대화를 잃을 수 있습니다(바로가기가 끊겼거나 권한이 없을 수 있습니다).'
+                } elseif ($null -eq $dk) {
+                    $script:KeptFail++
+                    Write-Host ('  [남음] ' + (Short $CysHome) + ' - 남겨야 할 부서 기록의 목록을 읽지 못해 아무것도 지우지 않았습니다.')
+                } else {
+                    Drop 'cys 계정 자리' $CysHome (@($hk.Canon) + @($dk))
+                }
+            } elseif ($KeepHistory) {
+                if ($hi -or (Test-PathOrLink $CysHome)) { [void](Invoke-CysHomeReinstall) }
+            } else {
+                # 0.3.37(설계 결정 3): 보관한 옛 ~\.cys 자리를 회차 사이에 기억해 두고 **회차마다** 그 안 로그인 파일을 지운다 —
+                #   앞 판은 이번 회차에 옮긴 때만 지워, 1회차 지우기가 실패하면 다시 해 보기가 그 파일을 안 보고 rc 0 으로 끝났다(비밀값이 보관 폴더에 남음).
+                $script:ArchiveLast = ''
+                if (Archive-Move $CysHome 'cys-home' 'cys 계정 자리(대화·부서 기록)') {
+                    if ($script:ArchiveLast) { $script:CysHomeArchived = $script:ArchiveLast }
+                    if ($script:CysHomeArchived) { Remove-ArchivedCredentials $script:CysHomeArchived }
+                }
+            }
+        }
+        # 프로그램 폴더 안 실행 기록 · 닫은 부서 휴지통 · 앱 화면 자료
+        #   재설치(-KeepApp · -KeepHistory) = 지난 편성 기록만 보관(본부 좌석이 설치 도우미보다 먼저 뜨지 않게) · 나머지와 부서 상태(cys-dept-<n>)는 제자리
+        #   완전 삭제 = 프로그램 폴더 안의 프로그램 파일이 아닌 것 전부 · 휴지통 · 앱 화면 자료를 보관(프로그램 파일은 관문 뒤에서 지운다)
+        if ($KeepApp -or $KeepHistory) {
+            foreach ($s in (Get-CysStateItems)) { [void](Archive-Move $s ('cys-state\' + (Split-Path -Leaf $s)) 'cys 지난 편성 기록') }
+        } else {
+            # footprint: W-DEPTSTATE
+            foreach ($d in @($CysDir, $CysDirOld)) { Invoke-CysAppStateArchive $d }
+            # footprint: W-TRASH
+            [void](Archive-Move $CysTrash 'cys-trash' '닫은 부서 휴지통')
+            # footprint: W-WEBVIEW
+            [void](Archive-Move $WebviewRoaming 'webview-appdata' '앱 화면 자료')
+            [void](Archive-Move $WebviewLocal 'webview-localappdata' '앱 화면 자료')
+        }
+    }
+
+    # ── 보관 관문(0.3.37) — 옮기기·대조가 하나라도 어긋났으면 이 뒤(프로그램 지우기·설정 칸 빼기)를 하지 않는다 ──
+    #   ⚠이미 끝난 것: 상시 가동 등록 떼기 · 프로세스 끄기 · 훅 떼기 · 신뢰 칸(설치 도우미가 다시 한다).
+    #     사람 자료는 어느 쪽이든 한 곳(원자리 또는 보관 폴더)에 온전하다.
+    if (($script:ArchiveFail -ne 0) -or ($script:ArchiveVerifyFail -ne 0)) {
+        if ($script:KeptFail -eq 0) { $script:KeptFail = 1 }
+        Write-Host '  [남음] 보관을 끝까지 마치지 못해 프로그램과 설정 칸은 지우지 않고 그대로 두었습니다.'
+        Write-Host '         이전 자료는 원래 자리나 보관 폴더 한쪽에 그대로 있습니다 - 사라진 것은 없습니다.'
+    } else {
+        if ($KeepApp) {
+            # 재설치 길(-KeepApp) — 프로그램 걷기를 통째로 건너뛴다. 재설치는 곧바로 다시 까는 길이라 프로그램을 지울 까닭이 없다.
+            Write-Host '  남김: cys 프로그램 (재설치 — 지우지 않고 그대로 씁니다)'
+            if ($hasRegEntry -or (Test-Path $RegKeyR)) { Write-Host '  남김: cys 설치 목록 항목 (프로그램과 한 쌍이라 함께 둡니다)' }
+        } else {
+            if ((Test-Path $UninstExe) -and $UseUninstaller) {
+                Write-Host '  cys 제거 프로그램을 실행합니다. (백신이 이 행위를 막을 수 있습니다)'
+                try {
+                    $u = Start-Process -FilePath $UninstExe -ArgumentList '/S' -PassThru -ErrorAction Stop
+                    if (-not $u.WaitForExit(180000)) { Write-Host '    제거 프로그램이 180초 안에 끝나지 않았습니다. 기다리기를 멈추고 나머지를 지웁니다.' }
+                } catch {
+                    Write-Host ("    제거 프로그램을 실행하지 못했습니다: " + $_.Exception.Message)
+                    Write-Host '    백신이 막았을 수 있습니다. 그 화면의 이름, 대상 파일, 조치(차단·격리·종료)를 알려 주십시오.'
+                }
+                Start-Sleep -Seconds 3
+            }
+            if ((Test-Path $CysDir) -or (Test-Path $CysDirOld)) {
+                # 프로그램 파일만 지운다(자료는 위에서 보관 폴더로 옮겼다) — 폴더 자체가 바로가기면 이름표만(가리키던 자리는 그대로)
+                if (Test-IsReparsePath $CysDir) { Drop 'cys 프로그램' $CysDir } else { Remove-CysProgramFiles $CysDir 'cys 프로그램' }
+                if (Test-IsReparsePath $CysDirOld) { Drop 'cys 프로그램(옛 자리)' $CysDirOld } else { Remove-CysProgramFiles $CysDirOld 'cys 프로그램(옛 자리)' }
+            }
+            # 공식 제거기가 해 주던 뒷정리 — 우리 설치 자리를 가리키는 것만(남의 같은 이름 항목 무접촉 · 모르면 남김)
+            Remove-OurShortcuts
+            # footprint: W-REG
+            Invoke-OurRegistryCleanup
+        }
+        # footprint: W-CLAUDEBIN
+        # ★지우기 직전에 그 자리에서 도는 클로드를 끈다(Stop-ClaudeUnderBin 참조) — 스스로 다시 해 보기(1/2)도 이 자리를 다시 지난다.
+        $claudeAlive = @()
+        if (Test-Path $ClaudeExe) { $claudeAlive = @(Stop-ClaudeUnderBin) }
+        Drop '클로드 실행 파일' $ClaudeExe
+        if ((Test-Path $ClaudeExe) -and ($claudeAlive.Count -gt 0)) { Write-AliveProcs $claudeAlive }
+        # footprint: W-SCRIPTCOPY
+        Drop '받아 둔 설치 스크립트' $HomePs1
+        Drop '받아 둔 설치 스크립트(옛 자리)' $TempPs1
+        # 남의 파일 속 우리 줄 — 파일을 지우지 않는다
+        # footprint: W-PATH
+        Remove-UserPathSeed
+        # footprint: W-CLAUDEJSON
+        Remove-JsonKey $ClaudeJson 'hasCompletedOnboarding'
+        # 큰 화면 권유 질문을 미리 넘기려고 설치기가 99 로 적어 둔 칸이다. 우리 자국이니 우리가 뺀다.
+        #   ⚠이 칸은 오래 전부터 심고 있었는데 표에 없어서 아무도 안 지웠다(2026-09-10 자국 표를 채우다 드러났다).
+        Remove-JsonKey $ClaudeJson 'fullscreenUpsellSeenCount'
+        # 폴더 신뢰 씨앗 — 설치기가 심은 자리를 되돌린다. **범위가 자리마다 다르다**(위 함수 머리글 참조).
+        #   ⑴자비스 작업 폴더(백슬래시·슬래시 2형) = 우리가 만든 칸이므로 칸째 뺀다(맥판과 같아진다).
+        Remove-ProjectEntry $ClaudeJson @($JarvisDir, ($JarvisDir -replace '\\','/'))
+        # footprint: W-CLAUDESETTINGS
+        Remove-JsonKey $SettingsJs 'theme'
+        Remove-JsonKey $SettingsJs 'skipDangerousModePermissionPrompt'
+        Remove-JsonKey $SettingsJs 'remoteControlAtStartup'
+    }
     # 🔴**요청한 로그인 자국이 정말 사라졌는지 끝에서 다시 본다**(2차 N1 확정). 앞 판은 「지웠다」를
     #   그 순간의 종료값으로만 말했다 ⇒ 파일이 잠겨 남았는데 전체는 성공으로 끝났다.
     #   ★「지웠다」는 **다시 봐서 없을 때만** 참이다.
@@ -1691,6 +2507,11 @@ function Invoke-Purge {
         $script:KeptFail++
         Write-Host ('  [남음] ' + (Short $CredFile) + ' - 로그인 파일이 아직 남아 있습니다.')
         Write-Host '         그 파일을 쓰고 있는 프로그램(클로드 창 등)을 닫으신 뒤 다시 해 주십시오.'
+    }
+    # 0.3.37 반례 ①(DESIGN-0337 6-1절): 되옮긴 자리 안 바로가기가 보관 폴더로 간 자리를 가리키면 한 줄 알린다(자료는 보관 폴더에 있다)
+    if (@($script:PrescanNote).Count -gt 0) {
+        Write-Host '  [안내] 아래 바로가기가 가리키던 자료는 보관 폴더(cys-home)에 그대로 있습니다 - 새 자리에서는 그 자료가 보이지 않을 수 있습니다.'
+        foreach ($l in @($script:PrescanNote | Select-Object -First 5)) { Write-Host ('           ' + $l) }
     }
     # footprint: W-CLAUDEUSER — 손대지 않는다
     Write-Host '  남김: 클로드 대화·기록'
@@ -1702,15 +2523,18 @@ function Invoke-Purge {
     }
     if ($script:KeptFail -eq 0) {
         Write-Host ("=== 끝났습니다 — {0} 가지를 지웠고, 못 지운 것은 없습니다. ===" -f $script:Removed)
-        if ($script:BackupNote) { Write-Host ('    ' + $script:BackupNote) }   # 0.3.36: 마지막 안내 1줄(보관 자리)
+        # 0.3.36 안내 1줄(보관 자리)은 0.3.37 부터 Write-ArchiveSummary 가 크기와 함께 말한다 — 작업 폴더를 못 옮긴 갈래의 안내만 따로 남긴다
+        if ($script:BackupNote -and (-not $script:ArchiveDest)) { Write-Host ('    ' + $script:BackupNote) }
+        Write-ArchiveSummary
         return 0
     }
     # 사실만 말한다. 「거의 다 됐다」로 얼버무리면 다음 단계가 그 위에 얹힌다.
     Write-Host ("=== 끝났습니다 — {0} 가지를 지웠고, {1} 가지를 못 지웠습니다. ===" -f $script:Removed, $script:KeptFail)
     Write-Host '    위에 [남음] 으로 표시된 자리가 있습니다. 그대로 두고 다시 설치하면 뒤엉킵니다.'
-    Write-Host '    까닭은 보통 셋 중 하나입니다: 프로그램이 아직 돌고 있다 · 백신이 그 파일을 붙들고 있다 · cys 제거를 아직 안 하셨다'
+    Write-Host '    까닭은 보통 둘 중 하나입니다: 프로그램이 아직 돌고 있다 · 백신이 그 파일을 붙들고 있다'
     Write-Host '    아래 「다시 하시는 법」대로 한 번 더 해 보시고, 그래도 남으면 이 화면을 사진으로 남겨 알려 주십시오.'
-    if ($script:BackupNote) { Write-Host ('    ' + $script:BackupNote) }
+    if ($script:BackupNote -and ((-not $script:ArchiveDest) -or ($script:ArchiveFail -ne 0) -or ($script:ArchiveVerifyFail -ne 0))) { Write-Host ('    ' + $script:BackupNote) }
+    Write-ArchiveSummary
     return 7
 }
 
@@ -1720,46 +2544,55 @@ if ($ListOnly) { Write-Host ''; Write-Host '(보기만 했습니다. 아무것�
 
 if ($script:Found -eq 0) { Write-Host ''; Write-Host '지울 것이 없습니다.'; exit 0 }
 
-# ── 🔴「cys 를 먼저 닫아 주십시오」 (v0.3.10 · 실제 노트북에서 겪은 일 2026-09-10 · 맥판과 같다) ──
-#   자리 기준으로 끄더라도 **사람에게 먼저 알린다**: 갑자기 꺼진 것으로 읽히지 않게 하고,
-#   저장할 틈을 드리고, 붙잡고 있는 프로세스 때문에 삭제가 실패하는 자리를 미리 줄인다.
-#   ⚠알리는 것이지 묻는 것이 아니다 — 사람이 없는 자리(-Yes·입력이 딴 데로 이어진 자리)에서는 안 묻는다.
+# ── 0.3.37 사전 훑기(읽기만 · 첫 변경 전 · DESIGN-0337 6-1절 ②③④) — 막히면 아무것도 바꾸지 않고 멈춘다 ──
+if (-not (Invoke-Prescan)) {
+    Write-Host ''
+    Write-Host '이번에는 아무것도 바꾸지 않았습니다.'
+    Write-Host ('   옮겨 둘 자료 가운데 확인할 수 없는 자리가 있습니다: ' + $script:PrescanBad)
+    Write-Host '   그대로 지우면 그 자료가 사라질 수 있어 멈췄습니다. 그 바로가기나 폴더를 살펴보신 뒤 아래 「다시 하시는 법」대로 다시 실행해 주십시오.'
+    Show-RerunHow
+    exit 7
+}
+
+Write-Host ''
+Write-Host '위 목록의 자료는 지우지 않고 보관 폴더로 옮깁니다(다시 받을 수 있는 프로그램 파일만 지웁니다). 보관 자리는 끝에 알려 드립니다.'
+# ── 「cys 를 곧 끕니다」 (v0.3.10 · 실제 노트북에서 겪은 일 2026-09-10 · 맥판과 같다) ──
+#   자리 기준으로 끄더라도 **사람에게 먼저 알린다**: 갑자기 꺼진 것으로 읽히지 않게 하고, 저장할 틈을 드린다.
+#   0.3.37: 묻지 않는다(사람 손 0 · Enter 없음) — 알리고 5초 기다린 뒤 이 도구가 끈다. 재설치(-Yes)는 기다리지 않는다.
+#   「지웁니다」 입력도 묻지 않는다 — 사람 자료는 보관 폴더로 옮기므로 되돌릴 수 있다. -Yes 는 받아서 넘긴다(옛 재설치 입구 호환).
 $aliveNow = @(Get-ProcsUnder @($CysDir, $CysDirOld))
 if ($aliveNow.Count -gt 0) {
     Write-Host ''
-    Write-Host ("cys 가 아직 돌고 있습니다(" + $aliveNow.Count + "가지). 먼저 cys 창을 닫아 주십시오.")
-    Write-Host '     닫지 않으셔도 이 도구가 끕니다 — 다만 저장하지 않으신 것이 사라질 수 있습니다.'
-    $human = $false
-    try { $human = ((-not [Console]::IsInputRedirected) -and [Environment]::UserInteractive) } catch { $human = $false }
-    if ((-not $Yes) -and $human) { [void](Read-Host '  확인하셨으면 Enter 를 눌러 주십시오') }
+    Write-Host 'cys 를 곧 끕니다. 저장하지 않으신 것이 있으면 지금 저장해 주세요.'
+    if (-not $Yes) {
+        $noticeWait = 5
+        if ([string]$env:JARVIS_NOTICE_WAIT -match '^[0-9]+$') { $noticeWait = [int]$env:JARVIS_NOTICE_WAIT }
+        Start-Sleep -Seconds $noticeWait
+    }
 }
 
-if (-not $Yes) {
-    Write-Host ''
-    Write-Host '위 목록을 지웁니다. 되돌릴 수 없습니다.'
-    $answer = Read-Host '계속하려면 「지웁니다」 라고 입력해 주십시오'
-    if ($answer -ne '지웁니다') { Write-Host '그만둡니다 — 아무것도 지우지 않았습니다.'; exit 1 }
-}
-
-# ★그 자리에서 다시 해 본다 - 창을 닫고 명령을 다시 찾는 것보다 Enter 한 번이 싸다(2026-09-10).
-#   막힌 까닭 대부분은 **사람이 지금 이 창 앞에서 없앨 수 있는 것**이다(설정 앱 제거를 마친다 ·
-#   작업 관리자에서 붙들고 있는 것을 끝낸다). 그때마다 사이트를 다시 찾게 하지 않는다.
-#   ⚠상한 3회 - 무한 고리는 「막혔다」를 영영 말하지 않는 것과 같다. 3회 뒤에는 사실대로 끝내고
+# ★남은 자리가 있으면 스스로 다시 해 본다 — 최대 2회 · 사이 5초(0.3.37 · 잠깐 붙들린 파일이 풀릴 틈 · Enter 를 묻지 않는다).
+#   ⚠상한은 그대로 둔다 - 무한 고리는 「막혔다」를 영영 말하지 않는 것과 같다. 상한 뒤에는 사실대로 끝내고
 #     **명령 전체를 인쇄**한다(재부팅이 필요한 자리는 재실행으로 안 풀린다).
 function Reset-PurgeCounters {
     $script:Removed = 0
     $script:KeptFail = 0
     $script:Preserved = 0
     $script:SkipCysDir = $false
+    $script:ArchiveFail = 0   # 보관 폴더(ArchiveDest·ArchiveHome)는 이어 쓴다 — 끝 요약이 첫 번째 것도 말하게 · 대조 실패(ArchiveVerifyFail)는 풀지 않는다
+    $script:Archived = 0
 }
 $rc = Invoke-Purge
 $tries = 0
-while (($rc -ne 0) -and (-not $Yes) -and ($tries -lt 3)) {
+while (($rc -ne 0) -and ($tries -lt 2)) {
     $tries++
+    $retryWait = 5
+    if ([string]$env:JARVIS_RETRY_WAIT -match '^[0-9]+$') { $retryWait = [int]$env:JARVIS_RETRY_WAIT }
     Write-Host ''
-    $a = Read-Host ('  남은 자리를 여기서 바로 다시 지워 볼 수 있습니다. Enter 를 누르면 다시 해 봅니다 (' + $tries + '/3 · 그만두려면 q)')
-    if ($a -eq 'q') { break }
+    Write-Host ('  남은 자리가 있어 ' + $retryWait + '초 뒤 스스로 한 번 더 해 봅니다 (' + $tries + '/2 · 창을 닫지 말고 기다려 주세요).')
+    Start-Sleep -Seconds $retryWait
     Reset-PurgeCounters
+    if (-not (Invoke-Prescan)) { Write-Host ('  확인할 수 없는 자리가 생겨 다시 해 보기를 멈췄습니다(아무것도 더 바꾸지 않았습니다): ' + $script:PrescanBad); break }
     $rc = Invoke-Purge
 }
 if ($rc -ne 0) { Show-RerunHow }

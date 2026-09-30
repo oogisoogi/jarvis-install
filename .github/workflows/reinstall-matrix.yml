@@ -120,11 +120,14 @@ jobs:
           set -e
           # 러너에는 계정이 없다. 로그인 앞에서 멈추는 것이 이 상태의 정의다.
           # ⚠여기서 heredoc 을 쓰지 않는다 — YAML 블록 안에서는 끝 표시가 줄머리에 오지 못해 깨진다.
-          grep -q 'step_login          || exit \$?' install-master/bootstrap.sh \
-            || { echo '::error::로그인 게이트 자리를 못 찾았다 — 스크립트가 바뀌었다'; exit 1; }
-          # 구분자로 | 를 쓰면 안 된다 — 찾는 문구 자체에 || 가 들어 있다.
-          sed 's@step_login          || exit \$?@say "[3/10] (검증) 로그인 앞에서 멈춥니다."; exit 0@' \
+          # 0.3.38: 설치기 코드 줄이 아니라 설치기에 박은 표식 한 줄(RM-ANCHOR: login-stop)을 찾는다 — 앞 판의 코드 줄 앵커는
+          #   v0.3.23 뒤 0건이 되어 이 칸 뒤가 통째로 안 돌았다. 표식이 정확히 1개가 아니면 건너뛰지 않고 적색이다(checks [RM 표식] 이 로컬에서 먼저 잡는다).
+          n="$(grep -c '^# RM-ANCHOR: login-stop' install-master/bootstrap.sh || true)"
+          [ "$n" = "1" ] || { echo "::error::설치기 표식 RM-ANCHOR: login-stop 이 1개가 아니다(${n}개) — bootstrap.sh 가 바뀌었다"; exit 1; }
+          # 표식 바로 뒤에 로그인 단계를 멈춤으로 바꿔 정의한다(뒤 정의가 이긴다 · 제품 코드 줄 모양과 무관).
+          awk '{print} /^# RM-ANCHOR: login-stop/{print "step_login() { say \"[3/10] (검증) 로그인 앞에서 멈춥니다.\"; exit 0; }"}' \
             install-master/bootstrap.sh > /tmp/bs-partial.sh
+          grep -q '^step_login() { say "\[3/10\] (검증)' /tmp/bs-partial.sh || { echo '::error::멈춤을 끼우지 못했다'; exit 1; }
           bash /tmp/bs-partial.sh || true
 
       - name: 중간 멈춤을 진단이 알아보는가 (맥)
@@ -221,18 +224,15 @@ jobs:
         timeout-minutes: 12
         run: |
           $src = Get-Content install-master\bootstrap.ps1 -Raw
-          $anchor = 'if ($rc -ne 0) { $script:BlockedStep = $st.Name; break }'
-          if ($src -notmatch [regex]::Escape($anchor)) {
-            # 앵커가 바뀌었으면 조용히 지나가지 않는다 — 안 잰 것을 잰 것으로 세지 않기 위해서다.
-            Write-Host '::error::본문 사슬 앵커를 못 찾았다 — bootstrap.ps1 이 바뀌었다'; exit 1
-          }
+          # 0.3.38: 설치기 코드 줄이 아니라 설치기에 박은 표식 한 줄(RM-ANCHOR: login-stop)을 찾는다 — 앞 판의 코드 줄 앵커는
+          #   0.3.35(da36463) 뒤 0건이 되어 이 칸 뒤(진단·삭제·재설치·멱등)가 통째로 안 돌았다. 표식이 정확히 1개가 아니면 적색이다.
           # 러너에는 계정이 없다. 로그인 앞에서 멈추는 것이 이 상태의 정의다.
-          # ⚠머리에 덧붙이지 않는다 — param() 앞에 문장이 오면 param 이 명령으로 읽혀 깨진다(3차 실행 실측 · 2차는 stderr 를 안 받아 안 보였다).
-          #   원 함수 자리에 스텁을 두고 원본은 개명한다(맥의 sed 치환과 같은 자리).
-          $gate = 'function Step-Login {'
-          if ($src -notmatch [regex]::Escape($gate)) { Write-Host '::error::로그인 함수 자리를 못 찾았다 — bootstrap.ps1 이 바뀌었다'; exit 1 }
-          $stub = "function Step-Login { Write-Host '[3/10] (검증) 로그인 앞에서 멈춥니다.'; exit 0 }`r`nfunction Step-LoginOriginal {"
-          $patched = $src.Replace($gate, $stub)
+          $marks = [regex]::Matches($src, '(?m)^[ \t]*# RM-ANCHOR: login-stop[^\r\n]*')
+          if ($marks.Count -ne 1) { Write-Host "::error::설치기 표식 RM-ANCHOR: login-stop 이 1개가 아니다($($marks.Count)개) — bootstrap.ps1 이 바뀌었다"; exit 1 }
+          # 표식 바로 뒤에 로그인 단계를 멈춤으로 바꿔 정의한다(뒤 정의가 이긴다 · 제품 코드 줄 모양과 무관 · param() 앞에 문장을 두지 않는다).
+          $m = $marks[0]
+          $stub = "`r`n    function Step-Login { Write-Host '[3/10] (검증) 로그인 앞에서 멈춥니다.'; exit 0 }"
+          $patched = $src.Substring(0, $m.Index + $m.Length) + $stub + $src.Substring($m.Index + $m.Length)
           # ⚠utf8BOM 이어야 한다. pwsh 7 의 -Encoding UTF8 은 BOM 을 안 붙이고, 그 파일을 Windows PowerShell 5.1 이
           #   ANSI 로 읽어 한글이 깨지며 파싱 오류가 난다(첫 실행 2026-09-08 실증 · 원본 bootstrap.ps1 은 BOM 있음).
           #   JSON 은 BOM 없이(아래 축), .ps1 은 BOM 있이 — 파일 종류마다 반대다.

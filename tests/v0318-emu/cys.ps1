@@ -146,6 +146,14 @@ function Test-CysBody {
     $reg = if ($v -and $v -ne 'unknown') { [pscustomobject]@{ DisplayName = 'cys'; DisplayVersion = $v } } else { $null }
     return [pscustomobject]@{ Reg = $reg; Body = $true; Path = "$Sb/cysdir"; Cli = "$Sb/cysdir/cys.exe" }
 }
+# 0.3.38(윈 결함 묶음 ⓑ): 판은 설치 목록이 아니라 **cys.exe 파일의 판**이 먼저다 — 흉내도 같은 사실을 파일 쪽에서 준다(맥 pwsh 는 PE 판을 못 읽는다).
+#   끝 확인은 프로그램 파일 셋(cys·cysd·cys-app)이 다 있어야 하므로 흉내 설치 자리에도 셋을 둔다 · 설치 자리(/D)는 이 흉내의 폴더.
+function Get-CysExeVersion($p) {
+    if (((Split-Path -Leaf $p) -eq 'cys.exe') -and (Test-Path -LiteralPath "$Sb/cys-state.txt")) { $v = (Get-Content -LiteralPath "$Sb/cys-state.txt" -Raw).Trim(); if ($v -ne 'unknown') { return $v } }
+    return ''
+}
+function Get-CysInstallTarget { return "$Sb/cysdir" }
+if (Test-Path -LiteralPath "$Sb/cysdir/cys.exe") { foreach ($n in @('cysd.exe', 'cys-app.exe')) { Set-Content -LiteralPath "$Sb/cysdir/$n" -Value 'x' -NoNewline } }
 function Invoke-WebRequest {
     [CmdletBinding()] param([string]$Uri, [string]$OutFile, [switch]$UseBasicParsing, [int]$TimeoutSec, [string]$Method)
     Add-Content -LiteralPath "$Sb/iwr.log" -Value ("IWR $Uri")
@@ -177,6 +185,7 @@ function Start-Process {
         Set-Content -LiteralPath "$Sb/cys-state.txt" -Value $CysVersion -NoNewline
         New-Item -ItemType Directory -Force -Path "$Sb/cysdir" | Out-Null
         [System.IO.File]::WriteAllBytes("$Sb/cysdir/cys.exe", $exeNew)
+        foreach ($n in @('cysd.exe', 'cys-app.exe')) { Set-Content -LiteralPath "$Sb/cysdir/$n" -Value 'x' -NoNewline }
     }
     $o = [pscustomobject]@{ HasExited = $true; ExitCode = $(if ($fail) { 4 } else { 0 }) }
     if ($Scenario -eq 'wait-hb') {

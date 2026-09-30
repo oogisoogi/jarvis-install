@@ -6,7 +6,7 @@
 #   ⓑ cys 프로그램 폴더(제거 프로그램 포함)를 지우지 않는다
 #   ⓒ 지운 뒤 설치 도우미까지 간다 — 가짜 설치 도우미가 표지를 남기고 재설치가 0 으로 끝난다
 #   ⓓ 살펴보기 목록에 「[남김] cys 프로그램」 한 줄
-#   ⓔ 나머지는 종전대로 지운다 — ~\.cys · (0.3.36) ~\install-jarvis 는 지우지 않고 보관(또는 그대로 두고 안내)
+#   ⓔ 나머지는 지우지 않는다 — ~\.cys = 보관 폴더로 옮긴 뒤 남길 것만 되옮김(0.3.37) · (0.3.36) ~\install-jarvis 는 보관(또는 그대로 두고 안내)
 #   ⓕ 프로그램 폴더 안의 지난 편성 기록(topology.json · phoenix\ · boot-intents\ · dept_tombstones.json · topology.json.*)은 지우고
 #      프로그램 파일(cys.exe · pack.tar.gz · runtime\)은 남긴다 — 윈도우 기본 cys 의 상태 자리가 곧 프로그램 폴더라서다(2026-09-15 윈 2차 재설치)
 #
@@ -65,8 +65,10 @@ else
   t $? "[재설치] 목록에 「[남김] cys 프로그램」 한 줄" "지우개 출력에 그 줄이 없다"
   # ⓔ 는 Drop(파일 자리) 두 곳을 본다 — 윈도우 모양 경로(C:\Users\emu)를 샌드박스의 「C:」 폴더로 흉내 내서 실물 삭제 길이 그대로 탄다.
   #   ~\install-jarvis.ps1 은 여기서 안 본다: 지운 뒤 재설치가 같은 자리에 설치 도우미를 새로 받아 둔다(윈도우도 같다).
-  [ ! -e "$U/.cys" ]
-  t $? "[재설치] 나머지는 종전대로 지운다(~/.cys)" "남은 자리: $( [ -e "$U/.cys" ] && echo '~/.cys ') · $(grep -E '\[남음\]' "$SB/reset-out.txt" 2>/dev/null | head -2 | tr '\n' '|' | cut -c1-200)"
+  # 0.3.37(뜻 변경 · TICKET=installer-0337-delete-path): ~\.cys 는 지우지 않고 통째로 보관 폴더(cys-home)로 옮긴 뒤 남길 것만 되옮긴다 —
+  #   남길 것이 없는 이 씨앗(emu.txt)은 새 자리에 없고 보관 폴더에 있어야 한다(새 ~\.cys 폴더 자체는 되옮기기 자리로 다시 선다).
+  [ ! -e "$U/.cys/emu.txt" ] && [ -n "$(find "$U" -mindepth 3 -maxdepth 3 -path '*install-jarvis-backup-*/cys-home/emu.txt' 2>/dev/null)" ]
+  t $? "[재설치] 나머지(~\\.cys)는 지우지 않고 보관 폴더로 옮긴다 · 새 자리에 없다(0.3.37)" "새 자리 emu=$( [ -e "$U/.cys/emu.txt" ] && echo 있음 || echo 없음) · 보관=$(find "$U" -maxdepth 3 -path '*cys-home*' 2>/dev/null | head -2 | tr '\n' ' ') · $(grep -E '\[남음\]' "$SB/reset-out.txt" 2>/dev/null | head -2 | tr '\n' '|' | cut -c1-200)"
   # 0.3.36: 작업 폴더는 지우지 않는다 — 보관본으로 옮겼거나(install-jarvis-backup-*) · 못 옮겼으면 그대로 두고 「지운 것은 없습니다」 안내(이 흉내의
   #   윈도우 모양 경로는 맥 pwsh 에서 이름 바꾸기가 안 되어 늘 뒤 갈래를 탄다 — 옮기는 갈래는 tests/keep-backup-run.sh 가 잰다)
   { [ ! -e "$U/install-jarvis" ] && ls -d "$U"/install-jarvis-backup-* >/dev/null 2>&1; } || { [ -d "$U/install-jarvis" ] && has "$SB/reset-out.txt" '옮기지 못해 .* 그대로 두었습니다\. 지운 것은 없습니다\.'; }

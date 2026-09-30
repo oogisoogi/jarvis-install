@@ -32,9 +32,10 @@ MUTANTS = [
      '    if false; then',
      "[0328 폴백] 맥: 같은 갈래가 있다"),
     # ⓑ 앱 자동 실행을 빼면 「사람이 직접 실행하라」로 되돌아간다(박사님 원칙 위반).
+    # 0.3.38(윈 결함 묶음 ⓓ): 창 띄우기가 「자리를 연 뒤」로 옮겨 가 같은 줄이 선점 갈래와 두 곳이 됐다 — 앵커 = 성공 갈래(다음 줄 기록까지).
     ("win-app-autostart-drop", PS,
-     "            $appState = Start-CysAppWindow",
-     "            $appState = ''",
+     "            $appState = Start-CysAppWindow\n            Write-Log ('wake: app window ' + $appState)",
+     "            $appState = ''\n            Write-Log ('wake: app window ' + $appState)",
      "[0328 폴백] 윈: cysr 앱을 자동으로 띄운다(또는 앞으로)"),
     ("mac-app-autostart-drop", SH,
      '      app_state="$(start_cys_app_window)"',

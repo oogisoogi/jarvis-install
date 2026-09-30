@@ -3656,8 +3656,12 @@ seed_cys_path() { # seed_cys_path <폴더> → rc 0 = 있거나 넣었다 · rc 
   return 0
 }
 
+# [7/10] 화면에 보일 버전 숫자(0.3.37 · 윈 Get-VersionNumber 짝) — `cys --version` 첫 줄에서 첫 x.y.z 만 뽑는다 · 없으면 빈 값.
+#   ★이름(cys·cysr)을 화면에 싣지 않는다: 1.1.7 부터 첫 줄이 「cysr 1.1.7」 이라 「cys 가 답합니다: cysr 1.1.7」 로 섞였고,
+#     인텔 맥은 원작자 판(「cys 0.14.x」)이 깔려 이름을 박으면 한쪽이 거짓이 된다 ⇒ 숫자만(옛 판·새 판·파일 판본 모두 같은 모양).
+version_number() { printf '%s' "$1" | grep -oE '[0-9]+\.[0-9]+\.[0-9]+' | head -1; }
 step_verify_cys() {
-  local c ver
+  local c ver vn
   #   dry 분기가 이 단에만 없었다. 깨끗한 기계에는 /Applications/cys.app 이 없으므로 미리보기가
   #   여기서 rc 7 로 끊겨 **[8/10] 이 호출조차 안 됐다**(화면이 7 다음에 9 로 건너뛴다). 다른 아홉 단은
   #   전부 dry 분기를 갖고 있었고, 이 단만 없어서 미리보기가 기계 상태에 따라 다른 길을 갔다.
@@ -3691,13 +3695,15 @@ step_verify_cys() {
   fi
   if [ -n "$ver" ] && [ -n "$CYS_CLI" ] && [ "$CYS_KIND" = "fork" ]; then
     case "$ver" in *"$CYS_FORK_VERSION"*) : ;; *)
-      say "[7/10] cys 가 답하는데 이번 판(${CYS_FORK_VERSION})이 아닙니다: $ver"
+      vn="$(version_number "$ver")"
+      say "[7/10] 프로그램은 있는데 이번 버전(${CYS_FORK_VERSION})이 아닙니다${vn:+ (지금 버전 $vn)}"
       say "     부르는 길: $(redact "$CYS_CLI") — 옛 판의 연결이 남아 있습니다. 아래 「다시 하시는 법」대로 다시 실행해 주십시오."; SHOW_RERUN=1
       return 7 ;;
     esac
   fi
   if [ -n "$ver" ] && [ -n "$CYS_CLI" ]; then
-    say "[7/10] cys 가 답합니다: $ver"
+    vn="$(version_number "$ver")"
+    say "[7/10] 프로그램이 준비되었습니다${vn:+ (버전 $vn)}"
     say "     부르는 길: $(redact "$CYS_CLI")"
     # ps1 3075 — 새 창에서 이름만으로 cys 를 부를 수 있게(seed_cys_path 머리 주석) · 앱 안 경로로만 답했을 때
     case "$CYS_CLI" in "$(cys_app_dir)/Contents/MacOS/cys") seed_cys_path "$(dirname "$CYS_CLI")" || true ;; esac
@@ -6065,6 +6071,7 @@ fi
 progress_send '2/10' 'start' '' '' ''
 step_install_claude; rc=$?; progress_send '2/10' 'end' '' "rc=$rc" ''; [ "$rc" -eq 0 ] || exit "$rc"
 progress_send '3/10' 'start' '' '' ''
+# RM-ANCHOR: login-stop — 공개 재설치 검증 흐름(reinstall-matrix)이 이 줄 바로 뒤에 [3/10] 앞 멈춤을 끼운다 · 옮기거나 지우지 마라(checks [RM 표식])
 step_login;          rc=$?; progress_send '3/10' 'end' '' "rc=$rc${LOGIN_SWEEP:+ sweep=$LOGIN_SWEEP}" ''; [ "$rc" -eq 0 ] || exit "$rc"
 
 progress_send '4/10' 'start' '' '' ''

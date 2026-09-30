@@ -51,6 +51,13 @@ function Invoke-WebRequest {
     [System.IO.File]::WriteAllBytes($OutFile, $script:FakeBytes)
     & chmod +x $OutFile
 }
+# 0.3.38: 직접 받기가 자식 PowerShell(Start-ClaudeDirectDownload)로 옮겨 갔다 — 흉내는 위 가짜 받기를 이 자리에서 부르고 끝난 프로세스를 돌려준다
+function Start-ClaudeDirectDownload($u, $o, $e) {
+    Invoke-WebRequest -Uri $u -OutFile $o
+    $dp = [pscustomobject]@{ Id = 0; ExitCode = 0; HasExited = $true }
+    $dp | Add-Member -MemberType ScriptMethod -Name WaitForExit -Value { return $true }
+    return $dp
+}
 # 사용자 PATH 등록은 윈도우 전용 축(맥 .NET 은 User/Machine 대상을 무시) — 흉내에서는 제자리 파일을 claude 이름으로 잇는다
 function Seed-LocalBinPath {
     $p = $ExecutionContext.SessionState.Path.GetUnresolvedProviderPathFromPSPath((Join-Path (Join-Path $env:USERPROFILE '.local\bin') 'claude.exe'))

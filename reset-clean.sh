@@ -2,18 +2,20 @@
 # 깨끗이 지우기 (맥) — 설치 도우미가 놓은 것을 도로 걷어 낸다
 #
 # 무엇을 하는가
-#   이 컴퓨터의 상태를 먼저 살펴 목록으로 보여 주고, 확인을 받은 뒤 지운다.
-#   지우는 것은 `footprint.md` 에 적힌 것뿐이다. 사진·문서 같은 사용자 파일은 손대지 않는다.
+#   이 컴퓨터의 상태를 먼저 살펴 목록으로 보여 주고, 묻지 않고 치운다(0.3.37 · 사람 손 0).
+#   지우는 것은 `footprint.md` 에 적힌 것 가운데 **다시 받을 수 있는 프로그램 파일·등록뿐**이다.
+#   사람이 쌓은 자료(자비스 작업 폴더 · ~/.cys · 실행 상태 · 부서 기록)는 `install-jarvis-backup-<날짜-시각>` 보관 폴더로 옮긴다.
+#   사진·문서 같은 사용자 파일은 손대지 않는다.
 #
 # 쓰는 법
-#   bash reset-clean.sh            지울 목록을 보여 주고 한 번 물은 뒤 지운다
+#   bash reset-clean.sh            목록을 보여 주고 묻지 않고 치운다(자료는 보관 폴더로 · 0.3.37)
 #   bash reset-clean.sh --list     살펴보기만 한다 (아무것도 안 지운다)
 #   bash reset-clean.sh --dry-run  지울 목록만 보여 준다 (--list 와 같다)
-#   bash reset-clean.sh --yes      묻지 않는다 (재설치 한 줄이 안에서 쓴다)
+#   bash reset-clean.sh --yes      알림 뒤 5초를 기다리지 않는다 (재설치 한 줄이 안에서 쓴다 · 0.3.37 부터 묻는 단계는 없다)
 #   bash reset-clean.sh --purge-login   로그인까지 지운다 (기본은 로그인을 남긴다)
 #   bash reset-clean.sh --keep-app      cys 프로그램은 남긴다 (재설치 한 줄이 안에서 쓴다)
-#   bash reset-clean.sh --keep-history  자비스 창의 이전 대화는 남긴다 (재설치 한 줄이 안에서 늘 쓴다 · 0.3.36)
-# 되돌릴 수 없다.
+#   bash reset-clean.sh --keep-history  자비스 창 로그인·이전 대화·부서 기록을 제자리에 둔다 (재설치 한 줄이 안에서 늘 쓴다 · 0.3.36·0.3.37)
+# 지운 프로그램은 다시 설치하면 돌아온다. 자료는 보관 폴더에 남는다.
 #
 # ★로그인은 기본으로 남긴다. 재설치 뒤 로그인 손 한 번을 아끼기 위해서다.
 #   그리고 맥에서는 로그인이 파일이 아니라 **열쇠고리**에 있어서(2026-09-08 실측),
@@ -423,8 +425,8 @@ diagnose() {
   if [ "$KEEP_APP" = "1" ]; then
     # 재설치 길 — 프로그램은 남긴다(윈도우 -KeepApp 과 같다). 다시 깔 때 설치 도우미가 판을 확인해
     #   이번 판이면 그대로 쓰고, 아니면 이번 판으로 바꿔 넣는다 — 그래서 여기서 지울 까닭이 없다.
-    #   ⚠실행 상태(~/.local/state/cys)는 아래에서 **통째로** 지운다 — 맥은 윈도우와 달리 그 자리가
-    #     프로그램 폴더 밖에 따로 있어서, 지난 편성 기록만 골라낼 필요 없이 전부 비울 수 있다.
+    #   ⚠실행 상태(~/.local/state/cys)는 아래에서 **지난 편성 기록만** 보관 폴더로 옮기고 나머지는 제자리에 둔다
+    #     (0.3.37 · 윈 Get-CysStateItems 와 같은 모양 · 앞 판은 통째로 지워 검색 기록까지 사라졌다).
     [ -d "$CYS_APP" ] && say "  [있음] cys 프로그램 · $CYS_APP (남깁니다 — 다시 깔 때 판을 확인해 그대로 쓰거나 바꿉니다)" \
                       || say "  [없음] cys 프로그램 · $CYS_APP"
     [ -n "$CYS_APP_OLD" ] && say "  [있음] cys 프로그램(옛 이름) · $CYS_APP_OLD (남깁니다 — 다시 깔 때 새 이름으로 바꿔 넣으며 한 벌 보관합니다)"
@@ -435,10 +437,47 @@ diagnose() {
   # footprint: M-DAEMON
   [ -f "$HOME/Library/LaunchAgents/com.cysjavis.cysd.plist" ]; row $? 'cys 상시 가동 등록' "$HOME/Library/LaunchAgents/com.cysjavis.cysd.plist"
   # footprint: M-CYSHOME
-  if [ "$KEEP_HISTORY" = "1" ]; then [ -d "$HOME/.cys" ]; row $? 'cys 계정 자리(자비스 창 이전 대화는 남깁니다)' "$HOME/.cys"
-  else [ -d "$HOME/.cys" ]; row $? 'cys 계정 자리' "$HOME/.cys"; fi
+  if [ "$KEEP_HISTORY" = "1" ]; then [ -d "$HOME/.cys" ]; row $? 'cys 계정 자리(로그인·이전 대화·부서 기록은 제자리로 되옮기고 나머지는 보관합니다)' "$HOME/.cys"
+  else [ -d "$HOME/.cys" ]; row $? 'cys 계정 자리(보관 폴더로 옮깁니다)' "$HOME/.cys"; fi
   # footprint: M-CYSSTATE
-  [ -d "$HOME/.local/state/cys" ]; row $? 'cys 실행 상태' "$HOME/.local/state/cys"
+  if [ "$KEEP_HISTORY" = "1" ] || [ "$KEEP_APP" = "1" ]; then [ -d "$HOME/.local/state/cys" ]; row $? 'cys 실행 상태(지난 편성 기록만 보관합니다)' "$HOME/.local/state/cys"
+  else [ -d "$HOME/.local/state/cys" ]; row $? 'cys 실행 상태(보관 폴더로 옮깁니다)' "$HOME/.local/state/cys"; fi
+  # footprint: M-DEPTSTATE (0.3.37 · 부서 실행 상태 — 재설치는 제자리 · 완전 삭제는 보관)
+  local _ds
+  for _ds in "$HOME/.local/state"/cys-dept-*; do
+    [ -e "$_ds" ] || continue
+    if [ "$KEEP_HISTORY" = "1" ] || [ "$KEEP_APP" = "1" ]; then say "  [있음] 부서 실행 상태 · $(short "$_ds") (제자리에 둡니다 — 부서가 그대로 이어집니다)"
+    else row 0 '부서 실행 상태(보관 폴더로 옮깁니다)' "$_ds"; fi
+  done
+  # footprint: M-TRASH (0.3.37 · 닫은 부서 휴지통 — 재설치는 제자리 · 완전 삭제는 보관)
+  if [ -d "$HOME/.local/state/cys-trash" ]; then
+    if [ "$KEEP_HISTORY" = "1" ] || [ "$KEEP_APP" = "1" ]; then say "  [있음] 닫은 부서 휴지통 · $(short "$HOME/.local/state/cys-trash") (제자리에 둡니다)"
+    else row 0 '닫은 부서 휴지통(보관 폴더로 옮깁니다)' "$HOME/.local/state/cys-trash"; fi
+  fi
+  # footprint: M-WEBVIEW (0.3.37 · 앱 화면(웹뷰) 자료 — 완전 삭제는 보관 · 재설치는 무접촉 · 윈 W-WEBVIEW 짝)
+  if [ "$KEEP_HISTORY" != "1" ] && [ "$KEEP_APP" != "1" ]; then
+    local _wv
+    for _wv in "$HOME/Library/WebKit/com.cysjavis.terminal" "$HOME/Library/Caches/com.cysjavis.terminal" "$HOME/Library/Preferences/com.cysjavis.terminal.plist"; do
+      [ -e "$_wv" ] && row 0 '앱 화면 자료(보관 폴더로 옮깁니다)' "$_wv"
+    done
+  fi
+  # 0.3.37: 지난 재설치의 되옮기기가 끊긴 보관본(다음 실행이 먼저 이어서 끝낸다) — 찾은 자국으로 센다(r1 F5 · 윈 짝 $script:Found++):
+  #   안 세면 다른 자국이 없을 때 「지울 것이 없습니다」 로 끝나 이어 하기(resume_unfinished_restore)가 영영 안 돈다.
+  local _bk _p2=""
+  [ "$(dirname "$JARVIS_HOME")" != "$HOME" ] && _p2="$(dirname "$JARVIS_HOME")"   # 두 자리가 같으면 한 번만 센다(r2 N2 · resume 과 같은 거르기)
+  for _bk in "$HOME/${JARVIS_BACKUP_PREFIX}"* ${_p2:+"$_p2/${JARVIS_BACKUP_PREFIX}"*}; do
+    is_jarvis_backup "$_bk" && [ -f "$_bk/$RESTORE_MARK" ] || continue
+    FOUND=$((FOUND+1))
+    say "  [있음] 끝나지 않은 되옮기기 · $(short "$_bk") (이번에 먼저 이어서 끝냅니다)"
+  done
+  # 0.3.37 r1 F4: 완전 삭제 보관본 속 로그인 파일 정리가 남은 것 — 찾은 자국으로 센다(안 세면 「지울 것이 없습니다」 로 끝나 비밀값이 남는다)
+  while IFS= read -r _bk; do
+    [ -n "$_bk" ] || continue
+    FOUND=$((FOUND+1))
+    say "  [있음] 보관본 속 로그인 파일 지우기가 남음 · $(short "$_bk") (이번에 이어서 지웁니다)"
+  done <<CRED_DIAG
+$(cred_pending_homes)
+CRED_DIAG
   # footprint: M-CLAUDEBIN
   [ -e "$HOME/.local/bin/claude" ]; row $? '클로드 실행 파일' "$HOME/.local/bin/claude"
   # footprint: M-CLAUDESHARE
@@ -476,8 +515,8 @@ diagnose() {
       # 0.3.36: 재설치 길에서는 이 로그인을 남긴다(HISTORY_KEEP_NAMES) — 앞 판의 「다시 하셔야 합니다」는 이 길에서 거짓이다.
       say "         다시 까는 길이라 이 로그인은 지우지 않고 그대로 둡니다 — 자비스 창에서 로그인을 다시 하지 않으셔도 됩니다."
     else
-      say "         ⚠이것은 위의 「cys 계정 자리」 안에 들어 있어 함께 지워집니다."
-      say "         자비스 창에서 하신 로그인은 다시 하셔야 합니다 — 따로 하신 로그인과는 별개입니다."
+      say "         ⚠이 로그인 파일은 보관 폴더에 넣지 않고 지웁니다(비밀값은 보관하지 않습니다)."
+      say "         자비스 창에서 하신 로그인은 다시 하셔야 할 수 있습니다 — 따로 하신 로그인과는 별개입니다."
     fi
   fi
   # 0.3.36: 자비스 창의 이전 대화(재설치 길에서만 남긴다) — 남긴다고 말하는 것이 사실일 때만 적는다.
@@ -500,7 +539,7 @@ diagnose() {
     || say "  [없음] 토론장 안내 가리키기 · $(short "$AGORA_SKILL")"
   if [ -d "$AGORA_SKILL_IN_CYS" ]; then
     say "  [있음] 토론장 안내 가리키기(자비스 창 쪽) · $(short "$AGORA_SKILL_IN_CYS")"
-    say "         ⚠이것은 위의 「cys 계정 자리」 안에 들어 있어 함께 지워집니다(cys 설치의 일부입니다)."
+    say "         ⚠이것은 위의 「cys 계정 자리」 안에 들어 있어 그 자리와 함께 옮겨지거나 새로 만들어집니다(cys 설치의 일부입니다)."
     if [ -d "$AGORA_SKILL" ]; then
       say "         같은 안내가 $(short "$AGORA_SKILL") 에도 있어 그쪽은 남습니다."
     else
@@ -682,6 +721,25 @@ prune_keep_hit() {
   done <<< "$keeps"
   return 1
 }
+# 0.3.37(DESIGN-0337 6-1절 ⑤·MINOR): 남길 목록을 **둘로 가른다** —
+#   ⑴참가 자리(keeps) = 가리키는 곳(실경로)과 바로가기 **자리** 둘 다로 비교(0.3.36 그대로 · 모든 길)
+#     ★MINOR 처방(「자리 비교는 표지 길에만」)은 **기각**했다 — 그렇게 하면 표지 없는 길에서 참가 자리 **안**의 바로가기
+#       (참가자가 만든 것)를 다시 지운다(0.3.35 동작 · 더 지우는 쪽). 더 남기는 쪽을 유지하고 시험으로 고정한다(delete-path 칸 ⓓM).
+#   ⑵재설치 남길 것(hkeeps) = 바로가기는 **자리로만**(가리키는 곳으로 보지 않는다) — 앞 판은 가리키는 곳으로도 봐서
+#     `pack` 이 `projects` 안을 가리키는 바로가기면 pack 이름표가 남았다(반례 ⑤ · 옛 팩 → 병합 대기).
+prune_keep_hit_split() { # <항목 원문> <실경로(바로가기면 가리키는 곳)> <루트 원문> <루트 실경로> <참가 자리> <재설치 남길 것>
+  local p="$1" c="$2" root="$3" rc="$4" pk="$5" hk="$6" loc=""
+  [ "${p#"$root"/}" != "$p" ] && loc="$rc${p#"$root"}"
+  if [ -L "$p" ]; then
+    prune_keep_hit "$c" "$pk" && return 0
+    [ -n "$loc" ] && prune_keep_hit "$loc" "$pk" && return 0
+    [ -n "$hk" ] && [ -n "$loc" ] && prune_keep_hit "$loc" "$hk" && return 0
+    return 1
+  fi
+  prune_keep_hit "$c" "$pk" && return 0
+  [ -n "$hk" ] && prune_keep_hit "$c" "$hk" && return 0
+  return 1
+}
 # 항목의 실경로를 **싸게** 낸다. `find` 는 링크를 따라가지 않으므로 루트 아래 조상 마디에는
 #   링크가 없다 ⇒ 「루트 실경로 + 나머지 마디」. 항목 **자신이** 링크일 때만 따로 푼다.
 item_canon() { # item_canon <항목 원문> <루트 원문> <루트 실경로>
@@ -709,7 +767,7 @@ item_canon() { # item_canon <항목 원문> <루트 원문> <루트 실경로>
 #   ⇒ 훑는 것은 언제나 원문 루트, 실경로는 **비교에만** 쓴다.
 PRUNE_WHY=""
 prune_except() {
-  local root="$1" root_canon="$2" keeps="$3" list p c enum_fail left why
+  local root="$1" root_canon="$2" keeps="$3" hkeeps="${4:-}" list p c enum_fail left why
   PRUNE_FAIL=0; enum_fail=0; left=0
   list="$(mktemp -t jarvis-prune)" || return 1
   find "$root" -depth -mindepth 1 -print0 > "$list" 2>/dev/null || enum_fail=1
@@ -721,9 +779,7 @@ prune_except() {
     # 0.3.36: 링크가 아니면 item_canon 과 같은 값을 프로세스 없이 낸다(「루트 실경로 + 나머지 마디」 — item_canon 머리 주석)
     if [ ! -L "$p" ] && [ "${p#"$root"/}" != "$p" ]; then c="$root_canon${p#"$root"}"
     else c="$(item_canon "$p" "$root" "$root_canon")" || c=""; fi
-    prune_keep_hit "$c" "$keeps" && continue
-    # 0.3.36 교차 검토: 바로가기는 **자리**로도 본다 — 남길 폴더 안에 든 바로가기가 가리키는 곳으로만 비교돼 지워졌다.
-    [ -L "$p" ] && [ "${p#"$root"/}" != "$p" ] && prune_keep_hit "$root_canon${p#"$root"}" "$keeps" && continue
+    prune_keep_hit_split "$p" "$c" "$root" "$root_canon" "$keeps" "$hkeeps" && continue
     why="$(rm -rf "$p" 2>&1)"
     if [ -n "$why" ]; then
       PRUNE_WHY="$(printf '%s%s\n' "$PRUNE_WHY" "$why")"
@@ -735,9 +791,7 @@ prune_except() {
   while IFS= read -r -d '' p; do
     if [ ! -L "$p" ] && [ "${p#"$root"/}" != "$p" ]; then c="$root_canon${p#"$root"}"
     else c="$(item_canon "$p" "$root" "$root_canon")" || c=""; fi
-    prune_keep_hit "$c" "$keeps" && continue
-    # 0.3.36 교차 검토: 바로가기는 **자리**로도 본다 — 남길 폴더 안에 든 바로가기가 가리키는 곳으로만 비교돼 지워졌다.
-    [ -L "$p" ] && [ "${p#"$root"/}" != "$p" ] && prune_keep_hit "$root_canon${p#"$root"}" "$keeps" && continue
+    prune_keep_hit_split "$p" "$c" "$root" "$root_canon" "$keeps" "$hkeeps" && continue
     left=$((left+1))
   done < "$list"
   rm -f "$list"
@@ -830,7 +884,7 @@ drop_dir()  {
       paths_under "$t" "$hist" | while IFS= read -r k; do [ -n "$k" ] && say "           남기는 자리: $(short "$k")"; done
     fi
     if [ -z "$hist" ]; then what='참가 자리'; elif [ -z "$keeps" ]; then what='이전 대화'; else what='참가 자리와 이전 대화'; fi
-    if prune_except "$1" "$t" "$(printf '%s\n%s\n' "$keeps" "$hist")"; then
+    if prune_except "$1" "$t" "$keeps" "$hist"; then
       REMOVED=$((REMOVED+1)); say "  지움: $(short "$1") (${what}는 그대로)"
       return 0
     fi
@@ -1162,7 +1216,9 @@ keep_jarvis_dir() { # keep_jarvis_dir <작업 폴더(안전 확인 통과)> — 
     return 0
   fi
   after="$(tree_stat "$dest")"
+  ARCHIVE_DEST="$dest"   # 0.3.37: 이번 실행의 보관 폴더 — 뒤의 cys 자료도 여기로 모은다(archive_root)
   if [ "$before" != "$after" ]; then
+    ARCHIVE_FAIL=1; ARCHIVE_VERIFY_FAIL=1   # 0.3.37: 대조가 어긋나면 뒤 단계를 하지 않는다 · 다시 해 보기도 이 깃발은 안 지운다
     say "  🔴보관 확인 실패: $(short "$dest") — 옮기기 전과 파일 수·크기가 달라 아무것도 지우지 않았습니다(전 $before · 뒤 ${after:-못 셈})."
     BACKUP_NOTE="이전 자비스 자료를 $(short "$dest") 로 옮겼지만 빠짐없이 옮겨졌는지 확인하지 못했습니다. 아무것도 지우지 않았습니다."
     return 0
@@ -1182,6 +1238,441 @@ keep_jarvis_dir() { # keep_jarvis_dir <작업 폴더(안전 확인 통과)> — 
   prune_jarvis_backups "$parent" "$dest"
   BACKUP_NOTE="이전 자비스 자료는 $(short "$dest") 에 그대로 보관해 두었습니다."
   return 0
+}
+
+# ── 0.3.37 보관 이동 넓히기 — 지우는 것은 다시 받는 프로그램 파일뿐 · 사람이 쌓은 자료는 보관 폴더로 옮긴다 ──
+#   설계 = docs/install-master/DESIGN-0337.md 3·4절.
+#   ★옮기기 = 같은 볼륨 안 이름 바꾸기 한 번(perl rename)뿐 — 복사하지 않는다. 다른 볼륨이면 옮기지 않고 멈춘다(ARCHIVE_FAIL).
+#   ★옮긴 뒤 파일 수·총 바이트를 대조한다(tree_stat) — 어긋나면 ARCHIVE_FAIL · purge 가 그 뒤 단계(프로그램 지우기 등)를 하지 않는다.
+#   ★보관 폴더 = 작업 폴더 보관(keep_jarvis_dir)이 만든 것(ARCHIVE_DEST)에 모은다 — 그것이 없거나 홈과 다른 볼륨이면
+#     홈에 같은 이름 꼴로 새로 만들고 우리 표식을 놓는다(ARCHIVE_HOME). 사람 자료가 든 보관본은 자동 정리 대상이 아니다
+#     (installer_only_backup 이 설치기 이름 밖의 것을 보면 늘 남긴다 — 0.3.36 규칙 그대로).
+ARCHIVE_DEST=""; ARCHIVE_HOME=""; ARCHIVE_FAIL=0; ARCHIVED=0; ARCHIVE_LAST=""; ARCHIVE_VERIFY_FAIL=0; CYS_HOME_ARCHIVED=""
+CRED_MARK=".jarvis-cred-pending"   # 완전 삭제 보관본 속 로그인 파일 정리가 남았다(보관된 옛 ~/.cys 맨 위 · 빈 파일) — 다음 실행이 이어서 지운다(r1 F4)
+RESTORE_MARK=".jarvis-restore-pending"   # 재설치 되옮기기 진행 표지(보관 폴더 맨 위 · NUL 로 가른 상대 이름 목록) — 다음 실행이 이어서 끝낸다
+# 재설치 길에서 본부 상태(~/.local/state/cys) 안에서 보관 폴더로 옮길 편성 기록(윈 Get-CysStateItems 짝 · DESIGN-0337 📌4 ⓑ) — 나머지는 제자리
+STATE_FORMATION_NAMES="topology.json
+phoenix
+boot-intents
+dept_tombstones.json"
+volume_of() { stat -f %d "$1" 2>/dev/null; }
+same_volume() { local a b; a="$(volume_of "$1")"; b="$(volume_of "$2")"; [ -n "$a" ] && [ "$a" = "$b" ]; }
+new_backup_dir() { # new_backup_dir <부모> → 새 보관 폴더(우리 표식 · 이름 꼴 install-jarvis-backup-<시각>[-n])를 찍는다 · 못 만들면 rc 1
+  local parent="$1" stamp d n=1
+  stamp="$(date +%Y%m%d-%H%M%S)"
+  d="$parent/${JARVIS_BACKUP_PREFIX}${stamp}"
+  while [ -e "$d" ] || [ -L "$d" ]; do n=$((n+1)); d="$parent/${JARVIS_BACKUP_PREFIX}${stamp}-$n"; done
+  mkdir "$d" 2>/dev/null || return 1
+  chmod 700 "$d" 2>/dev/null
+  if ! printf '%s\n' "$JARVIS_OWNER_MARK" > "$d/.jarvis-owned" 2>/dev/null; then rmdir "$d" 2>/dev/null; return 1; fi
+  printf '%s' "$d"
+}
+# archive_move <원 자리> <보관 폴더 안 이름> <화면 이름> — 자료 한 자리를 보관 폴더로 옮긴다. 실패 = ARCHIVE_FAIL · 못 지움 +1 · rc 1
+#   링크면 종전대로 이름표만 지운다(가리키던 실제 자료는 무접촉) · 참가 자리가 안에 있으면 옮기지 않고 그대로 둔다(옮겼다 되돌리기 금지)
+#   ⚠보관 폴더는 하위 셸($(…))에서 정하면 ARCHIVE_HOME 이 부모에 안 남는다 — 그래서 archive_root_set 이 부모 셸에서 정해 AROOT 에 둔다.
+archive_root_set() { # 부모 셸에서 보관 폴더를 정해 AROOT 에 둔다 · 못 만들면 rc 1
+  AROOT=""
+  if [ -n "$ARCHIVE_DEST" ] && [ -d "$ARCHIVE_DEST" ] && same_volume "$ARCHIVE_DEST" "$HOME"; then AROOT="$ARCHIVE_DEST"; return 0; fi
+  if [ -z "$ARCHIVE_HOME" ] || [ ! -d "$ARCHIVE_HOME" ]; then ARCHIVE_HOME="$(new_backup_dir "$HOME")" || { ARCHIVE_HOME=""; return 1; }; fi
+  AROOT="$ARCHIVE_HOME"
+}
+free_rel() { # free_rel <보관 폴더> <이름> → 비어 있는 이름(겹치면 -2, -3 …) — 다시 해 보기가 같은 이름을 또 쓸 때 덮지 않는다
+  local r="$2" n=1
+  while [ -e "$1/$r" ] || [ -L "$1/$r" ]; do n=$((n+1)); r="$2-$n"; done
+  printf '%s' "$r"
+}
+archive_move() {
+  local src="$1" rel="$2" what="$3" dest before after c
+  [ -e "$src" ] || [ -L "$src" ] || return 0
+  if [ -L "$src" ]; then drop_dir "$src"; return $?; fi
+  c="$(canon "$src" 2>/dev/null)" || c=""
+  if [ "${PRESERVE_CANON_FAIL:-0}" -ne 0 ] || [ -z "$c" ] || [ -n "$(preserved_under "$c")" ] || [ -n "$(preserve_covers "$c")" ]; then
+    PRESERVED=$((PRESERVED+1))
+    say "  남김: $(short "$src") — 안에 따로 두신 자리가 있거나 실제 경로를 확인하지 못해 옮기지 않고 그대로 두었습니다(지운 것 없음)."
+    return 0
+  fi
+  if ! archive_root_set; then
+    ARCHIVE_FAIL=1; KEPT_FAIL=$((KEPT_FAIL+1))
+    say "  🔴못 옮김: $(short "$src") — 보관 폴더를 만들지 못해 그대로 두었습니다(지운 것 없음)."
+    return 1
+  fi
+  if ! same_volume "$AROOT" "$(dirname "$src")"; then
+    ARCHIVE_FAIL=1; KEPT_FAIL=$((KEPT_FAIL+1))
+    say "  🔴못 옮김: $(short "$src") — 보관 폴더와 다른 디스크에 있어 옮기지 않았습니다(복사하지 않습니다 · 지운 것 없음)."
+    return 1
+  fi
+  mkdir -p "$(dirname "$AROOT/$rel")" 2>/dev/null
+  dest="$AROOT/$(free_rel "$AROOT" "$rel")"
+  if ! before="$(tree_stat "$src")" || [ -z "$before" ] \
+     || ! perl -e 'rename($ARGV[0], $ARGV[1]) or exit 1' "$src" "$dest" 2>/dev/null; then
+    ARCHIVE_FAIL=1; KEPT_FAIL=$((KEPT_FAIL+1))
+    say "  🔴못 옮김: $(short "$src") — 보관 폴더로 옮기지 못해 그대로 두었습니다(지운 것 없음 · 쓰고 있는 프로그램이 있을 수 있습니다)."
+    return 1
+  fi
+  after="$(tree_stat "$dest")"
+  if [ "$before" != "$after" ]; then
+    ARCHIVE_FAIL=1; ARCHIVE_VERIFY_FAIL=1; KEPT_FAIL=$((KEPT_FAIL+1))
+    say "  🔴보관 확인 실패: $(short "$dest") — 옮기기 전과 파일 수·크기가 다릅니다(전 $before · 뒤 ${after:-못 셈}). 이 뒤로는 아무것도 지우지 않습니다."
+    return 1
+  fi
+  ARCHIVED=$((ARCHIVED+1)); ARCHIVE_LAST="$dest"
+  say "  보관: ${what} $(short "$src") → $(short "$dest")"
+  return 0
+}
+# 완전 삭제 보관본에서는 자비스 창 전용 로그인 파일을 빼고 지운다(DESIGN-0337 📌3 · 보관 폴더는 사람이 옮기고 나눠 줄 수 있는 자리 —
+#   비밀값이 남으면 안 된다). 맥은 로그인이 열쇠고리라 보통 파일이 없다. 바로가기는 따라가지 않는다(이름표도 건드리지 않음).
+#   r1 F4: 지우기 **전에** 그 보관본 맨 위에 「정리 남음」 표지(CRED_MARK)를 먼저 둔다 — 창이 닫히거나 끝내 실패해도 **다음 실행**이
+#   진단에서 찾은 자국으로 세고 지우기 맨 앞에서 이어서 지운다(resume_archived_credentials). 다 지우면 표지를 치운다.
+#   (앞 판은 보관 자리를 이 실행의 변수로만 기억해, 회차 사이만 이어지고 새 실행은 「지울 것 없음」 → 비밀값이 보관본에 남았다.)
+drop_archived_credentials() { # drop_archived_credentials <보관된 옛 ~/.cys>
+  local f d fail=0 next="다시 실행하시면 이어서 지웁니다."
+  # 표지를 못 쓰면 다음 실행이 이어서 지울 근거가 없다 — 그때는 「이어서 지웁니다」 라고 약속하지 않는다(r3 M3)
+  { : > "$1/$CRED_MARK"; } 2>/dev/null || next="그 폴더의 쓰기 권한을 확인해 주십시오(정리 표지를 쓰지 못해 다음 실행이 스스로 이어 지우지 못합니다): $(short "$1")"
+  if [ -d "$1" ] && { [ ! -x "$1" ] || [ ! -r "$1" ]; }; then   # 보관된 옛 ~/.cys 를 못 들어가거나 목록을 못 읽으면(claude-* 가 안 펼쳐짐 · r3 M1) 「없음」 이 아니다(r2 N3 · 윈 Get-ChildItem 예외 짝)
+    KEPT_FAIL=$((KEPT_FAIL+1)); say "  🔴못 지움: 보관본 속 로그인 파일을 찾지 못했습니다: $(short "$1") — $next"
+    return 0
+  fi
+  for d in "$1"/claude "$1"/claude-*; do
+    [ -d "$d" ] && [ ! -L "$d" ] || continue   # 폴더(claude*)가 바로가기면 바깥 파일이다 — 손대지 않는다
+    # 못 들어가는 폴더(권한)면 「없음」 으로 넘기지 않는다 — 못 지움으로 센다(r1 F4-2 · 윈 짝)
+    if [ ! -x "$d" ]; then
+      fail=1; KEPT_FAIL=$((KEPT_FAIL+1)); say "  🔴못 지움: 보관본 속 로그인 파일을 읽지 못했습니다: $(short "$d") — $next"
+      continue
+    fi
+    f="$d/.credentials.json"
+    [ -f "$f" ] && [ ! -L "$f" ] || continue
+    if rm -f "$f" 2>/dev/null && [ ! -e "$f" ]; then
+      say "  지움: 보관본 속 자비스 창 로그인 파일 $(short "$f") (비밀값은 보관하지 않습니다 — 다시 설치하실 때 이어서 로그인됩니다)"
+    else
+      fail=1; KEPT_FAIL=$((KEPT_FAIL+1)); say "  🔴못 지움: 보관본 속 로그인 파일 $(short "$f") — $next"
+    fi
+  done
+  if [ "$fail" -eq 0 ] && { [ -e "$1/$CRED_MARK" ] || [ -L "$1/$CRED_MARK" ]; }; then
+    # 다 지웠는데 표지를 못 치우면 다음 실행마다 「남음」 으로 세게 된다 — 조용히 넘기지 않는다(r2 N4)
+    if ! { rm -f "${1:?}/$CRED_MARK"; } 2>/dev/null || [ -e "$1/$CRED_MARK" ]; then
+      KEPT_FAIL=$((KEPT_FAIL+1)); say "  🔴못 지움: 보관본 속 정리 표지 $(short "$1/$CRED_MARK") — 로그인 파일은 지웠습니다. 그 폴더의 쓰기 권한을 확인해 주십시오."
+    fi
+  fi
+  return 0
+}
+# 로그인 파일 정리가 남은 완전 삭제 보관본의 옛 ~/.cys(보관 폴더 두 자리 · 한 줄에 하나) — 되옮기기 표지가 있는 재설치 보관본은 뺀다(그 안 로그인은 되옮길 것)
+cred_pending_homes() {
+  local d p h parents="$HOME"
+  [ "$(dirname "$JARVIS_HOME")" != "$HOME" ] && parents="$parents
+$(dirname "$JARVIS_HOME")"
+  while IFS= read -r d; do
+    [ -n "$d" ] || continue
+    while IFS= read -r p; do
+      [ -n "$p" ] || continue
+      is_jarvis_backup "$p" && [ ! -e "$p/$RESTORE_MARK" ] || continue
+      for h in "$p"/cys-home "$p"/cys-home-[0-9]*; do
+        [ -d "$h" ] && [ ! -L "$h" ] && [ -f "$h/$CRED_MARK" ] && printf '%s\n' "$h"
+      done
+    done <<CRED_LIST
+$(find "$d" -mindepth 1 -maxdepth 1 -name "${JARVIS_BACKUP_PREFIX}*" 2>/dev/null | LC_ALL=C sort)
+CRED_LIST
+  done <<CRED_PARENTS
+$parents
+CRED_PARENTS
+}
+resume_archived_credentials() {
+  local h
+  while IFS= read -r h; do
+    [ -n "$h" ] || continue
+    say "  지난번에 끝나지 않은 보관본 속 로그인 파일 지우기를 이어서 합니다: $(short "$h")"
+    drop_archived_credentials "$h"
+  done <<CRED_HOMES
+$(cred_pending_homes)
+CRED_HOMES
+}
+# 재설치 길에서 ~/.cys 로 되옮길 것을 ~/.cys 기준 상대 이름으로 NUL 로 갈라 찍는다(DESIGN-0337 4-2절) — 한 층 · 목록을 못 읽으면 rc 1
+#   본부 = claude/ 안 HISTORY_KEEP_NAMES(0.3.36 · 대소문자 무시) · 부서 = depts.json · dept-catalog.json · dept-missions ·
+#   dept-requests · dept-snapshots · pack-dept-* · claude-*(부서·계정별 좌석 프로필 — 통째로).
+#   ★줄 목록을 쓰지 않는다(NUL) — 경로·이름에 줄바꿈이 있어도 쪼개지지 않는다(0.3.36 반례 ③).
+#   ★find 종료값을 직접 받는다 — 「못 읽음」을 「남길 것 없음」으로 읽지 않는다(반례 ④).
+reinstall_keep_list() {
+  local n out
+  out="$(mktemp -t jarvis-keep)" || return 1
+  if ! find "$HOME/.cys" -mindepth 1 -maxdepth 1 \( -name 'depts.json' -o -name 'dept-catalog.json' -o -name 'dept-missions' \
+      -o -name 'dept-requests' -o -name 'dept-snapshots' -o -name 'pack-dept-*' -o -name 'claude-*' \) -print0 > "$out" 2>/dev/null; then
+    rm -f "${out:?}"; return 1
+  fi
+  if [ -d "$HOME/.cys/claude" ] && [ ! -L "$HOME/.cys/claude" ]; then
+    while IFS= read -r n; do
+      [ -n "$n" ] || continue
+      if ! find "$HOME/.cys/claude" -mindepth 1 -maxdepth 1 -iname "$n" -print0 >> "$out" 2>/dev/null; then rm -f "${out:?}"; return 1; fi
+    done <<KEEP_NAMES
+$HISTORY_KEEP_NAMES
+KEEP_NAMES
+  fi
+  JK_ROOT="$HOME/.cys" perl -0 -ne 'chomp; my $h = $ENV{JK_ROOT}; print substr($_, length($h) + 1), "\0" if substr($_, 0, length($h) + 1) eq "$h/"' "$out" 2>/dev/null
+  rm -f "${out:?}"
+}
+# 예외 갈래(참가 자리가 ~/.cys 안 · DESIGN-0337 4-4절)의 부서 남길 것 실경로(한 줄에 하나) → DEPT_KEEPS · 목록 못 읽음·줄바꿈 = rc 1
+#   바로가기는 **자리**(부모 실경로 + 이름)로 적는다 — 가리키는 곳이 ~/.cys 안 남길 것 밖이면 사전 훑기가 이미 멈췄다(반례 ①).
+DEPT_KEEPS=""
+dept_keeps() {
+  local lst hc
+  DEPT_KEEPS=""
+  hc="$(canon "$HOME/.cys" 2>/dev/null)" || return 1
+  lst="$(mktemp -t jarvis-dk)" || return 1
+  if ! reinstall_keep_list > "$lst"; then rm -f "${lst:?}"; return 1; fi
+  DEPT_KEEPS="$(JK_HC="$hc" perl -0 -ne 'chomp; exit 3 if /\n/; next if m{^claude/}; print "$ENV{JK_HC}/$_\n"' "$lst" 2>/dev/null)" || { rm -f "${lst:?}"; DEPT_KEEPS=""; return 1; }
+  rm -f "${lst:?}"
+  [ -n "$DEPT_KEEPS" ] && DEPT_KEEPS="$DEPT_KEEPS
+"
+  return 0
+}
+# restore_from <보관 폴더> — 되옮기기 진행 표지에 적힌 것을 cys-home 에서 ~/.cys 로 이름 바꾸기로 되옮긴다.
+#   ~/.cys 에 같은 이름이 이미 있으면 덮지 않는다 — **되옮기기 실패와 같다**(r1 F2 · master#0337b3fa · DESIGN-0337 4절 5 · 10절):
+#     그 이름은 보관 폴더에 그대로 · 표지에 남김 · 쉬운 말 1줄 · rc 1 → 재설치를 멈춘다(rc 7). 옛 판은 건너뛰고 표지를 지워 rc 0 이었다.
+#   하나라도 못 옮기면 표지에 남은 것만 적어 두고 못 지움 +1 · rc 1(다음 실행이 이어서 끝낸다) · 전부 끝나면 표지를 지운다.
+#   표지 고쳐 쓰기 = 임시 파일에 다 쓴 뒤 이름 바꾸기(r1 F3) — 도중에 끊기거나 못 쓰면 옛 표지가 그대로 남는다(반쪽 표지 → 「할 것 없음」 → 표지 지움 금지).
+restore_from() {
+  local root="$1" mark rel src dst fail=0 left home="" _up _lnk
+  mark="${root:?}/$RESTORE_MARK"
+  [ -f "$mark" ] || return 0
+  left="$(mktemp -t jarvis-left)" || return 1
+  # 표지 첫 칸 = 보관 폴더 안 옛 ~/.cys 의 이름(보통 cys-home · 다시 해 보기면 cys-home-2 …) · 나머지 = 되옮길 상대 이름
+  IFS= read -r -d '' home < "$mark" || home=""
+  case "$home" in cys-home|cys-home-[0-9]*) : ;; *) rm -f "${left:?}"; KEPT_FAIL=$((KEPT_FAIL+1)); ARCHIVE_FAIL=1
+    say "  🔴되옮기기 표지를 읽지 못했습니다: $(short "$mark") — 자료는 보관 폴더에 그대로 있습니다."; return 1 ;; esac
+  printf '%s\0' "$home" > "$left"
+  if [ ! -d "$HOME/.cys" ]; then mkdir "$HOME/.cys" 2>/dev/null; chmod 700 "$HOME/.cys" 2>/dev/null; fi
+  while IFS= read -r -d '' rel; do
+    [ -n "$rel" ] || continue
+    [ "$rel" = "$home" ] && continue                        # 첫 칸
+    # 표지는 우리가 쓴 것이지만 손으로 고쳐졌을 수 있다 — ~/.cys 밖을 가리키는 칸(절대경로 · ..)은 되옮기지 않는다(윈 Restore-From 짝 · r1 F5-2)
+    case "$rel" in /*|..|../*|*/..|*/../*)
+      fail=1; printf '%s\0' "$rel" >> "$left"
+      say "  🔴남음: 되옮기기 표지의 한 칸을 알아보지 못했습니다: $rel — 자료는 보관 폴더에 그대로 있습니다."
+      continue ;;
+    esac
+    src="$root/$home/$rel"; dst="$HOME/.cys/$rel"
+    [ -e "$src" ] || [ -L "$src" ] || continue            # 이미 되옮겼다
+    # 되옮길 자리의 윗자리(~/.cys 안 · 예: ~/.cys/claude)가 바로가기면 따라가지 않는다 — 따라가면 ~/.cys 밖으로 옮겨진다(r2 N6 · cys_home_reinstall 과 같은 판정)
+    _up="$(dirname "$rel")"; _lnk=""
+    while [ "$_up" != "." ] && [ "$_up" != "/" ]; do [ -L "$HOME/.cys/$_up" ] && _lnk="$_up"; _up="$(dirname "$_up")"; done
+    if [ -n "$_lnk" ]; then
+      fail=1; printf '%s\0' "$rel" >> "$left"
+      say "  🔴남음: $(short "$HOME/.cys/$_lnk") 가 바로가기라 $(short "$dst") 를 되옮기지 않았습니다 — 예전 자료는 보관 폴더에 그대로 있습니다: $(short "$src")"
+      continue
+    fi
+    if [ -e "$dst" ] || [ -L "$dst" ]; then
+      fail=1; printf '%s\0' "$rel" >> "$left"
+      say "  🔴남음: $(short "$dst") — 같은 이름의 자료가 이미 있어 덮지 않았습니다. 예전 자료는 보관 폴더에 그대로 있습니다: $(short "$src")"
+      say "         새로 생긴 쪽($(short "$dst"))을 다른 이름으로 바꿔 두신 뒤 다시 실행하시면 예전 자료를 제자리로 옮깁니다 — 바꿔 둔 새 쪽은 그때 보관 폴더로 함께 옮겨집니다(어느 쪽도 지우지 않습니다)."
+      continue
+    fi
+    mkdir -p "$(dirname "$dst")" 2>/dev/null
+    if perl -e 'rename($ARGV[0], $ARGV[1]) or exit 1' "$src" "$dst" 2>/dev/null; then
+      say "  되옮김: $(short "$dst")"
+    else
+      fail=1; printf '%s\0' "$rel" >> "$left"
+      say "  🔴되옮기지 못함: $(short "$src") — 보관 폴더에 그대로 있습니다(지운 것 없음)."
+    fi
+  done < "$mark"
+  if [ "$fail" -eq 0 ]; then rm -f "${mark:?}" "${left:?}"; return 0; fi   # (left 의 첫 칸 = home 이름 · 남은 것만 뒤에)
+  if ! { cat "$left" > "$mark.tmp" && perl -e 'rename($ARGV[0], $ARGV[1]) or exit 1' "$mark.tmp" "$mark"; } 2>/dev/null; then
+    rm -f "${mark:?}.tmp"
+    say "  🔴되옮기기 표지를 고쳐 쓰지 못해 지난 표지를 그대로 두었습니다 — 자료는 보관 폴더에 그대로 있고, 다시 실행하시면 이어서 옮깁니다."
+  fi
+  rm -f "${left:?}"
+  KEPT_FAIL=$((KEPT_FAIL+1)); ARCHIVE_FAIL=1
+  return 1
+}
+# 끝나지 않은 되옮기기를 먼저 끝낸다(보관 이동 승인 조건 ⑴) — 보관 폴더 두 자리(홈 · 작업 폴더 부모)에서 표지가 있는 우리 보관본을 오래된 것부터.
+#   하나라도 못 끝내면 RESUME_LEFT=1 — 이 실행의 ~/.cys 재설치 길은 이어 가지 않는다(r1 F2 · DESIGN-0337 10절 「이어 가지 않고 멈춘다」).
+resume_unfinished_restore() {
+  local p d parents
+  RESUME_LEFT=0
+  parents="$HOME"
+  [ "$(dirname "$JARVIS_HOME")" != "$HOME" ] && parents="$parents
+$(dirname "$JARVIS_HOME")"
+  while IFS= read -r d; do
+    [ -n "$d" ] || continue
+    while IFS= read -r p; do
+      [ -n "$p" ] || continue
+      is_jarvis_backup "$p" && [ -f "$p/$RESTORE_MARK" ] || continue
+      if [ -L "$HOME/.cys" ]; then
+        KEPT_FAIL=$((KEPT_FAIL+1)); ARCHIVE_FAIL=1; RESUME_LEFT=1
+        say "  🔴되옮기기를 이어 가지 못했습니다: $(short "$HOME/.cys") 가 바로가기입니다 — 자료는 $(short "$p") 에 그대로 있습니다."
+        continue
+      fi
+      say "  지난번에 끝나지 않은 되옮기기를 이어서 합니다: $(short "$p")"
+      restore_from "$p" || RESUME_LEFT=1
+    done <<RESUME_LIST
+$(find "$d" -mindepth 1 -maxdepth 1 -name "${JARVIS_BACKUP_PREFIX}*" 2>/dev/null | LC_ALL=C sort)
+RESUME_LIST
+  done <<RESUME_PARENTS
+$parents
+RESUME_PARENTS
+}
+# ~/.cys 재설치 길(R2 · DESIGN-0337 4절): 통째로 보관 폴더로 옮긴 뒤 남길 것만 되옮긴다 — 지우는 것 0.
+cys_home_reinstall() {
+  local list hname
+  if [ -L "$HOME/.cys" ]; then
+    KEPT_FAIL=$((KEPT_FAIL+1))
+    say "  🔴못 지움: $(short "$HOME/.cys") — 바로가기라 이전 대화를 제자리로 되옮길 수 없어 **아무것도 바꾸지 않았습니다.**"
+    return 1
+  fi
+  # ~/.cys/claude 자체가 바로가기면 못 푼다(0.3.36 ⓠ 그대로) — 이름표만 되옮기면 가리키는 곳의 옛 CLAUDE.md 가 새 판을 막고,
+  #   안 되옮기면 새 자리에서 이전 대화가 안 보인다 ⇒ 아무것도 바꾸지 않고 멈춘다(가리키는 곳의 자료는 원래 무접촉).
+  if [ -L "$HOME/.cys/claude" ]; then
+    KEPT_FAIL=$((KEPT_FAIL+1))
+    say "  🔴못 지움: $(short "$HOME/.cys/claude") — 바로가기라 이전 대화를 제자리로 되옮길 수 없어 **아무것도 바꾸지 않았습니다.**"
+    return 1
+  fi
+  # 지난번 되옮기기를 이번 실행에서 끝내지 못했으면(겹침 · 못 옮김) ~/.cys 를 또 옮기지 않는다 — 옛 자료가 보관본 두 곳으로 갈라진다.
+  if [ "${RESUME_LEFT:-0}" = "1" ]; then
+    KEPT_FAIL=$((KEPT_FAIL+1)); ARCHIVE_FAIL=1
+    say "  🔴남음: 지난번 옮기기가 아직 끝나지 않아 이번에는 $(short "$HOME/.cys") 를 바꾸지 않았습니다."
+    say "         예전 자료는 보관 폴더에 그대로 있고, 위 🔴 줄의 까닭이 풀린 뒤 다시 실행하시면 이어서 제자리로 옮깁니다."
+    return 1
+  fi
+  list="$(mktemp -t jarvis-rl)" || return 1
+  if ! reinstall_keep_list > "$list" || ! ls -A "$HOME/.cys" >/dev/null 2>&1; then
+    rm -f "${list:?}"; KEPT_FAIL=$((KEPT_FAIL+1)); ARCHIVE_FAIL=1
+    say "  🔴못 지움: $(short "$HOME/.cys") — 남길 자리의 목록을 읽지 못해 **아무것도 바꾸지 않았습니다.**"
+    return 1
+  fi
+  if ! archive_root_set; then
+    rm -f "${list:?}"; KEPT_FAIL=$((KEPT_FAIL+1)); ARCHIVE_FAIL=1
+    say "  🔴못 옮김: $(short "$HOME/.cys") — 보관 폴더를 만들지 못해 그대로 두었습니다(지운 것 없음)."
+    return 1
+  fi
+  # 이 보관 폴더에 아직 끝나지 않은 되옮기기 표지가 있으면 덮지 않는다(윈 Invoke-CysHomeReinstall 짝) —
+  #   덮으면 그 목록을 잃어, 앞 회차 보관본에 남은 로그인·대화가 제자리로 영영 안 돌아온다(스스로 다시 해 보기가 그렇게 rc 0 으로 끝났다).
+  if [ -e "$AROOT/$RESTORE_MARK" ] || [ -L "$AROOT/$RESTORE_MARK" ]; then
+    rm -f "${list:?}"; KEPT_FAIL=$((KEPT_FAIL+1)); ARCHIVE_FAIL=1
+    say "  🔴남음: 지난번 옮기기가 아직 끝나지 않아 이번에는 $(short "$HOME/.cys") 를 바꾸지 않았습니다."
+    say "         자료는 $(short "$AROOT") 에 그대로 있고, 다시 실행하시면 이어서 제자리로 옮깁니다."
+    return 1
+  fi
+  # 표지를 **먼저** 쓴다 — 옮긴 직후 멈춰도 다음 실행이 무엇을 되옮길지 안다. 첫 칸 = 보관 폴더 안 이름(겹치지 않게 고른다).
+  hname="$(free_rel "$AROOT" "cys-home")"
+  if ! { printf '%s\0' "$hname"; cat "$list"; } > "$AROOT/$RESTORE_MARK" 2>/dev/null; then
+    rm -f "${list:?}"; KEPT_FAIL=$((KEPT_FAIL+1)); ARCHIVE_FAIL=1
+    say "  🔴못 옮김: 되옮기기 표지를 쓰지 못해 $(short "$HOME/.cys") 를 그대로 두었습니다(지운 것 없음)."
+    return 1
+  fi
+  rm -f "${list:?}"
+  if ! archive_move "$HOME/.cys" "$hname" "cys 계정 자리(다시 까는 길 — 남길 것은 곧 제자리로 되옮깁니다)"; then
+    [ -e "$HOME/.cys" ] && rm -f "${AROOT:?}/$RESTORE_MARK"   # 원자리가 그대로면 아무것도 안 옮긴 것 — 표지를 거둔다
+    return 1
+  fi
+  mkdir "$HOME/.cys" 2>/dev/null; chmod 700 "$HOME/.cys" 2>/dev/null
+  restore_from "$AROOT" || return 1
+  say "  남김: 자비스 창 로그인·이전 대화 · 부서 등록부·부서 좌석 기록 (다시 까는 길이라 제자리로 되옮겼습니다)"
+  return 0
+}
+# 재설치 길 — 본부 상태 안의 편성 기록만 보관 폴더로(나머지 제자리 · 윈 Get-CysStateItems 짝 · 📌4 ⓑ)
+state_formation_archive() {
+  local d="$HOME/.local/state/cys" n f
+  if [ -L "$d" ]; then drop_dir "$d"; return $?; fi
+  [ -d "$d" ] || return 0
+  while IFS= read -r n; do
+    [ -n "$n" ] || continue
+    archive_move "$d/$n" "cys-state/$n" "cys 지난 편성 기록" || return 1
+  done <<SF_NAMES
+$STATE_FORMATION_NAMES
+SF_NAMES
+  for f in "$d"/topology.json.*; do
+    [ -e "$f" ] || [ -L "$f" ] || continue
+    archive_move "$f" "cys-state/$(basename "$f")" "cys 지난 편성 기록" || return 1
+  done
+  return 0
+}
+# 사전 훑기(읽기만 · 첫 변경 전 · DESIGN-0337 6-1절 ②③④) — 옮길 자료 자리 아래 바로가기가 이 실행이 **지우는** 프로그램 자리를
+#   가리키거나(그곳 자료가 사라진다) · 경로에 줄바꿈이 있거나 · 목록을 못 읽으면 rc 1 → 이 실행은 아무것도 바꾸지 않는다.
+#   남길 것 안 바로가기가 ~/.cys 의 남길 것 밖을 가리키면 PRESCAN_NOTE(재설치 · 멈추지 않음 · 가리키던 자료는 보관 폴더에 있다 = 반례 ①).
+PRESCAN_BAD=""; PRESCAN_NOTE=""
+lc() { printf '%s' "$1" | tr '[:upper:]' '[:lower:]'; }   # APFS 기본 = 대소문자 무시 ⇒ 비교는 소문자로(더 많이 잡는 쪽)
+under_any() { # under_any <경로> <뿌리들(한 줄에 하나)> → rc 0 = 그 뿌리 자신이거나 그 아래
+  local c r
+  c="$(lc "$1")"
+  while IFS= read -r r; do
+    [ -n "$r" ] || continue
+    r="$(lc "$r")"
+    case "$c" in "$r"|"$r"/*) return 0 ;; esac
+  done <<< "$2"
+  return 1
+}
+prescan_links() {
+  local roots p pc r c t lst proots="" keeps="" hc="" prc nested=""
+  PRESCAN_BAD=""; PRESCAN_NOTE=""
+  case "$HOME" in *$'\n'*) PRESCAN_BAD="(홈 경로에 줄바꿈이 있습니다)"; return 1 ;; esac
+  # 이 실행이 지우는 프로그램 자리(P)
+  for p in "$HOME/.local/share/claude" "$HOME/.local/bin/claude" "$HOME/install-jarvis.sh"; do
+    [ -e "$p" ] || [ -L "$p" ] || continue
+    c="$(canon "$p" 2>/dev/null)" && [ -n "$c" ] && proots="$proots$c
+"
+  done
+  if [ "$KEEP_APP" != "1" ]; then
+    for p in "$CYS_APP" ${CYS_APP_OLD:+"$CYS_APP_OLD"}; do
+      [ -e "$p" ] || continue
+      c="$(canon "$p" 2>/dev/null)" && [ -n "$c" ] && proots="$proots$c
+"
+    done
+  fi
+  # 재설치 길의 남길 것(반례 ① 판정용 · 실경로 한 줄에 하나 — 줄바꿈 든 이름은 못 풂)
+  if [ "$KEEP_HISTORY" = "1" ] && [ -d "$HOME/.cys" ] && [ ! -L "$HOME/.cys" ]; then
+    hc="$(canon "$HOME/.cys" 2>/dev/null)" || { PRESCAN_BAD="$(short "$HOME/.cys") (실제 경로를 확인하지 못했습니다)"; return 1; }
+    lst="$(mktemp -t jarvis-pk)" || return 1
+    if ! reinstall_keep_list > "$lst"; then rm -f "${lst:?}"; PRESCAN_BAD="$(short "$HOME/.cys") (목록을 읽지 못했습니다)"; return 1; fi
+    keeps="$(JK_HC="$hc" perl -0 -ne 'chomp; exit 3 if /\n/; print "$ENV{JK_HC}/$_\n"' "$lst" 2>/dev/null)"; prc=$?
+    rm -f "${lst:?}"
+    [ "$prc" -eq 0 ] || { PRESCAN_BAD="(남길 자리 이름에 줄바꿈이 있습니다)"; return 1; }
+    # 참가 자리가 ~/.cys 안인가(예외 갈래 · 4-4절) — 읽기만(보존 경로 실경로 풀기)
+    resolve_preserve_paths
+    nested="$(preserved_under "$hc")"
+  fi
+  roots="$HOME/.cys
+$HOME/.local/state/cys
+$HOME/.local/state/cys-trash
+$JARVIS_HOME"
+  for r in "$HOME/.local/state"/cys-dept-*; do [ -d "$r" ] && roots="$roots
+$r"; done
+  lst="$(mktemp -t jarvis-pl)" || return 1
+  while IFS= read -r r; do
+    [ -n "$r" ] || continue
+    [ -d "$r" ] && [ ! -L "$r" ] || continue
+    : > "$lst"
+    if ! find "$r" -type l -print0 > "$lst" 2>/dev/null; then rm -f "${lst:?}"; PRESCAN_BAD="$(short "$r") (목록을 끝까지 읽지 못했습니다)"; return 1; fi
+    while IFS= read -r -d '' p; do
+      t="$(perl -MCwd=abs_path -e '$r = abs_path($ARGV[0]); (defined $r && -e $r) or exit 1; print $r' "$p" 2>/dev/null)" || continue   # 끊긴 바로가기 = 뒤에 자료 없음
+      case "$t$p" in *$'\n'*) rm -f "${lst:?}"; PRESCAN_BAD="$(short "$p") (경로에 줄바꿈이 있습니다)"; return 1 ;; esac
+      if [ -n "$proots" ] && under_any "$t" "$proots"; then
+        rm -f "${lst:?}"; PRESCAN_BAD="$(short "$p") → $(short "$t") (지울 프로그램 자리를 가리킵니다)"; return 1
+      fi
+      # 바로가기 **자리**의 실경로 = 부모 실경로 + 이름(canon 은 폴더를 가리키는 바로가기를 따라가 버린다) — 남길 목록은 실경로다
+      pc="$(canon "$(dirname "$p")" 2>/dev/null)" && pc="$pc/$(basename "$p")" || pc="$p"
+      if [ -n "$keeps" ] && under_any "$pc" "$keeps" && under_any "$t" "$hc" && ! under_any "$t" "$keeps"; then
+        # 예외 갈래(참가 자리가 ~/.cys 안)는 남길 것 밖을 **지운다** ⇒ 가리키던 자료가 사라진다 → 못 풂(반례 ① 처방 · 삭제 0)
+        if [ -n "$nested" ]; then rm -f "${lst:?}"; PRESCAN_BAD="$(short "$p") → $(short "$t") (남길 자리 밖을 가리킵니다)"; return 1; fi
+        PRESCAN_NOTE="${PRESCAN_NOTE}$(short "$p")
+"
+      fi
+    done < "$lst"
+  done <<< "$roots"
+  rm -f "${lst:?}"
+  return 0
+}
+# 끝 요약 한 줄 — 보관 폴더 자리와 크기(쉬운 말)
+human_size() { # human_size <KB>
+  local k="${1:-0}"
+  if [ "$k" -ge 1048576 ]; then printf '약 %s.%sGB' "$((k/1048576))" "$(( (k%1048576)*10/1048576 ))"
+  elif [ "$k" -ge 1024 ]; then printf '약 %sMB' "$(( (k+1023)/1024 ))"
+  else printf '1MB 미만'; fi
+}
+archive_summary() {
+  local d k
+  for d in "$ARCHIVE_DEST" "$ARCHIVE_HOME"; do
+    [ -n "$d" ] && [ -d "$d" ] || continue
+    [ "$d" = "$ARCHIVE_HOME" ] && [ "$ARCHIVE_HOME" = "$ARCHIVE_DEST" ] && continue
+    k="$(du -sk "$d" 2>/dev/null | awk '{print $1}')"
+    say "    이전 자료는 $(short "$d") 폴더에 모두 보관해 두었습니다 ($(human_size "${k:-0}")). 필요 없으시면 나중에 그 폴더를 지우셔도 됩니다."
+  done
 }
 
 # 우리가 홈에 **새로 넣은** 신뢰 키의 기록을 읽는다 — 설치기가 적어 둔 TSV(설정파일<탭>키).
@@ -1361,6 +1852,10 @@ purge() {
   # 🔴**자비스 폴더를 지우기 전에** 신뢰 씨앗 기록을 읽어 둔다(1차 REVISE ④). 그 기록은 그 폴더
   #   안에 있고 아래에서 그 폴더를 지운다 — 순서를 뒤집으면 「우리가 넣은 것」과 「참가자의 것」을
   #   영영 구별할 수 없다.
+  # 0.3.37: 신뢰 칸 실패 깃발은 **이 회차가 다시 잰 값**이다 — 바로 아래 기록 읽기·칸 되돌리기가 이번 회차에 다시 돌며
+  #   실패하면 다시 세운다(무조건 풀기가 아니다). 앞 판은 회차 사이에 안 풀어, 1회차에 잠깐 잠겼던 칸이 풀려도
+  #   스스로 다시 해 보기 2·3회차가 늘 작업 폴더를 남기고 rc 7 로 끝났다.
+  TRUST_CLEANUP_FAIL=0
   read_trust_seed_record
 
   # ★남겨야 할 자리의 실경로를 **먼저 한 번에** 푼다. 하나라도 못 풀면 이 실행은 아무것도 지우지 않는다.
@@ -1376,6 +1871,11 @@ purge() {
     say "         그 자리를 살펴보신 뒤(링크가 끊겼거나 권한이 없을 수 있습니다) 아래 「다시 하시는 법」대로 다시 실행해 주십시오."
   fi
 
+  # 0.3.37(보관 이동 승인 조건 ⑴): 지난 재설치의 되옮기기가 도중에 끊겼으면 **그것부터** 이어서 끝낸다(자료는 보관 폴더에 온전하다).
+  resume_unfinished_restore
+  # r1 F4: 지난 실행에서 끝내지 못한 보관본 속 로그인 파일 지우기를 이어서 한다(어느 길이든 — 완전 삭제 보관본만 · 비밀값을 보관본에 두지 않는다)
+  resume_archived_credentials
+
   # ★순서가 중요하다 — 등록을 떼는 명령이 **프로그램 안에** 들어 있다.
   #   프로그램을 먼저 지우면 등록을 뗄 수단이 사라져 죽은 등록이 남는다.
   # footprint: M-DAEMON
@@ -1390,7 +1890,15 @@ purge() {
   #   또 있는지** 세어라. 아래 stop_cys_processes 가 자리 축 + 혈연으로 같은 일을 안전하게 한다.
   # ★이름이 아니라 **자리**로 한 번 더 훑는다(R1) — 데몬이 띄운 자식은 이름이 우리 것이 아니다.
   CYS_ALIVE="$(stop_cys_processes "$CYS_APP" ${CYS_APP_OLD:+"$CYS_APP_OLD"} "$HOME/.cys")"
-  if [ -n "$CYS_ALIVE" ]; then
+  #   ★끈 뒤에도 돌고 있으면(완전 삭제 길 · 앱을 지우는 길) 이번에는 아무것도 옮기지 않는다(r1 F6 · 윈 $procBlocked 짝) —
+  #   붙잡힌 폴더를 옮기다 반쪽이 되느니, 스스로 다시 해 보기가 그 사이 창을 닫을 틈을 준다. 재설치(앱 남김)는 알림만.
+  PROC_BLOCKED=0
+  if [ -n "$CYS_ALIVE" ] && [ "$KEEP_APP" != "1" ]; then
+    PROC_BLOCKED=1; ARCHIVE_FAIL=1; KEPT_FAIL=$((KEPT_FAIL+1))
+    say "  🔴남음: cys 프로그램 — 아직 실행 중이라 옮기거나 지울 수 없어 이번에는 아무것도 옮기지 않았습니다."
+    write_alive_procs "$CYS_ALIVE"
+    say "         cys 창을 모두 닫아 주십시오 — 닫힌 뒤 다시 해 보면 이어서 옮깁니다(자료는 원래 자리에 그대로 있습니다)."
+  elif [ -n "$CYS_ALIVE" ]; then
     say "  [주의] cys 자리에서 아직 돌고 있는 것이 있습니다 — 폴더가 안 지워질 수 있습니다."
     write_alive_procs "$CYS_ALIVE"
   fi
@@ -1403,14 +1911,7 @@ purge() {
   # footprint: M-HOOK
   strip_hooks "$HOME/.claude/settings.json"
 
-  # footprint: M-APP
-  if [ "$KEEP_APP" = "1" ]; then
-    say "  [남김] cys 프로그램 · $CYS_APP (다시 깔 때 판을 확인해 그대로 쓰거나 바꿉니다)"
-    [ -n "$CYS_APP_OLD" ] && say "  [남김] cys 프로그램(옛 이름) · $CYS_APP_OLD (다시 깔 때 새 이름으로 바꿔 넣으며 한 벌 보관합니다)"
-  else
-    drop_dir "$CYS_APP"
-    [ -n "$CYS_APP_OLD" ] && drop_dir "$CYS_APP_OLD"
-  fi
+  # footprint: M-APP — 0.3.37: 자료를 보관 폴더로 다 옮긴 **뒤에** 지운다(아래 「보관 관문」 · DESIGN-0337 3-3절 순서)
   # 🔴cys 계정 자리를 지우기 **전에** 토론장 안내 파일을 밖으로 옮겨 둔다(검토 지적 채택 2026-09-09).
   #   까닭: `~/.cys/claude/skills/agora-delegate` 는 cys 설치의 일부라 cys 와 함께 사라지는 것이 맞다.
   #   그런데 그대로 두면 다시 깐 뒤 「아고라에 참가해」가 **안 먹는 공백**이 생긴다 — 참가 열쇠는
@@ -1460,28 +1961,6 @@ purge() {
     fi
   fi
 
-  # footprint: M-CYSHOME   (M-CYSPROFILE 은 이 안에 들어 있다)
-  # 0.3.36: 재설치 길(--keep-history)이면 이전 대화 자리를 남기고 지운다(HISTORY_KEEP_NAMES 머리 주석).
-  #   🔴남길 자리가 있는데 실경로를 못 풀었으면 ~/.cys 를 **하나도 지우지 않고** 못 지움으로 센다(재설치는 여기서 멈춘다).
-  #   ⚠~/.cys 를 남긴 채 설치를 이어 가면 팩이 「병합 대기」(.new)로 남아 새 판이 안 들어간다 — 그래서 이어 가지 않는다.
-  if [ "$AGORA_MIGRATE_OK" = "1" ]; then
-    if [ "$KEEP_HISTORY" = "1" ] && ! history_keeps; then
-      KEPT_FAIL=$((KEPT_FAIL+1))
-      say "  🔴못 지움: $(short "$HOME/.cys") — 남겨야 할 이전 대화 자리를 확인하지 못해 **아무것도 지우지 않았습니다.**"
-      printf '%s' "$HIST_KEEP_BAD" | while IFS= read -r bad; do [ -n "$bad" ] && say "         확인 못한 자리: $(short "$bad")"; done
-      say "         확인할 수 없는 채로 지우면 이전 대화를 잃을 수 있습니다(바로가기가 끊겼거나 권한이 없을 수 있습니다)."
-    elif [ "$KEEP_HISTORY" = "1" ]; then
-      drop_dir "$HOME/.cys" "$HIST_KEEPS"
-    else
-      drop_dir "$HOME/.cys"
-    fi
-  fi
-  # footprint: M-CYSSTATE
-  drop_dir "$HOME/.local/state/cys"
-  # footprint: M-CLAUDEBIN
-  drop_file "$HOME/.local/bin/claude"
-  # footprint: M-CLAUDESHARE
-  drop_dir "$HOME/.local/share/claude"
   # 🔴**신뢰 키 정리를 작업 폴더 삭제보다 앞에 둔다**(2차 N4 확정 2026-09-10).
   #   기록 파일은 그 폴더 안에 있다. 폴더를 먼저 지우면, 키 정리가 실패했을 때 **다시 해 볼 근거가
   #   사라진다** — 재시도는 「기록 없음」으로 읽고 그 키를 영영 건너뛴다.
@@ -1512,6 +1991,8 @@ EOF_TRUST_ROWS
     say "  🔴못 지움: $(short "$JARVIS_HOME") — 폴더 신뢰 칸을 다 되돌리지 못해 **일부러 남겼습니다.**"
     say "         이 폴더 안의 기록(trust-seed.tsv)이 있어야 다시 해 볼 수 있습니다."
     say "         그 칸을 쓰고 있는 프로그램(클로드 창 등)을 닫으신 뒤 아래 「다시 하시는 법」대로 다시 실행해 주십시오."
+  elif [ "${PROC_BLOCKED:-0}" = "1" ]; then
+    say "  [남김] $(short "$JARVIS_HOME") — cys 가 아직 돌고 있어 이번에는 옮기지 않았습니다(다음에 그대로 옮깁니다)."
   elif safe_jarvis_dir "$JARVIS_HOME"; then
     keep_jarvis_dir "$JARVIS_HOME"   # 0.3.36: 지우지 않고 보관 이동(위 keep_jarvis_dir)
   elif [ -e "$JARVIS_HOME" ]; then
@@ -1520,24 +2001,103 @@ EOF_TRUST_ROWS
     say "         까닭: $SAFE_WHY"
     say "         그 자리는 손으로 확인해 주십시오. 확실하지 않은 자리를 재귀로 지우지 않습니다."
   fi
-  # footprint: M-SCRIPTCOPY
-  drop_file "$HOME/install-jarvis.sh"
-  # 남의 파일 속 우리 줄 — 파일을 지우지 않는다
-  # footprint: M-PROFILE
-  strip_profile_marker
-  #   🔴표에 적힌 칸을 **전건** 빼야 한다. 실기에서 두 칸을 빠뜨렸더니(2026-09-08 게스트 실측)
-  #   다 지운 뒤에도 진단기가 자국 1 개를 계속 찾아내 **「중간에 멈춘 상태」로 오보**했다.
-  #   ⇒ 「거의 다 지웠다」는 이 도구에서 곧 **거짓 상태 보고**가 된다.
-  # footprint: M-CLAUDEJSON
-  strip_json_key "$HOME/.claude.json" 'hasCompletedOnboarding'
-  # 큰 화면 권유 질문을 미리 넘기려고 설치기가 99 로 적어 둔 칸. 우리 자국이니 우리가 뺀다.
-  #   ⚠오래 전부터 심고 있었는데 표에 없어서 아무도 안 지웠다(2026-09-10 자국 표를 채우다 드러났다).
-  strip_json_key "$HOME/.claude.json" 'fullscreenUpsellSeenCount'
-  strip_json_key "$HOME/.claude.json" 'projects.'"$JARVIS_HOME"
-  # footprint: M-CLAUDESETTINGS
-  strip_json_key "$HOME/.claude/settings.json" 'theme'
-  strip_json_key "$HOME/.claude/settings.json" 'skipDangerousModePermissionPrompt'
-  strip_json_key "$HOME/.claude/settings.json" 'remoteControlAtStartup'
+  # footprint: M-CYSHOME   (M-CYSPROFILE 은 이 안에 들어 있다)
+  # 0.3.37(DESIGN-0337 3절 · 4절): 지우지 않고 보관 폴더로 옮긴다 — 완전 삭제 = 통째로 · 재설치 = 통째로 옮긴 뒤 남길 것만 되옮긴다(R2).
+  #   ★작업 폴더 보관(위 keep_jarvis_dir)이 먼저다 — 그 보관 폴더에 모은다(archive_root_set). 신뢰 칸 기록은 이미 위에서 다 썼다.
+  #   참가 자리가 ~/.cys 안이면(사람이 AGORA_HOME 을 옮겨 둔 드문 경우) 통째로 옮길 수 없다 — 재설치는 0.3.36 장치(남기고 지우기)로,
+  #   완전 삭제는 옮기지 않고 그대로 둔다(archive_move 가 「남김」 으로 말한다 · 옮겼다 되돌리기 금지).
+  if [ "${PROC_BLOCKED:-0}" = "1" ]; then
+    :   # r1 F6 — cys 가 아직 돌고 있다: ~/.cys 는 이번에 옮기지 않는다(윈 짝)
+  elif [ "$AGORA_MIGRATE_OK" = "1" ]; then
+    CYS_NESTED=""
+    if [ -d "$HOME/.cys" ] && [ ! -L "$HOME/.cys" ]; then CYS_NESTED="$(preserved_under "$(canon "$HOME/.cys" 2>/dev/null)")"; fi
+    if [ "$KEEP_HISTORY" = "1" ] && [ -n "$CYS_NESTED" ]; then
+      if ! history_keeps; then
+        KEPT_FAIL=$((KEPT_FAIL+1))
+        say "  🔴못 지움: $(short "$HOME/.cys") — 남겨야 할 이전 대화 자리를 확인하지 못해 **아무것도 지우지 않았습니다.**"
+        printf '%s' "$HIST_KEEP_BAD" | while IFS= read -r bad; do [ -n "$bad" ] && say "         확인 못한 자리: $(short "$bad")"; done
+        say "         확인할 수 없는 채로 지우면 이전 대화를 잃을 수 있습니다(바로가기가 끊겼거나 권한이 없을 수 있습니다)."
+      elif ! dept_keeps; then
+        KEPT_FAIL=$((KEPT_FAIL+1))
+        say "  🔴못 지움: $(short "$HOME/.cys") — 남겨야 할 부서 기록의 목록을 읽지 못해 **아무것도 지우지 않았습니다.**"
+      else
+        drop_dir "$HOME/.cys" "$HIST_KEEPS$DEPT_KEEPS"
+      fi
+    elif [ "$KEEP_HISTORY" = "1" ]; then
+      [ -e "$HOME/.cys" ] || [ -L "$HOME/.cys" ] && cys_home_reinstall
+    else
+      # 0.3.37(설계 결정 3): 보관한 옛 ~/.cys 자리를 회차 사이에 기억해 두고 **회차마다** 그 안 로그인 파일을 지운다 —
+      #   앞 판은 이번 회차에 옮긴 때만 지워, 1회차 지우기가 실패하면 다시 해 보기가 그 파일을 안 보고 rc 0 으로 끝났다(비밀값이 보관 폴더에 남음).
+      ARCHIVE_LAST=""
+      if archive_move "$HOME/.cys" "cys-home" "cys 계정 자리(대화·부서 기록)"; then
+        [ -n "$ARCHIVE_LAST" ] && CYS_HOME_ARCHIVED="$ARCHIVE_LAST"
+        [ -n "$CYS_HOME_ARCHIVED" ] && drop_archived_credentials "$CYS_HOME_ARCHIVED"
+      fi
+    fi
+  fi
+  # footprint: M-CYSSTATE
+  # footprint: M-DEPTSTATE
+  # footprint: M-TRASH
+  #   재설치(--keep-app · --keep-history 어느 쪽이든 · 윈 짝) = 편성 기록만 보관(본부 좌석이 설치기보다 먼저 뜨지 않게 · 나머지와 부서 상태는 제자리 — 부서가 그대로 되살아난다)
+  #   완전 삭제 = 본부 상태 · 부서 상태 · 휴지통을 모두 보관(자국 표 M-DEPTSTATE·M-TRASH = 0.3.37 전에는 아무도 안 치웠다)
+  if [ "${PROC_BLOCKED:-0}" = "1" ]; then
+    :   # r1 F6 — cys 가 아직 돌고 있다: 상태 · 부서 상태 · 휴지통 · 앱 화면 자료도 이번에 옮기지 않는다(윈 짝)
+  elif [ "$KEEP_HISTORY" = "1" ] || [ "$KEEP_APP" = "1" ]; then
+    state_formation_archive
+  else
+    archive_move "$HOME/.local/state/cys" "cys-state" "cys 실행 상태"
+    for _ds in "$HOME/.local/state"/cys-dept-*; do
+      [ -e "$_ds" ] || [ -L "$_ds" ] || continue
+      archive_move "$_ds" "cys-dept-state/$(basename "$_ds")" "부서 실행 상태"
+    done
+    archive_move "$HOME/.local/state/cys-trash" "cys-trash" "닫은 부서 휴지통"
+    # footprint: M-WEBVIEW
+    # 앱 화면(웹뷰) 자료 — 윈 W-WEBVIEW 와 같은 뜻(자리 = cys 1.1.7 가지 src/factory_reset.rs 「macOS GUI 층」).
+    #   완전 삭제에서만 보관 폴더로 옮긴다(재설치·--keep-app = 무접촉 · 앱이 쓰는 자리). DARWIN_USER_CACHE_DIR 쪽 캐시는 OS 임시 자리라 손대지 않는다(DESIGN-0337 10절).
+    if [ "$KEEP_APP" != "1" ]; then
+      archive_move "$HOME/Library/WebKit/com.cysjavis.terminal" "webview-webkit" "앱 화면 자료"
+      archive_move "$HOME/Library/Caches/com.cysjavis.terminal" "webview-caches" "앱 화면 자료"
+      archive_move "$HOME/Library/Preferences/com.cysjavis.terminal.plist" "webview-prefs/com.cysjavis.terminal.plist" "앱 화면 자료"
+    fi
+  fi
+
+  # ── 보관 관문(0.3.37 · 보관 이동 승인 조건 ⑴⑵⑶) — 옮기기·대조가 하나라도 어긋났으면 이 뒤(프로그램 지우기·설정 칸 빼기)를 하지 않는다 ──
+  #   ⚠이미 끝난 것: 데몬 등록 떼기 · 프로세스 끄기 · 훅 떼기(설치 도우미가 다시 한다). 사람 자료는 어느 쪽이든 한 곳(원자리 또는 보관 폴더)에 온전하다.
+  if [ "$ARCHIVE_FAIL" != "0" ]; then
+    [ "$KEPT_FAIL" -eq 0 ] && KEPT_FAIL=1
+    say "  🔴보관을 끝까지 마치지 못해 프로그램과 설정 칸은 지우지 않고 그대로 두었습니다."
+    say "         이전 자료는 원래 자리나 보관 폴더 한쪽에 그대로 있습니다 — 사라진 것은 없습니다."
+  else
+    if [ "$KEEP_APP" = "1" ]; then
+      say "  [남김] cys 프로그램 · $CYS_APP (다시 깔 때 판을 확인해 그대로 쓰거나 바꿉니다)"
+      [ -n "$CYS_APP_OLD" ] && say "  [남김] cys 프로그램(옛 이름) · $CYS_APP_OLD (다시 깔 때 새 이름으로 바꿔 넣으며 한 벌 보관합니다)"
+    else
+      drop_dir "$CYS_APP"
+      [ -n "$CYS_APP_OLD" ] && drop_dir "$CYS_APP_OLD"
+    fi
+    # footprint: M-CLAUDEBIN
+    drop_file "$HOME/.local/bin/claude"
+    # footprint: M-CLAUDESHARE
+    drop_dir "$HOME/.local/share/claude"
+    # footprint: M-SCRIPTCOPY
+    drop_file "$HOME/install-jarvis.sh"
+    # 남의 파일 속 우리 줄 — 파일을 지우지 않는다
+    # footprint: M-PROFILE
+    strip_profile_marker
+    #   🔴표에 적힌 칸을 **전건** 빼야 한다. 실기에서 두 칸을 빠뜨렸더니(2026-09-08 게스트 실측)
+    #   다 지운 뒤에도 진단기가 자국 1 개를 계속 찾아내 **「중간에 멈춘 상태」로 오보**했다.
+    #   ⇒ 「거의 다 지웠다」는 이 도구에서 곧 **거짓 상태 보고**가 된다.
+    # footprint: M-CLAUDEJSON
+    strip_json_key "$HOME/.claude.json" 'hasCompletedOnboarding'
+    # 큰 화면 권유 질문을 미리 넘기려고 설치기가 99 로 적어 둔 칸. 우리 자국이니 우리가 뺀다.
+    #   ⚠오래 전부터 심고 있었는데 표에 없어서 아무도 안 지웠다(2026-09-10 자국 표를 채우다 드러났다).
+    strip_json_key "$HOME/.claude.json" 'fullscreenUpsellSeenCount'
+    strip_json_key "$HOME/.claude.json" 'projects.'"$JARVIS_HOME"
+    # footprint: M-CLAUDESETTINGS
+    strip_json_key "$HOME/.claude/settings.json" 'theme'
+    strip_json_key "$HOME/.claude/settings.json" 'skipDangerousModePermissionPrompt'
+    strip_json_key "$HOME/.claude/settings.json" 'remoteControlAtStartup'
+  fi
 
   # 🔴**요청한 로그인 자국이 정말 사라졌는지 끝에서 다시 본다**(2차 N1 확정). 앞 판은 「지웠다」를
   #   그 순간의 종료값으로만 말했다 ⇒ 파일이 잠겨 남았는데 전체는 성공으로 끝났다.
@@ -1565,6 +2125,11 @@ EOF_TRUST_ROWS
     fi
     [ -f "$CRED_FILE" ] && say "         로그인 파일을 쓰고 있는 프로그램(클로드 창 등)을 닫으신 뒤 아래 「다시 하시는 법」대로 다시 해 주십시오."
   fi
+  # 0.3.37 반례 ①(DESIGN-0337 6-1절): 되옮긴 자리 안 바로가기가 보관 폴더로 간 자리를 가리키면 한 줄 알린다(자료는 보관 폴더에 있다)
+  if [ -n "$PRESCAN_NOTE" ]; then
+    say "  [안내] 아래 바로가기가 가리키던 자료는 보관 폴더(cys-home)에 그대로 있습니다 — 새 자리에서는 그 자료가 보이지 않을 수 있습니다."
+    printf '%s' "$PRESCAN_NOTE" | head -5 | while IFS= read -r l; do [ -n "$l" ] && say "           $l"; done
+  fi
   # (로그인은 클로드를 지우기 전에 이미 처리했다 — purge_login_first 참조)
   # footprint: M-CLAUDEUSER  — 손대지 않는다
   say "  남김: 클로드 대화·기록"
@@ -1574,14 +2139,17 @@ EOF_TRUST_ROWS
   [ "$PRESERVED" -gt 0 ] && say "    (참가 자리와 겹쳐 그대로 둔 자리 $PRESERVED 곳이 있습니다 — 위 「보존(중첩)」 줄)"
   if [ "$KEPT_FAIL" -eq 0 ]; then
     say "=== 끝났습니다 — $REMOVED 가지를 지웠고, 못 지운 것은 없습니다. ==="
-    [ -n "$BACKUP_NOTE" ] && say "    $BACKUP_NOTE"   # 0.3.36: 마지막 안내 1줄(보관 자리)
+    # 0.3.36 안내 1줄(보관 자리)은 0.3.37 부터 archive_summary 가 크기와 함께 말한다 — 작업 폴더를 못 옮긴 갈래의 안내만 따로 남긴다
+    [ -n "$BACKUP_NOTE" ] && [ -z "$ARCHIVE_DEST" ] && say "    $BACKUP_NOTE"
+    archive_summary                                  # 0.3.37: 보관 폴더 자리·크기 1줄
     return 0
   fi
   # 🔴사실만 말한다. 「거의 다 됐다」로 얼버무리면 다음 단계가 그 위에 얹힌다.
   say "=== 끝났습니다 — $REMOVED 가지를 지웠고, $KEPT_FAIL 가지를 못 지웠습니다. ==="
   say "    위에 🔴로 표시된 자리가 남아 있습니다. 그대로 두고 다시 설치하면 뒤엉킵니다."
   say "    아래 「다시 하시는 법」대로 한 번 더 해 보시고, 그래도 남으면 이 화면을 사진으로 남겨 알려 주십시오."
-  [ -n "$BACKUP_NOTE" ] && say "    $BACKUP_NOTE"
+  [ -n "$BACKUP_NOTE" ] && { [ -z "$ARCHIVE_DEST" ] || [ "$ARCHIVE_FAIL" != "0" ]; } && say "    $BACKUP_NOTE"
+  archive_summary
   return 7
 }
 
@@ -1605,26 +2173,26 @@ notice_close_cys() {
   alive="$(procs_under "$CYS_APP" ${CYS_APP_OLD:+"$CYS_APP_OLD"} "$HOME/.cys" 2>/dev/null | sort -u | wc -l | tr -d ' ')"
   [ "${alive:-0}" -gt 0 ] || return 0
   say ""
-  say "cys 가 아직 돌고 있습니다(${alive}가지). 먼저 cys 창을 닫아 주십시오."
-  say "     닫지 않으셔도 이 도구가 끕니다 — 다만 저장하지 않으신 것이 사라질 수 있습니다."
-  if [ "$ASSUME_YES" != "1" ] && { : < /dev/tty; } 2>/dev/null; then
-    printf '  확인하셨으면 Enter 를 눌러 주십시오: '
-    read -r _ignored < /dev/tty || true
-  fi
+  say "cys 를 곧 끕니다. 저장하지 않으신 것이 있으면 지금 저장해 주세요."
+  # 0.3.37: 묻지 않는다(사람 손 0 · 알림 뒤 5초) — 알리고 잠깐 기다린 뒤 이 도구가 끈다. 재설치 한 줄(--yes)은 기다리지 않는다.
+  [ "$ASSUME_YES" = "1" ] || sleep "${JARVIS_NOTICE_WAIT:-5}"
   return 0
 }
-notice_close_cys
-
-if [ "$ASSUME_YES" != "1" ]; then
+# ── 0.3.37 사전 훑기(읽기만 · 첫 변경 전 · DESIGN-0337 6-1절 ②③④) — 막히면 아무것도 바꾸지 않고 멈춘다 ──
+if ! prescan_links; then
   say ""
-  say "위 목록을 지웁니다. 되돌릴 수 없습니다."
-  printf '계속하려면 「지웁니다」라고 입력해 주십시오: '
-  read -r answer < /dev/tty || answer=""
-  if [ "$answer" != "지웁니다" ]; then
-    say "그만둡니다 — 아무것도 지우지 않았습니다."
-    exit 1
-  fi
+  say "🔴이번에는 아무것도 바꾸지 않았습니다."
+  say "   옮겨 둘 자료 가운데 확인할 수 없는 자리가 있습니다: $PRESCAN_BAD"
+  say "   그대로 지우면 그 자료가 사라질 수 있어 멈췄습니다. 그 바로가기나 폴더를 살펴보신 뒤 아래 「다시 하시는 법」대로 다시 실행해 주십시오."
+  show_rerun_how
+  exit 7
 fi
+
+say ""
+say "위 목록의 자료는 지우지 않고 보관 폴더로 옮깁니다(다시 받을 수 있는 프로그램 파일만 지웁니다). 보관 자리는 끝에 알려 드립니다."
+notice_close_cys
+# 0.3.37: 「지웁니다」 입력을 묻지 않는다(사람 손 0 · 은행 책임 원칙) — 사람 자료는 보관 폴더로 옮기므로 되돌릴 수 있다.
+#   --yes 는 받아서 넘긴다(옛 재설치 입구 호환 · 알림 대기만 건너뛴다).
 
 # ★그 자리에서 다시 해 본다 — 창을 닫고 명령을 다시 찾는 것보다 Enter 한 번이 싸다(2026-09-10).
 #   막힌 까닭 대부분은 **사람이 지금 이 창 앞에서 없앨 수 있는 것**이다. 그때마다 사이트를
@@ -1633,13 +2201,14 @@ fi
 purge
 rc=$?
 tries=0
-while [ "$rc" -ne 0 ] && [ "$ASSUME_YES" != "1" ] && [ "$tries" -lt 3 ] && [ -r /dev/tty ]; do
+# 0.3.37: 묻지 않고 스스로 다시 해 본다 — 최대 2회 · 사이 5초(보관 이동 승인 조건 ⑵ · 잠깐 붙들린 파일이 풀릴 틈). 상한은 그대로 둔다.
+while [ "$rc" -ne 0 ] && [ "$tries" -lt 2 ]; do
   tries=$((tries+1))
   say ""
-  printf '  남은 자리를 여기서 바로 다시 지워 볼 수 있습니다. Enter 를 누르면 다시 해 봅니다 (%s/3 · 그만두려면 q): ' "$tries"
-  read -r again < /dev/tty || again="q"
-  [ "$again" = "q" ] && break
-  REMOVED=0; KEPT_FAIL=0; PRESERVED=0
+  say "  남은 자리가 있어 ${JARVIS_RETRY_WAIT:-5}초 뒤 스스로 한 번 더 해 봅니다 (${tries}/2 · 창을 닫지 말고 기다려 주세요)."
+  sleep "${JARVIS_RETRY_WAIT:-5}"
+  REMOVED=0; KEPT_FAIL=0; PRESERVED=0; ARCHIVE_FAIL="$ARCHIVE_VERIFY_FAIL"; ARCHIVED=0   # 대조 실패는 끝까지 남긴다(윈 짝 적대 발견 · 다시 해 보기가 관문을 열던 구멍)   # 보관 폴더(ARCHIVE_DEST·HOME)는 이어 쓴다 — 끝 요약이 첫 번째 것도 말하게
+  prescan_links || break
   purge
   rc=$?
 done

@@ -123,6 +123,7 @@ function Move-OldRound { }
 function Set-FleetBaseline { }
 function Test-CysAgentFlag { return \$true }
 function Start-CysAppWindow { return $av }
+function Get-CysAppExe { return 'C:\emu\cys-app.exe' }   # 0.3.38(ⓓ): [9/10] 진입 판정 = 창 실행 파일 실재 — 이 흉내의 기기에는 있다고 준다(없는 갈래는 defect-0930 이 잰다)
 function Get-MasterSeatRef { return '' }
 function Invoke-StepFleet { return 0 }
 function Send-Progress(\$step, \$ev, \$code, \$detail) { Add-Content -LiteralPath (Join-Path \$env:FAKE_OUT (\$global:CASE + '.prog')) -Value (\$step + ' ' + \$ev + ' ' + \$detail) -Encoding UTF8 }

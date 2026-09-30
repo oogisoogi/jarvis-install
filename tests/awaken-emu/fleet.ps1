@@ -62,6 +62,9 @@ $MasterAwakeCapSec = 2; $MasterAwakePollSec = 0; $MasterRetryCapSec = 2
 #   no-answer      = 제출(사용자 레코드)은 됐는데 답 레코드가 아직 없다 → Return 0회 → child-verified(installer-awaken-verify-r2 · 답은 늦게 생긴다)
 #   grace          = Return 3회 뒤 1초 늦게 사용자 레코드가 생긴다 → 유예 뒤 다시 재서 child-verified(샌드박스 7차 거짓 실패의 모양)
 # 진행 전송을 가로채 파일에 적는다 — 실제 서버로는 나가지 않는다(표지·증거 칸을 글자 그대로 재려고)
+# 0.3.38(윈 결함 묶음 ⓓ): [9/10] 진입 판정 = 창 실행 파일 실재 — 이 흉내의 기기에는 창 실행 파일이 있다고 준다(없는 갈래는 tests/defect-0930-run.sh 가 잰다) · 창 띄우기는 기록만.
+function Get-CysAppExe { return 'C:\emu\cys-app.exe' }
+function Start-CysAppWindow { return 'raised' }
 function Send-Progress($step, $ev, $elapsed, $detail, $envInfo, $extra) {
     $row = [ordered]@{ step = $step; event = $ev; detail = $detail }
     if ($null -ne $extra) { foreach ($k in @($extra.Keys)) { $row[[string]$k] = $extra[$k] } }

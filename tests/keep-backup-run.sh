@@ -166,8 +166,10 @@ s, p = nc(sh), nc(ps)
 o = []
 o.append("sh-call=" + ("1" if re.search(r'elif safe_jarvis_dir "\$JARVIS_HOME"; then\s*\n\s*keep_jarvis_dir "\$JARVIS_HOME"\s*\n', s) and 'drop_dir "$JARVIS_HOME"' not in s else "0"))
 o.append("ps-call=" + ("1" if re.search(r'elseif \(Test-SafeJarvisDir \$JarvisDir\) \{\s*\n\s*Keep-JarvisDir \$JarvisDir\s*\n', p) and "Drop '자비스 작업 폴더' $JarvisDir" not in p else "0"))
-o.append("sh-note=" + str(len(re.findall(r'\[ -n "\$BACKUP_NOTE" \] && say "    \$BACKUP_NOTE"', s))))
-o.append("ps-note=" + str(len(re.findall(r"if \(\$script:BackupNote\) \{ Write-Host \('    ' \+ \$script:BackupNote\) \}", p))))
+# 0.3.37 뜻 변경(TICKET=installer-0337-delete-path): 끝 요약의 보관 자리 안내는 archive_summary 가 크기와 함께 말한다 —
+#   BACKUP_NOTE 줄은 작업 폴더를 못 옮긴·대조 실패 갈래에서만 나온다 ⇒ 두 갈래 각각 「BACKUP_NOTE 조건부 1줄 + archive_summary 1」
+o.append("sh-note=" + str(min(len(re.findall(r'\[ -n "\$BACKUP_NOTE" \] && .*say "    \$BACKUP_NOTE"', s)), len(re.findall(r'^\s*archive_summary\b', s, re.M)))))
+o.append("ps-note=" + str(min(len(re.findall(r"if \(\$script:BackupNote .*\) \{ Write-Host \('    ' \+ \$script:BackupNote\) \}", p)), len(re.findall(r'^\s*Write-ArchiveSummary\b', p, re.M)))))
 o.append("sh-rename=" + ("1" if "rename($ARGV[0], $ARGV[1])" in sh and not re.search(r'^\s*mv\b[^\n]*JARVIS', s, re.M) else "0"))
 print(" ".join(o))
 PY
