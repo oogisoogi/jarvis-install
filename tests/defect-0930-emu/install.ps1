@@ -38,7 +38,7 @@ switch ($Case) {
         $rc = @(Step-InstallCys)[-1]; $s = Said-All
         T ($rc -eq 6) 'ⓐ 판올림 실패 = rc 6(이어 가지 않음)' ('rc=' + $rc + ' · ' + $s)
         T (($s -notmatch '이어 갑니다') -and ($s -notmatch '제거하지 않음')) 'ⓐ 「이어 갑니다」 · 「제거하지 않음」 안내 0' $s
-        T (($s -match '프로그램을 넣지 못했습니다') -and ($s -match '쓰시던 프로그램은 그대로 남아 있습니다') -and ($s -match 'JCODE J-CYS-01')) 'ⓐ 한 문장 + 쓰시던 파일 실재 → 남아 있다는 말 + J-CYS-01' $s
+        T (($s -match '프로그램을 넣지 못했습니다') -and ($s -match '쓰시던 cys\(v0\.14\.29\)의 명령 파일\(cys\.exe\)은 그대로 있습니다') -and ($s -notmatch '쓰시던 프로그램은 그대로 남아') -and ($s -match 'JCODE J-CYS-01')) 'ⓐ 한 문장 + 쓰시던 파일 실재 → 남아 있다는 말 + J-CYS-01' $s
         T (-not $script:ShowRerun) 'ⓐ 다시 하시는 법 깃발 0(다음 할 일 = 원격 해결 하나)' ('ShowRerun=' + $script:ShowRerun)
     }
     'first-fail-no-wizard' {
@@ -120,6 +120,45 @@ switch ($Case) {
         $script:InstallerDoes = { param($a) Put-Bins (Join-Path $env:LOCALAPPDATA 'cys') '1.1.6' }
         $rc = @(Step-InstallCys)[-1]; $s = Said-All
         T (($script:Calls.Count -eq 1) -and ($s -match '창을 여는 파일') -and ($s -notmatch '건너뜁니다')) 'ⓑ 지문 일치여도 cys-app.exe 없으면 다시 설치 · 사유 = 파일 일부 없음' ('calls=' + $script:Calls.Count + ' · ' + $s)
+    }
+    'refresh-late-bins' {
+        # 같은 판 덮어 깔기 · 설치기 종료 0 · 파일 확인이 처음 두 번 실패(늦게 자리 잡음) → 60초 상한 안에서 계속 본다 · rc 0
+        $d = Join-Path $L 'cys'; Put-Bins $d '1.1.6'
+        $script:FakeUninstall = @((Entry 'cysr' '1.1.6' ('"' + $d + '"')))
+        function Get-CysContentState($b) { return 'nostamp' }
+        $script:Late = 0; $script:Ran = $false
+        $script:InstallerDoes = { param($a) $script:Ran = $true }
+        ${function:Test-CysDirHasBinsOrig} = ${function:Test-CysDirHasBins}
+        function Test-CysDirHasBins($x) { if ($script:Ran -and ($script:Late -lt 2)) { $script:Late++; return $false }; Test-CysDirHasBinsOrig $x }
+        $rc = @(Step-InstallCys)[-1]
+        T (($rc -eq 0) -and ($script:Late -eq 2)) '같은 판 덮어 깔기 · 종료 0 · 파일 늦게 자리 잡음 → 기다려 rc 0' ('rc=' + $rc + ' late=' + $script:Late + ' · ' + (Said-All))
+    }
+    'refresh-fail-no-left' {
+        # 같은 판 덮어 깔기 실패 → 「쓰시던 프로그램은 그대로 남아 있습니다」 0(같은 판번은 내용 보존의 증거가 아니다)
+        $d = Join-Path $L 'cys'; Put-Bins $d '1.1.6'
+        $script:FakeUninstall = @((Entry 'cysr' '1.1.6' ('"' + $d + '"')))
+        $script:InstallerExit = 5
+        $rc = @(Step-InstallCys)[-1]
+        T (($rc -eq 6) -and ((Said-All) -notmatch '그대로 (남아 )?있습니다')) '같은 판 덮어 깔기 실패 → 남아 있다는 말 0' ('rc=' + $rc + ' · ' + (Said-All))
+    }
+    'mem-log-fail' {
+        # 지우기 전 값을 기록에 못 적으면 키를 지우지 않는다 · 설치 결과는 그대로
+        $script:Mem = 'Q:\cys'
+        $LogFile = $Sb   # 폴더 = 덧붙이기 실패
+        $script:InstallerDoes = { param($a) Put-Bins (Join-Path $env:LOCALAPPDATA 'cys') '1.1.6' }
+        $rc = @(Step-InstallCys)[-1]
+        T (($rc -eq 0) -and ($script:MemRemoved -eq 0)) '기록 실패 → 기억 키 그대로 · rc 0' ('rc=' + $rc + ' removed=' + $script:MemRemoved)
+    }
+    'f11-skipped-log' {
+        # 버린 설치 목록 후보를 기록에 1줄(화면 변화 0) — 없는 폴더를 가리키는 cysr 항목 · 채택된 cys 항목
+        $gone = Join-Path $Sb 'apps/cysr-gone'
+        $pf = Join-Path $env:ProgramFiles 'cys'; Put-Bins $pf '0.14.29' @('cys.exe', 'cysd.exe')
+        $script:FakeUninstall = @((Entry 'cysr' '1.1.5' ('"' + $gone + '"')), (Entry 'cys' '0.14.29' ('"' + $pf + '"')))
+        $script:InstallerDoes = { param($a) Put-Bins (Join-Path $env:LOCALAPPDATA 'cys') '1.1.6' }
+        $n0 = $script:Said.Count
+        [void](Step-InstallCys); $lg = Log-All
+        T (($lg -match 'cys uninstall entries skipped: cysr 1\.1\.5 loc=\S*cysr-gone cys\.exe=no') -and ($lg -match 'chosen: cys 0\.14\.29')) '버린 설치 목록 후보·고른 항목을 기록에 1줄' $lg
+        T ((Said-All) -notmatch 'skipped') '화면에는 안 보인다' (Said-All)
     }
     'mem-stale-removed' {
         # 09-30 노트북 뒤처리: 기억 값 = 없는 드라이브(Q:\cys) · 설치 성공 → \cys 키를 지우고 지우기 전 값을 기록에 1줄

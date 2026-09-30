@@ -17,7 +17,7 @@ MUTANTS = [
      "foreach ($n in @('cys.exe', 'cysd.exe', 'cys-app.exe')) { if (-not (Test-Path -LiteralPath (Join-Path $dir $n))) { return $false } }",
      "$null = 0"),
     ("b-reg-trust", "body",
-     "if ($d -and (Test-Path -LiteralPath (Join-Path $d 'cys.exe'))) { $reg = $e; $path = $d; break }",
+     "if ($d -and (Test-Path -LiteralPath ([System.IO.Path]::Combine($d, 'cys.exe')) -ErrorAction SilentlyContinue)) { $reg = $e; $path = $d; break }",
      "if ($d) { $reg = $e; $path = $d; break }"),
     # ⓐ 실패는 실패로 — 새 판 설치 실패를 성공으로 · [7/10] 옛 판을 넘김
     ("a-install-done", "install",
@@ -65,8 +65,21 @@ MUTANTS = [
     ("m2-exe-kept", "install", "            Write-Log ('install memory \\cys kept (cys.exe there): ' + (Redact $raw)); return 'kept'", "            $null = 0"),
     ("m2-unread", "install", "        } catch { Write-Log ('install memory \\cys kept (unread): ' + (Redact $raw) + ' · ' + $_.Exception.GetType().Name); return 'unread' }", "        } catch { }"),
     ("m2-drive", "install", "        } catch [System.Management.Automation.DriveNotFoundException] {\n", ""),
-    ("m2-log-was", "install", "        Write-Log ('install memory \\cys removed · was=' + (Redact $raw) + ' · body=' + (Redact $dir))", "        $null = 0"),
+    ("m2-log-was", "install", "        if (-not (Write-LogChecked ('install memory \\cys removed · was=' + (Redact $raw) + ' · body=' + (Redact $dir)))) { return 'nolog' }", "        $null = 0"),
     ("m2-absorb", "install", "    } catch { Write-Log ('install memory \\cys not removed: ' + $_.Exception.Message); return 'fail' }", "    } finally { }"),
+    # 두 번째 코드 검토 — [7/10] 본체 폴더 · 같은 판 덮어 깔기 기다림 · 남아 있다는 말 · 기록 못 하면 안 지움
+    ("r2-verify-body", "verify", "    if ($script:CysBodyDir -and (Test-Path -LiteralPath (Join-Path $script:CysBodyDir 'cys.exe')) -and\n", "    if ($false -and\n"),
+    ("r2-refresh-wait", "install", "            if ($refresh -and $p.HasExited -and ($p.ExitCode -ne 0)) { break }", "            if ($refresh -and $p.HasExited) { break }"),
+    ("r2-no-left-refresh", "install", "    $oldLeft = $b0.Body -and (-not $refresh) -and", "    $oldLeft = $b0.Body -and"),
+    ("r2-log-guard", "install", "        if (-not (Write-LogChecked ('install memory \\cys removed · was=' + (Redact $raw) + ' · body=' + (Redact $dir)))) { return 'nolog' }", "        [void](Write-LogChecked ('install memory \\cys removed · was=' + (Redact $raw) + ' · body=' + (Redact $dir)))"),
+    # 두 번째 코드 검토 결정분 — 본 창에 맞춘 단추 이름 · 버린 설치 목록 후보 기록
+    ("r2-button-hint", "avhold", "    if ([string]$title -match '\\bV3\\b|AhnLab|안랩') { return ' (이 백신에서는 「파일 전송」 단추로 보였습니다)' }\n    return ''", "    return ' (이 백신에서는 「파일 전송」 단추로 보였습니다)'"),
+    ("r2-skipped-log", "install", "    if (@($b0.Skipped).Count -gt 0) { Write-Log", "    if ($false) { Write-Log"),
+    # 세 번째 코드 검토 — 창 실행 파일도 본체 폴더 먼저 · 없는 드라이브에서 오류 0(진단·선택 둘 다)
+    ("r3-app-body", "verify", "    if ($script:CysBodyDir) { [void]$roots.Add([string]$script:CysBodyDir) }\n", ""),
+    ("r3-skip-combine", "verify", "if (Test-Path -LiteralPath ([System.IO.Path]::Combine($d, 'cys.exe')) -ErrorAction Stop) { $ex = 'yes' }", "if (Test-Path -LiteralPath (Join-Path $d 'cys.exe')) { $ex = 'yes' }"),
+    ("r3-loop-combine", "verify", "        if ($d -and (Test-Path -LiteralPath ([System.IO.Path]::Combine($d, 'cys.exe')) -ErrorAction SilentlyContinue)) { $reg = $e; $path = $d; break }", "        if ($d -and (Test-Path -LiteralPath (Join-Path $d 'cys.exe'))) { $reg = $e; $path = $d; break }"),
+    ("r3-rh-body", "verify", "        if ([System.IO.Path]::IsPathRooted($c) -and (Test-Path -LiteralPath $c -PathType Leaf)) { return $c }", "        $null = 0"),
     ("e-except-once", "avhold", "    if (($d.Count -eq 0) -or $script:AvExceptShown) { return }", "    if ($d.Count -eq 0) { return }"),
 ]
 

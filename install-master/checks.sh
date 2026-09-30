@@ -789,7 +789,8 @@ no_code "$PS" "'1-6' '관리자 여부' \"IsInRole\(Administrator\)=False\" 'blo
 echo "== 2차 실측 수정 (F-W17 · 레지스트리 ≠ 몸통) =="
 codegrep "$PS" 'cysBody'; ck "[F-W17] 실행 파일 존재를 따로 잰다" $? "레지스트리 등록만 보고 「앱 있음」으로 거짓 양성"
 # 0.3.38(윈 결함 묶음 ⓑ): 본체 판정 = 등록 자리의 cys.exe 실측(앞 판 = 설치 위치에서 실행 파일 찾기) — 뜻 동일(등록만 믿지 않는다) · 자리만 바뀜.
-codegrep "$PS" "Test-Path -LiteralPath \(Join-Path \\\$d 'cys\.exe'\)"; ck "[F-W17] 설치 위치에서 실행 파일을 찾는다(0.3.38 = 등록 자리의 cys.exe 실측)" $? "몸통 축이 값을 안 만든다"
+# 0.3.39: 경로 잇기 = .NET(없는 드라이브에서 Join-Path 가 오류를 화면에 낸다) — 뜻 동일 · 글자만 바뀜.
+codegrep "$PS" "Test-Path -LiteralPath \(\[System\.IO\.Path\]::Combine\(\\\$d, 'cys\.exe'\)\)"; ck "[F-W17] 설치 위치에서 실행 파일을 찾는다(0.3.38 = 등록 자리의 cys.exe 실측)" $? "몸통 축이 값을 안 만든다"
 codegrep "$PS" '등록만 남음'; ck "[F-W17] 「등록만 남음」 갈래" $? "이전 실패 잔존을 ok 로 삼킨다"
 awk '/cysReg -and/{if(!a)a=NR} /cysOnboard -eq .있음. -and/{if(!b)b=NR} END{exit !(a&&b&&a<b)}' "$PS"; ck "[F-W17] 「등록만 남음」을 온보딩 갈래보다 먼저 판정" $? "순서가 뒤면 온보딩 있음이 그것을 ok 로 삼킨다"
 codegrep "$PS" 'CysBodyMissing'; ck "[F-W17] 몸통 부재를 상태로 보관(1-8·2-* 가 읽는다)" $? "같은 사실을 세 곳이 따로 추측한다"
@@ -867,7 +868,8 @@ echo "== 만든 사람이 알려 준 것 반영 =="
 codegrep "$PS" "cys install not confirmed: target=" && codegrep "$PS" "Write-Log \('install-failure: '"; ck "[6] 실패 때 종료 코드·설치기 기록을 기록 파일에 남긴다(0.3.38 · 화면은 한 문장)" $? "무엇이 왜 안 됐는지 기록에 안 남는다"
 codegrep "$PS" 'cys-install-failure.txt'; ck "[6] 설치기가 남긴 기록을 사람에게 보인다" $? "무엇을 왜 못 바꿨는지 사라진다"
 # 0.3.38 뜻 변경: 「제거하지 마십시오」 대신 쓰던 프로그램 파일이 실제로 남아 있을 때만 「그대로 남아 있습니다」(관측만).
-codegrep "$PS" "if \(\\\$oldLeft\) \{ Say '     쓰시던 프로그램은 그대로 남아 있습니다\.' \}"; ck "[6] 실패 때 쓰던 프로그램이 파일로 남았을 때만 「남아 있습니다」(0.3.38 · 앞 판 = 제거 금지 안내)" $? "남았는지 재지 않고 말하거나 말이 없다"
+# 0.3.39: 말하는 것은 확인한 것 하나(그 자리 cys.exe 와 그 판) — 「프로그램이 남아 있다」에서 「명령 파일(cys.exe)은 그대로 있다」로 좁힘.
+codegrep "$PS" "if \(\\\$oldLeft\) \{ Say \('     쓰시던 cys\(v' \+ \\\$upgradeFrom \+ '\)의 명령 파일\(cys\.exe\)은 그대로 있습니다\.'\) \}"; ck "[6] 실패 때 쓰던 프로그램이 파일로 남았을 때만 「남아 있습니다」(0.3.38 · 앞 판 = 제거 금지 안내)" $? "남았는지 재지 않고 말하거나 말이 없다"
 codegrep "$PS" 'VersionInfo.ProductVersion'; ck "[7] 명령이 안 답하면 파일의 판본을 읽는다" $? "크기·날짜로 판정하게 된다"
 codegrep "$PS" 'CYS_NO_AUTOSTART'; ck "[프로브] 살펴보는 호출이 데몬을 깨우지 않는다" $? "설치 직후 다른 판본 데몬이 겹친다"
 codegrep "$SH" 'CYS_NO_AUTOSTART'; ck "[프로브] sh 도 같음" $? "같음"
@@ -2966,8 +2968,8 @@ for f in "$PS" "$RESET" "$REIN_PS"; do
   codegrep "$f" '1\) ⊞ 윈도우 키\(키보드 왼쪽 아래, Ctrl과 Alt 사이\)를 누르고 powershell' && no_code "$f" '시작 단추를 누르고'; rc=$?
   ck "[v0317] 다시 하시는 법 첫 줄은 윈도우 키(사이트와 같은 말) · $(basename "$f")" "$rc" "(${GREP_WHY})"
 done
-codegrep "$PS" "^\\\$InstallerVersion *= '0\.3\.38'" && codegrep "$SH" '^INSTALLER_VERSION="0\.3\.38"'
-ck "[v0322] 판본 0.3.38(두 설치기 · 한 릴리스 = 한 판번)" $? "보고의 판본이 갈린다"
+codegrep "$PS" "^\\\$InstallerVersion *= '0\.3\.39'" && codegrep "$SH" '^INSTALLER_VERSION="0\.3\.39"'
+ck "[v0322] 판본 0.3.39(두 설치기 · 한 릴리스 = 한 판번)" $? "보고의 판본이 갈린다"
 # 확인 명령 한 번에도 상한 — 없으면 벤더 도구가 멈추는 순간 20분 상한까지 함께 멈춘다(이종 검토 1R 지적 채택).
 awk '/^function Get-LoginStatusText/{f=1}
      f&&/Start-Process -FilePath \$exe -ArgumentList .auth.,.status. .*-RedirectStandardOutput/{s=1}
@@ -3093,6 +3095,10 @@ if [ -f "$DIR/../tests/d5-f11-f17-interrupt-close.sh" ]; then
   ck "[F11·F17] Ctrl-C 뒤 고아 감시자 0 · 창 닫힘 뒤 기록 줄 전부 시각 · 다음 실행 = 끝맺음(J-AV-03 거짓 0)(행동 시험 · 맥)" $? "감시자가 남거나 거짓 J-AV-03(tests/d5-f11-f17-interrupt-close.sh)"
 fi
 # F11 보강(0.3.36 적대 검토 지적) — 감시자를 끝낼 때 내 자식인지 먼저 본다(먼저 끝난 감시자의 번호를 물려받은 남을 치지 않는다 · 맥)
+if [ -f "$DIR/../tests/defect-0930-mac-rh.sh" ]; then
+  bash "$DIR/../tests/defect-0930-mac-rh.sh" --dir "$DIR" >/dev/null 2>&1
+  ck "[원격 해결 cys · 맥] [7/10] 이 고른 CYS_CLI(절대 경로)가 먼저 · 없으면 종전 순서(대조군 2칸)" $? "옛 cys 가 남은 맥에서 원격 해결이 옛 cys 를 부른다(tests/defect-0930-mac-rh.sh)"
+fi
 if [ -f "$DIR/../tests/d5-f11-kill-owner.sh" ]; then
   bash "$DIR/../tests/d5-f11-kill-owner.sh" --dir "$DIR" >/dev/null 2>&1
   ck "[F11 소유] 감시자 번호가 내 자식일 때만 끝낸다 · 대조군 = 내 자식은 끝냄(행동 시험 · 맥)" $? "남의 프로세스를 끝내거나 내 감시자를 못 끝낸다(tests/d5-f11-kill-owner.sh)"

@@ -135,6 +135,7 @@ $CysDisplayName = 'cysr'
 # 0.3.36(재절단 핀): 1.1.6 재절단 드래프트(2026-09-26 · 릴리스 id 396787705 · 대상 커밋 76d2b5e9 · build_id 76d2b5e9d2c2.20260925T1540Z) 자산 실측값으로 윈·맥 함께 교체 · 판번 1.1.6 그대로
 # 0.3.37: 핀 값 그대로(cysr 1.1.6 재절단) · 바뀐 것 = 원격 해결만: 윈 파일·폴더 읽기는 연 핸들로만(연 핸들의 최종 경로가 작업 폴더 아래일 때만 · 이음줄을 따라가지 않고 엶) · 깨우기 성공 = 종료 코드 0 그리고 surface: · 오래돼 보이는 실행 기록 잠금을 추측으로 치우지 않음
 # 0.3.38: 핀 값 그대로(cysr 1.1.6) · 바뀐 것 = 윈 설치 결함 묶음(2026-09-30 노트북): 설치 확인 = 파일 판 · 설치 자리 = /D 한 자리 · 설치 창 폴백 0 · 창 실행 파일 확인 · 백신 보류 1분 판정 · 쓸 수 없는 자리를 가리키는 옛 설치 자리 기억 정리 / 맥: 코드 변경 0(한 릴리스 = 한 판번)
+# 0.3.39: cysr 1.1.7 과 함께 내는 판(핀은 1.1.7 절단 뒤 · 그 전까지 1.1.6) · 바뀐 것 = 0.3.38 위에 [7/10]·창 찾기·원격 해결이 [6/10] 본체 폴더를 먼저 · 같은 판 덮어 깔기 기다림 · 옛 설치 자리 기억 정리 보강(숨김 파일 · 원래 값 기록 못 하면 안 지움) · 백신 창 단추 안내 = 본 창 기준 · 버린 설치 목록 후보 기록 1줄 · 없는 드라이브 항목 오류 0 / 맥: 원격 해결의 cys 도 [7/10] 이 고른 것 먼저
 $CysVersion     = '1.1.6'
 $CysDownloadDir = "https://github.com/oogisoogi/cys-ro/releases/download/v${CysVersion}/"
 # ✅아래 세 값 = v1.1.6 재절단 드래프트 릴리스(2026-09-26 · 릴리스 id 396787705 · 대상 커밋 76d2b5e9) 의 자산에서 **실측으로 채웠다**(첫 절단 값(a8ab563b · 140837194 · 릴리스 id 396500235)을 대신한다).
@@ -266,6 +267,11 @@ function Write-Log($msg) {
     #   ⚠앞 판이 ANSI 로 적어 둔 기록은 첫 실행 한 번만 한글 줄이 깨져 읽힌다(지난 실행 상태를 「모름」으로 본다).
     #   줄 끝은 Add-Content 와 같게 운영체제의 줄바꿈이다(윈도우 CRLF) — 이 파일을 읽는 흉내·도구의 줄 모양을 바꾸지 않는다.
     try { [System.IO.File]::AppendAllText($LogFile, "$ts $msg" + [Environment]::NewLine, (New-Object System.Text.UTF8Encoding $false)) } catch { }
+}
+# 적은 것이 꼭 남아야 하는 한 줄(되돌리기용 원래 값 등) — Write-Log 와 같은 모양으로 적되, 못 적었으면 $false 를 돌려준다(부르는 쪽이 멈춘다).
+function Write-LogChecked($msg) {
+    $ts = Get-Date -Format 'yyyy-MM-ddTHH:mm:sszzz'
+    try { [System.IO.File]::AppendAllText($LogFile, "$ts $msg" + [Environment]::NewLine, (New-Object System.Text.UTF8Encoding $false)); return $true } catch { return $false }
 }
 # Write-Output 을 쓰면 안 된다 — PowerShell 함수는 출력 스트림에 나간 것 전부가 반환값이라
 #   `$rc = Step-InstallClaude` 가 종료 코드가 아니라 「안내문 여러 줄 + 0」 배열을 받는다.
@@ -1144,8 +1150,15 @@ function Test-CysBody {
     $reg = $null; $path = ''
     foreach ($e in $ordered) {
         $d = Get-RegPathValue $e.InstallLocation
-        if ($d -and (Test-Path -LiteralPath (Join-Path $d 'cys.exe'))) { $reg = $e; $path = $d; break }
+        if ($d -and (Test-Path -LiteralPath ([System.IO.Path]::Combine($d, 'cys.exe')) -ErrorAction SilentlyContinue)) { $reg = $e; $path = $d; break }   # 없는 드라이브여도 오류 0(Join-Path 는 드라이브부터 찾다 멈춘다)
     }
+    # 고르지 않은 항목(이름 · 판 · 가리키는 폴더 · 그 폴더의 cys.exe 유무) — [6/10] 이 기록에 한 줄 남긴다(화면 0 · 진단 전용)
+    $skipped = @($ordered | Where-Object { -not [object]::ReferenceEquals($_, $reg) } | ForEach-Object {
+        $d = Get-RegPathValue $_.InstallLocation
+        # 없는 드라이브여도 오류를 내지 않게 경로는 .NET 으로 잇고 조회 실패는 'no' 로만 적는다(진단 전용 · 다른 호출자의 화면에 오류 0)
+        $ex = 'no'; if ($d) { try { if (Test-Path -LiteralPath ([System.IO.Path]::Combine($d, 'cys.exe')) -ErrorAction Stop) { $ex = 'yes' } } catch { $ex = 'unread' } }
+        [string]$_.DisplayName + ' ' + [string]$_.DisplayVersion + ' loc=' + (Redact $d) + ' cys.exe=' + $ex
+    })
     if (-not $path) {
         # 기본 설치 자리는 사용자 폴더 안이다(관리자 권한이 필요 없는 이유가 이것이다).
         foreach ($r in @((Join-Path $env:LOCALAPPDATA 'cys'), (Join-Path $env:LOCALAPPDATA 'Programs\cys'), (Join-Path $env:ProgramFiles 'cys'))) {
@@ -1156,7 +1169,7 @@ function Test-CysBody {
     # 명령줄로 쓰는 것은 cys.exe 다. 설치기가 실행 경로를 등록하지 않으므로 전체 경로로 부른다.
     $body = [bool]$path; $cli = ''
     if ($body) { $cli = Join-Path $path 'cys.exe' }
-    return [pscustomobject]@{ Reg = $reg; Body = $body; Path = $path; Cli = $cli }
+    return [pscustomobject]@{ Reg = $reg; Body = $body; Path = $path; Cli = $cli; Skipped = $skipped; Chosen = $(if ($reg) { [string]$reg.DisplayName + ' ' + [string]$reg.DisplayVersion } else { '' }) }
 }
 # 이번 설치 자리(조용한 설치의 /D 값) — 0.3.38(윈 결함 묶음 ⓒ).
 #   ⑴ cysr 항목이 가리키고 그 폴더에 프로그램 파일 셋이 있으면 그 폴더(사용자가 다른 폴더를 골라 제대로 깐 기기 = 두 번째 설치 방지)
@@ -1193,12 +1206,13 @@ function Clear-CysStaleInstallMemory([string]$dir) {
         if ($mem.TrimEnd('\', '/') -ieq ([string]$dir).TrimEnd('\', '/')) { return 'same' }
         try {
             # Join-Path 는 없는 드라이브에서 먼저 멈춘다 — 경로 잇기는 .NET 으로
-            [void](Get-Item -LiteralPath ([System.IO.Path]::Combine($mem, 'cys.exe')) -ErrorAction Stop)
+            [void](Get-Item -LiteralPath ([System.IO.Path]::Combine($mem, 'cys.exe')) -Force -ErrorAction Stop)   # -Force = 숨김·시스템 파일도 「있음」으로 본다
             Write-Log ('install memory \cys kept (cys.exe there): ' + (Redact $raw)); return 'kept'
         } catch [System.Management.Automation.ItemNotFoundException] {
         } catch [System.Management.Automation.DriveNotFoundException] {
         } catch { Write-Log ('install memory \cys kept (unread): ' + (Redact $raw) + ' · ' + $_.Exception.GetType().Name); return 'unread' }
-        Write-Log ('install memory \cys removed · was=' + (Redact $raw) + ' · body=' + (Redact $dir))
+        # 되돌리기용 원래 값을 먼저 적는다 — 못 적었으면 지우지 않는다
+        if (-not (Write-LogChecked ('install memory \cys removed · was=' + (Redact $raw) + ' · body=' + (Redact $dir)))) { return 'nolog' }
         Remove-CysInstallMemory
         return 'removed'
     } catch { Write-Log ('install memory \cys not removed: ' + $_.Exception.Message); return 'fail' }
@@ -1869,7 +1883,7 @@ function Write-ClaudeInstallDiag($p, $where) {
     foreach ($l in $lines) { Write-Log ('install hold diag (' + $where + '): ' + (Redact $l)) }
     Add-ReportLines (@('', ('## [2/10] 설치가 상한에 닿았을 때 본 것 (' + $where + ')')) + @($lines | ForEach-Object { '- ' + (Redact $_) }))
     if ($av.Count -gt 0) {
-        Say ('     지금 떠 있는 창 가운데 백신 창으로 보이는 것: 『' + $av[0] + '』 — 그 창에서 [실행] 또는 [파일 전송] 을 눌러 주십시오.')
+        Say ('     지금 떠 있는 창 가운데 백신 창으로 보이는 것: 『' + $av[0] + '』 — 그 창의 안내대로 진행을 허용해 주세요' + (Get-AvButtonHint $av[0]) + '.')
     }
     return $tree
 }
@@ -1999,6 +2013,11 @@ function Say-AvExceptDirs {
     foreach ($x in $d) { Say ('       · ' + (Redact $x)) }
     Say '     설치가 끝나면 그 폴더들을 예외에서 지우셔도 됩니다.'
 }
+# 단추 이름은 **본 창**에 맞춰서만 말한다 — 백신 창 제목이 V3(안랩)로 보였을 때만 「파일 전송」 예시(2026-09-09 V3 실기 창) · 그 밖은 빈 글자(「그 창의 안내대로」만).
+function Get-AvButtonHint($title) {
+    if ([string]$title -match '\bV3\b|AhnLab|안랩') { return ' (이 백신에서는 「파일 전송」 단추로 보였습니다)' }
+    return ''
+}
 function Invoke-AvHoldRetrigger($p, $w, $where) {
     # 돌려주는 것 = $true 붙든 파일을 치웠다(한 번 다시 받는다) · $false 아직 붙들려 있다(다시 받지 않는다 → J-AV-01 길)
     $fileWords = if ($w.File) { (Redact $w.File) + ' ' + $w.Len + 'B' } else { 'not created' }
@@ -2006,8 +2025,7 @@ function Invoke-AvHoldRetrigger($p, $w, $where) {
     Say '     설치 파일 받기가 1분째 멈춰 있습니다.'
     $tree = @(Write-ClaudeInstallDiag $p ('1분 멈춤 · ' + $where))
     Stop-ProcTree $p $tree
-    $v3 = (@(Get-AvWindowTitles | Where-Object { $_ -match '\bV3\b|AhnLab|안랩' }).Count -gt 0)
-    $eg = if ($v3) { '(이 백신에서는 「파일 전송」 단추로 보였습니다).' } else { '.' }
+    $eg = (Get-AvButtonHint (@(Get-AvWindowTitles | Where-Object { $_ -match '\bV3\b|AhnLab|안랩' }) -join ' ')) + '.'
     Say ('     백신 프로그램이 파일을 확인하는 중일 수 있습니다. 화면 오른쪽 아래에 확인 창이 있으면 그 창의 안내대로 진행을 허용해 주세요' + $eg)
     $cleared = $true
     $hadFile = [bool]($w.File -and (Test-Path -LiteralPath $w.File))
@@ -2288,7 +2306,7 @@ function Step-InstallClaude {
             $av = @(Get-AvWindowTitles)
             if (($av.Count -gt 0) -and ($av[0] -cne $avShown)) {
                 $avShown = $av[0]
-                Say ('     지금 떠 있는 창 가운데 백신 창으로 보이는 것: 『' + $av[0] + '』 — 그 창에서 [실행] 또는 [파일 전송] 을 눌러 주십시오.')
+                Say ('     지금 떠 있는 창 가운데 백신 창으로 보이는 것: 『' + $av[0] + '』 — 그 창의 안내대로 진행을 허용해 주세요' + (Get-AvButtonHint $av[0]) + '.')
             }
         }
     }
@@ -2316,7 +2334,7 @@ function Step-InstallClaude {
             Say '     「Installation complete」 가 보이면 그 창을 닫고 아래 「다시 하시는 법」대로 다시 실행해 주십시오.'
         }
         Say-AntivirusHold '클로드 설치 파일 (이름이 claude 로 시작하는 파일)'
-        Set-NextStepRerun '작업 표시줄에서 백신 창을 찾아 [파일 전송] 또는 [실행] 을 누르신 뒤, 아래 「다시 하시는 법」대로 다시 실행해 주십시오.'
+        Set-NextStepRerun '작업 표시줄이나 화면 오른쪽 아래에 백신 확인 창이 있으면 그 창의 안내대로 진행을 허용하신 뒤, 아래 「다시 하시는 법」대로 다시 실행해 주십시오.'
         return 4
     }
     # PowerShell 5.1 은 갓 끝난 프로세스의 ExitCode 를 늦게 채우는 일이 있다(검토 지적 채택).
@@ -3576,6 +3594,7 @@ function Step-InstallCys {
     $upgradeFrom = ''
     $refresh = ''   # v0.3.18 — 같은 판번을 핀 파일로 덮어 까는 까닭(Get-CysContentState 값) · 빈 글자 = 해당 없음
     $b0 = Test-CysBody
+    if (@($b0.Skipped).Count -gt 0) { Write-Log ('cys uninstall entries skipped: ' + (@($b0.Skipped) -join ' ; ') + ' · chosen: ' + $(if ($b0.Chosen) { $b0.Chosen } else { '(none)' }) + ' · body=' + (Redact $b0.Path)) }
     if ($b0.Body) {
         $have0 = Get-CysInstalledVersion $b0
         if ($have0 -eq $CysVersion) {
@@ -3668,7 +3687,7 @@ function Step-InstallCys {
         for ($i = 0; $i -lt 60; $i++) {
             if ((Test-CysDirHasBins $dir) -and ((Get-VersionNumber (Get-CysExeVersion (Join-Path $dir 'cys.exe'))) -eq $CysVersion) -and
                 ((-not $refresh) -or ($p.HasExited -and $p.ExitCode -eq 0))) { $done = $true; break }
-            if ($refresh -and $p.HasExited) { break }   # 같은 판은 파일로 가를 수 없다 — 끝난 설치기의 답이 전부다
+            if ($refresh -and $p.HasExited -and ($p.ExitCode -ne 0)) { break }   # 같은 판은 파일로 가를 수 없다 — 설치기가 실패를 답했으면 거기서 끝 · 성공(0)이면 파일이 자리 잡기를 상한까지 기다린다
             Start-Sleep -Seconds 1
         }
     } catch {
@@ -3685,8 +3704,10 @@ function Step-InstallCys {
     Write-Log ('cys install not confirmed: target=' + (Redact $dir) + ' exit=' + $rcShown + ' from=' + $upgradeFrom)
     Say ("[6/10] 새 $CysDisplayName 프로그램을 넣지 못했습니다.")
     # 「그대로 남아 있습니다」 = 옛 cys.exe 가 있고 그 판이 설치 전에 읽은 판 그대로일 때만(새 파일로 반쯤 바뀐 자리를 「남았다」고 말하지 않는다)
-    $oldLeft = $b0.Body -and (Test-Path -LiteralPath $b0.Cli) -and $upgradeFrom -and ((Get-VersionNumber (Get-CysExeVersion $b0.Cli)) -eq (Get-VersionNumber $upgradeFrom))
-    if ($oldLeft) { Say '     쓰시던 프로그램은 그대로 남아 있습니다.' }
+    #   같은 판 덮어 깔기(refresh)에서는 말하지 않는다 — 같은 판번은 내용이 그대로라는 증거가 아니다(같은 판번 · 다른 내용을 덮는 길이 바로 refresh).
+    $oldLeft = $b0.Body -and (-not $refresh) -and (Test-Path -LiteralPath $b0.Cli) -and $upgradeFrom -and ((Get-VersionNumber (Get-CysExeVersion $b0.Cli)) -eq (Get-VersionNumber $upgradeFrom))
+    #   말하는 것은 확인한 것 하나 — 그 자리의 cys.exe 와 그 판(다른 파일의 보존은 확인하지 않았으므로 말하지 않는다).
+    if ($oldLeft) { Say ('     쓰시던 cys(v' + $upgradeFrom + ')의 명령 파일(cys.exe)은 그대로 있습니다.') }
     # 설치기가 남긴 기록(어느 파일을 왜 못 바꿨는지) — 이번 설치 자리에서 읽는다(기록에만 · 화면은 한 문장).
     $note = Join-Path $dir 'cys-install-failure.txt'
     if (Test-Path -LiteralPath $note) {
@@ -3711,6 +3732,12 @@ function Step-VerifyCys {
     #   안 드러나는 형태다 — 그래서 여태 아무도 못 봤다.
     if ($Mode -eq 'dry') { Say '[7/10] (dry-run) cys 를 확인하지 않았습니다.'; return 0 }
     $b = Test-CysBody
+    # [6/10] 이 이번 실행에서 본체 폴더를 확정했으면 그 폴더를 본다 — 설치 목록이 먼저 가리키는 다른 폴더(옛 cys.exe 만 남은 자리)를 부르지 않는다.
+    if ($script:CysBodyDir -and (Test-Path -LiteralPath (Join-Path $script:CysBodyDir 'cys.exe')) -and
+        (([string]$b.Path).TrimEnd('\', '/') -ine ([string]$script:CysBodyDir).TrimEnd('\', '/'))) {
+        Write-Log ('verify: body dir from [6/10] = ' + (Redact $script:CysBodyDir) + ' (list pointed at ' + (Redact $b.Path) + ')')
+        $b = [pscustomobject]@{ Reg = $b.Reg; Body = $true; Path = [string]$script:CysBodyDir; Cli = (Join-Path $script:CysBodyDir 'cys.exe') }
+    }
     if (-not $b.Body) { Say '[7/10] cys 프로그램을 찾지 못했습니다.'; return 7 }
     Say "[7/10] cys 프로그램을 찾았습니다: $(Redact $b.Path)"
     # 명령이 이 창의 경로 목록에 없을 수 있다 — 새 프로세스로 다시 본다
@@ -4232,6 +4259,8 @@ function Test-SeatClaimDenied([string]$Answer) {
 #   ⚠이름을 하나로 박지 않는다: 제품 이름이 cys → cysr 로 바뀌면서 설치 폴더·실행 파일 이름이 함께 옮겨 갔다.
 function Get-CysAppExe {
     $roots = New-Object System.Collections.ArrayList
+    # [6/10] 이 이번 실행에서 확정한 본체 폴더가 먼저 — 설치 목록이 가리키는 옛 폴더의 창 파일을 먼저 잡지 않는다
+    if ($script:CysBodyDir) { [void]$roots.Add([string]$script:CysBodyDir) }
     try {
         $b = Test-CysBody
         if ($b.Path) { [void]$roots.Add($b.Path) }
@@ -5194,7 +5223,7 @@ function Step-Fleet {
 #   글자 칸은 `\z` 로 끝을 못박아 다시 만든다. 이름·글자·판본 비교는 대소문자를 가르는 -ceq·-cmatch·-ccontains 만 쓴다.
 # ⚠PowerShell 은 `'true' -eq $true` 를 참으로 본다 ⇒ 칸마다 **형(type)을 먼저** 본다.
 # ⚠이 절은 맥에서 PowerShell 없이 **정적 검사 + 맥판과의 대조**로만 증명했다 — 윈도우 실기가 필요한 축은 내부 문서.
-$InstallerVersion       = '0.3.38'   # 보고의 installer_version · $BootstrapVersion 은 화면 머리글 용도 그대로(보내지 않는다)
+$InstallerVersion       = '0.3.39'   # 보고의 installer_version · $BootstrapVersion 은 화면 머리글 용도 그대로(보내지 않는다)
 # 0.3.36: JARVIS_HELP_API_URL = CI·흉내가 도움 보고를 로컬로 돌리는 손잡이(맥 짝 · 사람이 쓰는 길이 아니다 · 없으면 종전 주소 — tests/help-url-lever.sh).
 $HelpApiUrl             = if ($env:JARVIS_HELP_API_URL) { [string]$env:JARVIS_HELP_API_URL } else { 'https://jarvis-install.godmeyou.kr' }
 # 🔴0.3.36(이종 검토): 시험용 함수 묶음은 도움 보고(/api/help)·닫기도 라이브로 못 보낸다(맥 HELP_API_URL 짝) — 가짜 서버는 읽은 뒤 덮어쓴다.
@@ -5697,6 +5726,11 @@ function Resolve-RemoteHelpPath([string]$Rel) {
 
 function Get-RemoteHelpCysPath {
     # 설치기가 이미 쓰는 cys 찾기 규칙(Test-CysBody) · 절대 경로의 cys.exe 만 · PATH 조회 없음
+    #   [6/10] 이 이번 실행에서 확정한 본체 폴더가 먼저 — 설치 목록이 가리키는 옛 폴더의 cys.exe 를 먼저 부르지 않는다
+    if ($script:CysBodyDir) {
+        $c = Join-Path $script:CysBodyDir 'cys.exe'
+        if ([System.IO.Path]::IsPathRooted($c) -and (Test-Path -LiteralPath $c -PathType Leaf)) { return $c }
+    }
     $b = Test-CysBody
     if ($b.Cli -and [System.IO.Path]::IsPathRooted($b.Cli) -and ((Split-Path -Leaf $b.Cli) -ieq 'cys.exe') -and (Test-Path -LiteralPath $b.Cli -PathType Leaf)) { return $b.Cli }
     return ''

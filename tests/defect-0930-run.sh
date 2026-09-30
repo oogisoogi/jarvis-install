@@ -27,12 +27,12 @@ run() { # run <스크립트> <칸>
 echo "== ⓑ 본체 판정 =="
 for c in laptop quoted-elsewhere no-cys-exe envvar; do run body "$c"; done
 echo "== ⓐⓒ [6/10] 설치 =="
-for c in upgrade-fail first-fail-no-wizard d-arg d-cysr-elsewhere d-cysr-partial d-cysr-gone-fixed install-partial d-oldpf d-localcysr refresh-fail skip-missing-app mem-stale-removed mem-gone-dir-removed mem-same-kept mem-exe-kept mem-unread-kept mem-none mem-fail-kept mem-skip-removed mem-remove-throws; do run install "$c"; done
+for c in upgrade-fail first-fail-no-wizard d-arg d-cysr-elsewhere d-cysr-partial d-cysr-gone-fixed install-partial d-oldpf d-localcysr refresh-fail skip-missing-app mem-stale-removed mem-gone-dir-removed mem-same-kept mem-exe-kept mem-unread-kept mem-none mem-fail-kept mem-skip-removed mem-remove-throws refresh-late-bins refresh-fail-no-left mem-log-fail f11-skipped-log; do run install "$c"; done
 echo "== ⓐⓑ [5/10] · [7/10] =="
-for c in dl-skip-missing verify-old verify-ok autostart-old-folder autostart-one-value autostart-body; do run verify "$c"; done
+for c in dl-skip-missing verify-old verify-body-dir app-body-dir rh-body-dir skipped-no-error verify-ok autostart-old-folder autostart-one-value autostart-body; do run verify "$c"; done
 echo "== ⓓ [9/10] 창 실행 파일 =="
 for c in no-app-exe card-hint; do run wake "$c"; done
 echo "== ⓔ 백신 보류 1분 판정 =="
-for c in progress-count except-once vendor-progress-ok vendor-grow-stop vendor-v3-title vendor-growing vendor-none vendor-transcript-grows vendor-setup-done vendor-delete-fail vendor-unread-log vendor-delete-late vendor-no-ok-before direct-none direct-full-size direct-unknown-size direct-first-seen-complete direct-after-vendor direct-exit-fail; do run avhold "$c"; done
+for c in progress-count except-once button-words vendor-progress-ok vendor-grow-stop vendor-v3-title vendor-growing vendor-none vendor-transcript-grows vendor-setup-done vendor-delete-fail vendor-unread-log vendor-delete-late vendor-no-ok-before direct-none direct-full-size direct-unknown-size direct-first-seen-complete direct-after-vendor direct-exit-fail; do run avhold "$c"; done
 echo "== defect-0930: ok $pass · FAIL $fail =="
 [ "$fail" -eq 0 ]

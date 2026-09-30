@@ -267,3 +267,5 @@ Test-AvSetupDone	-	na	백신 보류 판정의 벤더 설치 기록 읽기(쓰기
 Get-CysInstallMemory	-	na	윈 설치 자리 기억(HKCU\Software\cysjavis\cys 기본값) 읽기 · 레지스트리 = 윈 전용(맥 앱 설치는 자리 기억 없음)
 Remove-CysInstallMemory	-	na	윈 설치 자리 기억 키 지우기 · 레지스트리 = 윈 전용
 Clear-CysStaleInstallMemory	-	na	[6/10] 뒤 옛 이름 설치 자리 기억이 쓸 수 없는 자리를 가리키면 지움(\cysr 무접촉) · 레지스트리 = 윈 전용
+Write-LogChecked	-	na	되돌리기용 원래 값처럼 꼭 남아야 하는 기록 한 줄(못 적으면 거짓) · 지금 부르는 곳 = 윈 설치 자리 기억 정리(레지스트리 · 윈 전용)
+Get-AvButtonHint	-	na	백신 창 제목이 V3(안랩)일 때만 「파일 전송」 단추 예시 · 윈도우 백신 알림 창 전용

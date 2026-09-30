@@ -141,6 +141,7 @@ CYS_DISPLAY_NAME="cysr"
 # 0.3.36(재절단 핀): 1.1.6 재절단 드래프트(2026-09-26 · 릴리스 id 396787705 · 대상 커밋 76d2b5e9 · build_id 76d2b5e9d2c2.20260925T1540Z) 자산 실측값으로 윈·맥 함께 교체
 # 0.3.37: 핀 값 그대로(cysr 1.1.6 재절단) · 바뀐 것 = 원격 해결만: 윈 파일·폴더 읽기는 연 핸들로만(연 핸들의 최종 경로가 작업 폴더 아래일 때만 · 이음줄을 따라가지 않고 엶) · 깨우기 성공 = 종료 코드 0 그리고 surface: · 오래돼 보이는 실행 기록 잠금을 추측으로 치우지 않음
 # 0.3.38: 핀 값 그대로(cysr 1.1.6) · 맥 코드 변경 0 — 판번만 윈과 함께 올림(한 릴리스 = 한 판번 · 윈 = 설치 결함 묶음)
+# 0.3.39: cysr 1.1.7 과 함께 내는 판(핀은 1.1.7 절단 뒤) · 맥 바뀐 것 = 원격 해결이 부르는 cys 도 [7/10] 이 고른 CYS_CLI(절대 경로) 먼저
 CYS_FORK_VERSION="1.1.6"
 CYS_FORK_DIR="https://github.com/oogisoogi/cys-ro/releases/download/v${CYS_FORK_VERSION}/"
 # 1.0.1 부터 zip 최상위 = cysr.app(안의 실행 파일 = Contents/MacOS/cys · cys-app · cysd · CFBundleName cysr · 로컬 빌드 실측 2026-09-16).
@@ -5060,7 +5061,7 @@ raise_cys_app_window() {
 # ★언제 도는가 = 자비스를 깨우기 **전에** 진단 코드를 남기고 멈춘 끝. 자비스를 깨운 뒤에는 돌지 않는다
 #   (자비스가 이 창을 넘겨받으므로 두 쪽이 한 화면에 섞이지 않게).
 # ⚠JSON·재검사·스크럽은 macOS 기본 `osascript`(JavaScript)가 한다 — 깨끗한 맥에는 jq·python 이 없다.
-INSTALLER_VERSION="0.3.38"      # 보고의 installer_version · BOOTSTRAP_VERSION 은 화면 머리글 용도 그대로(보내지 않는다)
+INSTALLER_VERSION="0.3.39"      # 보고의 installer_version · BOOTSTRAP_VERSION 은 화면 머리글 용도 그대로(보내지 않는다)
 # 0.3.36: JARVIS_HELP_API_URL = CI·흉내가 도움 보고를 로컬로 돌리는 손잡이(JARVIS_PROGRESS_URL 과 같은 모양 · 사람이 쓰는 길이 아니다 ·
 #   없으면 종전 주소 그대로 — tests/help-url-lever.sh 가 잰다). CI(reinstall-matrix.yml)의 full 부분 설치가 라이브 도움 채널로 가던 길을 막는다.
 HELP_API_URL="${JARVIS_HELP_API_URL:-https://jarvis-install.godmeyou.kr}"
@@ -5918,6 +5919,8 @@ remote_help_confine() {   # <작업 폴더 기준 상대 경로> → RH_REAL · 
 
 remote_help_cys_path() {   # 표 9-2절 「실행 대상」 — 절대 경로 후보만 본다
   local c
+  # 0.3.39: [7/10] 이 핀 판으로 고른 CYS_CLI 가 절대 경로면 그것이 먼저(옛 /usr/local/bin/cys 등이 남은 맥에서 옛 cys 를 부르지 않게) · 아니면 종전 순서
+  case "${CYS_CLI:-}" in /*) [ -x "$CYS_CLI" ] && { printf '%s\n' "$CYS_CLI"; return 0; } ;; esac
   for c in "$HOME/.local/bin/cys" "/usr/local/bin/cys" "/Applications/cysr.app/Contents/MacOS/cys" "/Applications/cys.app/Contents/MacOS/cys"; do
     [ -x "$c" ] && { printf '%s\n' "$c"; return 0; }
   done

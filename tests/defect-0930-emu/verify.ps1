@@ -23,6 +23,42 @@ switch ($Case) {
         $rc = @(Step-VerifyCys)[-1]; $s = $script:Said -join ' | '
         T (($rc -eq 7) -and ($s -notmatch '준비되었습니다')) 'ⓐ [7/10] 답한 판번 0.14.29 < 1.1.6 → rc 7 · 「준비되었습니다」 0' ('rc=' + $rc + ' · ' + $s)
     }
+    'verify-body-dir' {
+        # [6/10] 이 확정한 본체 폴더가 있으면 [7/10] 도 그 폴더를 본다 — 설치 목록이 먼저 가리키는 옛 cys.exe 만 남은 폴더를 부르지 않는다
+        $old = Join-Path $Sb 'apps/cysr-old'; Put-Bins $old '0.14.29' @('cys.exe')
+        $script:FakeUninstall = @((Entry 'cysr' '0.14.29' ('"' + $old + '"')))
+        $d = Join-Path $L 'cys'; Put-Bins $d '1.1.6'
+        $script:CysBodyDir = (Resolve-Path $d).Path
+        function Invoke-CysProbe($cli, $a) { if ([string]$cli -like '*cysr-old*') { 'cys 0.14.29' } else { 'cysr 1.1.6' } }
+        $rc = @(Step-VerifyCys)[-1]; $s = $script:Said -join ' | '
+        T (($rc -eq 0) -and ([string]$script:CysCli -like ('*' + [IO.Path]::DirectorySeparatorChar + 'cys' + [IO.Path]::DirectorySeparatorChar + 'cys.exe')) -and ([string]$script:CysCli -notlike '*cysr-old*')) '[7/10] = [6/10] 본체 폴더의 cys.exe(설치 목록의 옛 폴더 아님) → rc 0' ('rc=' + $rc + ' cli=' + $script:CysCli + ' · ' + $s)
+    }
+    'app-body-dir' {
+        # 창 실행 파일도 [6/10] 이 확정한 본체 폴더가 먼저 — 설치 목록의 옛 폴더에 cys.exe·cys-app.exe 가 남아 있어도
+        $old = Join-Path $Sb 'apps/cysr-old'; Put-Bins $old '0.14.29' @('cys.exe', 'cys-app.exe')
+        $script:FakeUninstall = @((Entry 'cysr' '0.14.29' ('"' + $old + '"')))
+        $d = Join-Path $L 'cys'; Put-Bins $d '1.1.6'
+        $script:CysBodyDir = (Resolve-Path $d).Path
+        $app = [string](Get-CysAppExe)
+        T (($app -like ((Resolve-Path $d).Path + '*')) -and ($app -notlike '*cysr-old*')) '창 실행 파일 = [6/10] 본체 폴더의 것' ('app=' + $app)
+    }
+    'skipped-no-error' {
+        # 버린 항목 진단이 없는 드라이브를 가리켜도 오류를 내지 않는다(앞 항목에서 본체를 찾은 뒤에도 뒤 항목을 살핀다)
+        $d = Join-Path $L 'cys'; Put-Bins $d '1.1.6'
+        $script:FakeUninstall = @((Entry 'cysr' '1.1.5' '"Q:\cysr"'), (Entry 'cysr' '1.1.6' ('"' + $d + '"')), (Entry 'cys' '0.14.29' '"Q:\cys"'))
+        $Error.Clear()
+        $b = Test-CysBody
+        T (($Error.Count -eq 0) -and (@($b.Skipped) -join ' ') -match 'cys 0\.14\.29 loc=Q:\\cys cys\.exe=no') '버린 항목이 없는 드라이브여도 오류 0 · 기록 칸은 채움' ('errors=' + $Error.Count + ' · ' + (@($Error | ForEach-Object { $_.Exception.GetType().Name }) -join ',') + ' · skipped=' + (@($b.Skipped) -join ' ; '))
+    }
+    'rh-body-dir' {
+        # 원격 해결이 부르는 cys 도 [6/10] 본체 폴더가 먼저 — 설치 목록의 옛 폴더에 cys.exe 가 남아 있어도
+        $old = Join-Path $Sb 'apps/cysr-old'; Put-Bins $old '0.14.29' @('cys.exe')
+        $script:FakeUninstall = @((Entry 'cysr' '0.14.29' ('"' + $old + '"')))
+        $d = Join-Path $L 'cys'; Put-Bins $d '1.1.6'
+        $script:CysBodyDir = (Resolve-Path $d).Path
+        $rh = [string](Get-RemoteHelpCysPath)
+        T (($rh -like ((Resolve-Path $d).Path + '*cys.exe')) -and ($rh -notlike '*cysr-old*')) '원격 해결의 cys = [6/10] 본체 폴더의 cys.exe' ('rh=' + $rh)
+    }
     'verify-ok' {
         $d = Join-Path $L 'cys'; Put-Bins $d '1.1.6'
         function Invoke-CysProbe($cli, $a) { 'cysr 1.1.6' }

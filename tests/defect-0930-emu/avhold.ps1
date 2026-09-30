@@ -75,6 +75,13 @@ switch ($Case) {
         $at = [regex]::Match((Get-Content -LiteralPath $LogFile -Raw), 'av hold judged')
         T ($at.Success) 'ⓔ⑴ 기록 파일에 판정 한 줄' 'log 에 av hold judged 없음'
     }
+    'button-words' {
+        # 관측한 것만 말한다 — 백신 창 제목이 V3 일 때만 「파일 전송」 예시 · 그 밖은 「그 창의 안내대로」 · J-AV-01 다음 할 일도 같은 말
+        $g = Get-AvButtonHint 'Norton Security'; $v = Get-AvButtonHint 'AhnLab V3 Lite'
+        T (($g -eq '') -and ($v -match '파일 전송')) '창 제목이 V3 일 때만 「파일 전송」 예시' ('g=[' + $g + '] v=[' + $v + ']')
+        $src = Get-Content -LiteralPath $Src -Raw
+        T (($src -notmatch "\[실행\] 또는 \[파일 전송\]") -and ($src -notmatch "\[파일 전송\] 또는 \[실행\]")) '백신 종류와 무관하게 [실행]·[파일 전송] 을 누르라는 줄 0' 'bootstrap.ps1 에 남음'
+    }
     'vendor-v3-title' {
         # 백신 창 제목이 V3 로 관측됐을 때만 괄호 속 「파일 전송」 예시
         $script:ProgressEverOk = $true; $script:ProgressFailRun = 0
