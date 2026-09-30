@@ -263,3 +263,7 @@ Get-RotateRoleRefs	rotate_role_refs	sh	cys list 글 → 살아 있는 역할 자
 Get-RotateObserveVerdict	rotate_observe_verdict	sh	순수 — ok · no:pid · no:old-seats · no:role-seats(흉내 동형 축 · 여덟 입력 글자까지 같다) · 성공 = pid 바뀜 + 기준선 자리 0 + 역할 자리 ≥3. TICKET=installer-0331(2026-09-21)
 Invoke-RotateObserve	rotate_observe	sh	세 축(ping·데몬 pid·cys list · 각 상한 5초 · 무기동)을 한 번 재 판정을 돌려주고 bootstrap.log 에 남긴다(주기 = 1줄 · 마지막 = ①②③ 3줄 + verdict). 드레인 뒤(단계 2 이후)에만 주기 관측 · 성공이면 rotate 를 끊고 observed-ok · 상한 180 뒤 1회 더. TICKET=installer-0331(2026-09-21)
 Get-RotateHeldRecheck	rotate_held_recheck	sh	rc 25(복원 보류) 뒤 곧바로 held 로 말하지 않고 창 60초 동안 세 축을 10초마다 다시 본다 — 서면 observed-ok · 끝내 안 서면 held(종전 경고) · 기준 데몬 pid 를 못 읽었으면 기다리지 않는다(판정이 no:pid 로 굳음). 근거 = 09-22 맥 VM 재설치 rc 25 뒤 20초에 cso 자리가 섰다(실제 3/3 · 거짓 경고). 0.3.36 X-5(2026-09-24)
+Test-AvSetupDone	-	na	백신 보류 판정의 벤더 설치 기록 읽기(쓰기 공유로 열기 · 못 읽음 = 판정 0) · 윈 전용(맥 설치 길에 백신 확인 창 보류 관측 없음)
+Get-CysInstallMemory	-	na	윈 설치 자리 기억(HKCU\Software\cysjavis\cys 기본값) 읽기 · 레지스트리 = 윈 전용(맥 앱 설치는 자리 기억 없음)
+Remove-CysInstallMemory	-	na	윈 설치 자리 기억 키 지우기 · 레지스트리 = 윈 전용
+Clear-CysStaleInstallMemory	-	na	[6/10] 뒤 옛 이름 설치 자리 기억이 쓸 수 없는 자리를 가리키면 지움(\cysr 무접촉) · 레지스트리 = 윈 전용

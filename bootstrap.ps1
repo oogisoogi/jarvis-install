@@ -134,6 +134,7 @@ $CysDisplayName = 'cysr'
 # 0.3.36(윈 핀 올림): 1.1.6 드래프트 자산 실측값(2026-09-25 · 릴리스 API 자산 digest·크기 + 인증 받기 실물 sha256 대조 · 드래프트라 SHA256SUMS.txt 자산 없음 → 발행 때 함께 올라야 tests/win-pin-release.sh 가 초록) · 맥 핀은 그대로(맥 자산 산출 뒤 따로)
 # 0.3.36(재절단 핀): 1.1.6 재절단 드래프트(2026-09-26 · 릴리스 id 396787705 · 대상 커밋 76d2b5e9 · build_id 76d2b5e9d2c2.20260925T1540Z) 자산 실측값으로 윈·맥 함께 교체 · 판번 1.1.6 그대로
 # 0.3.37: 핀 값 그대로(cysr 1.1.6 재절단) · 바뀐 것 = 원격 해결만: 윈 파일·폴더 읽기는 연 핸들로만(연 핸들의 최종 경로가 작업 폴더 아래일 때만 · 이음줄을 따라가지 않고 엶) · 깨우기 성공 = 종료 코드 0 그리고 surface: · 오래돼 보이는 실행 기록 잠금을 추측으로 치우지 않음
+# 0.3.38: 핀 값 그대로(cysr 1.1.6) · 바뀐 것 = 윈 설치 결함 묶음(2026-09-30 노트북): 설치 확인 = 파일 판 · 설치 자리 = /D 한 자리 · 설치 창 폴백 0 · 창 실행 파일 확인 · 백신 보류 1분 판정 · 쓸 수 없는 자리를 가리키는 옛 설치 자리 기억 정리 / 맥: 코드 변경 0(한 릴리스 = 한 판번)
 $CysVersion     = '1.1.6'
 $CysDownloadDir = "https://github.com/oogisoogi/cys-ro/releases/download/v${CysVersion}/"
 # ✅아래 세 값 = v1.1.6 재절단 드래프트 릴리스(2026-09-26 · 릴리스 id 396787705 · 대상 커밋 76d2b5e9) 의 자산에서 **실측으로 채웠다**(첫 절단 값(a8ab563b · 140837194 · 릴리스 id 396500235)을 대신한다).
@@ -348,10 +349,16 @@ function Get-CysAutoStartState {
     #   0.3.38(윈 결함 묶음 ⓒ): 기대 경로 = 실제 본체 폴더(Test-CysBody = 파일로 찾은 설치 자리) · 부르는 길이 전체 경로면 그 폴더.
     #   앞 판은 %LOCALAPPDATA%\cys · Programs\cys 를 늘 우리 것으로 보아, 새 판이 다른 자리에 깔린 뒤에도 옛 폴더의 옛 cysd 를 가리키는
     #   작업을 「등록됨」으로 셌다 → 다시 등록하지 않아 다음 로그온에 옛 데몬이 떴다.
+    #   0.3.38: [6/10] 이 이번 실행에서 확정한 본체 폴더(설치한 /D 자리 또는 건너뛴 자리)가 있으면 **그 폴더 하나만** 본다 —
+    #   설치와 자동 시작이 같은 값을 쓴다(등록 목록을 다시 읽으면 옛 항목이 먼저 잡혀 옛 cysd 를 우리 것으로 셀 수 있다).
     $wantList = @()
-    try { $bb = Test-CysBody; if ($bb.Body -and $bb.Path) { $wantList += (Join-Path $bb.Path 'cysd.exe') } } catch { }
-    if ($CysCli -and (Split-Path $CysCli -Parent)) {
-        try { $wantList += (Join-Path (Split-Path $CysCli -Parent) 'cysd.exe') } catch { }
+    if ($script:CysBodyDir) {
+        $wantList += (Join-Path $script:CysBodyDir 'cysd.exe')
+    } else {
+        try { $bb = Test-CysBody; if ($bb.Body -and $bb.Path) { $wantList += (Join-Path $bb.Path 'cysd.exe') } } catch { }
+        if ($CysCli -and (Split-Path $CysCli -Parent)) {
+            try { $wantList += (Join-Path (Split-Path $CysCli -Parent) 'cysd.exe') } catch { }
+        }
     }
     $cmds = @()
     try { foreach ($a in @($doc.Task.Actions.Exec)) { if ($a -and $a.Command) { $cmds += [string]$a.Command } } } catch { return 'unknown' }
@@ -1159,10 +1166,42 @@ function Test-CysBody {
 function Get-CysInstallTarget {
     $def = Join-Path $env:LOCALAPPDATA 'cys'
     $b = Test-CysBody
-    if ($b.Body -and $b.Reg -and ($b.Reg.DisplayName -eq 'cysr') -and (Test-CysDirHasBins $b.Path)) {
+    # cysr 항목이 **가리키는 폴더**가 곧 본체 폴더일 때만(항목이 빈 폴더를 가리키고 본체는 고정 후보에서 찾은 경우는 제외)
+    if ($b.Body -and $b.Reg -and ($b.Reg.DisplayName -eq 'cysr') -and (Test-CysDirHasBins $b.Path) -and
+        ((Get-RegPathValue $b.Reg.InstallLocation).TrimEnd('\', '/') -ieq ([string]$b.Path).TrimEnd('\', '/'))) {
         if ($b.Path.TrimEnd('\', '/') -ine (Join-Path $env:LOCALAPPDATA 'cysr')) { return $b.Path }
     }
     return $def
+}
+# 설치 자리 기억(HKCU\Software\cysjavis\cys 기본값) 정리 — 0.3.38(윈 결함 묶음 · 09-30 노트북 뒤처리).
+#   [6/10] 이 본체 폴더를 확정한 뒤, 옛 이름 기억 값이 그 폴더와 다르고 그 자리에 cys.exe 가 없으면 그 키를 지운다.
+#   까닭: 설치기 훅은 새 이름 기억(\cysr)이 비어 설치 자리가 기본값일 때 이 옛 값으로 설치 자리를 옮긴다 — 쓸 수 없는 자리를 가리킨 채
+#   남아 있으면 /D 없이 설치 파일을 부르는 길(앱 안 업데이트 = /P /R /UPDATE)이 그 자리로 끌려갈 수 있다. 설치기 훅도 같은 키를
+#   「설치 자리와 같을 때」 지운다(같은 설계 의도). ⚠새 이름 기억(\cysr)은 손대지 않는다.
+#   그 자리를 **못 읽으면**(권한 등) 지우지 않는다 — 「없음」(없는 파일·없는 드라이브)과 「못 읽음」을 예외 종류로 가른다.
+#   지우기 전 값은 설치 기록에 한 줄 남긴다(되돌리기 = 그 값을 같은 키의 기본값으로 다시 쓰기). 실패해도 설치 결과는 바꾸지 않는다.
+function Get-CysInstallMemory {
+    # 돌려주는 것 = 기본값 글자(빈 값이면 '') · 키가 없으면 $null
+    try { return [string]((Get-Item -LiteralPath 'HKCU:\Software\cysjavis\cys' -ErrorAction Stop).GetValue('')) } catch { return $null }
+}
+function Remove-CysInstallMemory { Remove-Item -LiteralPath 'HKCU:\Software\cysjavis\cys' -Recurse -Force -ErrorAction Stop }
+function Clear-CysStaleInstallMemory([string]$dir) {
+    try {
+        $raw = Get-CysInstallMemory
+        $mem = Get-RegPathValue $raw
+        if (-not $mem) { return 'none' }
+        if ($mem.TrimEnd('\', '/') -ieq ([string]$dir).TrimEnd('\', '/')) { return 'same' }
+        try {
+            # Join-Path 는 없는 드라이브에서 먼저 멈춘다 — 경로 잇기는 .NET 으로
+            [void](Get-Item -LiteralPath ([System.IO.Path]::Combine($mem, 'cys.exe')) -ErrorAction Stop)
+            Write-Log ('install memory \cys kept (cys.exe there): ' + (Redact $raw)); return 'kept'
+        } catch [System.Management.Automation.ItemNotFoundException] {
+        } catch [System.Management.Automation.DriveNotFoundException] {
+        } catch { Write-Log ('install memory \cys kept (unread): ' + (Redact $raw) + ' · ' + $_.Exception.GetType().Name); return 'unread' }
+        Write-Log ('install memory \cys removed · was=' + (Redact $raw) + ' · body=' + (Redact $dir))
+        Remove-CysInstallMemory
+        return 'removed'
+    } catch { Write-Log ('install memory \cys not removed: ' + $_.Exception.Message); return 'fail' }
 }
 # ── 옛 판 안내 (TICKET=installer-speed-pin-0320 · 2026-09-16) ─────────
 #   0.14.x 로 깔린 cys 는 앱 안 업데이트가 안 된다(서명 열쇠가 바뀌었다) — 설치기가 새 판으로 다시 깐다.
@@ -1868,7 +1907,8 @@ function New-AvHoldWatch($kind, $path, $expected, $aux, $nowMs) {
     $auxLen = 0L
     if ($aux) { $auxLen = Get-AvHoldLen $aux 0 }
     return @{ Kind = [string]$kind; Path = [string]$path; Since = (Get-Date).AddSeconds(-2); Expected = [long]$expected
-              Aux = $aux; AuxLen = $auxLen; Len = 0L; LastMoveMs = [long]$nowMs; EverOk = [bool]$script:ProgressEverOk; File = '' }
+              Aux = $aux; AuxLen = $auxLen; Len = 0L; LastMoveMs = [long]$nowMs; EverOk = [bool]$script:ProgressEverOk; File = ''
+              Obs = $false; Seen0 = $false; Grew = $false }
 }
 function Get-AvHoldFile($w) {
     # 직접 받기 = 우리가 정한 그 파일 · 공식 설치기 = 받는 자리에 이 대기 뒤 쓰인 claude-*.exe 가운데 가장 최근 것(앞 실행이 남긴 파일은 보지 않는다)
@@ -1885,6 +1925,13 @@ function Get-AvHoldFile($w) {
     return ''
 }
 function Get-AvHoldLen($path, $fallback) {
+    # 받는 중인 파일은 다른 프로세스가 열고 쓰는 중이라 폴더 항목의 크기가 늦게 바뀔 수 있다(NTFS) — 먼저 읽기 전용·전부 공유로 열어 핸들의 크기를 잰다.
+    #   못 열면(쓰는 쪽이 공유를 막았다) 폴더 항목의 크기로 잰다.
+    $fs = $null
+    try {
+        $fs = New-Object System.IO.FileStream ([string]$path), ([System.IO.FileMode]::Open), ([System.IO.FileAccess]::Read), ([System.IO.FileShare]([System.IO.FileShare]::ReadWrite -bor [System.IO.FileShare]::Delete))
+        return [long]$fs.Length
+    } catch { } finally { if ($fs) { $fs.Dispose() } }
     try { $fi = New-Object System.IO.FileInfo ([string]$path); if ($fi.Exists) { return [long]$fi.Length } } catch { }
     return [long]$fallback
 }
@@ -1893,6 +1940,9 @@ function Test-AvHoldStall($w, $nowMs) {
     $f = Get-AvHoldFile $w
     $len = 0L
     if ($f) { $w.File = $f; $len = Get-AvHoldLen $f $w.Len }
+    # 이력(기대 크기를 모를 때의 ⑷ 재료): 첫 관측이 「없음」이었는가 · 관측 뒤 실제로 자랐는가 — 첫 관측에 이미 다 된 파일은 둘 다 아니다
+    if (-not $w.Obs) { $w.Obs = $true; if ($len -eq 0) { $w.Seen0 = $true } }
+    elseif ($len -gt $w.Len) { $w.Grew = $true }
     if ($len -ne $w.Len) { $w.Len = $len; $w.LastMoveMs = [long]$nowMs }
     if ($w.Aux) {
         $a = Get-AvHoldLen $w.Aux $w.AuxLen
@@ -1902,12 +1952,29 @@ function Test-AvHoldStall($w, $nowMs) {
     if ([int]$script:ProgressFailRun -lt 2) { return $false }
     if (([long]$nowMs - $w.LastMoveMs) -lt $AvHoldJudgeMs) { return $false }
     if ($w.Expected -gt 0) { return ($w.Len -lt $w.Expected) }
+    if (-not ((($w.Len -eq 0) -and $w.Seen0) -or $w.Grew)) { return $false }
     if (($w.Kind -eq 'vendor') -and $w.Aux) {
-        $done = $false
-        try { $done = [bool](Select-String -LiteralPath $w.Aux -SimpleMatch -Pattern 'Setting up Claude Code' -Quiet -ErrorAction Stop) } catch { $done = $false }
-        if ($done) { return $false }
+        if ((Test-AvSetupDone $w.Aux) -ne 'no') { return $false }   # 받기 끝 표지가 있거나 기록을 못 읽었으면 판정하지 않는다
     }
     return $true
+}
+function Test-AvSetupDone($path) {
+    # 공식 설치기가 받기·해시 확인을 끝냈다는 표지(원문 80행 「Setting up Claude Code」)가 설치 기록에 있는가
+    #   돌려주는 것 = 'yes' · 'no' · 'unread'(못 읽음 = 판정하지 않는다 · 없는 것과 섞지 않는다)
+    #   설치 기록은 자식이 Start-Transcript 로 쥐고 쓰는 중이다 — 쓰기 공유(ReadWrite)로 열어야 읽힌다.
+    $fs = $null; $sr = $null
+    try {
+        $fs = New-Object System.IO.FileStream ([string]$path), ([System.IO.FileMode]::Open), ([System.IO.FileAccess]::Read), ([System.IO.FileShare]::ReadWrite)
+        $sr = New-Object System.IO.StreamReader($fs, $true)
+        if ($sr.ReadToEnd().Contains('Setting up Claude Code')) { return 'yes' }
+        return 'no'
+    } catch [System.IO.FileNotFoundException] {
+        return 'no'   # 기록이 아직 없다 = 표지도 없다(기록을 못 연 자식은 아무 말도 남기지 않았다)
+    } catch {
+        return 'unread'
+    } finally {
+        if ($sr) { $sr.Dispose() } elseif ($fs) { $fs.Dispose() }
+    }
 }
 function Show-AvWindowFront {
     # 백신으로 보이는 창을 앞으로 가져온다(창 앞으로만 · 누르는 것은 사람) · 돌려주는 것 = $true 앞으로 가져왔다
@@ -1943,14 +2010,23 @@ function Invoke-AvHoldRetrigger($p, $w, $where) {
     $eg = if ($v3) { '(이 백신에서는 「파일 전송」 단추로 보였습니다).' } else { '.' }
     Say ('     백신 프로그램이 파일을 확인하는 중일 수 있습니다. 화면 오른쪽 아래에 확인 창이 있으면 그 창의 안내대로 진행을 허용해 주세요' + $eg)
     $cleared = $true
-    if ($w.File -and (Test-Path -LiteralPath $w.File)) {
-        try { Remove-Item -LiteralPath $w.File -Force -ErrorAction Stop }
-        catch {
+    $hadFile = [bool]($w.File -and (Test-Path -LiteralPath $w.File))
+    if ($hadFile) {
+        # 방금 끈 설치기의 자식이 아직 파일을 쥐고 있을 수 있다(끄기는 곧바로 끝나지 않는다) — 5초 안에 몇 번 더 해 본 뒤에야 「붙들려 있음」으로 본다
+        $why = ''
+        for ($try = 1; $try -le 5; $try++) {
+            try { Remove-Item -LiteralPath $w.File -Force -ErrorAction Stop; $why = ''; break }
+            catch { $why = $_.Exception.GetType().Name; Start-Sleep -Seconds 1 }
+        }
+        if ($why) {
             $cleared = $false
-            Write-Log ('av hold: still held - ' + (Redact $w.File) + ' - ' + $_.Exception.GetType().Name)
+            Write-Log ('av hold: still held - ' + (Redact $w.File) + ' - ' + $why)
         }
     }
-    if ($cleared) { Say '     멈춘 파일을 지우고 한 번 더 받습니다 — 백신 확인 창이 다시 뜰 수 있습니다.' }
+    if ($cleared) {
+        if ($hadFile) { Say '     멈춘 파일을 지우고 한 번 더 받습니다 — 백신 확인 창이 다시 뜰 수 있습니다.' }
+        else { Say '     한 번 더 받아 봅니다 — 백신 확인 창이 다시 뜰 수 있습니다.' }
+    }
     Say-AvExceptDirs
     return $cleared
 }
@@ -1965,7 +2041,8 @@ function Start-ClaudeDirectDownload($url, $dl, $errFile) {
            "try { [Net.ServicePointManager]::SecurityProtocol = [Net.ServicePointManager]::SecurityProtocol -bor [Net.SecurityProtocolType]::Tls12 } catch { }; " +
            "try { Invoke-WebRequest -Uri '$u' -OutFile '$o' -UseBasicParsing -TimeoutSec 900 -ErrorAction Stop; exit 0 } " +
            "catch { try { Set-Content -LiteralPath '$e' -Value `$_.Exception.Message -Encoding UTF8 } catch { }; exit 1 }"
-    return (Start-Process -FilePath $psExe -NoNewWindow -PassThru -ErrorAction Stop -ArgumentList @('-NoProfile', '-Command', $cmd))
+    #   명령은 큰따옴표로 감싼 한 인자로 넘긴다(배열로 넘기면 5.1 이 공백에서 나눴다 다시 이어 경로 속 연속 공백이 하나로 준다 · 명령 안에 큰따옴표는 없다).
+    return (Start-Process -FilePath $psExe -NoNewWindow -PassThru -ErrorAction Stop -ArgumentList ('-NoProfile -Command "' + $cmd + '"'))
 }
 function Receive-ClaudeDirectFile($url, $dl, $errFile, $size) {
     # 돌려주는 것 = 'ok' 받았다 · 'held' 백신이 붙든 파일을 못 치웠다 · 그 밖의 글 = 못 받은 까닭
@@ -1981,8 +2058,13 @@ function Receive-ClaudeDirectFile($url, $dl, $errFile, $size) {
             Stop-ProcTree $dp @(Get-ProcTree $dp.Id)
             return ('받기가 ' + [int][math]::Floor($ClaudeDirectDownloadWaitMs / 60000) + '분 안에 끝나지 않았습니다')
         }
-        if ((-not $again) -and (Test-AvHoldStall $w $waited)) {
-            $again = $true
+        if (Test-AvHoldStall $w $waited) {
+            if ($script:AvRetriggered) {
+                Write-Log 'av hold judged again (직접 받기): no second retrigger - J-AV-01'
+                Stop-ProcTree $dp @(Write-ClaudeInstallDiag $dp '1분 멈춤 · 두 번째')
+                return 'held'
+            }
+            $script:AvRetriggered = $true; $again = $true
             if (-not (Invoke-AvHoldRetrigger $dp $w '직접 받기')) { return 'held' }
             try { $dp = Start-ClaudeDirectDownload $url $dl $errFile } catch { return ('다시 받기를 시작하지 못했습니다 - ' + $_.Exception.Message) }
             Write-Log 'av hold: restarted direct download once'
@@ -2178,8 +2260,14 @@ function Step-InstallClaude {
         Start-Sleep -Milliseconds 1000
         $waitedMs += 1000
         $sinceNoteMs += 1000
-        if ((-not $avRetried) -and (Test-AvHoldStall $avWatch $waitedMs)) {
-            $avRetried = $true
+        if (Test-AvHoldStall $avWatch $waitedMs) {
+            if ($script:AvRetriggered) {
+                # 두 번째 판정 — 다시 받지 않고(재유발 한 번뿐) 더 기다리지도 않는다: 진단·끄기 뒤 J-AV-01 길(안내는 첫 판정 때 나갔다)
+                Write-Log 'av hold judged again (공식 설치기): no second retrigger - J-AV-01'
+                Stop-ProcTree $p @(Write-ClaudeInstallDiag $p '1분 멈춤 · 두 번째')
+                $avStuck = $true; break
+            }
+            $script:AvRetriggered = $true; $avRetried = $true
             if (-not (Invoke-AvHoldRetrigger $p $avWatch '공식 설치기')) { $avStuck = $true; break }
             try { $p = Start-ClaudeInstallChild $psExe $childCmd } catch { Write-Log ('av hold: relaunch failed - ' + $_.Exception.Message); $avStuck = $true; break }
             Write-Log 'av hold: relaunched official installer once'
@@ -2192,7 +2280,8 @@ function Step-InstallClaude {
             $sinceNoteMs = 0
             # 🔴[int] 는 반올림이다 — 1분 30초가 「2분 30초」로 찍혀 시간이 뒤죽박죽이었다(2026-09-14 사진). 버림으로 센다.
             $mm = [int][math]::Floor($waitedMs / 60000); $ss = [int][math]::Floor($waitedMs / 1000) % 60
-            Say ("     아직 설치 중입니다 (" + $mm + "분 " + $ss + "초 지남 · 최대 " + [int]($waitCap / 60000) + "분). 작업 표시줄에 백신 창이 떠 있는지 확인해 주십시오 — 「파일 전송」이나 [실행] 을 누르시면 이어집니다.")
+            # 0.3.38: 창을 보지 않았으면 창을 전제로 말하지 않는다(09-30 노트북 — 창 없는 10분 내내 「파일 전송」을 누르라고 했다) · 버튼 이름은 창이 보였을 때 아래 줄이 말한다
+            Say ("     아직 설치 중입니다 (" + $mm + "분 " + $ss + "초 지남 · 최대 " + [int]($waitCap / 60000) + "분). 작업 표시줄이나 화면 오른쪽 아래에 백신 확인 창이 있으면 그 창의 안내대로 진행을 허용해 주세요.")
             Send-Progress '2/10' 'wait' ([int]($waitedMs / 1000)) $null $null
             if ($waitedMs -ge 180000) { Send-EvidenceOnce 'stall' }   # v0.3.18 — 대기 3분 이상 = 정체 증거
             # 백신 창으로 보이는 창 제목이 떠 있으면 그 이름을 그대로 적는다(읽기만 · 바뀌었을 때만)
@@ -2220,10 +2309,12 @@ function Step-InstallClaude {
     if ($held -and (-not $direct)) {
         # 조용히 다음 단계로 가지 않는다. 여기서 멈춰야 사람이 무엇을 누를지 알게 된다.
         Write-JCode 'J-AV-01' '백신 창이 설치 파일을 붙들고 있는 것으로 보입니다'
-        # 0.3.38: 첫 막힘부터(앞 판 = 같은 자리 2회째부터) — 현장에서 통한 처방(공식 설치기를 도우미 밖에서 직접)을 설치기가 먼저 알린다
-        Say '     클로드 공식 설치기를 이 도우미 밖에서 직접 돌려 보실 수도 있습니다 — 새 PowerShell 창에 아래 한 줄을 붙여넣고 Enter:'
-        Say ('     & ([scriptblock]::Create((irm ' + $ClaudeInstallUrl + '))) ' + $ClaudeChannel)
-        Say '     「Installation complete」 가 보이면 그 창을 닫고 아래 「다시 하시는 법」대로 다시 실행해 주십시오.'
+        if ($prevHold -ge 1) {
+            # 같은 자리 2회째부터 — 현장에서 통한 처방(공식 설치기를 도우미 밖에서 직접)을 설치기가 먼저 알린다
+            Say '     클로드 공식 설치기를 이 도우미 밖에서 직접 돌려 보실 수도 있습니다 — 새 PowerShell 창에 아래 한 줄을 붙여넣고 Enter:'
+            Say ('     & ([scriptblock]::Create((irm ' + $ClaudeInstallUrl + '))) ' + $ClaudeChannel)
+            Say '     「Installation complete」 가 보이면 그 창을 닫고 아래 「다시 하시는 법」대로 다시 실행해 주십시오.'
+        }
         Say-AntivirusHold '클로드 설치 파일 (이름이 claude 로 시작하는 파일)'
         Set-NextStepRerun '작업 표시줄에서 백신 창을 찾아 [파일 전송] 또는 [실행] 을 누르신 뒤, 아래 「다시 하시는 법」대로 다시 실행해 주십시오.'
         return 4
@@ -3356,7 +3447,7 @@ function Step-DownloadCys {
             $gone = @(@('cys.exe', 'cysd.exe', 'cys-app.exe') | Where-Object { -not (Test-Path -LiteralPath (Join-Path $b0.Path $_)) })
             if (($cs0 -eq 'match') -and ($gone.Count -eq 0)) { Say "[5/10] 같은 판(v$CysVersion)의 cys 가 이미 설치돼 있습니다 (지문 확인) — 받지 않고 건너뜁니다."; return 0 }
             Write-Log ('cys same version content ' + $cs0 + ' missing=' + ($gone -join ',') + ' - download again')
-            if ($gone.Count -gt 0) { Say "[5/10] 프로그램 파일 일부(창을 여는 파일)가 없어 설치 파일을 다시 받습니다." }
+            if ($gone.Count -gt 0) { Say ("[5/10] 프로그램 파일 일부" + $(if ($gone -contains 'cys-app.exe') { '(창을 여는 파일)' } else { '' }) + "가 없어 설치 파일을 다시 받습니다.") }
             else { Say "[5/10] 같은 판(v$CysVersion)이지만 깔린 파일이 이번 판 파일과 같은지 확인되지 않습니다 — 다시 받아 덮어 설치합니다." }
         } elseif (-not $have0) { Say '[5/10] 설치된 cys 의 판본을 읽지 못해 있는 것을 그대로 씁니다 — 받지 않고 건너뜁니다.'; return 0 } else { Say "[5/10] 설치된 cys 는 v$have0 입니다 — v$CysVersion 을 받아 덮어 설치합니다." }
     }
@@ -3492,14 +3583,14 @@ function Step-InstallCys {
             # 0.3.38(ⓑ): 지문이 맞아도 프로그램 파일 셋이 다 있어야 건너뛴다 — 백신이 창 파일만 격리한 기기가 같은 자리에서 영영 막히지 않게.
             if ($cs0 -eq 'match') {
                 $gone = @(@('cys.exe', 'cysd.exe', 'cys-app.exe') | Where-Object { -not (Test-Path -LiteralPath (Join-Path $b0.Path $_)) })
-                if ($gone.Count -eq 0) { Say "[6/10] cys 가 이미 설치돼 있습니다 (v$have0 · 지문 확인) — 건너뜁니다."; return 0 }
+                if ($gone.Count -eq 0) { $script:CysBodyDir = [string]$b0.Path; [void](Clear-CysStaleInstallMemory $script:CysBodyDir); Say "[6/10] cys 가 이미 설치돼 있습니다 (v$have0 · 지문 확인) — 건너뜁니다."; return 0 }
                 $cs0 = 'missing:' + ($gone -join ',')
             }
             $refresh = $cs0
             $upgradeFrom = $have0
             Write-Log ('cys refresh same version ' + $have0 + ' (' + $cs0 + ')')
         }
-        if (-not $have0) { Say '[6/10] cys 가 이미 설치돼 있습니다 — 판본을 읽지 못해 있는 것을 그대로 씁니다.'; Write-Log 'cys installed version unknown - keep'; return 0 }
+        if (-not $have0) { $script:CysBodyDir = [string]$b0.Path; [void](Clear-CysStaleInstallMemory $script:CysBodyDir); Say '[6/10] cys 가 이미 설치돼 있습니다 — 판본을 읽지 못해 있는 것을 그대로 씁니다.'; Write-Log 'cys installed version unknown - keep'; return 0 }
         if (-not $refresh) {
             $upgradeFrom = $have0
             Write-Log ('cys upgrade ' + $have0 + ' -> ' + $CysVersion)
@@ -3537,7 +3628,7 @@ function Step-InstallCys {
     }
 
     Human 'OS' '설치 파일 실행 확인 — 처음 보는 프로그램이라 경고 창이 뜰 수 있습니다'
-    if ($refresh -like 'missing:*') { Say "[6/10] 프로그램 파일 일부(창을 여는 파일)가 없어 다시 설치합니다." }
+    if ($refresh -like 'missing:*') { Say ("[6/10] 프로그램 파일 일부" + $(if ($refresh -like '*cys-app.exe*') { '(창을 여는 파일)' } else { '' }) + "가 없어 다시 설치합니다.") }
     elseif ($refresh) { Say "[6/10] 같은 판(v$CysVersion)을 이번 판 파일로 덮어 설치합니다 (깔린 파일이 이번 판과 같다고 확인되지 않았습니다)." } elseif ($upgradeFrom) { Say "[6/10] cys 를 v$upgradeFrom 에서 v$CysVersion 으로 덮어 설치합니다." } else { Say '[6/10] cys 를 설치합니다.' }
     Say '     파랗게 「Windows에서 PC를 보호했습니다」 창이 나타나면 [추가 정보] → [실행] 을 눌러 주십시오.'
     Say '     이 창은 서명되지 않은 프로그램에 뜨는 것이며 공식 안내에도 적혀 있습니다.'
@@ -3569,6 +3660,7 @@ function Step-InstallCys {
             if ($waitedMs -ge 180000) { Send-EvidenceOnce 'stall' }   # 대기 3분 이상 = 정체 증거
         }
         if (-not $exited) { Write-Log ('cys installer still running after ' + [int]($InstallWaitMs / 1000) + 's') }
+        else { [void]$p.WaitForExit() }   # 5.1 은 갓 끝난 프로세스의 ExitCode 를 늦게 채운다 — 한 번 더 불러 채운 뒤 읽는다(같은 판 덮어 깔기 판정이 이 값을 쓴다)
         # 설치기가 끝나도 파일이 자리를 잡기까지 잠깐 걸릴 수 있다 — 1초마다 60번(상한 60초).
         #   끝 확인(0.3.38 ⓑ) = /D 자리에 프로그램 파일 셋 + cys.exe 파일 판 = 이번 판. 설치 목록·종료 코드의 말은 믿지 않는다
         #   (09-30 노트북: 설치 목록은 없는 폴더를 가리키며 1.1.6 이라 했다).
@@ -3584,13 +3676,16 @@ function Step-InstallCys {
     }
     if ($done) {
         [void](Save-CysPinStamp ([pscustomobject]@{ Path = $dir; Cli = (Join-Path $dir 'cys.exe') }))
+        $script:CysBodyDir = [string]$dir
+        [void](Clear-CysStaleInstallMemory $dir)   # 옛 이름 설치 자리 기억이 쓸 수 없는 자리를 가리키면 지운다(\cysr 는 그대로)
         Say '[6/10] 설치를 마쳤습니다.'; return 0
     }
     # 실패 — 사람에게는 한 문장만(관측한 것만) · 다음에 할 일은 끝맺음의 원격 해결 하나(다시 하시는 법 깃발을 세우지 않는다).
     $rcShown = if ($p -and $p.HasExited) { [string]$p.ExitCode } else { '끝나지 않음' }
     Write-Log ('cys install not confirmed: target=' + (Redact $dir) + ' exit=' + $rcShown + ' from=' + $upgradeFrom)
     Say ("[6/10] 새 $CysDisplayName 프로그램을 넣지 못했습니다.")
-    $oldLeft = $b0.Body -and (Test-Path -LiteralPath $b0.Cli)
+    # 「그대로 남아 있습니다」 = 옛 cys.exe 가 있고 그 판이 설치 전에 읽은 판 그대로일 때만(새 파일로 반쯤 바뀐 자리를 「남았다」고 말하지 않는다)
+    $oldLeft = $b0.Body -and (Test-Path -LiteralPath $b0.Cli) -and $upgradeFrom -and ((Get-VersionNumber (Get-CysExeVersion $b0.Cli)) -eq (Get-VersionNumber $upgradeFrom))
     if ($oldLeft) { Say '     쓰시던 프로그램은 그대로 남아 있습니다.' }
     # 설치기가 남긴 기록(어느 파일을 왜 못 바꿨는지) — 이번 설치 자리에서 읽는다(기록에만 · 화면은 한 문장).
     $note = Join-Path $dir 'cys-install-failure.txt'
@@ -4254,6 +4349,7 @@ function Step-Wake {
         Say '[9/10] 프로그램 창을 열 파일이 없습니다.'
         Write-JCode 'J-APP-01' '창을 여는 프로그램 파일이 없습니다'
         # 다음에 할 일은 한 줄만 — 전송이 닿았으면 원격 해결을 기다리고, 아니면 다시 붙여넣기(같은 판 건너뛰기가 파일 셋을 다시 확인한다)
+        #   ProgressLastOk = 바로 위 Write-JCode 가 보낸 9/10 fail 전송의 결과(Write-JCode 안에서 Send-Progress … 'fail' 을 부른다).
         if ($script:ProgressLastOk) { $script:NextStep = '자비스 운영팀에 자동으로 알렸습니다. 창을 닫지 말고 잠시 기다려 주세요.' }
         else { $script:NextStep = '설치 한 줄을 다시 붙여넣으시면 프로그램 파일을 처음부터 다시 확인합니다.'; $script:ShowRerun = $true }
         return
@@ -5098,7 +5194,7 @@ function Step-Fleet {
 #   글자 칸은 `\z` 로 끝을 못박아 다시 만든다. 이름·글자·판본 비교는 대소문자를 가르는 -ceq·-cmatch·-ccontains 만 쓴다.
 # ⚠PowerShell 은 `'true' -eq $true` 를 참으로 본다 ⇒ 칸마다 **형(type)을 먼저** 본다.
 # ⚠이 절은 맥에서 PowerShell 없이 **정적 검사 + 맥판과의 대조**로만 증명했다 — 윈도우 실기가 필요한 축은 내부 문서.
-$InstallerVersion       = '0.3.37'   # 보고의 installer_version · $BootstrapVersion 은 화면 머리글 용도 그대로(보내지 않는다)
+$InstallerVersion       = '0.3.38'   # 보고의 installer_version · $BootstrapVersion 은 화면 머리글 용도 그대로(보내지 않는다)
 # 0.3.36: JARVIS_HELP_API_URL = CI·흉내가 도움 보고를 로컬로 돌리는 손잡이(맥 짝 · 사람이 쓰는 길이 아니다 · 없으면 종전 주소 — tests/help-url-lever.sh).
 $HelpApiUrl             = if ($env:JARVIS_HELP_API_URL) { [string]$env:JARVIS_HELP_API_URL } else { 'https://jarvis-install.godmeyou.kr' }
 # 🔴0.3.36(이종 검토): 시험용 함수 묶음은 도움 보고(/api/help)·닫기도 라이브로 못 보낸다(맥 HELP_API_URL 짝) — 가짜 서버는 읽은 뒤 덮어쓴다.
@@ -6200,6 +6296,9 @@ $script:InstallId      = ''
 $script:ProgressWarned = $false     # 전송 실패 경고는 실행당 한 번만 기록한다(fail-open)
 $script:ProgressFailRun = 0         # 0.3.38: 실제로 보냈다가 실패한 진행 전송이 연달아 몇 번인가(닿으면 0 · 조기 return 은 세지 않는다)
 $script:ProgressEverOk  = $false    # 0.3.38: 이 실행에서 진행 전송이 한 번이라도 닿았는가(처음부터 막힌 망은 백신 보류로 보지 않는다)
+$script:CysBodyDir      = ''        # 0.3.38: [6/10] 이 이번 실행에서 확정한 본체 폴더 — [8/10] 자동 시작 기대 경로가 같은 값을 쓴다
+$script:ProgressLastOk  = $false    # 0.3.38: 마지막 진행 전송이 닿았는가(Send-Progress 가 매번 다시 쓴다 · 한 번도 안 불렸을 때의 값)
+$script:AvRetriggered   = $false    # 0.3.38: 백신 보류 재유발은 한 실행에 한 번(공식 설치기·직접 받기 갈래가 함께 센다)
 $script:TranscriptOn   = $false
 $script:LoginCapCount  = 0          # 로그인 대기 중 창 캡처 수(최대 4 · 계약 3절)
 $script:LoginCapFiles  = @()        # 찍어 둔 로그인 창 캡처 파일 — 보고가 열리면 첨부한다
@@ -6241,6 +6340,7 @@ function Send-Progress($step, $ev, $elapsed, $detail, $envInfo, $extra) {
     if (-not $script:NoticeShown) { return }   # 0.3.36: 첫 화면 고지 전에는 보내지 않는다(맥 progress_send 짝 · 끝맺음 J-UNK-00 포함 · tests/notice-before-send.sh ⓓ)
     if ($env:JARVIS_NO_PROGRESS -eq '1') { return }   # 흉내 시험이 실제 서버로 나가지 않게 하는 레버(사람이 쓰는 길이 아니다)
     $url = Get-ProgressUrl
+    $reqSent = $false   # 0.3.38: 요청을 실제로 내보냈는가(본문 준비 실패는 연속 실패로 세지 않는다)
     try {
         $fields = [ordered]@{
             install_id        = (Get-InstallId)
@@ -6257,6 +6357,7 @@ function Send-Progress($step, $ev, $elapsed, $detail, $envInfo, $extra) {
         $body = ($fields | ConvertTo-Json -Compress -Depth 4)
         $ProgressPreference = 'SilentlyContinue'
         try { [Net.ServicePointManager]::SecurityProtocol = [Net.ServicePointManager]::SecurityProtocol -bor [Net.SecurityProtocolType]::Tls12 } catch { }
+        $reqSent = $true
         $resp = Invoke-WebRequest -Uri $url -Method POST `
             -Body ([System.Text.Encoding]::UTF8.GetBytes($body)) `
             -ContentType 'application/json; charset=utf-8' -UseBasicParsing `
@@ -6267,7 +6368,7 @@ function Send-Progress($step, $ev, $elapsed, $detail, $envInfo, $extra) {
         #   ⚠아무것도 출력 스트림에 흘리지 않는다 — 이 함수의 반환값이 부르는 쪽의 종료 코드에 섞이면 안 된다(이 파일 위쪽의 같은 함정).
         try { Receive-CaptureRequest ((ConvertFrom-Json -InputObject ([string]$resp.Content) -ErrorAction Stop).capture) } catch { }
     } catch {
-        $script:ProgressFailRun = [int]$script:ProgressFailRun + 1   # 0.3.38: 백신 보류 1분 판정의 재료(실제로 보낸 요청이 실패한 경우만)
+        if ($reqSent) { $script:ProgressFailRun = [int]$script:ProgressFailRun + 1 }   # 0.3.38: 백신 보류 1분 판정의 재료(실제로 보낸 요청이 실패한 경우만)
         if (-not $script:ProgressWarned) {
             $script:ProgressWarned = $true
             Write-Log ('progress send failed (fail-open) - ' + $_.Exception.Message)

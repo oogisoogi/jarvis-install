@@ -24,6 +24,11 @@ $Mode = 'full'; $script:Stamped = $false; $script:ShowRerun = $false
 New-Item -ItemType Directory -Force -Path $DlDir | Out-Null
 Set-Content -Path (Join-Path $DlDir $CysWinFile) -Value 'setup' -NoNewline
 function Said-All { $script:Said -join ' | ' }
+# 설치 자리 기억(HKCU\Software\cysjavis\cys 기본값) — 레지스트리 읽기·지우기만 가짜로 준다(판정은 실물 함수)
+$script:Mem = $null; $script:MemRemoved = 0
+function Get-CysInstallMemory { return $script:Mem }
+function Remove-CysInstallMemory { $script:MemRemoved++ }
+function Log-All { try { Get-Content -LiteralPath $LogFile -Raw -ErrorAction Stop } catch { '' } }
 switch ($Case) {
     'upgrade-fail' {
         # 노트북 모양: 옛 0.14.29 가 %LOCALAPPDATA%\cys · 가짜 설치기 = 등록만 쓰고 파일 0 · 종료 4
@@ -70,6 +75,15 @@ switch ($Case) {
         $a0 = if ($script:Calls.Count) { $script:Calls[0] } else { '' }
         T ($a0 -ceq ('/S /D=' + (Join-Path $L 'cys'))) 'ⓑⓒ cysr 항목 폴더에 파일 셋이 없으면 /D = %LOCALAPPDATA%\cys' ('arg=[' + $a0 + ']')
     }
+    'd-cysr-gone-fixed' {
+        # cysr 항목은 빈 폴더를 가리키고, 본체는 고정 후보(Programs\cys)에서 찾았다 → 그 고정 후보를 /D 로 이어 쓰지 않는다 · /D = %LOCALAPPDATA%\cys
+        $gone = Join-Path $Sb 'apps/cysr-gone'; New-Item -ItemType Directory -Force -Path $gone | Out-Null
+        Put-Bins (Join-Path $L 'Programs/cys') '1.1.5'
+        $script:FakeUninstall = @((Entry 'cysr' '1.1.5' ('"' + $gone + '"')))
+        [void](Step-InstallCys)
+        $a0 = if ($script:Calls.Count) { $script:Calls[0] } else { '' }
+        T ($a0 -ceq ('/S /D=' + (Join-Path $L 'cys'))) 'ⓑⓒ cysr 항목 폴더 ≠ 본체 폴더(고정 후보) → /D = %LOCALAPPDATA%\cys' ('arg=[' + $a0 + ']')
+    }
     'install-partial' {
         # 설치기는 끝났는데 창 실행 파일(cys-app.exe)이 안 생김 → 「설치를 마쳤습니다」 0 · 지문 저장 0 · rc 6
         $script:InstallerDoes = { param($a) Put-Bins (Join-Path $env:LOCALAPPDATA 'cys') '1.1.6' @('cys.exe', 'cysd.exe') }
@@ -106,6 +120,77 @@ switch ($Case) {
         $script:InstallerDoes = { param($a) Put-Bins (Join-Path $env:LOCALAPPDATA 'cys') '1.1.6' }
         $rc = @(Step-InstallCys)[-1]; $s = Said-All
         T (($script:Calls.Count -eq 1) -and ($s -match '창을 여는 파일') -and ($s -notmatch '건너뜁니다')) 'ⓑ 지문 일치여도 cys-app.exe 없으면 다시 설치 · 사유 = 파일 일부 없음' ('calls=' + $script:Calls.Count + ' · ' + $s)
+    }
+    'mem-stale-removed' {
+        # 09-30 노트북 뒤처리: 기억 값 = 없는 드라이브(Q:\cys) · 설치 성공 → \cys 키를 지우고 지우기 전 값을 기록에 1줄
+        $script:Mem = 'Q:\cys'
+        $script:InstallerDoes = { param($a) Put-Bins (Join-Path $env:LOCALAPPDATA 'cys') '1.1.6' }
+        $rc = @(Step-InstallCys)[-1]; $lg = Log-All
+        T (($rc -eq 0) -and ($script:MemRemoved -eq 1)) '⑵ 설치 성공 + 기억 값이 다른 자리·cys.exe 없음(없는 드라이브) → \cys 키 지움' ('rc=' + $rc + ' removed=' + $script:MemRemoved)
+        T ($lg -match [regex]::Escape('was=Q:\cys')) '⑵ 지우기 전 값을 설치 기록에 1줄(되돌리기용)' $lg
+    }
+    'mem-gone-dir-removed' {
+        # 기억 값 = 있는 드라이브의 없는 폴더 → 지움
+        $script:Mem = '"' + (Join-Path $Sb 'nowhere/cys') + '"'
+        $script:InstallerDoes = { param($a) Put-Bins (Join-Path $env:LOCALAPPDATA 'cys') '1.1.6' }
+        [void](Step-InstallCys)
+        T ($script:MemRemoved -eq 1) '⑵ 기억 값 = 없는 폴더(따옴표 든 값) → 지움' ('removed=' + $script:MemRemoved)
+    }
+    'mem-same-kept' {
+        # 기억 값 = 실제 설치 자리(끝 역슬래시·대소문자 차이) → 지우지 않는다
+        $script:Mem = (Join-Path $L 'CYS') + '/'
+        $script:InstallerDoes = { param($a) Put-Bins (Join-Path $env:LOCALAPPDATA 'cys') '1.1.6' }
+        [void](Step-InstallCys); $lg = Log-All
+        T (($script:MemRemoved -eq 0) -and ($lg -notmatch 'install memory')) '⑵ 기억 값 = 설치 자리 → 그대로 · 기록 0(같은 자리는 살피지도 않는다)' ('removed=' + $script:MemRemoved + ' · ' + $lg)
+    }
+    'mem-exe-kept' {
+        # 기억 값이 다른 자리지만 그 자리에 cys.exe 가 있다 → 지우지 않는다
+        $o = Join-Path $Sb 'other/cys'; Put-Bins $o '1.1.5' @('cys.exe')
+        $script:Mem = $o
+        $script:InstallerDoes = { param($a) Put-Bins (Join-Path $env:LOCALAPPDATA 'cys') '1.1.6' }
+        [void](Step-InstallCys)
+        T ($script:MemRemoved -eq 0) '⑵ 기억 값 자리에 cys.exe 있음 → 그대로' ('removed=' + $script:MemRemoved)
+    }
+    'mem-unread-kept' {
+        # 기억 값 자리를 못 읽는다(권한) → 「없음」이 아니므로 지우지 않는다 · 기록 1줄
+        $o = Join-Path $Sb 'locked/cys'; Put-Bins $o '1.1.5' @('cys.exe')
+        & chmod 000 $o
+        $script:Mem = $o
+        $script:InstallerDoes = { param($a) Put-Bins (Join-Path $env:LOCALAPPDATA 'cys') '1.1.6' }
+        [void](Step-InstallCys); $lg = Log-All
+        & chmod 755 $o
+        T (($script:MemRemoved -eq 0) -and ($lg -match 'unread')) '⑵ 기억 값 자리를 못 읽음 → 그대로 · 기록에 못 읽음' ('removed=' + $script:MemRemoved + ' · ' + $lg)
+    }
+    'mem-none' {
+        # 기억 키 없음 · 빈 기본값 → 아무것도 지우지 않는다
+        $script:InstallerDoes = { param($a) Put-Bins (Join-Path $env:LOCALAPPDATA 'cys') '1.1.6' }
+        [void](Step-InstallCys)
+        $script:Mem = ''; $script:Calls.Clear(); Remove-Item -Recurse -Force (Join-Path $L 'cys')
+        [void](Step-InstallCys)
+        T ($script:MemRemoved -eq 0) '⑵ 기억 키 없음·빈 값 → 지우기 0' ('removed=' + $script:MemRemoved)
+    }
+    'mem-fail-kept' {
+        # 설치 실패 → 기억 값을 건드리지 않는다
+        $script:Mem = 'Q:\cys'; $script:InstallerExit = 2
+        $rc = @(Step-InstallCys)[-1]
+        T (($rc -eq 6) -and ($script:MemRemoved -eq 0)) '⑵ 설치 실패면 기억 값 무접촉' ('rc=' + $rc + ' removed=' + $script:MemRemoved)
+    }
+    'mem-skip-removed' {
+        # 같은 판·지문 일치로 [6/10] 건너뜀(이미 %LOCALAPPDATA%\cys 에 성공 설치된 노트북 재실행) + 옛 기억 값 → 지움
+        $d = Join-Path $L 'cys'; Put-Bins $d '1.1.6'
+        $script:FakeUninstall = @((Entry 'cysr' '1.1.6' ('"' + $d + '"')))
+        function Get-CysContentState($b) { return 'match' }
+        $script:Mem = 'Q:\cys'
+        $rc = @(Step-InstallCys)[-1]
+        T (($rc -eq 0) -and ($script:Calls.Count -eq 0) -and ($script:MemRemoved -eq 1)) '⑵ 건너뜀(이미 설치) 뒤에도 옛 기억 값 지움' ('rc=' + $rc + ' calls=' + $script:Calls.Count + ' removed=' + $script:MemRemoved)
+    }
+    'mem-remove-throws' {
+        # 지우기가 실패해도 설치 성공(rc 0)은 뒤집히지 않는다 · 기록 1줄
+        $script:Mem = 'Q:\cys'
+        function Remove-CysInstallMemory { throw 'denied' }
+        $script:InstallerDoes = { param($a) Put-Bins (Join-Path $env:LOCALAPPDATA 'cys') '1.1.6' }
+        $rc = @(Step-InstallCys)[-1]; $lg = Log-All
+        T (($rc -eq 0) -and ($lg -match 'not removed')) '⑵ 지우기 실패 → rc 0 유지 · 기록에 못 지움' ('rc=' + $rc + ' · ' + $lg)
     }
 }
 Write-Output ('RESULT pass=' + $script:Pass + ' fail=' + $script:Fail)

@@ -38,6 +38,17 @@ switch ($Case) {
         $st = Get-CysAutoStartState (Join-Path $d 'cys.exe')
         T ($st -eq 'other') 'ⓒ [8/10] 예약 작업이 옛 폴더 cysd.exe 를 가리키면 우리 것이 아니다(다시 등록)' ('state=' + $st)
     }
+    'autostart-one-value' {
+        # [6/10] 이 이번 실행에 %LOCALAPPDATA%\cys 로 깔았다(CysBodyDir) · 등록 목록의 첫 항목은 옛 Programs\cys(파일 있음) · 작업 = 옛 cysd → 우리 것 아님
+        $old = Join-Path $L 'Programs/cys'; Put-Bins $old '0.14.29'
+        $new = Join-Path $L 'cys'; Put-Bins $new '1.1.6'
+        $script:FakeUninstall = @((Entry 'cys' '0.14.29' ('"' + $old + '"')))
+        $script:CysBodyDir = $new
+        $script:TaskCmd = (Join-Path $old 'cysd.exe')
+        function schtasks { $global:LASTEXITCODE = 0; '<?xml version="1.0"?><Task><Settings><Enabled>true</Enabled></Settings><Triggers><LogonTrigger><Enabled>true</Enabled></LogonTrigger></Triggers><Actions><Exec><Command>"' + $script:TaskCmd + '"</Command></Exec></Actions></Task>' }
+        $st = Get-CysAutoStartState (Join-Path $old 'cys.exe')
+        T ($st -eq 'other') 'ⓒ [8/10] 기대 경로 = [6/10] 이 확정한 본체 폴더 하나 — 등록 첫 항목(옛 폴더)의 cysd 는 우리 것 아님' ('state=' + $st)
+    }
     'autostart-body' {
         # 본체가 %LOCALAPPDATA%\cysr(훅 예외 기기) · 작업 = 그 cysd · 부르는 길이 이름뿐(cys) → 우리 것(경로 단계 통과)
         $d = Join-Path $L 'cysr'; Put-Bins $d '1.1.6'

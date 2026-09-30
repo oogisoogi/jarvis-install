@@ -67,6 +67,7 @@ switch ($Case) {
         T ($j -match '확인 창이 있으면 그 창의 안내대로 진행을 허용해 주세요\.') 'ⓔ⑴ 판정 문구 = 관측만 · 확인 창 조건부' $j
         T (-not (Test-Path -LiteralPath $vfile)) 'ⓔ⑴ 붙든 파일(우리가 본 그 파일)을 지웠다' ('exists=' + (Test-Path -LiteralPath $vfile))
         T ($script:FrontCalls -ge 1) 'ⓔ⑴ 다시 받은 뒤 백신 창 앞으로 시도' ('front=' + $script:FrontCalls)
+        T (($script:DirectCalls -eq 0) -and ($script:rc -eq 4) -and ($script:JCode -eq 'J-AV-01')) 'ⓔ 두 번째 판정 = 다시 받지 않고 J-AV-01(직접 받기 0 · 재유발 한 실행 1회)' ('direct=' + $script:DirectCalls + ' rc=' + $script:rc + ' j=' + $script:JCode)
         $ex = @($script:Said | Where-Object { $_ -match '「예외\(허용\)」에 아래 폴더' }).Count
         $all = (@($AvExceptDirs | Where-Object { $j.Contains('· ' + (Redact $_)) }).Count -eq 3)
         T (($ex -eq 1) -and $all -and ($j -match '설치가 끝나면 그 폴더들을 예외에서 지우셔도')) 'ⓔ 첫 막힘에 예외 폴더 3곳을 한 화면에 한 번 · 되돌리기 한 줄' ('ex=' + $ex + ' all=' + $all + ' · ' + $j)
@@ -121,6 +122,23 @@ switch ($Case) {
         T (($script:rc -eq 4) -and ($script:JCode -eq 'J-AV-01')) 'ⓔ⑷ J-AV-01 · rc 4' ('rc=' + $script:rc + ' j=' + $script:JCode)
         T ((Get-Content -LiteralPath $LogFile -Raw) -match 'still held') 'ⓔ⑷ 기록 = 아직 붙들려 있음' 'log 에 still held 없음'
     }
+    'vendor-unread-log' {
+        # 설치 기록을 못 읽으면(표지 있음·없음을 모름) 판정하지 않는다 — 못 읽음을 「표지 없음」으로 삼키지 않는다
+        $script:ProgressEverOk = $true; $script:ProgressFailRun = 0
+        function Test-AvSetupDone($p) { return 'unread' }
+        $script:OnTick = { if ($script:Clock -le 3000) { Grow $vfile ([long]$script:Clock * 10) } }
+        Run-Vendor
+        T (((Judged) -eq 0) -and ($script:Launch -eq 1)) 'ⓔ 설치 기록 못 읽음 → 판정 0' ('launch=' + $script:Launch + ' · ' + (JudgeLines))
+    }
+    'vendor-delete-late' {
+        # 끈 설치기의 자식이 잠깐 쥐고 있어 첫 지우기만 실패 → 다시 해 보고 지워지면 한 번 더 받는다(붙들림으로 오판하지 않는다)
+        $script:ProgressEverOk = $true; $script:ProgressFailRun = 0
+        $script:OnTick = { if (($script:Launch -eq 1) -and ($script:Clock -le 3000)) { Grow $vfile ([long]$script:Clock * 10) } }
+        $script:RmFails = 1
+        function Remove-Item { $p = [string]($args | Where-Object { $_ -is [string] -and $_ -match 'claude-9\.9\.9' } | Select-Object -First 1); if ($p -and ($script:RmFails -gt 0)) { $script:RmFails--; throw [System.IO.IOException]::new('in use') }; Microsoft.PowerShell.Management\Remove-Item @args }
+        Run-Vendor
+        T ($script:Launch -eq 2) 'ⓔ 첫 지우기만 실패 → 다시 해 보고 지워지면 다시 받기 1회' ('launch=' + $script:Launch)
+    }
     'vendor-no-ok-before' {
         # ⑹ 1/10 부터 전송 실패(대기 전 성공 0) → 판정 0
         $script:ProgressEverOk = $false; $script:ProgressFailRun = 0
@@ -135,6 +153,13 @@ switch ($Case) {
         $a = [int]$script:ProgressFailRun
         $env:JARVIS_NO_PROGRESS = ''; Send-Progress '2/10' 'wait' 2 $null $null; Send-Progress '2/10' 'wait' 3 $null $null
         T (($a -eq 0) -and ([int]$script:ProgressFailRun -eq 2)) 'ⓔ 전송 실패 수 = catch 에서만(레버 조기 return 0 · 실패 2)' ('lever=' + $a + ' after=' + $script:ProgressFailRun)
+        # 요청을 내보내기 전(본문 준비)에 실패하면 세지 않는다
+        $origId = ${function:Get-InstallId}
+        function Get-InstallId { throw 'id broken' }
+        $b0 = [int]$script:ProgressFailRun
+        Send-Progress '2/10' 'wait' 3 $null $null
+        T ([int]$script:ProgressFailRun -eq $b0) 'ⓔ 본문 준비 실패(요청 전)는 연속 실패로 세지 않는다' ('before=' + $b0 + ' after=' + $script:ProgressFailRun)
+        ${function:Get-InstallId} = $origId
         # 닿으면 연속 실패 수 = 0 · 「한 번이라도 닿았다」 = 참(가짜 응답 · 바깥에 닿지 않는다)
         $script:ProgressEverOk = $false
         function Invoke-WebRequest { return [pscustomobject]@{ Content = '{}' } }
@@ -180,9 +205,23 @@ switch ($Case) {
             'direct-unknown-size' {
                 # ⑻ 기대 크기 미상(0) + 12MB 에서 정지 → 판정 1 · 두 번째 받기도 멈추면 재유발 없이 상한까지(재유발 1회 상한)
                 $ClaudeDirectDownloadWaitMs = 200000
-                $script:OnLaunch = { param($p) Grow $dl 12582912 }
+                # 자라다가 멈춤(처음 5초 동안 자람 · 크기 값은 판정과 무관 · 맥에서 큰 파일 늘리기는 느려 작게) · 두 번째 받기는 아예 안 생김
+                $script:OnTick = { if (($script:DLaunch -eq 1) -and ($script:Clock -le 5000)) { Grow $dl ([long]$script:Clock * 10) } }
                 try { $r = Receive-ClaudeDirectFile 'u' $dl $err 0 } catch { $r = 'ERR ' + $_ }
                 T (((Judged) -eq 1) -and ($script:DLaunch -eq 2) -and ($r -ne 'ok')) 'ⓔ⑻ 기대 크기 미상 + 12MB 정지 → 판정 1 · 재유발 1회 뒤 상한 = 실패' ('r=' + $r + ' launch=' + $script:DLaunch + ' judged=' + (Judged))
+            }
+            'direct-first-seen-complete' {
+                # 기대 크기 미상 · 첫 관측에 이미 다 된 파일(자라는 것을 못 봄) → 판정 0(미생성도 자라다 멈춤도 아니다)
+                $ClaudeDirectDownloadWaitMs = 150000
+                $script:OnLaunch = { param($p) Grow $dl 5000; $p.ExitAt = 120000 }
+                try { $r = Receive-ClaudeDirectFile 'u' $dl $err 0 } catch { $r = 'ERR ' + $_ }
+                T (((Judged) -eq 0) -and ($script:DLaunch -eq 1)) 'ⓔ 기대 크기 미상 · 첫 관측에 다 된 파일 → 판정 0' ('r=' + $r + ' launch=' + $script:DLaunch + ' · ' + (JudgeLines))
+            }
+            'direct-after-vendor' {
+                # 공식 설치기 갈래에서 이미 재유발했다 → 직접 받기에서 판정이 나도 다시 받지 않고 held(J-AV-01 길)
+                $script:AvRetriggered = $true
+                try { $r = Receive-ClaudeDirectFile 'u' $dl $err 30000000 } catch { $r = 'ERR ' + $_ }
+                T (($r -eq 'held') -and ($script:DLaunch -eq 1)) 'ⓔ 재유발은 한 실행에 한 번 — 직접 받기에서 두 번째 판정 = held · 다시 받기 0' ('r=' + $r + ' launch=' + $script:DLaunch)
             }
             'direct-exit-fail' {
                 # 자식이 실패로 끝나면 그 까닭(오류 파일)을 돌려준다 — 판정과 무관한 옛 갈래 보존

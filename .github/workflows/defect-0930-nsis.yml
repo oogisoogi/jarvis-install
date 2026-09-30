@@ -30,7 +30,9 @@ jobs:
       matrix:
         # laptop-0930 = 설치 자리 기억 값이 없는 드라이브 · 설치 목록 없음 · cys-old 있음 / stale-uninstall = 설치 목록만 남아 없는 폴더를 가리킴
         # raw-no-d = 대조군(같은 상태에서 /S 만 · 판정에 안 씀 · 기록만)
-        case: [laptop-0930, stale-uninstall, raw-no-d]
+        # app-update = 우리 설치 뒤 옛 기억 키 없음 + 앱 안 업데이트 인자(/P /R /UPDATE /ARGS · /D 없음)로 재실행해도 같은 자리 /
+        # app-update-noclear = 대조군(기억 키 정리만 끔 · 정리 칸이 적색을 가르는지 확인)
+        case: [laptop-0930, stale-uninstall, raw-no-d, app-update, app-update-noclear]
     steps:
       - uses: actions/checkout@v4
 
