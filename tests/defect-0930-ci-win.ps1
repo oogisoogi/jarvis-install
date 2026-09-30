@@ -105,8 +105,11 @@ if ($Case -like 'app-update*') {
     try { Write-Host ('새 이름 기억(\cysr) 뒤=' + (Get-ItemProperty 'HKCU:\Software\cysjavis\cysr' -ErrorAction Stop).'(default)') } catch { Write-Host '새 이름 기억(\cysr) 뒤=(없음)' }
     # ② 앱 안 업데이트 흉내 — tauri-plugin-updater 2.10.1 기본(Passive)이 설치 파일에 주는 인자 그대로(/D 없음 · 앱은 인자 없이 떠 있다고 본다)
     $exe = Join-Path $DlDir $CysWinFile
+    # 설치 파일(NSIS)은 파일을 **만든 때의 시각 그대로** 풀어 놓는다(첫 러너 실측: 설치 전·뒤 모두 빌드 시각) ⇒ 「시각이 늘었다」로는 다시 썼는지 못 가른다.
+    #   그래서 업데이트 전에 세 파일의 시각을 2001-01-01 로 되돌려 두고, 업데이트 뒤 그 표지가 사라졌는지(= 그 자리 파일을 다시 씀)를 본다.
+    $mark = [datetime]::SpecifyKind([datetime]'2001-01-01', 'Utc')
+    foreach ($n in @('cys.exe', 'cysd.exe', 'cys-app.exe')) { try { (Get-Item -LiteralPath (Join-Path $dest $n) -ErrorAction Stop).LastWriteTimeUtc = $mark } catch { } }
     $before = try { (Get-Item -LiteralPath (Join-Path $dest 'cys.exe') -ErrorAction Stop).LastWriteTimeUtc } catch { $null }
-    Start-Sleep -Seconds 2
     $p = Start-Process -FilePath $exe -ArgumentList '/P /R /UPDATE /ARGS' -PassThru
     $done = $p.WaitForExit(300000)
     if (-not $done) { try { $p.Kill() } catch { } } else { [void]$p.WaitForExit() }
@@ -123,7 +126,7 @@ if ($Case -like 'app-update*') {
     Write-Host ('② 앱 안 업데이트 흉내: ' + $sum)
     if ($Case -eq 'app-update') {
         T ($done -and ($ex -eq 0)) '② 업데이트 인자(/P /R /UPDATE /ARGS)로 설치 파일이 끝나고 종료 0' $sum
-        T ($before -and $after -and ($after -gt $before)) '② %LOCALAPPDATA%\cys 의 cys.exe 를 새로 썼다(그 자리에 다시 깔림)' $sum
+        T (($before -eq $mark) -and $after -and ($after -ne $mark)) '② %LOCALAPPDATA%\cys 의 cys.exe 를 새로 썼다(되돌려 둔 시각 표지가 사라짐 = 그 자리에 다시 깔림)' $sum
         T (($miss2.Count -eq 0) -and ($v2 -eq $CysVersion)) ('② 그 자리에 실행 파일 3종 · 판 = ' + $CysVersion) $sum
         T ((Get-RegPathValue $cysrLoc).TrimEnd('\') -ieq $dest) '② 설치 목록 cysr = %LOCALAPPDATA%\cys' $sum
         T ($stray.Count -eq 0) '② 다른 자리(%LOCALAPPDATA%\cysr · 옛 기억 값)에 설치 0' $sum
