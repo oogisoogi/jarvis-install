@@ -1718,11 +1718,17 @@ function Write-Report {
 #   규율의 재발. ⇒ 공식 문서의 명령 그대로 **사용자 PATH 에 멱등으로** 넣고, 이 창의 PATH 도 갱신한다.
 #   ⚠사용자 PATH 만 만진다(시스템 PATH = 권한 상승 = 우리 상한 밖). 값은 %USERPROFILE% 확장·대소문자
 #   무시·끝 역슬래시 무시로 비교한다 — 사람이 손으로 넣은 다른 표기와 중복 누적되지 않게.
+#   0.3.39(관리 PC · 표준 계정 · 도움 실사례 10-01): 사용자 PATH 쓰기가 막힌 기기가 있다(「Attempted to perform an unauthorized operation.」).
+#   앞 판은 거기서 돌아가 이 창 PATH 에도 안 붙였고 [2/10] 이 J-PATH-01(새 창·재시작 처방)로 멈췄다 — 그 기기는 새 창에서도 같다.
+#   ⇒ 쓰기가 막혀도 **이 창 PATH 앞에는 붙인다**(이 설치가 띄우는 앱·데몬이 물려받는다) · 막힌 사실은 $script:UserPathDenied 로 남긴다.
+#   읽기·쓰기는 Get-UserPathValue·Set-UserPathValue(Seed-CysPath 와 같은 두 함수 · 흉내가 바꿔 끼운다).
+#   돌려주는 것 = $true(넣었다·이미 있다) · $false(자리 없음 · 쓰기 막힘).
 function Seed-LocalBinPath {
     $bin = (Join-Path $env:USERPROFILE '.local\bin').TrimEnd('\')
     if (-not (Test-Path $bin)) { Write-Log "seed-path: $bin absent - skip"; return $false }
+    $ok = $true
     try {
-        $user = [Environment]::GetEnvironmentVariable('Path','User')
+        $user = Get-UserPathValue
         $have = $false
         if ($user) {
             foreach ($p in ($user -split ';')) {
@@ -1735,18 +1741,20 @@ function Seed-LocalBinPath {
             Write-Log 'seed-path: already in User PATH'
         } else {
             $new = if ($user) { "$user;$bin" } else { $bin }
-            [Environment]::SetEnvironmentVariable('Path', $new, 'User')
+            Set-UserPathValue $new
             Write-Log "seed-path: added $bin to User PATH"
         }
     } catch {
-        Write-Log "seed-path: failed - $($_.Exception.Message)"
-        return $false
+        # 막혔다 — 그래도 아래에서 이 창 PATH 앞에는 붙인다(돌아가지 않는다)
+        Write-Log ("seed-path: denied - " + $_.Exception.GetType().Name + ' - ' + $_.Exception.Message)
+        $script:UserPathDenied = $true
+        $ok = $false
     }
     # 등록은 새 창부터 먹는다 — 이 창의 다음 단계가 바로 부를 수 있게 앞에 붙인다(있으면 안 붙인다).
     $inProc = $false
     foreach ($p in ($env:Path -split ';')) { if ($p -and ($p.TrimEnd('\') -ieq $bin)) { $inProc = $true; break } }
     if (-not $inProc) { $env:Path = "$bin;$env:Path" }
-    return $true
+    return $ok
 }
 
 # ── 사용자 PATH 에 cys 자리를 심는다 (v0.3.18 · 2026-09-15 윈 실기) ─────
@@ -2380,6 +2388,22 @@ function Step-InstallClaude {
     # 🔴설치기가 PATH 를 안 심으므로 우리가 심는다(2026-09-06). 위 갱신 **뒤에** 부른다 —
     #   위 줄이 이 창의 PATH 를 통째로 덮어쓰므로, 앞에서 붙였다면 여기서 지워진다.
     [void](Seed-LocalBinPath)
+    # 0.3.39: 이름으로 안 잡혀도 공식 자리(~\.local\bin\claude.exe)의 파일이 판본을 답하면 그 전체 경로로 이어 간다 —
+    #   사용자 PATH 쓰기가 막힌 기기는 새 창·재시작으로도 이름이 안 잡힌다(도움 실사례 10-01 · J-PATH-01 로 멈췄다).
+    #   이 프로세스 안에서만 별칭을 둔다 — 뒤 단계의 `& claude`·Test-ClaudeAuthCmd·Invoke-ClaudeCli 가 그대로 잡는다.
+    if (-not (Get-Command claude -ErrorAction SilentlyContinue)) {
+        $fullExe = Join-Path $env:USERPROFILE '.local\bin\claude.exe'
+        $fullVer = ''
+        if (Test-Path -LiteralPath $fullExe -PathType Leaf) { try { $fullVer = [string]((@(& $fullExe --version 2>$null) | Select-Object -First 1)) } catch { $fullVer = '' } }
+        if ($fullVer -match '\d+\.\d+\.\d+') {
+            Set-Alias -Name claude -Value $fullExe -Scope Global
+            Write-Log ('claude by full path: ' + (Redact $fullExe) + ' · ' + $fullVer + ' · user PATH denied=' + [bool]$script:UserPathDenied)
+            if ($script:UserPathDenied) {
+                Say '     이 컴퓨터는 사용자 환경 변수(PATH)를 바꾸지 못하게 막혀 있습니다 — 이번 설치는 클로드를 전체 경로로 불러 그대로 이어 갑니다.'
+                Add-ReportLines @('', '## [2/10] 사용자 PATH 쓰기 거부', ('- 사용자 PATH 에 ~\.local\bin 을 넣지 못했습니다(쓰기 거부) — 클로드를 전체 경로로 불러 이어 갔습니다 · 재부팅 뒤 새 창에서는 claude 이름이 안 잡힐 수 있습니다'))
+            }
+        }
+    }
     # 실행 결과 검사 = 설치기의 종료 코드가 아니라 명령이 답하는가
     if (-not (Get-Command claude -ErrorAction SilentlyContinue)) {
         #   「창을 새로 열고 다시」만 말하면 사람은 같은 자리를 돈다(실사용자 1차 제보). 사실 3개를 같이 적는다 —
@@ -6330,6 +6354,7 @@ $script:InstallId      = ''
 $script:ProgressWarned = $false     # 전송 실패 경고는 실행당 한 번만 기록한다(fail-open)
 $script:ProgressFailRun = 0         # 0.3.38: 실제로 보냈다가 실패한 진행 전송이 연달아 몇 번인가(닿으면 0 · 조기 return 은 세지 않는다)
 $script:ProgressEverOk  = $false    # 0.3.38: 이 실행에서 진행 전송이 한 번이라도 닿았는가(처음부터 막힌 망은 백신 보류로 보지 않는다)
+$script:UserPathDenied  = $false     # 0.3.39: 사용자 PATH 쓰기가 막힌 기기(관리 PC) — [2/10] 이 전체 경로로 이어 가고 보고에 1줄
 $script:CysBodyDir      = ''        # 0.3.38: [6/10] 이 이번 실행에서 확정한 본체 폴더 — [8/10] 자동 시작 기대 경로가 같은 값을 쓴다
 $script:ProgressLastOk  = $false    # 0.3.38: 마지막 진행 전송이 닿았는가(Send-Progress 가 매번 다시 쓴다 · 한 번도 안 불렸을 때의 값)
 $script:AvRetriggered   = $false    # 0.3.38: 백신 보류 재유발은 한 실행에 한 번(공식 설치기·직접 받기 갈래가 함께 센다)

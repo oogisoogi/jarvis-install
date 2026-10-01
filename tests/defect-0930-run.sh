@@ -8,7 +8,7 @@ export JARVIS_NO_PROGRESS=1
 set -u
 HERE="$(cd "$(dirname "$0")" && pwd)"
 DIR="$HERE/../install-master"
-ONLY=""   # --only <묶음> = body|install|verify|wake|avhold 하나만(변이 구동기가 쓴다 · 없으면 전부)
+ONLY=""   # --only <묶음> = body|install|verify|wake|avhold|pathdeny 하나만(변이 구동기가 쓴다 · 없으면 전부)
 while [ $# -gt 0 ]; do case "$1" in --dir) DIR="$2"; shift 2 ;; --only) ONLY="$2"; shift 2 ;; *) echo "모르는 인자: $1" >&2; exit 2 ;; esac; done
 PW="$(command -v pwsh 2>/dev/null)"; [ -n "$PW" ] || { echo "잴 수 없음: pwsh 가 없다" >&2; exit 2; }
 PS="$(cd "$DIR" && pwd)/bootstrap.ps1"; EMU="$HERE/defect-0930-emu"
@@ -34,5 +34,7 @@ echo "== ⓓ [9/10] 창 실행 파일 =="
 for c in no-app-exe card-hint; do run wake "$c"; done
 echo "== ⓔ 백신 보류 1분 판정 =="
 for c in progress-count except-once button-words vendor-progress-ok vendor-grow-stop vendor-v3-title vendor-growing vendor-none vendor-transcript-grows vendor-setup-done vendor-delete-fail vendor-unread-log vendor-delete-late vendor-no-ok-before direct-none direct-full-size direct-unknown-size direct-first-seen-complete direct-after-vendor direct-exit-fail; do run avhold "$c"; done
+echo "== [2/10] 사용자 PATH 쓰기 거부 =="
+for c in deny-exe deny-noexe ok-write deny-twice deny-report; do run pathdeny "$c"; done
 echo "== defect-0930: ok $pass · FAIL $fail =="
 [ "$fail" -eq 0 ]

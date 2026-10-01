@@ -80,6 +80,10 @@ MUTANTS = [
     ("r3-skip-combine", "verify", "if (Test-Path -LiteralPath ([System.IO.Path]::Combine($d, 'cys.exe')) -ErrorAction Stop) { $ex = 'yes' }", "if (Test-Path -LiteralPath (Join-Path $d 'cys.exe')) { $ex = 'yes' }"),
     ("r3-loop-combine", "verify", "        if ($d -and (Test-Path -LiteralPath ([System.IO.Path]::Combine($d, 'cys.exe')) -ErrorAction SilentlyContinue)) { $reg = $e; $path = $d; break }", "        if ($d -and (Test-Path -LiteralPath (Join-Path $d 'cys.exe'))) { $reg = $e; $path = $d; break }"),
     ("r3-rh-body", "verify", "        if ([System.IO.Path]::IsPathRooted($c) -and (Test-Path -LiteralPath $c -PathType Leaf)) { return $c }", "        $null = 0"),
+    # 사용자 PATH 쓰기 거부 — 이 창 PATH 는 그래도 붙인다 · 전체 경로로 이어 감 · 거부 문장은 거부일 때만
+    ("p-deny-inproc", "pathdeny", "        $script:UserPathDenied = $true\n        $ok = $false\n", "        $script:UserPathDenied = $true\n        return $false\n"),
+    ("p-full-path", "pathdeny", "            Set-Alias -Name claude -Value $fullExe -Scope Global\n", ""),
+    ("p-say-only-denied", "pathdeny", "            if ($script:UserPathDenied) {\n                Say '     이 컴퓨터는", "            if ($true) {\n                Say '     이 컴퓨터는"),
     ("e-except-once", "avhold", "    if (($d.Count -eq 0) -or $script:AvExceptShown) { return }", "    if ($d.Count -eq 0) { return }"),
 ]
 
