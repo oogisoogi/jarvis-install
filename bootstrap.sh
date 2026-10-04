@@ -142,7 +142,7 @@ CYS_DISPLAY_NAME="cysr"
 # 0.3.37: 핀 값 그대로(cysr 1.1.6 재절단) · 바뀐 것 = 원격 해결만: 윈 파일·폴더 읽기는 연 핸들로만(연 핸들의 최종 경로가 작업 폴더 아래일 때만 · 이음줄을 따라가지 않고 엶) · 깨우기 성공 = 종료 코드 0 그리고 surface: · 오래돼 보이는 실행 기록 잠금을 추측으로 치우지 않음
 # 0.3.38: 핀 값 그대로(cysr 1.1.6) · 맥 코드 변경 0 — 판번만 윈과 함께 올림(한 릴리스 = 한 판번 · 윈 = 설치 결함 묶음)
 # 0.3.39: cysr 1.1.7 과 함께 내는 판(핀은 1.1.7 절단 뒤) · 맥 바뀐 것 = 원격 해결이 부르는 cys 도 [7/10] 이 고른 CYS_CLI(절대 경로) 먼저
-CYS_FORK_VERSION="1.1.6"
+CYS_FORK_VERSION="1.1.7"
 CYS_FORK_DIR="https://github.com/oogisoogi/cys-ro/releases/download/v${CYS_FORK_VERSION}/"
 # 1.0.1 부터 zip 최상위 = cysr.app(안의 실행 파일 = Contents/MacOS/cys · cys-app · cysd · CFBundleName cysr · 로컬 빌드 실측 2026-09-16).
 CYS_FORK_FILE="cysr-macos-arm64-v${CYS_FORK_VERSION}.zip"
@@ -154,11 +154,11 @@ CYS_FORK_FILE="cysr-macos-arm64-v${CYS_FORK_VERSION}.zip"
 #         발행 자산 zip 실물(arm64·x64 · gh release download) — 크기·sha256 은 파일에서 셌고(릴리스 API digest·SUMS 줄과 3/3 일치), CDHash 는 풀어서(ditto -x -k) codesign -dvvv 로 쟀다(지시값 6/6 일치).
 #   ⚠태그가 옮겨지면 이 값도 함께 바뀐다(v1.1.0 라운드에만 네 번 옮겨졌다) — 값을 문서에 복제하지 말고 발행 자산에서 다시 재라.
 #   CDHash 는 **발행된 그 zip** 을 풀어(ditto -x -k) `codesign -dvvv` 로 쟀다(서명 = cys-local · zip 최상위 = cysr.app 하나).
-CYS_FORK_BYTES="207995364"
-CYS_FORK_SHA256="317e4eb145e02764aac18f8ce3579db8205cf7c6b2ca043f329655707fea1142"
+CYS_FORK_BYTES="208107459"
+CYS_FORK_SHA256="6d92f0fd8d5524b360e5b111601dc6e79f2a08148eb72e22d2e27de9f1fe7f94"
 # 설치된 프로그램이 「바로 이 판」인가를 가르는 값. 판본 숫자는 원작자 판도 같은 숫자를 쓸 수 있어서
 #   숫자만 보면 **원작자 판을 우리 판으로 읽고 건너뛴다**(어제 원작자 판을 깐 맥이 그대로 남는다).
-CYS_FORK_CDHASH="769ea31f9c8c7d0eeb1fc971760f99fe51c26ad9"
+CYS_FORK_CDHASH="3075e43311d07460ae291584453dece7d11b6114"
 
 # ★★인텔(x86_64) 맥 핀 — v1.1 부터 우리 판이 인텔 맥도 덮는다 (2026-09-20 · TICKET=v110-mac-x64).
 #   까닭: v1.0.2 까지 우리 맥 자산은 arm64 하나뿐이라 **인텔 맥만 원작자 판으로 갈라졌다**. 같은 날 같은 방에서
@@ -169,9 +169,9 @@ CYS_FORK_CDHASH="769ea31f9c8c7d0eeb1fc971760f99fe51c26ad9"
 #   ⛔자리표가 남아 있는 동안 인텔 맥은 **원작자 판으로 돌아가지 않고 멈춘다**(cys_fork_x64_pin_ready · step_download_cys 머리).
 #     조용히 원작자 판을 깔면 이 바꿈이 없애려던 그 갈림이 그대로 되살아난다 — 말없이 다른 판을 까느니 멈춰서 말하는 쪽을 고른다.
 CYS_FORK_X64_FILE="cysr-macos-x64-v${CYS_FORK_VERSION}.zip"
-CYS_FORK_X64_BYTES="215639282"
-CYS_FORK_X64_SHA256="df86961012f26f47deafa118da60cc443493858edb940dc8753c76752e10f6a6"
-CYS_FORK_X64_CDHASH="99a455b4c354c9f1599201d067b6e3a5534c2b2f"
+CYS_FORK_X64_BYTES="215736642"
+CYS_FORK_X64_SHA256="7bbf71a7cd59b5c606288a21ca29555f6903588882b03bd8bd014b9801058c28"
+CYS_FORK_X64_CDHASH="d9bab44f9b183e404b03be0087586b56a50750a2"
 # 저희 판이 놓이는 자리 = /Applications/cysr.app · 옛 이름 자리 = /Applications/cys.app(0.14.x·1.0.0 이 깔린 자리 · 원작자 판도 이 이름).
 CYS_FORK_APP="/Applications/cysr.app"
 CYS_OLD_APP="/Applications/cys.app"

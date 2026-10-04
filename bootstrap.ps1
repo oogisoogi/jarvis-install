@@ -136,7 +136,7 @@ $CysDisplayName = 'cysr'
 # 0.3.37: 핀 값 그대로(cysr 1.1.6 재절단) · 바뀐 것 = 원격 해결만: 윈 파일·폴더 읽기는 연 핸들로만(연 핸들의 최종 경로가 작업 폴더 아래일 때만 · 이음줄을 따라가지 않고 엶) · 깨우기 성공 = 종료 코드 0 그리고 surface: · 오래돼 보이는 실행 기록 잠금을 추측으로 치우지 않음
 # 0.3.38: 핀 값 그대로(cysr 1.1.6) · 바뀐 것 = 윈 설치 결함 묶음(2026-09-30 노트북): 설치 확인 = 파일 판 · 설치 자리 = /D 한 자리 · 설치 창 폴백 0 · 창 실행 파일 확인 · 백신 보류 1분 판정 · 쓸 수 없는 자리를 가리키는 옛 설치 자리 기억 정리 / 맥: 코드 변경 0(한 릴리스 = 한 판번)
 # 0.3.39: cysr 1.1.7 과 함께 내는 판(핀은 1.1.7 절단 뒤 · 그 전까지 1.1.6) · 바뀐 것 = 0.3.38 위에 [7/10]·창 찾기·원격 해결이 [6/10] 본체 폴더를 먼저 · 같은 판 덮어 깔기 기다림 · 옛 설치 자리 기억 정리 보강(숨김 파일 · 원래 값 기록 못 하면 안 지움) · 백신 창 단추 안내 = 본 창 기준 · 버린 설치 목록 후보 기록 1줄 · 없는 드라이브 항목 오류 0 / 맥: 원격 해결의 cys 도 [7/10] 이 고른 것 먼저
-$CysVersion     = '1.1.6'
+$CysVersion     = '1.1.7'
 $CysDownloadDir = "https://github.com/oogisoogi/cys-ro/releases/download/v${CysVersion}/"
 # ✅아래 세 값 = v1.1.6 재절단 드래프트 릴리스(2026-09-26 · 릴리스 id 396787705 · 대상 커밋 76d2b5e9) 의 자산에서 **실측으로 채웠다**(첫 절단 값(a8ab563b · 140837194 · 릴리스 id 396500235)을 대신한다).
 #   출처 = 릴리스 SHA256SUMS.txt(그 파일 자신의 sha256 = ca54d259b460340f33541181b1711e0183e036dc6a1c3110771480c2496b4ff2 · 1157 B · 13행 · 재절단 드래프트 자산) · 크기·지문은 릴리스 API 자산 digest·SUMS 줄·인증 받기 실물 sha256 과 대조(3/3 일치).
@@ -148,8 +148,8 @@ $CysDownloadDir = "https://github.com/oogisoogi/cys-ro/releases/download/v${CysV
 #   `${CysVersion}` 를 그대로 두는 것이 정본이다 — 판을 올릴 때 이름이 함께 따라 오르고, 뮤턴트 M508 이 그 따라오름을 잰다.
 #   지금 값은 풀면 cysr_1.1.6_x64-setup.exe = 릴리스 자산 이름과 글자 그대로 같다.
 $CysWinFile     = "cysr_${CysVersion}_x64-setup.exe"
-$CysWinBytes    = 140850967
-$CysWinSha256   = '79df3aed28481c8a8cfb2619451ccc738f67d52b6134ca50fd962b0c8086c31c'   # 릴리스 자산 digest = SHA256SUMS.txt 줄(재절단 드래프트 · SUMS 자산 있음)
+$CysWinBytes    = 140943199
+$CysWinSha256   = '74cc85abe56aa6617dcda3561f22def4fab868fd0bfe7d66c2dde81edf8a6c9b'   # 릴리스 자산 digest = SHA256SUMS.txt 줄(재절단 드래프트 · SUMS 자산 있음)
 $CysDownloadUrl = $CysDownloadDir + $CysWinFile
 
 $LoginPollInterval = 2     # 초 — 승인 프로세스가 끝난 뒤 로그인을 다시 확인하는 간격
