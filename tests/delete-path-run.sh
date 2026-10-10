@@ -1,5 +1,5 @@
 #!/bin/bash
-# 0.3.37(TICKET=installer-0337-delete-path) — 삭제 길 사람 손 0 · 자료는 보관 폴더로 · 재설치 = 통째 보관 후 되옮기기(부서 보존) · 반례 처방.
+# 0.3.37 — 삭제 길 사람 손 0 · 자료는 보관 폴더로 · 재설치 = 통째 보관 후 되옮기기(부서 보존) · 반례 처방.
 #   설계 = docs/install-master/DESIGN-0337.md (master#bc5fb4f6 승인).
 #
 # 🔴운영 맥 안전(remover-tests-only-in-guest-home-swap-is-not-isolation): 제거기 **전체는 돌리지 않는다.**
@@ -126,7 +126,7 @@ t $? "[맥] ⓐ 옛 ~/.cys 통째로 보관(cys-home · 대화 지문 같음 · 
 t $? "[맥] ⓐ 보관본에서 로그인 파일(본부·부서)만 빼고 지운다(📌3)" "$(find "$B" -name .credentials.json | head -2 | tr '\n' ' ')"
 [ -f "$B/cys-state/transcripts.db" ] && [ -f "$B/cys-dept-state/cys-dept-dept-1/transcripts.db" ] && [ -f "$B/cys-trash/dept-9-1/x" ] \
   && [ ! -e "$H/.local/state/cys" ] && [ ! -e "$H/.local/state/cys-dept-dept-1" ] && [ ! -e "$H/.local/state/cys-trash" ]
-t $? "[맥] ⓐ 실행 상태 · 부서 실행 상태 · 닫은 부서 휴지통도 보관(자국 표 밖이던 자리 · §2-3 ②)" "$(ls -A "$H/.local/state" 2>/dev/null | tr '\n' ' ')"
+t $? "[맥] ⓐ 실행 상태 · 부서 실행 상태 · 닫은 부서 휴지통도 보관(자국 표 밖이던 자리 · 절 2-3 ②)" "$(ls -A "$H/.local/state" 2>/dev/null | tr '\n' ' ')"
 [ ! -e "$H/Apps/cysr.app" ] && [ ! -e "$H/.local/share/claude" ] && [ ! -e "$H/.local/bin/claude" ] && [ ! -L "$H/.local/bin/claude" ] && [ ! -e "$H/install-jarvis.sh" ]
 t $? "[맥] ⓐ 프로그램 파일(앱 · 클로드 실물·실행 파일 · 설치 스크립트 사본)은 지운다" "$(why a)"
 [ -f "$B/webview-webkit/WebsiteData/x" ] && [ -f "$B/webview-caches/y" ] && [ -f "$B/webview-prefs/com.cysjavis.terminal.plist" ] \
@@ -145,7 +145,7 @@ t $? "[맥] ⓑ 재설치 = 본부 로그인·대화 5 제자리(바이트 같�
 t $? "[맥] ⓑ 부서 등록부·카탈로그·임무·요청·부서 팩(할 일)·부서 좌석 프로필(통째) 제자리" "$(ls -A "$H/.cys" | tr '\n' ' ')"
 [ ! -e "$H/.cys/pack" ] && [ ! -e "$H/.cys/state" ] && [ ! -e "$H/.cys/dept-launch-path.log" ] && [ -f "$B/cys-home/pack/memory/MEMORY.md" ] && [ -f "$B/cys-home/claude/CLAUDE.md" ] \
   && [ ! -e "$B/$(printf '.jarvis-restore-pending')" ]
-t $? "[맥] ⓑ 새 ~/.cys 에 팩 없음(병합 대기 0) · 나머지는 보관본에(팩 기억 포함 · §2-3 ④) · 되옮기기 표지 치움" "$(ls -A "$B/cys-home" 2>/dev/null | tr '\n' ' ')"
+t $? "[맥] ⓑ 새 ~/.cys 에 팩 없음(병합 대기 0) · 나머지는 보관본에(팩 기억 포함 · 절 2-3 ④) · 되옮기기 표지 치움" "$(ls -A "$B/cys-home" 2>/dev/null | tr '\n' ' ')"
 [ -f "$B/cys-state/topology.json" ] && [ -f "$B/cys-state/dept_tombstones.json" ] && [ -e "$B/cys-state/phoenix" ] && [ -e "$B/cys-state/boot-intents" ] && [ -f "$B/cys-state/topology.json.corrupt-1" ] \
   && [ -f "$H/.local/state/cys/transcripts.db" ] && [ -f "$H/.local/state/cys-dept-dept-1/topology.json" ] && [ -f "$H/.local/state/cys-trash/dept-9-1/x" ]
 t $? "[맥] ⓑ 재설치 = 본부 편성 기록만 보관 · 검색 기록·부서 상태·휴지통 제자리(📌4 ⓑ · 윈과 같은 모양)" "$(ls -A "$H/.local/state/cys" | tr '\n' ' ')"
@@ -259,7 +259,7 @@ H="$(mac_purge q 1 1 'mv .cys/claude ./prof-real && ln -s "$PWD/prof-real" .cys/
 [ "$(rc_of q)" = "7" ] && [ -L "$H/.cys/claude" ] && [ -f "$H/prof-real/CLAUDE.md" ] && [ -f "$H/.cys/pack/memory/MEMORY.md" ]
 t $? "[맥] ⓠ ~/.cys/claude 가 바로가기면 재설치 = ~/.cys 변경 0 · rc 7(0.3.36 ⓠ 유지)" "rc=$(rc_of q) · $(why q)"
 
-# ── 예외 갈래(참가 자리가 ~/.cys 안 · §4-4 · 재설치 = 0.3.36 장치 + 부서 남길 것 + 반례 처방) ──
+# ── 예외 갈래(참가 자리가 ~/.cys 안 · 절 4-4 · 재설치 = 0.3.36 장치 + 부서 남길 것 + 반례 처방) ──
 AGF='mkdir -p .cys/forum && printf key > .cys/forum/key'
 AGH="$BASE/mac-x1/home/.cys/forum" H="$(AGH="$BASE/mac-x1/home/.cys/forum" mac_purge x1 1 1 "$AGF")"
 [ "$(rc_of x1)" = "0" ] && [ "$(cat "$H/.cys/forum/key" 2>/dev/null)" = "key" ] && [ -f "$H/.cys/claude/projects/-u-install-jarvis/s 1.jsonl" ] && [ -f "$H/.cys/depts.json" ] \
@@ -339,17 +339,17 @@ W="$BASE/mac-kadg"; H="$W/home"; mkdir -p "$H"; seed_mac "$H"
     AGORA_HOME="$H/.config/agora" AGORA_SKILL="$H/.claude/skills/agora-delegate" AGORA_SKILL_IN_CYS="$H/.cys/claude/skills/agora-delegate" \
     PROFILE_MARKER="# added by jarvis installer (claude PATH)" KEYCHAIN_SERVICE="x" CRED_FILE="$H/.claude/.credentials.json" \
     bash -c 'set -u; . "$1"; . "$2"; login_status() { printf "없음"; }; FOUND=0; diagnose; echo "FOUND=$FOUND"' _ "$LIB" "$DG" ) > "$W/out.txt" 2>&1
-grep -q 'cys 실행 상태(지난 편성 기록만 보관합니다)' "$W/out.txt" && grep -q '부서 실행 상태 · .*(제자리에 둡니다' "$W/out.txt" && grep -q '닫은 부서 휴지통 · .*(제자리에 둡니다)' "$W/out.txt" \
+grep -q 'cysr 실행 상태(지난 편성 기록만 보관합니다)' "$W/out.txt" && grep -q '부서 실행 상태 · .*(제자리에 둡니다' "$W/out.txt" && grep -q '닫은 부서 휴지통 · .*(제자리에 둡니다)' "$W/out.txt" \
   && ! grep -qE '(실행 상태|휴지통)\(보관 폴더로 옮깁니다\)' "$W/out.txt"
 t $? "[맥] F8 진단 = 앱 남김 단독도 편성 기록만 보관 · 부서 상태·휴지통 제자리라고 말한다(purge 와 같은 말 · 윈 짝)" "$(grep -E '실행 상태|휴지통' "$W/out.txt" | tr '\n' '|' | cut -c1-400)"
-# ── r1 Fable F5 맥 되옮기기가 표지의 ~/.cys 밖 칸(.. · 절대경로)을 되옮기지 않는다(윈 Restore-From 짝) — 손으로 고쳐진 표지 ──
+# ── r1 검토 F5 맥 되옮기기가 표지의 ~/.cys 밖 칸(.. · 절대경로)을 되옮기지 않는다(윈 Restore-From 짝) — 손으로 고쳐진 표지 ──
 W="$BASE/mac-esc"; H="$W/home"; BK="$H/install-jarvis-backup-20260101-000000"; mkdir -p "$BK/cys-home" "$H/.cys"
 printf '%s\n' "$MARK" > "$BK/.jarvis-owned"; printf 'e' > "$BK/escape"; printf 'a' > "$BK/cys-home/ok.json"
 printf 'cys-home\0../escape\0%s\0ok.json\0' "$BK/escape" > "$BK/.jarvis-restore-pending"
 ( cd "$W" && HOME="$H" JARVIS_HOME="$H/install-jarvis" bash -c 'set -u; . "$1"; KEPT_FAIL=0; ARCHIVE_FAIL=0; resume_unfinished_restore; echo "KF=$KEPT_FAIL"' _ "$LIB" ) > "$W/out.txt" 2>&1
 [ ! -e "$H/escape" ] && [ -f "$BK/escape" ] && [ -f "$H/.cys/ok.json" ] && [ -f "$BK/.jarvis-restore-pending" ] && ! grep -q '^KF=0$' "$W/out.txt" && grep -q '알아보지 못했습니다' "$W/out.txt"
-t $? "[맥] Fable F5 표지의 ~/.cys 밖 칸(.. · 절대경로)은 되옮기지 않는다 · 표지에 남김 · 못 지움 · 나머지 칸은 되옮김" "$(ls -A "$H" | tr '\n' ' ') · $(tail -3 "$W/out.txt" | tr '\n' '|' | cut -c1-300)"
-# ── r1 F4(codex F4 · Fable F1 · agy F4 가족) 완전 삭제 보관본 속 로그인 파일 지우기가 그 실행에서 끝내 실패 → **새 실행**이 이어서 지운다
+t $? "[맥] 검토 F5 표지의 ~/.cys 밖 칸(.. · 절대경로)은 되옮기지 않는다 · 표지에 남김 · 못 지움 · 나머지 칸은 되옮김" "$(ls -A "$H" | tr '\n' ' ') · $(tail -3 "$W/out.txt" | tr '\n' '|' | cut -c1-300)"
+# ── r1 F4(검토 F4 · 검토 F1 · 검토 F4 가족) 완전 삭제 보관본 속 로그인 파일 지우기가 그 실행에서 끝내 실패 → **새 실행**이 이어서 지운다
 #    (진단이 그것을 찾은 자국으로 센다 · 지우면 표지 치움 · rc 0) — 앞 판은 회차 사이만 이어서, 새 실행은 「지울 것 없음」 · 비밀값이 보관본에 남았다 ──
 H="$(LOOPRUN=1 mac_purge cr 0 0 '' 'rm() { case "$*" in *.credentials.json*) return 1 ;; *) command rm "$@" ;; esac; }')"; B="$(bk_of "$H")"
 R1="$(rc_of cr)"; NC1="$(find "$B" -name .credentials.json 2>/dev/null | wc -l | tr -d ' ')"
@@ -363,11 +363,11 @@ NOSEED=1 mac_purge cr 0 0 >/dev/null
   && [ -z "$(find "$B" -name '.jarvis-cred-pending')" ] && [ -f "$B/cys-home/claude/projects/-u-install-jarvis/s 1.jsonl" ]
 t $? "[맥] F4 보관본 속 로그인 파일 지우기가 끝내 실패한 뒤 새 실행이 이어서 지운다(진단이 셈 · 표지 치움 · 대화 그대로 · rc 0)" \
   "1회 rc=$R1 남은 로그인=$NC1 · 진단 FOUND=$F2N · 2회 rc=$(rc_of cr) 남은 로그인=$(find "$B" -name .credentials.json | wc -l | tr -d ' ') · $(why cr 4)"
-# ── r1 agy F4 보관본 속 로그인 파일을 권한으로 못 읽으면 「없음」 으로 넘기지 않는다(못 지움 · 표지 남김 · rc 7) ──
+# ── r1 검토 F4 보관본 속 로그인 파일을 권한으로 못 읽으면 「없음」 으로 넘기지 않는다(못 지움 · 표지 남김 · rc 7) ──
 H="$(mac_purge cu 0 0 '' 'eval "orig_dac() $(declare -f drop_archived_credentials | tail -n +2)"; drop_archived_credentials() { chmod 000 "$1"/claude; orig_dac "$@"; }')"; B="$(bk_of "$H")"
 chmod 755 "$B/cys-home/claude" 2>/dev/null
 [ "$(rc_of cu)" = "7" ] && [ -f "$B/cys-home/.jarvis-cred-pending" ] && [ -f "$B/cys-home/claude/.credentials.json" ] && grep -q '읽지 못했습니다' "$BASE/mac-cu/out.txt"
-t $? "[맥] agy F4 보관본 속 로그인 파일을 못 읽으면 못 지움으로 센다(표지 남김 · rc 7)" "rc=$(rc_of cu) · 표지=$([ -f "$B/cys-home/.jarvis-cred-pending" ] && echo 있음 || echo 없음) · $(why cu 4)"
+t $? "[맥] 검토 F4 보관본 속 로그인 파일을 못 읽으면 못 지움으로 센다(표지 남김 · rc 7)" "rc=$(rc_of cu) · 표지=$([ -f "$B/cys-home/.jarvis-cred-pending" ] && echo 있음 || echo 없음) · $(why cu 4)"
 # ── r1 F6(윈 짝) 완전 삭제에서 끄지 못한 cys 가 남으면 이번 회차에는 아무것도 옮기지 않는다(작업 폴더 · ~/.cys · 상태 그대로 · rc 7) · 재설치는 알림만 ──
 H="$(mac_purge al 0 0 '' 'stop_cys_processes() { printf "4242 cysd\n"; }')"
 [ "$(rc_of al)" = "7" ] && [ "$(nbk "$H")" = "0" ] && [ "$(digest "$H/.cys/claude")" = "$(digest "$REF/.cys/claude")" ] && [ -f "$H/.cys/depts.json" ] && [ -f "$H/install-jarvis/notes/a.txt" ] \
@@ -377,7 +377,7 @@ t $? "[맥] F6 완전 삭제에서 끄지 못한 cys 가 남으면 아무것도 
 H="$(mac_purge al2 1 1 '' 'stop_cys_processes() { printf "4242 cysd\n"; }')"
 [ "$(rc_of al2)" = "0" ] && [ -f "$H/.cys/depts.json" ] && grep -q '돌고 있는 것이 있습니다' "$BASE/mac-al2/out.txt"
 t $? "[맥] F6 재설치(앱 남김)는 끄지 못한 cys 가 있어도 알림만 하고 이어 간다(윈 -KeepApp 짝)" "rc=$(rc_of al2) · $(why al2 4)"
-# ── r2 Fable N3 보관된 옛 ~/.cys 자체를 못 들어가면 「없음」 이 아니다 · N4 다 지웠는데 정리 표지를 못 치우면 센다 ──
+# ── r2 검토 N3 보관된 옛 ~/.cys 자체를 못 들어가면 「없음」 이 아니다 · N4 다 지웠는데 정리 표지를 못 치우면 센다 ──
 W="$BASE/mac-n34"; mkdir -p "$W/a/claude" "$W/b/claude"; printf s > "$W/a/claude/.credentials.json"; chmod 000 "$W/a"
 printf s > "$W/b/claude/.credentials.json"; : > "$W/b/.jarvis-cred-pending"; chmod 500 "$W/b"
 mkdir -p "$W/c/claude-dept-1"; printf s > "$W/c/claude-dept-1/.credentials.json"; : > "$W/c/.jarvis-cred-pending"; chmod 300 "$W/c"   # 들어가기만 되고 목록을 못 읽음(r3 M1)
@@ -387,7 +387,7 @@ chmod 755 "$W/a" "$W/b" "$W/c" "$W/d" "$W/d/claude"
 grep -q '^KA=[1-9]' "$W/out.txt" && grep -q '^KB=[1-9]' "$W/out.txt" && grep -q '^KC=[1-9]' "$W/out.txt" && [ -f "$W/c/.jarvis-cred-pending" ] && [ ! -f "$W/b/claude/.credentials.json" ] && ! grep -q 'Permission denied' "$W/out.txt" \
   && sed -n '/^===D$/,$p' "$W/out.txt" | grep -q '쓰기 권한을 확인해 주십시오' && ! sed -n '/^===D$/,$p' "$W/out.txt" | grep -q '이어서 지웁니다'
 t $? "[맥] r2 N3·N4 보관본 자체를 못 들어감 = 못 지움 · 정리 표지를 못 치움 = 못 지움(조용한 rc 0 · 영구 표지 금지) · 권한 오류가 화면에 새지 않음" "$(tr '\n' '|' < "$W/out.txt" | cut -c1-300)"
-# ── r2 Fable N6 되옮길 자리의 윗자리(~/.cys/claude)가 바로가기면 따라가지 않는다(밖으로 옮김 금지 · 표지 유지 · 못 지움) ──
+# ── r2 검토 N6 되옮길 자리의 윗자리(~/.cys/claude)가 바로가기면 따라가지 않는다(밖으로 옮김 금지 · 표지 유지 · 못 지움) ──
 W="$BASE/mac-n6"; H="$W/home"; BK="$H/install-jarvis-backup-20260101-000000"; mkdir -p "$BK/cys-home/claude/projects/p" "$H/.cys" "$H/elsewhere"
 printf '%s\n' "$MARK" > "$BK/.jarvis-owned"; printf 'x' > "$BK/cys-home/claude/projects/p/s.jsonl"; ln -s "$H/elsewhere" "$H/.cys/claude"
 printf 'cys-home\0claude/projects\0' > "$BK/.jarvis-restore-pending"
@@ -690,7 +690,7 @@ U="$SBka/C:/Users/emu"; B="$(wbk ka)"; L="$U/AppData/Local/cys"
   && [ -f "$U/.local/state/cys-trash/dept-9-1/x" ] && [ -f "$L/cys-app.exe" ] && [ -d "$U/AppData/Roaming/com.cysjavis.terminal" ] && [ ! -e "$B/cys-trash" ]
 t $? "[윈] F8 -KeepApp 단독 = 편성 기록만 보관 · 검색 기록·부서 상태·휴지통·프로그램·앱 화면 자료 제자리(맥 짝)" "rc=$(wrc ka) · $(ls -A "$L" 2>/dev/null | tr '\n' ' ') · $(wwhy ka)"
 grep -q '닫은 부서 휴지통 · .*(제자리에 둡니다)' "$SBka/out.txt" && ! grep -q '닫은 부서 휴지통(보관 폴더로 옮깁니다)' "$SBka/out.txt" \
-  && grep -q '부서 실행 상태 · .*(제자리에 둡니다' "$SBka/out.txt" && grep -q 'cys 지난 편성 기록' "$SBka/out.txt"
+  && grep -q '부서 실행 상태 · .*(제자리에 둡니다' "$SBka/out.txt" && grep -q 'cysr 지난 편성 기록' "$SBka/out.txt"
 t $? "[윈] F8 진단 = -KeepApp 단독도 휴지통 · 부서 상태 제자리 · 편성 기록만 보관이라고 말한다(purge 와 같은 말)" "$(grep -E '휴지통|부서 실행 상태|편성 기록' "$SBka/out.txt" | tr '\n' '|' | cut -c1-400)"
 
 # ── ⓒ 옮기기 실패(사용자 폴더 쓰기 막힘) → 자료 그대로 · 프로그램·등록 안 지움 · rc 7 ──
@@ -749,7 +749,7 @@ t $? "[윈] F4 보관본 속 로그인 파일 지우기가 끝내 실패한 뒤 
 B="$SBc0/C:/Users/emu/install-jarvis-backup-20260101-000000"
 [ "$(wrc c0)" = "0" ] && [ ! -e "$B/cys-home/claude/.credentials.json" ] && [ ! -e "$B/cys-home/.jarvis-cred-pending" ] && [ -f "$B/cys-home/claude/history.jsonl" ] && grep -q '보관본 속 로그인 파일 지우기가 남음' "$SBc0/out.txt"
 t $? "[윈] F4 다른 자국이 하나도 없어도 진단이 「보관본 속 로그인 파일 지우기 남음」 을 세어 이어서 지운다(「지울 것이 없습니다」 금지)" "rc=$(wrc c0) · $(wwhy c0 4)"
-# ── r1 F1(codex BLOCK · Fable F9) 설치 폴더 바로 아래 exe·dll 은 설치기가 실제로 까는 이름만 프로그램으로 지운다 — 사람이 둔 exe·dll·잔해 꼴은 보관(모르면 보관) ──
+# ── r1 F1(검토 BLOCK · 검토 F9) 설치 폴더 바로 아래 exe·dll 은 설치기가 실제로 까는 이름만 프로그램으로 지운다 — 사람이 둔 exe·dll·잔해 꼴은 보관(모르면 보관) ──
 L="$SBx1f/C:/Users/emu/AppData/Local/cys"; B="$(wbk x1f)"
 [ "$(wrc x1f)" = "0" ] && [ -n "$B" ] && [ -n "$(find "$B" -name my-tool.exe)" ] && [ -n "$(find "$B" -name helper.dll)" ] && [ -n "$(find "$B" -name other.exe.prev3)" ] \
   && [ ! -e "$L/my-tool.exe" ] && [ ! -e "$L/cys-app.new.exe" ] && [ ! -e "$L/cysd.prev123456.exe" ] && [ ! -e "$L/cys.exe.prev77" ] && [ ! -e "$L/WebView2Loader.dll.prev5" ] \
@@ -760,17 +760,17 @@ t $? "[윈] F1 사람이 둔 exe·dll·잔해 꼴(my-tool.exe · helper.dll · o
 B="$(wbk g2)"
 [ "$(wrc g2)" = "7" ] && [ -f "$B/.jarvis-restore-pending" ] && [ ! -e "$B/cys-home-2" ] && grep -q '지난번 옮기기가 아직 끝나지 않아' "$SBg2/out.txt"
 t $? "[윈] 결정⑵ 가드 단독 — 이어 하기를 꺼도 둘째 회차가 끝나지 않은 표지 위에 ~\\.cys 를 또 옮기지 않는다" "rc=$(wrc g2) · $(wwhy g2 4)"
-# ── r2 Fable N7 윈 F6 짝 — 완전 삭제에서 끄지 못한 cys 가 남으면 아무것도 안 옮김(rc 7 · 보관본 0 · 프로그램 그대로) · 재설치는 알림만 ──
+# ── r2 검토 N7 윈 F6 짝 — 완전 삭제에서 끄지 못한 cys 가 남으면 아무것도 안 옮김(rc 7 · 보관본 0 · 프로그램 그대로) · 재설치는 알림만 ──
 U="$SBal/C:/Users/emu"
 [ "$(wrc al)" = "7" ] && [ "$(wnbk al)" = "0" ] && [ -f "$U/.cys/depts.json" ] && [ -f "$U/AppData/Local/cys/cysd.exe" ] && grep -q '아직 실행 중이라' "$SBal/out.txt" \
   && ! grep -q '잠시 뒤 스스로 한 번 더 해 봅니다' "$SBal/out.txt"
 t $? "[윈] r2 N7 완전 삭제에서 끄지 못한 cys 가 남으면 아무것도 안 옮긴다(rc 7 · 보관본 0 · 프로그램 그대로 · 거짓 약속 문구 0)" "rc=$(wrc al) · 보관본 $(wnbk al) · $(wwhy al 4)"
 [ "$(wrc al2)" = "0" ] && [ -f "$SBal2/C:/Users/emu/.cys/depts.json" ] && grep -q '돌고 있습니다' "$SBal2/out.txt"
 t $? "[윈] r2 N7 재설치(-KeepApp)는 끄지 못한 cys 가 있어도 알림만 하고 이어 간다" "rc=$(wrc al2) · $(wwhy al2 4)"
-# ── r1 agy F4 보관본 속 로그인 파일을 권한으로 못 읽으면 「없음」 으로 넘기지 않는다 ──
+# ── r1 검토 F4 보관본 속 로그인 파일을 권한으로 못 읽으면 「없음」 으로 넘기지 않는다 ──
 U="$SBcu/C:/Users/emu"; B="$(wbk cu)"; find "$B" -type d -exec chmod u+rwx {} + 2>/dev/null
 [ "$(wrc cu)" = "7" ] && [ -f "$B/cys-home/.jarvis-cred-pending" ] && [ -f "$B/cys-home/claude/.credentials.json" ] && grep -q '읽지 못했습니다' "$SBcu/out.txt"
-t $? "[윈] agy F4 보관본 속 로그인 파일을 못 읽으면 못 지움으로 센다(표지 남김 · rc 7)" "rc=$(wrc cu) · $(wwhy cu 4)"
+t $? "[윈] 검토 F4 보관본 속 로그인 파일을 못 읽으면 못 지움으로 센다(표지 남김 · rc 7)" "rc=$(wrc cu) · $(wwhy cu 4)"
 # ── r1 F3 남은 목록 표지를 고쳐 쓰다 반쪽에서 끊김 → 옛 표지 유지 → 다음 실행이 남은 칸(depts.json)을 끝낸다 ──
 U="$SBhf/C:/Users/emu"; B="$(wbk hf)"
 [ "$(wrc hf)" = "7" ] && [ "$(wrc hf out2)" = "0" ] && [ -f "$U/.cys/depts.json" ] && [ ! -f "$B/.jarvis-restore-pending" ] && grep -q '이어서 합니다' "$SBhf/out2.txt"

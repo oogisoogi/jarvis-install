@@ -1,6 +1,6 @@
 #!/bin/bash
-# 캡처 증거 시험 — TICKET=installer-capture-evidence (2026-09-16 · v0.3.20)
-#   계약 정본 = 서버 docs/HELP-API.md §10-2c(그림)·d(기준선)·e(촬영 요청)·§10-7(고지).
+# 캡처 증거 시험 — (2026-09-16 · v0.3.20)
+#   계약 정본 = 서버 docs/HELP-API.md 절 10-2c(그림)·d(기준선)·e(촬영 요청)·절 10-7(고지).
 #
 # 무엇을 재는가
 #   ⓐ 두 걸음(증거 이벤트로 자리를 받고 그림을 올린다) · 계약에 없는 종류 거절 · 한 장 1.5MB · 설치당 12장 ·
@@ -44,7 +44,7 @@ t $? "[전체화면] 실패 보고 첨부가 설치 창 한정이다" "첨부가
 t $? "[post-install] 성공 두 자리(자동·카드 뒤)에서 부른다" "$(grep -c 'Send-PostInstallEvidence \$cli \$SurfaceRef' "$PS")곳"
 grep -q 'post_install_evidence "\$cli" "\$ref"' "$SHFILE"
 t $? "[post-install] 맥판도 성공 자리에서 부른다" "맥판에 호출이 없다"
-# 이종 검토 1R ④ — 먹통 창에 PrintWindow 를 보내면 설치기가 통째로 멈춘다(창 크기를 묻기 전에 먼저 본다)
+# 외부 검토 1차 ④ — 먹통 창에 PrintWindow 를 보내면 설치기가 통째로 멈춘다(창 크기를 묻기 전에 먼저 본다)
 awk '/^function Get-WindowJpeg/{f=1} f&&!a&&/IsHungAppWindow\(\$h\)/{a=NR} f&&!b&&/GetWindowRect\(\$h/{b=NR} f&&/^}/{f=0} END{exit !(a&&b&&a<b)}' "$PS"
 t $? "[먹통 창] 창 크기를 묻기 전에 먹통인지 먼저 본다" "먹통 검사가 없거나 순서가 뒤다 — 응답 없는 창에서 설치기가 멈춘다"
 grep -q 'StartsWith($dir.TrimEnd' "$PS"
@@ -221,9 +221,9 @@ t $? "[ⓕ③] 기록 파일의 사유 글도 가려져 있다(실패 때 이 �
 [ "$(fact appwin_nocli_null)" = "True" ]; t $? "[앱 창] 자리를 모를 때 죽지 않고 그림 없이 끝난다" "appwin_nocli_null=$(fact appwin_nocli_null)"
 
 echo
-echo "== TICKET=installer-0325 c5(2026-09-18) — 정체 증거 공백 도착(윈 evidence_text NULL) 폴백 =="
+echo "== c5(2026-09-18) — 정체 증거 공백 도착(윈 evidence_text NULL) 폴백 =="
 # 09-17 10:01 실기(WHm7yvpu) — Send-EvidenceOnce 'stall' 이 evidence_text=NULL·이미지 0장으로 서버에 도착했다.
-# ⚠여기서 안 재는 것: 실 윈도우 콘솔 캡처·실 백신 3종 차단·서버 실물 — 순수 pwsh 문자열/제어흐름 로직만(윈 실기는 이 티켓 범위 밖).
+# ⚠여기서 안 재는 것: 실 윈도우 콘솔 캡처·실 백신 3종 차단·서버 실물 — 순수 pwsh 문자열/제어흐름 로직만(윈 실기는 이 작업 범위 밖).
 case "$(fact evtext_empty_reason)" in
   '[text:empty(no-source)]') ok "[c5] 원본 파일이 없으면 빈 글이 아니라 사유 코드를 돌려준다" ;;
   *) bad "[c5] 원본 파일이 없으면 빈 글이 아니라 사유 코드를 돌려준다" "받은 값=$(fact evtext_empty_reason)" ;;

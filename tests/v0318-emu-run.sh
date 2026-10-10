@@ -78,7 +78,7 @@ for s in ver-same ver-same-pin ver-same-exe ver-same-refresh-fail ver-old ver-ol
   why="$r · 받기 ${niwr} · 설치기 ${nrun}(/S ${nsw}) · 표식 지우기 ${nub} · 표지 핀 ${stamp_pin}"
   case "$s" in
     ver-same)
-      [ "$r" = "r5=0 r6=0" ] && [ "$niwr" = "0" ] && [ "$nrun" = "0" ] && has "$L" '같은 판\(v[0-9.]+\)의 cys 가 이미 설치돼 있습니다 \(지문 확인\) — 받지 않고'
+      [ "$r" = "r5=0 r6=0" ] && [ "$niwr" = "0" ] && [ "$nrun" = "0" ] && has "$L" '같은 판\(v[0-9.]+\)의 cysr 이 이미 설치돼 있습니다 \(지문 확인\) — 받지 않고'
       t $? "[② 같은 판·같은 지문] 판번과 지문이 둘 다 같으면 받지도 설치하지도 않는다" "$why" ;;
     ver-same-pin)
       [ "$r" = "r5=0 r6=0" ] && [ "$niwr" = "1" ] && [ "$nsw" = "1" ] && has "$L" 'cys same version content pin-changed' && has "$L" 'cys refresh same version [0-9.]+ \(pin-changed\)' && has "$L" '\[6/10\] 설치를 마쳤습니다' && [ "$stamp_pin" = "1" ]

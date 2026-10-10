@@ -1,6 +1,6 @@
 #!/bin/bash
 # 맥 cys 핀 대조 — 설치기(bootstrap.sh)가 받을 zip 의 **판본·크기·지문·CDHash** 가 우리 릴리스가 실제로 낸 값과 같은가.
-#   (TICKET=installer-0326 C2 · 2026-09-18 · 799 적발: checks.sh 는 CYS_FORK_CDHASH 가 40자리인지만 봤다)
+#   (C2 · 2026-09-18 · 799 적발: checks.sh 는 CYS_FORK_CDHASH 가 40자리인지만 봤다)
 #
 # ★왜 네트워크를 때리는가: checks.sh 의 [전환] 핀 축은 「40자리 16진수다」까지만 잰다. 한 글자 틀린 CDHash 도
 #   그 축은 초록이다 — 그러면 깔린 판을 매번 「다른 판」으로 읽어 [6/10] 에서 471MB 를 다시 받고 바꿔 넣거나,

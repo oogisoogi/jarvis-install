@@ -36,9 +36,9 @@ if ($Scenario -like 'closing-*') {
         '/emu-nope-v0318d' -ErrorAction SilentlyContinue |
         Select-Object -First 1
     try { $v = (& emu-nope-v0318e --version 2>$null | Select-Object -First 1) } catch { }
-    # 바깥 명령에서 막은 경우(교차 검토 1R F4) — 오류 자리는 안쪽 Get-Item 이고 막는 것은 바깥 & { } 2>$null 이다
+    # 바깥 명령에서 막은 경우(교차 검토 1차 F4) — 오류 자리는 안쪽 Get-Item 이고 막는 것은 바깥 & { } 2>$null 이다
     & { Get-Item -LiteralPath '/emu-nope-v0318f' } 2>$null
-    # 한 줄에 조용한 확인과 조용하지 않은 오류가 함께 있는 경우(교차 검토 1R F3) — 뒤 오류는 참고로 적혀야 한다
+    # 한 줄에 조용한 확인과 조용하지 않은 오류가 함께 있는 경우(교차 검토 1차 F3) — 뒤 오류는 참고로 적혀야 한다
     if ($Scenario -eq 'closing-forms-loud') { [void](Get-Command emu-nope-v0318h -ErrorAction SilentlyContinue); Get-Item -LiteralPath "$Sb/emu-nope-v0318-loud" }
     $script:LoginStage = 'confirm'
     $script:NoticeShown = $false

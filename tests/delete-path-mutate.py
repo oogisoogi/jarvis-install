@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-# 0.3.37(TICKET=installer-0337-delete-path) — 「되돌리면 붉어진다」: 제거기 사본에 한 줄씩 변이를 넣고 tests/delete-path-run.sh 가 적색인지 잰다.
+# 0.3.37 — 「되돌리면 붉어진다」: 제거기 사본에 한 줄씩 변이를 넣고 tests/delete-path-run.sh 가 적색인지 잰다.
 #   ⚠원본은 건드리지 않는다 — 스크래치 사본(install-master 통째)만 고친다 · 원본 초록을 먼저 확인한다(거짓 적색 방지).
 #   쓰는 법: python3 tests/delete-path-mutate.py [--only 이름,이름] [--os mac|win]  · rc 0 = 전건 KILLED
 import os, shutil, subprocess, sys, tempfile
@@ -44,7 +44,7 @@ MUTANTS = [
      '    FOUND=$((FOUND+1))\n    say "  [있음] 끝나지 않은 되옮기기', '    say "  [있음] 끝나지 않은 되옮기기'),
     ("sh-restore-escape", "mac", "reset-clean.sh",
      '    case "$rel" in /*|..|../*|*/..|*/../*)\n', '    case "$rel" in //never//)\n'),
-    # r1 F4 · agy F4 — 보관본 속 로그인 파일 정리 표지 · 진단 셈 · 이어 지우기 · 못 읽음을 없음으로
+    # r1 F4 · 검토 F4 — 보관본 속 로그인 파일 정리 표지 · 진단 셈 · 이어 지우기 · 못 읽음을 없음으로
     ("sh-cred-mark-first", "mac", "reset-clean.sh", '  { : > "$1/$CRED_MARK"; } 2>/dev/null ||', '  false ||'),
     ("sh-cred-diag", "mac", "reset-clean.sh",
      '    FOUND=$((FOUND+1))\n    say "  [있음] 보관본 속 로그인', '    say "  [있음] 보관본 속 로그인'),
@@ -139,7 +139,7 @@ MUTANTS = [
     # master#bc5fb4f6 ⑨ — 떼기 첫 칸의 「기계 자리 0」 단언이 실제로 거는지: 떼는 함수 안에 기계 자리 명령이 들어오면 적색이어야 한다
     ("sh-guard-bites", "mac", "reset-clean.sh",
      'same_volume() { local a b;', 'same_volume() { : launchctl print gui; local a b;'),
-    # ── 윈 — 전임 서브에이전트 사본 측정 16 을 구동기로 옮김(HANDOFF-0337 §6) + 후임 수정 5 ──
+    # ── 윈 — 전임 서브에이전트 사본 측정 16 을 구동기로 옮김(인계 기록-0337 절 6) + 후임 수정 5 ──
     ("ps-keep-hq-name", "win", "reset-clean.ps1",
      "$HistoryKeepNames = @('.credentials.json', 'projects', 'history.jsonl'", "$HistoryKeepNames = @('.credentials.json', 'history.jsonl'"),
     ("ps-keep-dept-name", "win", "reset-clean.ps1",

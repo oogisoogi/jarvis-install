@@ -29,7 +29,7 @@ PY
 }
 sess() { sess_cwd "$(seat_cwd "$1")" "$2" "$1" "${3:-}"; }
 awake() { sess "$1" user; sess "$1" assistant; }
-# ── 마스터 자리(surface:9) 흉내 (TICKET=installer-0322-awaken) ────────────────────────────
+# ── 마스터 자리(surface:9) 흉내 ────────────────────────────
 #   설치기는 마스터를 두 축으로 잰다: 그 자리 세션 기록의 **답 레코드**와 지침이 시키는 **표지 파일**.
 #   여기서 둘을 따로 켤 수 있어야 「받았으나 시작 안 함」(거부의 모양)과 「각성 확인」이 갈린다.
 master_jh() { cat "$SB/jarvis-home" 2>/dev/null; }
@@ -90,10 +90,10 @@ case "$1" in
     # 거절 문구는 cys 0.14.36 이 내는 거절 사유 글자를 따른다(자리 번호는 싣지 않는다 — 실물 명령 출력 모양은 아직 안 쟀다)
     if [ "$S" = "no-surface" ]; then echo "Error: claim_denied: privileged role held by live surface" >&2; exit 7; fi
     touch "$SB/opened"
-    # 자비스 자리가 열린 순간 마스터가 무엇을 하는지 — 시나리오가 정한다
+    # 자비스 자리가 열린 순간 마스터 자리가 무엇을 하는지 — 시나리오가 정한다
     case "$S" in
       master-unknown) : ;;                                   # 아무 말도 안 한다(답 레코드 0 · 표지 0) → 판정 못 함
-      master-mark-only) master_mark ;;                       # 표지는 썼는데 답 기록이 아직 안 내려갔다 → 표지만으로 각성 확인(이종 검토 1R)
+      master-mark-only) master_mark ;;                       # 표지는 썼는데 답 기록이 아직 안 내려갔다 → 표지만으로 각성 확인(외부 검토 1차)
       master-refuse|master-retry-late|master-prior-mark|master-late-fleet) master_answer ;;   # 말은 했는데 준비 작업을 시작하지 않았다(2026-09-16 거부의 모양)
       master-stale-mark) master_answer; master_mark_old ;;   # 말은 했고, 표지는 **지난 설치의 것**이 남아 있다(시각 검사 축)
       *) master_answer; master_mark ;;                       # 읽고 판단한 뒤 준비 작업 1번을 했다

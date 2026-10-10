@@ -1,7 +1,7 @@
 #!/bin/bash
 # 재설치 사람 손 0 흉내 실행 시험 — PowerShell 7 로 실물 reinstall.ps1 을 처음부터 끝까지 부르고, 그 안에서 실물 reset-clean.ps1 이 -KeepApp -Yes 로 돈다.
 #
-# 무엇을 재는가 (2026-09-15 · 재설치 길 = 사람 키 입력 0 티켓)
+# 무엇을 재는가 (2026-09-15 · 재설치 길 = 사람 키 입력 0 작업)
 #   ⓐ 재설치 길에서 사람에게 묻는 자리가 0 — Read-Host 를 기록 함수로 바꿔 끼워, 한 번이라도 불리면 그 문구가 남는다
 #   ⓑ cys 프로그램 폴더(제거 프로그램 포함)를 지우지 않는다
 #   ⓒ 지운 뒤 설치 도우미까지 간다 — 가짜 설치 도우미가 표지를 남기고 재설치가 0 으로 끝난다
@@ -17,7 +17,7 @@
 # 🔴Stop-Process 는 흉내에서 아무것도 끄지 않는다 — reset-clean 은 이름(cys-app · cysd · cys)으로 끄는데, 이 맥에서 도는 cys 터미널이 바로 그 이름이다.
 # ⚠여기서 **안 재는 것**(윈도우에서만 있는 것): 레지스트리(샌드박스 폴더를 HKCU: 드라이브로 흉내) · 작업 스케줄러(맥에 명령이 없어 빈 목록) ·
 #   시작 메뉴 바로가기 · 윈도우 PowerShell 5.1(여기는 pwsh 7) · 백신 개입 · 실제 cys 프로세스 끄기.
-export JARVIS_NO_PROGRESS=1   # 🔴흉내·검사는 라이브 서버로 진행 이벤트를 보내지 않는다(2026-09-15 15:49 master 게이트 실행이 라이브 progress에 가짜 4건을 남긴 사고 · Send-Progress의 레버)
+export JARVIS_NO_PROGRESS=1   # 🔴흉내·검사는 라이브 서버로 진행 이벤트를 보내지 않는다(2026-09-15 15:49 출고 전 점검 실행이 라이브 progress에 가짜 4건을 남긴 사고 · Send-Progress의 레버)
 set -u
 HERE="$(cd "$(dirname "$0")" && pwd)"
 DIR="$HERE/../install-master"
@@ -61,11 +61,11 @@ else
   t $? "[재설치] cys 프로그램 폴더를 지우지 않는다" "cys 폴더 또는 제거 프로그램이 사라졌다"
   has "$SB/bootstrap-marker.txt" '^FAKE-BOOTSTRAP-RAN$' && [ "$(val "$S" reinstall_rc)" = "0" ]
   t $? "[재설치] 지운 뒤 설치 도우미까지 간다" "설치 도우미 표지 $( [ -f "$SB/bootstrap-marker.txt" ] && echo 있음 || echo 없음) · 재설치 rc=$(val "$S" reinstall_rc) · 지우개 rc=$(val "$S" reset_rc)"
-  has "$SB/reset-out.txt" '\[남김\] cys 프로그램'
+  has "$SB/reset-out.txt" '\[남김\] cysr 프로그램'
   t $? "[재설치] 목록에 「[남김] cys 프로그램」 한 줄" "지우개 출력에 그 줄이 없다"
   # ⓔ 는 Drop(파일 자리) 두 곳을 본다 — 윈도우 모양 경로(C:\Users\emu)를 샌드박스의 「C:」 폴더로 흉내 내서 실물 삭제 길이 그대로 탄다.
   #   ~\install-jarvis.ps1 은 여기서 안 본다: 지운 뒤 재설치가 같은 자리에 설치 도우미를 새로 받아 둔다(윈도우도 같다).
-  # 0.3.37(뜻 변경 · TICKET=installer-0337-delete-path): ~\.cys 는 지우지 않고 통째로 보관 폴더(cys-home)로 옮긴 뒤 남길 것만 되옮긴다 —
+  # 0.3.37(뜻 변경): ~\.cys 는 지우지 않고 통째로 보관 폴더(cys-home)로 옮긴 뒤 남길 것만 되옮긴다 —
   #   남길 것이 없는 이 씨앗(emu.txt)은 새 자리에 없고 보관 폴더에 있어야 한다(새 ~\.cys 폴더 자체는 되옮기기 자리로 다시 선다).
   [ ! -e "$U/.cys/emu.txt" ] && [ -n "$(find "$U" -mindepth 3 -maxdepth 3 -path '*install-jarvis-backup-*/cys-home/emu.txt' 2>/dev/null)" ]
   t $? "[재설치] 나머지(~\\.cys)는 지우지 않고 보관 폴더로 옮긴다 · 새 자리에 없다(0.3.37)" "새 자리 emu=$( [ -e "$U/.cys/emu.txt" ] && echo 있음 || echo 없음) · 보관=$(find "$U" -maxdepth 3 -path '*cys-home*' 2>/dev/null | head -2 | tr '\n' ' ') · $(grep -E '\[남음\]' "$SB/reset-out.txt" 2>/dev/null | head -2 | tr '\n' '|' | cut -c1-200)"

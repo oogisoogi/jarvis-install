@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-# 뮤턴트 — 0.3.29(재설치 텔레메트리 · 자동 재시작 · 손 횟수 · 옛 라운드)의 검사가 **대상을 실제로 때리는가** (TICKET=installer-0329)
+# 뮤턴트 — 0.3.29(재설치 텔레메트리 · 자동 재시작 · 손 횟수 · 옛 라운드)의 검사가 **대상을 실제로 때리는가**
 #
 # ★쓰는 법
 #   python3 tests/v0329-mutate.py --root <저장소>           전건(사본에서만 고친다 · 실물 무접촉)
@@ -49,7 +49,7 @@ MUTANTS = [
      "        if ($rc -eq 0 -or $rc -eq 21) { return (\"ok`t\" + $rc + \"`t\" + $note) }",
      "        if ($rc -eq 99 -or $rc -eq 21) { return (\"ok`t\" + $rc + \"`t\" + $note) }",
      "[윈 r1] cys rotate 성공 → ok", "emu"),
-    # ④ 빈칸으로 되돌리면 자리의 master 가 다시 「세지 못했다」로 보고한다(윈 실기 09-21 14:2x).
+    # ④ 빈칸으로 되돌리면 자리의 master 자리가 다시 「세지 못했다」로 보고한다(윈 실기 09-21 14:2x).
     ("win-hands-blank-revert", PS,
      '    [void]$lines.Add("- 사람 손 (실제로 누른 횟수): **$($script:HumanHands)번** — 설치 창 [9/10] 에 나온 수와 같습니다.")',
      "    [void]$lines.Add('- 사람 손 (실제로 누른 횟수): ____번  ← **직접 적어 주십시오.**')",
@@ -69,15 +69,15 @@ MUTANTS = [
      ' && $4!="exited=true" {print $1; exit}',
      ' {print $1; exit}',
      "[맥 m1] 살아 있는 master 자리를 찾는다", "emu"),
-    # ③ 출력을 명령 치환 파이프로 되돌리면 rotate 가 남긴 새 데몬이 파이프를 쥐어 설치 창이 멈춘다(이종 검토 1R 지적 M).
+    # ③ 출력을 명령 치환 파이프로 되돌리면 rotate 가 남긴 새 데몬이 파이프를 쥐어 설치 창이 멈춘다(외부 검토 1차 지적 M).
     ("mac-rotate-pipe-capture", SH,
-     # v0.3.30: 받는 자리가 「뒤로 돌려 파일을 들여다보기」로 바뀌어 앵커를 다시 겨눴다(TICKET=installer-0330) — 변이의 뜻은 같다(명령 치환 파이프로 되돌림).
-     # v0.3.31: 상한을 고리가 지게 되어 perl alarm 감싸기가 빠졌다 — 앵커를 다시 겨눴다(TICKET=installer-0331 · 변이의 뜻 동일).
-     # v0.3.32: 호출 줄에 부서 순회 생략(env·인자)이 붙어 앵커를 다시 겨눴다(TICKET=installer-0332 · 변이의 뜻 동일).
+     # v0.3.30: 받는 자리가 「뒤로 돌려 파일을 들여다보기」로 바뀌어 앵커를 다시 겨눴다 — 변이의 뜻은 같다(명령 치환 파이프로 되돌림).
+     # v0.3.31: 상한을 고리가 지게 되어 perl alarm 감싸기가 빠졌다 — 앵커를 다시 겨눴다(변이의 뜻 동일).
+     # v0.3.32: 호출 줄에 부서 순회 생략(env·인자)이 붙어 앵커를 다시 겨눴다(변이의 뜻 동일).
      '  CYS_ROTATE_SKIP_DEPTS=1 "${1:-cys}" rotate --timeout "$ROTATE_DRAIN_TIMEOUT_SEC" $skip_flag >"$tf" 2>"$te" </dev/null &\n  rp=$!\n',
      '  out="$(perl -e \'alarm shift; exec @ARGV or exit 126\' "$ROTATE_WALL_CAP_SEC" "${1:-cys}" rotate --timeout "$ROTATE_DRAIN_TIMEOUT_SEC" 2>&1)"; printf \'%s\\n\' "$out" > "$tf"\n  rp=999999\n',
      "[맥 r5] rotate 가 자식(새 데몬)을 남겨도 설치 창이 기다리지 않는다", "emu"),
-    # ⑥ cys 1.1.2 rotate 종료코드 표(TICKET=v112-vm-verify) — 21(저장 일부 미확인)을 실패로 읽으면
+    # ⑥ cys 1.1.2 rotate 종료코드 표 — 21(저장 일부 미확인)을 실패로 읽으면
     #   끝까지 돈 재시작에 사람에게 [재시작] 을 또 누르게 한다(설계 반대).
     ("mac-rotate-rc21-as-fail", SH,
      "    0|21) printf 'ok\\t%s\\t%s\\n' \"$rc\" \"$note\"; return 0 ;;\n",

@@ -1,5 +1,5 @@
 #!/bin/bash
-# 0.3.32 흉내 실행 시험 — 새 갈래를 **실제로 부른다**(글자 대조가 아니라 실행 · TICKET=installer-0332).
+# 0.3.32 흉내 실행 시험 — 새 갈래를 **실제로 부른다**(글자 대조가 아니라 실행).
 #
 # 재는 것
 #   ⓐ C1 [8/10] 데몬 선확인 문구 — 이미 돎+등록 yes 면 「그대로 둡니다」 한 줄뿐(「등록됨」 줄 0) ·
@@ -8,13 +8,13 @@
 #      대조군 = 선점이 아닌 거절이면 원문을 종전대로 창에 보인다(두 OS)
 #   ⓒ B9 선점 갈래 끝 — 화면에 [10/10] 끝맺음 줄 · 진행 전송 순서 9/10 end → 10/10 start → 10/10 end ·
 #      그 뒤 설치 끝 증거(post-install)가 단계 10/10 으로 나간다(앞 판은 9/10 으로 붙어 서버 마지막 행이 9/10 이었다)
-#   ⓓ B2 로그인 승계(A1 · master 판정 70ab51cf) — 판정 함수 두 OS 글자 동형 · 네 갈래 × 두 OS
+#   ⓓ B2 로그인 승계(A1 · 운영자 판정) — 판정 함수 두 OS 글자 동형 · 네 갈래 × 두 OS
 #      (자비스 없음 / 자비스 옛것 / 자비스 새것 / 둘 다 만료시각 없음 → 수정 시각) · 앞 사본 1세대 · 기록에 값 0
 #
 # 쓰는 법: bash tests/v0332-emu-run.sh [--dir <install-master 자리>]   rc 0 = 전건 통과 · 1 = 실패 · 2 = 잴 수 없음(pwsh 없음)
 # ⛔바깥에 닿지 않는다 — 네트워크 0 · 앱 실행 0 · 실물 cys·키체인·자격증명 무접촉(가짜 cys · 가짜 security · 가짜 HOME · 가짜 토큰 글).
 # ⚠여기서 안 재는 것: 실물 서버가 10/10 증거 행을 보드에 어떻게 그리는가(스테이징 몫) · 실물 키체인의 mdat 형식(맥 실기 몫) ·
-#   실물 클로드 자격증명 파일의 칸 이름(claudeAiOauth.expiresAt — 【추정】 실물 형식 대조는 실기 몫) · 갱신 토큰 1회용 회전 여부(미실측).
+#   실물 클로드 자격증명 파일의 칸 이름(claudeAiOauth.expiresAt — 【추정】 실물 형식 대조는 실기 몫) · 갱신 토큰 1회용 회전 여부(아직 재지 않음).
 set -u
 HERE="$(cd "$(dirname "$0")" && pwd)"
 DIR="$HERE/../install-master"
@@ -292,7 +292,7 @@ grep -q 'J-PATH-01' "$BASE/msay-iP" && ! grep -q 'J-DL-07' "$BASE/msay-iP"
 t $? "[맥 대조군] 1-7 이 성하고 빨리 안 끝났으면 종전대로 J-PATH-01" "$(grep -E 'J-' "$BASE/msay-iP" 2>/dev/null | tr '\n' '|')"
 grep -q 'Failed to fetch version' "$BASE/msay-iN"; t $? "[맥 ③] 자식 설치기의 오류 글(stderr)이 화면 꼬리·기록에 남는다" "-"
 
-echo "== [2/10] 종료 코드 실패 갈래도 같은 축(master 판정 abb77ec4) =="
+echo "== [2/10] 종료 코드 실패 갈래도 같은 축(운영자 판정) =="
 mkdir -p "$BASE/wh-iR" "$BASE/up-iR"
 PATH="$BASE/pbin:/usr/bin:/bin" JARVIS_NO_PROGRESS=1 run_ps "iR" "\$ClaudeInstallUrl = 'http://127.0.0.1:9/install.ps1'; \$script:NetFailed = \$true
 function Seed-LocalBinPath { }
@@ -314,7 +314,7 @@ grep -q '^NEXT=휴대폰 핫스팟 같은 다른 인터넷으로' "$BASE/msay-rN
 t $? "[맥 종료코드] 기다림 끝에도 안 붙고 파일 없음+1-7 실패 → 다른 인터넷 안내 · 기록 근거 · 설치기 글 꼬리" "$(tr '\n' '|' < "$BASE/msay-rN" 2>/dev/null | cut -c1-400)"
 grep -q '^NEXT=연결이 된 뒤' "$BASE/msay-rP"; t $? "[맥 종료코드 대조군] 1-7 이 성하면 종전대로 「연결이 된 뒤」" "$(grep NEXT "$BASE/msay-rP" 2>/dev/null)"
 
-echo "== rotate 부서 순회 생략(master 판정 0c0f5705) =="
+echo "== rotate 부서 순회 생략(운영자 판정) =="
 cat > "$BASE/cysr" <<'EOF'
 #!/bin/bash
 S="${FAKE_CYS_STATE:?}"
@@ -348,7 +348,7 @@ SHF="$(run_sh "$BASE/mlog0" "for l in 'cys 1.1.2' 'cys 1.1.3 (x)' 'cysr v1.2.0' 
 [ "$PWF" = "[] [--skip-depts] [--skip-depts] [--skip-depts] [--skip-depts] [] [] [] " ] && [ "$PWF" = "$SHF" ]
 t $? "[동형] 판번 판정 여덟 입력 두 OS 글자까지 같다(1.1.10 = 이상 · 판번 없음 = 인자 없음)" "윈[$PWF] 맥[$SHF]"
 
-echo "== B2 개인 쪽 로그아웃(토큰 없음) → 옮기지 않음(master 판정 1b01748b · 899 L5) =="
+echo "== B2 개인 쪽 로그아웃(토큰 없음) → 옮기지 않음(운영자 판정 · 899 L5) =="
 # 개인 쪽 = 토큰이 빠진 글(수정 시각은 더 새것) · 자비스 쪽 = 살아 있는 로그인 — 앞 판은 수정 시각으로 copy:older 가 나와 덮었다
 mkup L6 '{"claudeAiOauth":{}}' "$(cred D 1000)"
 run_ps L6 '' 'Write-Output (Copy-LoginToIsolated)' >/dev/null

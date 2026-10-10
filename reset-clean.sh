@@ -213,7 +213,7 @@ add_descendants() {  # add_descendants <표> → 자손이 더해진 표
     #   해도 **이미 있는 것으로 읽고 그 자손을 목록에서 빠뜨렸다**(그래서 못 끈다).
     case "$pids" in *" $pid "*) continue ;; esac
     tok="$(proc_token "$pid" 2>/dev/null)" || continue
-    table="$(printf '%s\n%s\t%s\t%s' "$table" "$pid" "$tok" "(cys 가 띄운 자식)")"
+    table="$(printf '%s\n%s\t%s\t%s' "$table" "$pid" "$tok" "(cysr 이 띄운 자식)")"
     pids="$pids$pid "
   done
   printf '%s\n' "$table"
@@ -274,7 +274,7 @@ stop_cys_processes() {
   # 🔴**끄기 전에 무엇을 끄는지 인쇄한다**(1차 BLOCK ② · 3차 채널 분리). 강제 종료는 되돌릴 수 없다 —
   #   우리가 무엇을 골랐는지 사람이 볼 수 없으면, 잘못 골랐을 때 아무도 그것을 모른다.
   if [ -n "$targets" ]; then
-    tell "  cys 자리에서 도는 것을 멈춥니다:"
+    tell "  cysr 자리에서 도는 것을 멈춥니다:"
     printf '%s\n' "$targets" | while IFS="$(printf '\t')" read -r pid tok cmd; do
       [ -n "$pid" ] && tell "    끄는 중: $cmd  (번호 $pid)"
     done
@@ -427,21 +427,21 @@ diagnose() {
     #   이번 판이면 그대로 쓰고, 아니면 이번 판으로 바꿔 넣는다 — 그래서 여기서 지울 까닭이 없다.
     #   ⚠실행 상태(~/.local/state/cys)는 아래에서 **지난 편성 기록만** 보관 폴더로 옮기고 나머지는 제자리에 둔다
     #     (0.3.37 · 윈 Get-CysStateItems 와 같은 모양 · 앞 판은 통째로 지워 검색 기록까지 사라졌다).
-    [ -d "$CYS_APP" ] && say "  [있음] cys 프로그램 · $CYS_APP (남깁니다 — 다시 깔 때 판을 확인해 그대로 쓰거나 바꿉니다)" \
-                      || say "  [없음] cys 프로그램 · $CYS_APP"
-    [ -n "$CYS_APP_OLD" ] && say "  [있음] cys 프로그램(옛 이름) · $CYS_APP_OLD (남깁니다 — 다시 깔 때 새 이름으로 바꿔 넣으며 한 벌 보관합니다)"
+    [ -d "$CYS_APP" ] && say "  [있음] cysr 프로그램 · $CYS_APP (남깁니다 — 다시 깔 때 판을 확인해 그대로 쓰거나 바꿉니다)" \
+                      || say "  [없음] cysr 프로그램 · $CYS_APP"
+    [ -n "$CYS_APP_OLD" ] && say "  [있음] cysr 프로그램(옛 이름) · $CYS_APP_OLD (남깁니다 — 다시 깔 때 새 이름으로 바꿔 넣으며 한 벌 보관합니다)"
   else
-    [ -d "$CYS_APP" ]; row $? 'cys 프로그램' "$CYS_APP"
-    if [ -n "$CYS_APP_OLD" ]; then [ -d "$CYS_APP_OLD" ]; row $? 'cys 프로그램(옛 이름)' "$CYS_APP_OLD"; fi
+    [ -d "$CYS_APP" ]; row $? 'cysr 프로그램' "$CYS_APP"
+    if [ -n "$CYS_APP_OLD" ]; then [ -d "$CYS_APP_OLD" ]; row $? 'cysr 프로그램(옛 이름)' "$CYS_APP_OLD"; fi
   fi
   # footprint: M-DAEMON
-  [ -f "$HOME/Library/LaunchAgents/com.cysjavis.cysd.plist" ]; row $? 'cys 상시 가동 등록' "$HOME/Library/LaunchAgents/com.cysjavis.cysd.plist"
+  [ -f "$HOME/Library/LaunchAgents/com.cysjavis.cysd.plist" ]; row $? 'cysr 상시 가동 등록' "$HOME/Library/LaunchAgents/com.cysjavis.cysd.plist"
   # footprint: M-CYSHOME
-  if [ "$KEEP_HISTORY" = "1" ]; then [ -d "$HOME/.cys" ]; row $? 'cys 계정 자리(로그인·이전 대화·부서 기록은 제자리로 되옮기고 나머지는 보관합니다)' "$HOME/.cys"
-  else [ -d "$HOME/.cys" ]; row $? 'cys 계정 자리(보관 폴더로 옮깁니다)' "$HOME/.cys"; fi
+  if [ "$KEEP_HISTORY" = "1" ]; then [ -d "$HOME/.cys" ]; row $? 'cysr 계정 자리(로그인·이전 대화·부서 기록은 제자리로 되옮기고 나머지는 보관합니다)' "$HOME/.cys"
+  else [ -d "$HOME/.cys" ]; row $? 'cysr 계정 자리(보관 폴더로 옮깁니다)' "$HOME/.cys"; fi
   # footprint: M-CYSSTATE
-  if [ "$KEEP_HISTORY" = "1" ] || [ "$KEEP_APP" = "1" ]; then [ -d "$HOME/.local/state/cys" ]; row $? 'cys 실행 상태(지난 편성 기록만 보관합니다)' "$HOME/.local/state/cys"
-  else [ -d "$HOME/.local/state/cys" ]; row $? 'cys 실행 상태(보관 폴더로 옮깁니다)' "$HOME/.local/state/cys"; fi
+  if [ "$KEEP_HISTORY" = "1" ] || [ "$KEEP_APP" = "1" ]; then [ -d "$HOME/.local/state/cys" ]; row $? 'cysr 실행 상태(지난 편성 기록만 보관합니다)' "$HOME/.local/state/cys"
+  else [ -d "$HOME/.local/state/cys" ]; row $? 'cysr 실행 상태(보관 폴더로 옮깁니다)' "$HOME/.local/state/cys"; fi
   # footprint: M-DEPTSTATE (0.3.37 · 부서 실행 상태 — 재설치는 제자리 · 완전 삭제는 보관)
   local _ds
   for _ds in "$HOME/.local/state"/cys-dept-*; do
@@ -539,7 +539,7 @@ CRED_DIAG
     || say "  [없음] 토론장 안내 가리키기 · $(short "$AGORA_SKILL")"
   if [ -d "$AGORA_SKILL_IN_CYS" ]; then
     say "  [있음] 토론장 안내 가리키기(자비스 창 쪽) · $(short "$AGORA_SKILL_IN_CYS")"
-    say "         ⚠이것은 위의 「cys 계정 자리」 안에 들어 있어 그 자리와 함께 옮겨지거나 새로 만들어집니다(cys 설치의 일부입니다)."
+    say "         ⚠이것은 위의 「cysr 계정 자리」 안에 들어 있어 그 자리와 함께 옮겨지거나 새로 만들어집니다(cysr 설치의 일부입니다)."
     if [ -d "$AGORA_SKILL" ]; then
       say "         같은 안내가 $(short "$AGORA_SKILL") 에도 있어 그쪽은 남습니다."
     else
@@ -1508,7 +1508,7 @@ RESUME_LIST
 $parents
 RESUME_PARENTS
 }
-# ~/.cys 재설치 길(R2 · DESIGN-0337 4절): 통째로 보관 폴더로 옮긴 뒤 남길 것만 되옮긴다 — 지우는 것 0.
+# ~/.cys 재설치 길(요건 2 · DESIGN-0337 4절): 통째로 보관 폴더로 옮긴 뒤 남길 것만 되옮긴다 — 지우는 것 0.
 cys_home_reinstall() {
   local list hname
   if [ -L "$HOME/.cys" ]; then
@@ -1557,7 +1557,7 @@ cys_home_reinstall() {
     return 1
   fi
   rm -f "${list:?}"
-  if ! archive_move "$HOME/.cys" "$hname" "cys 계정 자리(다시 까는 길 — 남길 것은 곧 제자리로 되옮깁니다)"; then
+  if ! archive_move "$HOME/.cys" "$hname" "cysr 계정 자리(다시 까는 길 — 남길 것은 곧 제자리로 되옮깁니다)"; then
     [ -e "$HOME/.cys" ] && rm -f "${AROOT:?}/$RESTORE_MARK"   # 원자리가 그대로면 아무것도 안 옮긴 것 — 표지를 거둔다
     return 1
   fi
@@ -1573,13 +1573,13 @@ state_formation_archive() {
   [ -d "$d" ] || return 0
   while IFS= read -r n; do
     [ -n "$n" ] || continue
-    archive_move "$d/$n" "cys-state/$n" "cys 지난 편성 기록" || return 1
+    archive_move "$d/$n" "cys-state/$n" "cysr 지난 편성 기록" || return 1
   done <<SF_NAMES
 $STATE_FORMATION_NAMES
 SF_NAMES
   for f in "$d"/topology.json.*; do
     [ -e "$f" ] || [ -L "$f" ] || continue
-    archive_move "$f" "cys-state/$(basename "$f")" "cys 지난 편성 기록" || return 1
+    archive_move "$f" "cys-state/$(basename "$f")" "cysr 지난 편성 기록" || return 1
   done
   return 0
 }
@@ -1880,7 +1880,7 @@ purge() {
   #   프로그램을 먼저 지우면 등록을 뗄 수단이 사라져 죽은 등록이 남는다.
   # footprint: M-DAEMON
   if [ -n "$CYS_CLI" ]; then
-    CYS_NO_AUTOSTART=1 "$CYS_CLI" daemon uninstall >/dev/null 2>&1 && say "  지움: cys 상시 가동 등록"
+    CYS_NO_AUTOSTART=1 "$CYS_CLI" daemon uninstall >/dev/null 2>&1 && say "  지움: cysr 상시 가동 등록"
   fi
   launchctl bootout "gui/$(id -u)/com.cysjavis.cysd" >/dev/null 2>&1 || true
   drop_file "$HOME/Library/LaunchAgents/com.cysjavis.cysd.plist"
@@ -1895,11 +1895,11 @@ purge() {
   PROC_BLOCKED=0
   if [ -n "$CYS_ALIVE" ] && [ "$KEEP_APP" != "1" ]; then
     PROC_BLOCKED=1; ARCHIVE_FAIL=1; KEPT_FAIL=$((KEPT_FAIL+1))
-    say "  🔴남음: cys 프로그램 — 아직 실행 중이라 옮기거나 지울 수 없어 이번에는 아무것도 옮기지 않았습니다."
+    say "  🔴남음: cysr 프로그램 — 아직 실행 중이라 옮기거나 지울 수 없어 이번에는 아무것도 옮기지 않았습니다."
     write_alive_procs "$CYS_ALIVE"
-    say "         cys 창을 모두 닫아 주십시오 — 닫힌 뒤 다시 해 보면 이어서 옮깁니다(자료는 원래 자리에 그대로 있습니다)."
+    say "         cysr 창을 모두 닫아 주십시오 — 닫힌 뒤 다시 해 보면 이어서 옮깁니다(자료는 원래 자리에 그대로 있습니다)."
   elif [ -n "$CYS_ALIVE" ]; then
-    say "  [주의] cys 자리에서 아직 돌고 있는 것이 있습니다 — 폴더가 안 지워질 수 있습니다."
+    say "  [주의] cysr 자리에서 아직 돌고 있는 것이 있습니다 — 폴더가 안 지워질 수 있습니다."
     write_alive_procs "$CYS_ALIVE"
   fi
 
@@ -1992,7 +1992,7 @@ EOF_TRUST_ROWS
     say "         이 폴더 안의 기록(trust-seed.tsv)이 있어야 다시 해 볼 수 있습니다."
     say "         그 칸을 쓰고 있는 프로그램(클로드 창 등)을 닫으신 뒤 아래 「다시 하시는 법」대로 다시 실행해 주십시오."
   elif [ "${PROC_BLOCKED:-0}" = "1" ]; then
-    say "  [남김] $(short "$JARVIS_HOME") — cys 가 아직 돌고 있어 이번에는 옮기지 않았습니다(다음에 그대로 옮깁니다)."
+    say "  [남김] $(short "$JARVIS_HOME") — cysr 이 아직 돌고 있어 이번에는 옮기지 않았습니다(다음에 그대로 옮깁니다)."
   elif safe_jarvis_dir "$JARVIS_HOME"; then
     keep_jarvis_dir "$JARVIS_HOME"   # 0.3.36: 지우지 않고 보관 이동(위 keep_jarvis_dir)
   elif [ -e "$JARVIS_HOME" ]; then
@@ -2002,7 +2002,7 @@ EOF_TRUST_ROWS
     say "         그 자리는 손으로 확인해 주십시오. 확실하지 않은 자리를 재귀로 지우지 않습니다."
   fi
   # footprint: M-CYSHOME   (M-CYSPROFILE 은 이 안에 들어 있다)
-  # 0.3.37(DESIGN-0337 3절 · 4절): 지우지 않고 보관 폴더로 옮긴다 — 완전 삭제 = 통째로 · 재설치 = 통째로 옮긴 뒤 남길 것만 되옮긴다(R2).
+  # 0.3.37(DESIGN-0337 3절 · 4절): 지우지 않고 보관 폴더로 옮긴다 — 완전 삭제 = 통째로 · 재설치 = 통째로 옮긴 뒤 남길 것만 되옮긴다(요건 2).
   #   ★작업 폴더 보관(위 keep_jarvis_dir)이 먼저다 — 그 보관 폴더에 모은다(archive_root_set). 신뢰 칸 기록은 이미 위에서 다 썼다.
   #   참가 자리가 ~/.cys 안이면(사람이 AGORA_HOME 을 옮겨 둔 드문 경우) 통째로 옮길 수 없다 — 재설치는 0.3.36 장치(남기고 지우기)로,
   #   완전 삭제는 옮기지 않고 그대로 둔다(archive_move 가 「남김」 으로 말한다 · 옮겼다 되돌리기 금지).
@@ -2029,7 +2029,7 @@ EOF_TRUST_ROWS
       # 0.3.37(설계 결정 3): 보관한 옛 ~/.cys 자리를 회차 사이에 기억해 두고 **회차마다** 그 안 로그인 파일을 지운다 —
       #   앞 판은 이번 회차에 옮긴 때만 지워, 1회차 지우기가 실패하면 다시 해 보기가 그 파일을 안 보고 rc 0 으로 끝났다(비밀값이 보관 폴더에 남음).
       ARCHIVE_LAST=""
-      if archive_move "$HOME/.cys" "cys-home" "cys 계정 자리(대화·부서 기록)"; then
+      if archive_move "$HOME/.cys" "cys-home" "cysr 계정 자리(대화·부서 기록)"; then
         [ -n "$ARCHIVE_LAST" ] && CYS_HOME_ARCHIVED="$ARCHIVE_LAST"
         [ -n "$CYS_HOME_ARCHIVED" ] && drop_archived_credentials "$CYS_HOME_ARCHIVED"
       fi
@@ -2045,7 +2045,7 @@ EOF_TRUST_ROWS
   elif [ "$KEEP_HISTORY" = "1" ] || [ "$KEEP_APP" = "1" ]; then
     state_formation_archive
   else
-    archive_move "$HOME/.local/state/cys" "cys-state" "cys 실행 상태"
+    archive_move "$HOME/.local/state/cys" "cys-state" "cysr 실행 상태"
     for _ds in "$HOME/.local/state"/cys-dept-*; do
       [ -e "$_ds" ] || [ -L "$_ds" ] || continue
       archive_move "$_ds" "cys-dept-state/$(basename "$_ds")" "부서 실행 상태"
@@ -2069,8 +2069,8 @@ EOF_TRUST_ROWS
     say "         이전 자료는 원래 자리나 보관 폴더 한쪽에 그대로 있습니다 — 사라진 것은 없습니다."
   else
     if [ "$KEEP_APP" = "1" ]; then
-      say "  [남김] cys 프로그램 · $CYS_APP (다시 깔 때 판을 확인해 그대로 쓰거나 바꿉니다)"
-      [ -n "$CYS_APP_OLD" ] && say "  [남김] cys 프로그램(옛 이름) · $CYS_APP_OLD (다시 깔 때 새 이름으로 바꿔 넣으며 한 벌 보관합니다)"
+      say "  [남김] cysr 프로그램 · $CYS_APP (다시 깔 때 판을 확인해 그대로 쓰거나 바꿉니다)"
+      [ -n "$CYS_APP_OLD" ] && say "  [남김] cysr 프로그램(옛 이름) · $CYS_APP_OLD (다시 깔 때 새 이름으로 바꿔 넣으며 한 벌 보관합니다)"
     else
       drop_dir "$CYS_APP"
       [ -n "$CYS_APP_OLD" ] && drop_dir "$CYS_APP_OLD"
@@ -2173,7 +2173,7 @@ notice_close_cys() {
   alive="$(procs_under "$CYS_APP" ${CYS_APP_OLD:+"$CYS_APP_OLD"} "$HOME/.cys" 2>/dev/null | sort -u | wc -l | tr -d ' ')"
   [ "${alive:-0}" -gt 0 ] || return 0
   say ""
-  say "cys 를 곧 끕니다. 저장하지 않으신 것이 있으면 지금 저장해 주세요."
+  say "cysr 을 곧 끕니다. 저장하지 않으신 것이 있으면 지금 저장해 주세요."
   # 0.3.37: 묻지 않는다(사람 손 0 · 알림 뒤 5초) — 알리고 잠깐 기다린 뒤 이 도구가 끈다. 재설치 한 줄(--yes)은 기다리지 않는다.
   [ "$ASSUME_YES" = "1" ] || sleep "${JARVIS_NOTICE_WAIT:-5}"
   return 0

@@ -1,6 +1,6 @@
 #!/bin/bash
 # D5-F2 검출 시험 — 맥 「다시 설치하기」 한 줄(reinstall.sh)이 사람에게 묻지 않고 설치 단계까지 가는가.
-#   박사님 09-21 「중간에 묻는 단계 전부 삭제」 · 윈판 reinstall.ps1 = -KeepApp -Yes(질문 0) 와 같은 끝.
+#   운영자 09-21 「중간에 묻는 단계 전부 삭제」 · 윈판 reinstall.ps1 = -KeepApp -Yes(질문 0) 와 같은 끝.
 #   입력(stdin)을 닫고 제어 터미널 없이 돈다 — 묻는 줄이 있으면 답을 못 받아 「그만둡니다」로 빠지고 설치 도우미에 닿지 못한다.
 # ⛔라이브 무접촉: reset-clean.sh 는 /Applications/cysr.app 의 cys 로 데몬 등록을 떼고 launchctl bootout·그 자리 프로세스를 끈다.
 #   ⇒ 시험 사본에서 절대경로 /Applications/·/usr/local/bin/cys 를 가짜 루트로 바꾸고, launchctl·security 는 PATH 가짜로 막는다.

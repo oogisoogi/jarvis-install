@@ -1,5 +1,5 @@
 #!/bin/bash
-# 32비트 PowerShell 감지·64비트 재실행 시험 — TICKET=installer-0325 c8 (2026-09-17)
+# 32비트 PowerShell 감지·64비트 재실행 시험 — c8 (2026-09-17)
 #
 # 무엇을 재는가
 #   ⓐ Test-Ps32OnWin64(순수 함수 — [Environment] 정적값을 직접 안 묻는다)가 4개 조합에서 정확히 판정한다

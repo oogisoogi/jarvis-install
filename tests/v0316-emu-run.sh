@@ -17,7 +17,7 @@
 #   쓰기는 mktemp -d 안에서만(USERPROFILE · JARVIS_HOME 모두 그 안).
 # ⚠여기서 **안 재는 것**(윈도우에서만 있는 것): 사용자 PATH 등록(맥 .NET 은 User 대상을 무시해 흉내에서는 이름을 이어 준다) ·
 #   CIM 프로세스 목록(PowerShell 7 의 Parent 칸으로 대신 잰다) · 창 제목(가짜 함수로 한 갈래만) · 레지스트리 · 콘솔 붙여넣기.
-export JARVIS_NO_PROGRESS=1   # 🔴흉내·검사는 라이브 서버로 진행 이벤트를 보내지 않는다(2026-09-15 15:49 master 게이트 실행이 라이브 progress에 가짜 4건을 남긴 사고 · Send-Progress의 레버)
+export JARVIS_NO_PROGRESS=1   # 🔴흉내·검사는 라이브 서버로 진행 이벤트를 보내지 않는다(2026-09-15 15:49 출고 전 점검 실행이 라이브 progress에 가짜 4건을 남긴 사고 · Send-Progress의 레버)
 set -u
 HERE="$(cd "$(dirname "$0")" && pwd)"
 DIR="$HERE/../install-master"

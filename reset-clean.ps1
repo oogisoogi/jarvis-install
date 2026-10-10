@@ -880,14 +880,14 @@ function Invoke-Diagnose {
     # footprint: W-APP
     if ($KeepApp) {
         # 재설치 길 — 지울 목록에 넣지 않는다(개수에도 안 센다). 무엇을 남기는지는 말한다.
-        Write-Host '  [남김] cys 프로그램 — 프로그램 파일은 지우지 않고 그대로 둡니다(다시 깔 때 이 프로그램을 씁니다)'
+        Write-Host '  [남김] cysr 프로그램 — 프로그램 파일은 지우지 않고 그대로 둡니다(다시 깔 때 이 프로그램을 씁니다)'
         # 지난 편성 기록은 보관 폴더로 옮긴다(Get-CysStateItems 머리 주석 · 0.3.37) — 있으면 목록에 센다.
-        foreach ($s in (Get-CysStateItems)) { [void](Row 'cys 지난 편성 기록(동료 좌석을 되살리는 기록 · 보관 폴더로 옮깁니다)' $s) }
+        foreach ($s in (Get-CysStateItems)) { [void](Row 'cysr 지난 편성 기록(동료 좌석을 되살리는 기록 · 보관 폴더로 옮깁니다)' $s) }
     } else {
-        [void](Row 'cys 프로그램(프로그램 파일은 지우고, 안의 실행 기록은 보관 폴더로 옮깁니다)' $CysDir)
-        [void](Row 'cys 프로그램(옛 자리)' $CysDirOld)
-        foreach ($lnk in (Get-StartMenuLinks)) { [void](Row 'cys 시작 메뉴 바로가기(우리 설치 자리를 가리킬 때만 지웁니다)' $lnk) }
-        foreach ($lnk in (Get-DesktopLinks)) { [void](Row 'cys 바탕화면 바로가기(우리 설치 자리를 가리킬 때만 지웁니다)' $lnk) }
+        [void](Row 'cysr 프로그램(프로그램 파일은 지우고, 안의 실행 기록은 보관 폴더로 옮깁니다)' $CysDir)
+        [void](Row 'cysr 프로그램(옛 자리)' $CysDirOld)
+        foreach ($lnk in (Get-StartMenuLinks)) { [void](Row 'cysr 시작 메뉴 바로가기(우리 설치 자리를 가리킬 때만 지웁니다)' $lnk) }
+        foreach ($lnk in (Get-DesktopLinks)) { [void](Row 'cysr 바탕화면 바로가기(우리 설치 자리를 가리킬 때만 지웁니다)' $lnk) }
     }
     # 0.3.37: 부서 실행 상태(프로그램 폴더 안 cys-dept-<n>) · 닫은 부서 휴지통 · 앱 화면 자료 — 재설치는 제자리 · 완전 삭제는 보관
     # footprint: W-DEPTSTATE
@@ -917,15 +917,15 @@ function Invoke-Diagnose {
     }
     # footprint: W-REG
     if (-not $KeepApp) {
-        [void](Row 'cys 설치 목록 항목(우리 설치 자리를 가리킬 때만 지웁니다)' $RegKeyR)
-        [void](Row 'cys 설치 목록 항목(옛 이름 · 우리 설치 자리를 가리킬 때만 지웁니다)' $RegKey)
+        [void](Row 'cysr 설치 목록 항목(우리 설치 자리를 가리킬 때만 지웁니다)' $RegKeyR)
+        [void](Row 'cysr 설치 목록 항목(옛 이름 · 우리 설치 자리를 가리킬 때만 지웁니다)' $RegKey)
     }
     # footprint: W-DAEMON
     $tk = @(Get-CysTasks)
-    RowFlag 'cys 상시 가동 등록' ($tk.Count -gt 0) '작업 스케줄러'
+    RowFlag 'cysr 상시 가동 등록' ($tk.Count -gt 0) '작업 스케줄러'
     # footprint: W-CYSHOME
-    if ($KeepHistory) { [void](Row 'cys 계정 자리(로그인·이전 대화·부서 기록은 제자리로 되옮기고 나머지는 보관합니다)' $CysHome) }
-    else { [void](Row 'cys 계정 자리(보관 폴더로 옮깁니다)' $CysHome) }
+    if ($KeepHistory) { [void](Row 'cysr 계정 자리(로그인·이전 대화·부서 기록은 제자리로 되옮기고 나머지는 보관합니다)' $CysHome) }
+    else { [void](Row 'cysr 계정 자리(보관 폴더로 옮깁니다)' $CysHome) }
     # footprint: W-CLAUDEBIN
     [void](Row '클로드 실행 파일' $ClaudeExe)
     # footprint: W-JARVISHOME
@@ -985,7 +985,7 @@ function Invoke-Diagnose {
     else { Write-Host ('  [없음] 토론장 안내 가리키기 · ' + (Short $AgoraSkill)) }
     if (Test-Path -LiteralPath $AgoraSkillInCys) {
         Write-Host ('  [있음] 토론장 안내 가리키기(자비스 창 쪽) · ' + (Short $AgoraSkillInCys))
-        Write-Host '         이것은 위의 「cys 계정 자리」 안에 들어 있어 그 자리와 함께 옮겨지거나 새로 만들어집니다(cys 설치의 일부입니다).'
+        Write-Host '         이것은 위의 「cysr 계정 자리」 안에 들어 있어 그 자리와 함께 옮겨지거나 새로 만들어집니다(cysr 설치의 일부입니다).'
         if (Test-Path -LiteralPath $AgoraSkill) {
             Write-Host ('         같은 안내가 ' + (Short $AgoraSkill) + ' 에도 있어 그쪽은 남습니다.')
         } else {
@@ -1758,7 +1758,7 @@ function Invoke-CysHomeReinstall {
         return $false
     }
     $kf = $script:KeptFail
-    $ok = Archive-Move $CysHome $hname 'cys 계정 자리(다시 까는 길 - 남길 것은 곧 제자리로 되옮깁니다)'
+    $ok = Archive-Move $CysHome $hname 'cysr 계정 자리(다시 까는 길 - 남길 것은 곧 제자리로 되옮깁니다)'
     if ((-not $ok) -or (Test-PathOrLink $CysHome)) {
         # 원자리가 그대로면 아무것도 안 옮긴 것 — 표지를 거둔다(자료는 원자리에 온전). 재설치는 여기서 멈춘다(옛 ~\.cys 위에 이어 가지 않는다).
         if (Test-PathOrLink $CysHome) { try { [System.IO.File]::Delete($markPath) } catch { } }
@@ -1795,7 +1795,7 @@ function Invoke-CysAppStateArchive($dir) {
         if (Test-CysProgramItem $k) { continue }
         # 부서 실행 상태(cys-dept-<n>)는 맥과 같은 자리(cys-dept-state\) — 두 OS 보관 폴더 모양을 같게(DESIGN-0337 3-3절)
         if ([string]$k.Name -ilike 'cys-dept-*') { [void](Archive-Move (Join-Path $dir $k.Name) ('cys-dept-state\' + $k.Name) '부서 실행 상태'); continue }
-        [void](Archive-Move (Join-Path $dir $k.Name) ('cys-app-state\' + $k.Name) 'cys 실행 기록')
+        [void](Archive-Move (Join-Path $dir $k.Name) ('cys-app-state\' + $k.Name) 'cysr 실행 기록')
     }
 }
 # 보관 관문 뒤 — 프로그램 폴더에서 프로그램 파일만 지우고, 비었으면 폴더도 지운다(설치 템플릿 RMDir "$INSTDIR" 와 같다 · 비었을 때만).
@@ -1857,13 +1857,13 @@ function Invoke-OurRegistryCleanup {
     #   등록만 지우면 설정 앱 항목 없는 고아 프로그램이 남는다 ⇒ 등록도 함께 남긴다(프로그램과 한 쌍).
     if ($script:PreserveCanonFail.Count -gt 0) {
         $script:KeptFail++
-        Write-Host '  [남음] cys 설치 목록 항목·설치 위치 기록·자동 실행 값 - 남겨야 할 자리를 확인하지 못해 프로그램과 함께 그대로 두었습니다.'
+        Write-Host '  [남음] cysr 설치 목록 항목·설치 위치 기록·자동 실행 값 - 남겨야 할 자리를 확인하지 못해 프로그램과 함께 그대로 두었습니다.'
         return
     }
     # 설치 목록 항목(설정 앱 목록 · installer.nsi:880~887 · 옛 이름 nsis-hooks.nsh:863~868)
     foreach ($k in @($RegKeyR, $RegKey)) {
         if (-not (Test-Path -LiteralPath $k)) { continue }
-        if (Test-OurUninstallKey $k) { [void](Remove-RegKeyOurs $k 'cys 설치 목록 항목') }
+        if (Test-OurUninstallKey $k) { [void](Remove-RegKeyOurs $k 'cysr 설치 목록 항목') }
         else { Write-Host ('  남김: ' + $k + ' - 우리 설치 자리를 가리키지 않아 손대지 않았습니다(다른 설치일 수 있습니다).') }
     }
     # 설치 위치 기록 Software\<제조사>\<제품 이름> 기본값(installer.nsi:708·902~907) — 값이 우리 설치 자리일 때만
@@ -1871,7 +1871,7 @@ function Invoke-OurRegistryCleanup {
     foreach ($n in @('cysr', 'cys')) {
         $k = $ManuKey + '\' + $n
         if (-not (Test-Path -LiteralPath $k)) { continue }
-        if (Test-OurInstallDir (Get-RegValue $k '(default)')) { if (Remove-RegKeyOurs $k 'cys 설치 위치 기록') { $manuHit = $true } }
+        if (Test-OurInstallDir (Get-RegValue $k '(default)')) { if (Remove-RegKeyOurs $k 'cysr 설치 위치 기록') { $manuHit = $true } }
         else { Write-Host ('  남김: ' + $k + ' - 우리 설치 자리를 가리키지 않아 손대지 않았습니다.') }
     }
     # 제조사 키가 이제 비었으면(하위 키·값 없음) 지운다 — 설치 템플릿 DeleteRegKey /ifempty 와 같다(installer.nsi:906)
@@ -1880,15 +1880,15 @@ function Invoke-OurRegistryCleanup {
         try { $sub = @(Get-ChildItem -LiteralPath $ManuKey -Force -ErrorAction Stop) } catch { $sub = $null }
         $vals = @('?')
         try { $vals = @(@((Get-Item -LiteralPath $ManuKey -ErrorAction Stop).Property) | Where-Object { $_ }) } catch { $vals = @('?') }
-        if (($null -ne $sub) -and ($sub.Count -eq 0) -and ($vals.Count -eq 0)) { [void](Remove-RegKeyOurs $ManuKey 'cys 제조사 기록(빈 칸)') }
+        if (($null -ne $sub) -and ($sub.Count -eq 0) -and ($vals.Count -eq 0)) { [void](Remove-RegKeyOurs $ManuKey 'cysr 제조사 기록(빈 칸)') }
     }
     # 자동 실행 값 Run\<제품 이름>(installer.nsi:893~895) — 값이 우리 실행 파일일 때만
     foreach ($n in @('cysr', 'cys')) {
         $v = Get-RegValue $RunKey $n
         if ($null -eq $v) { continue }
         if (Test-OurExe (Get-ExePathOf $v)) {
-            try { Remove-ItemProperty -LiteralPath $RunKey -Name $n -ErrorAction Stop; $script:Removed++; Write-Host ('  지움: cys 자동 실행 값 (' + $n + ')') }
-            catch { $script:KeptFail++; Write-Host ('  [남음] cys 자동 실행 값 (' + $n + ') - ' + $_.Exception.Message) }
+            try { Remove-ItemProperty -LiteralPath $RunKey -Name $n -ErrorAction Stop; $script:Removed++; Write-Host ('  지움: cysr 자동 실행 값 (' + $n + ')') }
+            catch { $script:KeptFail++; Write-Host ('  [남음] cysr 자동 실행 값 (' + $n + ') - ' + $_.Exception.Message) }
         } else { Write-Host ('  남김: 자동 실행 값 ' + $n + ' - 우리 프로그램을 가리키지 않아 손대지 않았습니다.') }
     }
 }
@@ -1900,10 +1900,10 @@ function Get-ShortcutTarget($lnk) {   # 바로가기가 가리키는 실행 파�
 }
 function Remove-OurShortcuts {   # 시작 메뉴 · 바탕화면 — 대상이 우리 설치 자리 실행 파일일 때만(installer.nsi:853~877)
     $links = @(Get-StartMenuLinks) + @(Get-DesktopLinks)
-    if ($links.Count -eq 0) { Write-Host '  [없음] cys 시작 메뉴 바로가기'; return }
+    if ($links.Count -eq 0) { Write-Host '  [없음] cysr 시작 메뉴 바로가기'; return }
     if ($script:PreserveCanonFail.Count -gt 0) {
         $script:KeptFail++
-        Write-Host '  [남음] cys 바로가기 - 남겨야 할 자리를 확인하지 못해 이번에는 지우지 않았습니다.'
+        Write-Host '  [남음] cysr 바로가기 - 남겨야 할 자리를 확인하지 못해 이번에는 지우지 않았습니다.'
         return
     }
     foreach ($lnk in $links) {
@@ -1914,9 +1914,9 @@ function Remove-OurShortcuts {   # 시작 메뉴 · 바탕화면 — 대상이 �
         if (-not $t) { Write-Host ('  남김: ' + (Short $lnk) + ' - 가리키는 곳을 확인하지 못해 그대로 두었습니다(모르면 남깁니다).'); continue }
         if (-not (Test-OurExe $t)) { Write-Host ('  남김: ' + (Short $lnk) + ' - 우리 설치 자리를 가리키지 않아 손대지 않았습니다.'); continue }
         try { [System.IO.File]::Delete($lnk) } catch { }
-        if (Test-PathOrLink $lnk) { $script:KeptFail++; Write-Host ('  [남음] cys 바로가기 · ' + (Short $lnk)); continue }
+        if (Test-PathOrLink $lnk) { $script:KeptFail++; Write-Host ('  [남음] cysr 바로가기 · ' + (Short $lnk)); continue }
         $script:Removed++
-        Write-Host ('  지움: cys 바로가기 · ' + (Short $lnk))
+        Write-Host ('  지움: cysr 바로가기 · ' + (Short $lnk))
         # 폴더 안 바로가기(cys\cys.lnk · cysr\cysr.lnk)면 그 폴더도 — 비었을 때만(installer.nsi:861)
         $pd = Split-Path -Parent $lnk
         $pl = [string](Split-Path -Leaf $pd)
@@ -2233,7 +2233,7 @@ function Invoke-Purge {
     $cys = Get-CysCmd
     $daemonDone = $false
     if ($cys) {
-        try { & $cys daemon uninstall 2>&1 | Out-Null; $daemonDone = $true; Write-Host '  지움: cys 상시 가동 등록' } catch { }
+        try { & $cys daemon uninstall 2>&1 | Out-Null; $daemonDone = $true; Write-Host '  지움: cysr 상시 가동 등록' } catch { }
     }
     # 🔴교차 검토 지적 채택(2026-09-08): 프로그램이 이미 없으면(사람이 손으로 지웠거나 백신이 날렸거나)
     #   위 명령을 부를 수단이 없어 **등록만 영원히 남는다.** 맥에는 폴백(launchctl bootout)이 있는데
@@ -2242,9 +2242,9 @@ function Invoke-Purge {
         try {
             foreach ($tk in @(Get-CysTasks)) {
                 Unregister-ScheduledTask -TaskName $tk.TaskName -Confirm:$false -ErrorAction Stop
-                $script:Removed++; Write-Host ('  지움: cys 상시 가동 등록 (' + $tk.TaskName + ')')
+                $script:Removed++; Write-Host ('  지움: cysr 상시 가동 등록 (' + $tk.TaskName + ')')
             }
-        } catch { $script:KeptFail++; Write-Host ('  [남음] cys 상시 가동 등록 — ' + $_.Exception.Message) }
+        } catch { $script:KeptFail++; Write-Host ('  [남음] cysr 상시 가동 등록 — ' + $_.Exception.Message) }
     }
 
     # footprint: W-HOOK
@@ -2257,7 +2257,7 @@ function Invoke-Purge {
     #   🔴앞 판의 설정 앱 안내 · 「제거를 마치셨으면 Enter」 고리 · 「이 폴더를 지웁니다」 확인은 사람이 할 수 없는 일을 요구하다 막힌 일이 셋이었다
     #     (설정 앱에 없는 항목을 여덟 번 요구 · Enter 만 믿고 뜯음 · 1.1.x 의 cysr 항목을 몰라 「설정 앱에는 cys 가 보이지 않습니다」 라는 틀린 말).
     $hasRegEntry = Test-Path $RegKey
-    # cys 가 돌고 있으면 폴더·기록이 옮겨지지 않는다 — 먼저 자리 기준으로 끈다(R1 · 고아가 된 python3.exe 가 정확히 이 자리에서 걸렸다).
+    # cys 가 돌고 있으면 폴더·기록이 옮겨지지 않는다 — 먼저 자리 기준으로 끈다(요건 1 · 고아가 된 python3.exe 가 정확히 이 자리에서 걸렸다).
     #   ★끈 뒤에도 돌고 있으면(완전 삭제 길) 이번에는 아무것도 옮기지 않는다 — 스스로 다시 해 보기가 그 사이 창을 닫을 틈을 준다.
     $procBlocked = $false
     $alive = @(Stop-CysProcesses)
@@ -2266,11 +2266,11 @@ function Invoke-Purge {
         $script:SkipCysDir = $true
         $script:ArchiveFail = 1
         $script:KeptFail++
-        Write-Host ('  [남음] cys 프로그램 — 아직 실행 중이라 옮기거나 지울 수 없어 이번에는 아무것도 옮기지 않았습니다(' + $alive.Count + '가지).')
+        Write-Host ('  [남음] cysr 프로그램 — 아직 실행 중이라 옮기거나 지울 수 없어 이번에는 아무것도 옮기지 않았습니다(' + $alive.Count + '가지).')
         Write-AliveProcs $alive
-        Write-Host '         cys 창을 모두 닫아 주십시오 — 닫힌 뒤 다시 해 보면 이어서 옮깁니다(자료는 원래 자리에 그대로 있습니다).'
+        Write-Host '         cysr 창을 모두 닫아 주십시오 — 닫힌 뒤 다시 해 보면 이어서 옮깁니다(자료는 원래 자리에 그대로 있습니다).'
     } elseif ($alive.Count -gt 0) {
-        Write-Host ('  [주의] cys 자리에서 아직 ' + $alive.Count + '개가 돌고 있습니다 — 지난 편성 기록이 안 옮겨질 수 있습니다.')
+        Write-Host ('  [주의] cysr 자리에서 아직 ' + $alive.Count + '개가 돌고 있습니다 — 지난 편성 기록이 안 옮겨질 수 있습니다.')
         Write-AliveProcs $alive
     }
 
@@ -2368,7 +2368,7 @@ function Invoke-Purge {
     #   영영 건너뛴다(참가자 컴퓨터에 우리 자국이 남는다).
     #   ★순서를 앞당긴 것만으로는 부족했다: 실패해도 그냥 이어서 지우고 있었다.
     if ($procBlocked) {
-        Write-Host ('  [남김] ' + (Short $JarvisDir) + ' - cys 가 아직 돌고 있어 이번에는 옮기지 않았습니다(다음에 그대로 옮깁니다).')
+        Write-Host ('  [남김] ' + (Short $JarvisDir) + ' - cysr 이 아직 돌고 있어 이번에는 옮기지 않았습니다(다음에 그대로 옮깁니다).')
     } elseif ($script:TrustCleanupFail -gt 0) {
         $script:KeptFail++
         Write-Host ('  [남음] ' + (Short $JarvisDir) + ' - 폴더 신뢰 칸을 다 되돌리지 못해 일부러 남겼습니다.')
@@ -2411,7 +2411,7 @@ function Invoke-Purge {
                     $script:KeptFail++
                     Write-Host ('  [남음] ' + (Short $CysHome) + ' - 남겨야 할 부서 기록의 목록을 읽지 못해 아무것도 지우지 않았습니다.')
                 } else {
-                    Drop 'cys 계정 자리' $CysHome (@($hk.Canon) + @($dk))
+                    Drop 'cysr 계정 자리' $CysHome (@($hk.Canon) + @($dk))
                 }
             } elseif ($KeepHistory) {
                 if ($hi -or (Test-PathOrLink $CysHome)) { [void](Invoke-CysHomeReinstall) }
@@ -2419,7 +2419,7 @@ function Invoke-Purge {
                 # 0.3.37(설계 결정 3): 보관한 옛 ~\.cys 자리를 회차 사이에 기억해 두고 **회차마다** 그 안 로그인 파일을 지운다 —
                 #   앞 판은 이번 회차에 옮긴 때만 지워, 1회차 지우기가 실패하면 다시 해 보기가 그 파일을 안 보고 rc 0 으로 끝났다(비밀값이 보관 폴더에 남음).
                 $script:ArchiveLast = ''
-                if (Archive-Move $CysHome 'cys-home' 'cys 계정 자리(대화·부서 기록)') {
+                if (Archive-Move $CysHome 'cys-home' 'cysr 계정 자리(대화·부서 기록)') {
                     if ($script:ArchiveLast) { $script:CysHomeArchived = $script:ArchiveLast }
                     if ($script:CysHomeArchived) { Remove-ArchivedCredentials $script:CysHomeArchived }
                 }
@@ -2429,7 +2429,7 @@ function Invoke-Purge {
         #   재설치(-KeepApp · -KeepHistory) = 지난 편성 기록만 보관(본부 좌석이 설치 도우미보다 먼저 뜨지 않게) · 나머지와 부서 상태(cys-dept-<n>)는 제자리
         #   완전 삭제 = 프로그램 폴더 안의 프로그램 파일이 아닌 것 전부 · 휴지통 · 앱 화면 자료를 보관(프로그램 파일은 관문 뒤에서 지운다)
         if ($KeepApp -or $KeepHistory) {
-            foreach ($s in (Get-CysStateItems)) { [void](Archive-Move $s ('cys-state\' + (Split-Path -Leaf $s)) 'cys 지난 편성 기록') }
+            foreach ($s in (Get-CysStateItems)) { [void](Archive-Move $s ('cys-state\' + (Split-Path -Leaf $s)) 'cysr 지난 편성 기록') }
         } else {
             # footprint: W-DEPTSTATE
             foreach ($d in @($CysDir, $CysDirOld)) { Invoke-CysAppStateArchive $d }
@@ -2451,11 +2451,11 @@ function Invoke-Purge {
     } else {
         if ($KeepApp) {
             # 재설치 길(-KeepApp) — 프로그램 걷기를 통째로 건너뛴다. 재설치는 곧바로 다시 까는 길이라 프로그램을 지울 까닭이 없다.
-            Write-Host '  남김: cys 프로그램 (재설치 — 지우지 않고 그대로 씁니다)'
-            if ($hasRegEntry -or (Test-Path $RegKeyR)) { Write-Host '  남김: cys 설치 목록 항목 (프로그램과 한 쌍이라 함께 둡니다)' }
+            Write-Host '  남김: cysr 프로그램 (재설치 — 지우지 않고 그대로 씁니다)'
+            if ($hasRegEntry -or (Test-Path $RegKeyR)) { Write-Host '  남김: cysr 설치 목록 항목 (프로그램과 한 쌍이라 함께 둡니다)' }
         } else {
             if ((Test-Path $UninstExe) -and $UseUninstaller) {
-                Write-Host '  cys 제거 프로그램을 실행합니다. (백신이 이 행위를 막을 수 있습니다)'
+                Write-Host '  cysr 제거 프로그램을 실행합니다. (백신이 이 행위를 막을 수 있습니다)'
                 try {
                     $u = Start-Process -FilePath $UninstExe -ArgumentList '/S' -PassThru -ErrorAction Stop
                     if (-not $u.WaitForExit(180000)) { Write-Host '    제거 프로그램이 180초 안에 끝나지 않았습니다. 기다리기를 멈추고 나머지를 지웁니다.' }
@@ -2467,8 +2467,8 @@ function Invoke-Purge {
             }
             if ((Test-Path $CysDir) -or (Test-Path $CysDirOld)) {
                 # 프로그램 파일만 지운다(자료는 위에서 보관 폴더로 옮겼다) — 폴더 자체가 바로가기면 이름표만(가리키던 자리는 그대로)
-                if (Test-IsReparsePath $CysDir) { Drop 'cys 프로그램' $CysDir } else { Remove-CysProgramFiles $CysDir 'cys 프로그램' }
-                if (Test-IsReparsePath $CysDirOld) { Drop 'cys 프로그램(옛 자리)' $CysDirOld } else { Remove-CysProgramFiles $CysDirOld 'cys 프로그램(옛 자리)' }
+                if (Test-IsReparsePath $CysDir) { Drop 'cysr 프로그램' $CysDir } else { Remove-CysProgramFiles $CysDir 'cysr 프로그램' }
+                if (Test-IsReparsePath $CysDirOld) { Drop 'cysr 프로그램(옛 자리)' $CysDirOld } else { Remove-CysProgramFiles $CysDirOld 'cysr 프로그램(옛 자리)' }
             }
             # 공식 제거기가 해 주던 뒷정리 — 우리 설치 자리를 가리키는 것만(남의 같은 이름 항목 무접촉 · 모르면 남김)
             Remove-OurShortcuts
@@ -2563,7 +2563,7 @@ Write-Host '위 목록의 자료는 지우지 않고 보관 폴더로 옮깁니�
 $aliveNow = @(Get-ProcsUnder @($CysDir, $CysDirOld))
 if ($aliveNow.Count -gt 0) {
     Write-Host ''
-    Write-Host 'cys 를 곧 끕니다. 저장하지 않으신 것이 있으면 지금 저장해 주세요.'
+    Write-Host 'cysr 을 곧 끕니다. 저장하지 않으신 것이 있으면 지금 저장해 주세요.'
     if (-not $Yes) {
         $noticeWait = 5
         if ([string]$env:JARVIS_NOTICE_WAIT -match '^[0-9]+$') { $noticeWait = [int]$env:JARVIS_NOTICE_WAIT }

@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-# 뮤턴트 — 캡처 증거(TICKET=installer-capture-evidence · 2026-09-16)가 「실제로 재지고 있는가」를 재는 도구
+# 뮤턴트 — 캡처 증거(2026-09-16)가 「실제로 재지고 있는가」를 재는 도구
 #
 # ★쓰는 법
 #   python3 tests/capture-mutate.py --root <저장소>           전건(사본에서만 고친다 · 실물 무접촉)
@@ -58,7 +58,7 @@ MUTANTS = [
      "    return ($Sec -gt ($b * 2))",
      "    return ($Sec -gt $b)",
      "[기준선] 딱 2배는 촉발하지 않는다(초과여야 한다)", CAP),
-    # ⓕ① 「모름」을 「느림」으로 읽는다 — master 결정(빈 표 = 꺼짐)의 정반대
+    # ⓕ① 「모름」을 「느림」으로 읽는다 — 운영자 결정(빈 표 = 꺼짐)의 정반대
     ("slow-unknown-true", PS,
      "    if (-not $script:StepBaselineSec.ContainsKey($Step)) { return $false }",
      "    if (-not $script:StepBaselineSec.ContainsKey($Step)) { return $true }",
@@ -135,7 +135,7 @@ MUTANTS = [
      "        $key = $Reason + '|' + $step\n        if ($script:CaptureSent.ContainsKey($key)) { return }",
      "        $key = $Reason + '|' + $step + '|' + [guid]::NewGuid()\n        if ($script:CaptureSent.ContainsKey($key)) { return }",
      "[3회 실패] 증거 = 이유마다 정확히 1건", AWK),
-    # ── 이종 검토 1R(2026-09-16) 지적 채택분 ──────────────────────────────────
+    # ── 외부 검토 1차(2026-09-16) 지적 채택분 ──────────────────────────────────
     # ③ 기록 파일에 사유 글을 날것으로 — 이 파일은 실패 때 통째로 서버로 간다(보내는 쪽만 가려도 소용없다)
     ("log-mask-drop", PS,
      "        Write-Log ('capture evidence: ' + $key + ' ' + (Protect-EvidenceText ([string]$Detail)))",
@@ -163,12 +163,12 @@ MUTANTS = [
      "설치가 막히거나 이상이 보이거나 끝났을 때, 그리고 운영팀이 청할 때 설치 창·로그인 창·자비스 창·첫 자리 화면의 글자와 그림이 함께 보내집니다(다른 창은 찍지 않습니다). 글자에서는 로그인 코드·이메일·계정 이름을 가리지만, 그림은 가릴 수 없어 운영팀만 봅니다.",
      "설치가 막히면 설치 창에 표시된 글자만 보내지며, 로그인 코드·이메일·계정 이름은 가려집니다.",
      "[고지] 고지가 「글자만」이라고 말하지 않는다", CAP),
-    # TICKET=installer-0325 c5(2026-09-18) — 원본 파일이 없을 때 사유 코드 대신 빈 글로 되돌림(09-17 10:01 실기 WHm7yvpu 재현)
+    # c5(2026-09-18) — 원본 파일이 없을 때 사유 코드 대신 빈 글로 되돌림(09-17 10:01 실기 WHm7yvpu 재현)
     ("evidence-text-empty-revert", PS,
      "    if ($null -eq $bytes -or $bytes.Length -eq 0) { return '[text:empty(no-source)]' }",
      "    if ($null -eq $bytes -or $bytes.Length -eq 0) { return '' }",
      "[c5] 원본 파일이 없으면 빈 글이 아니라 사유 코드를 돌려준다", CAP),
-    # TICKET=installer-0325 c5(2026-09-18) — 그림 찍기 실패 사유를 글자 칸에 담는 것을 되돌린다(옛 판 = 이 기계 기록에만 남음)
+    # c5(2026-09-18) — 그림 찍기 실패 사유를 글자 칸에 담는 것을 되돌린다(옛 판 = 이 기계 기록에만 남음)
     ("evidence-capture-failnote-revert", PS,
      "        if ($failNote) { $t = ([string]$t) + \"`n\" + $failNote }   # 사진이 안 찍혔으면 그 사유도 글자 칸에 함께 싣는다(c5)\n",
      "",

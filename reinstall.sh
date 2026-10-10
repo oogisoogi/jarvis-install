@@ -128,7 +128,7 @@ if ! download_with_retry "$BOOTSTRAP_URL" "$BOOTSTRAP_FILE" "설치 도우미"; 
   say ""
   say "설치 도우미를 받지 못했습니다. 인터넷 연결을 확인해 주십시오."
   if [ -n "$KEEP_APP_ARG" ]; then
-    say "지우기는 끝났으므로, 이 컴퓨터는 지금 「cys 프로그램만 남고 나머지는 안 깔린 상태」입니다."
+    say "지우기는 끝났으므로, 이 컴퓨터는 지금 「cysr 프로그램만 남고 나머지는 안 깔린 상태」입니다."
   else
     say "지우기는 끝났으므로, 이 컴퓨터는 지금 「아무것도 안 깔린 상태」입니다."
   fi

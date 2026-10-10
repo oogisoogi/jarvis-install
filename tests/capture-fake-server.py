@@ -9,7 +9,7 @@
   상태 폴더/baseline.json  = 있으면 그 내용을 기준선 답으로 준다(없으면 404)
   상태 폴더/capture.json   = 있으면 진행 201 의 capture 칸에 실어 준다(한 번 실으면 지운다 = 1회성)
 
-계약(서버 docs/HELP-API.md §10-2c·d·e):
+계약(서버 docs/HELP-API.md 절 10-2c·d·e):
   POST <진행 주소>                       event=evidence → 201 {seq, upload_token, upload{…}, capture, notice}
   POST <진행 주소>/evidence/<seq>/image?kind=&filename=   머리글 x-progress-upload · 본문 = 그림 바이트 → 201
   GET  <진행 주소>/baseline?os=win       {os, days, min_samples, steps:[{step, median_elapsed_s, samples}]}

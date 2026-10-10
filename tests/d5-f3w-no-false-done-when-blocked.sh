@@ -1,6 +1,6 @@
 #!/bin/bash
 # D5-F3 윈 짝 검출 시험 — 윈 [5/10]~[8/10] 이 막혔는데 자비스를 깨우러 [9/10] 으로 가면 적색(맥판 tests/d5-f3-no-false-done-when-blocked.sh 의 pwsh 판).
-#   master 확정(2026-09-23 20:00 결정 A): 막히면 각성 단계에 들어가지 않고 「설치가 끝나지 않았습니다 · 진단 코드」로 끝난다 · rc≠0.
+#   운영자 확정(2026-09-23 20:00 결정 A): 막히면 각성 단계에 들어가지 않고 「설치가 끝나지 않았습니다 · 진단 코드」로 끝난다 · rc≠0.
 #   실물 bootstrap.ps1 을 JARVIS_LIB_ONLY=1 로 함수 묶음으로 읽고, 본문의 [5/10] 루프부터 Step-Wake 까지를 글자 그대로 떼어
 #   본문과 같은 try/finally(끝맺음 Write-ClosingNote) 안, 스크립트 최상위에 이어 붙여 돌린다. 망 0 · 라이브 서버 0.
 #   두 갈래를 잰다:
@@ -75,7 +75,7 @@ for n in A B; do
   grep -q '^reached:wake$' "$BASE/calls-$n" 2>/dev/null && bad "[$n] 막혔는데 각성 단계(Step-Wake)에 들어갔다"
   grep -q '^reached:6$' "$BASE/calls-$n" 2>/dev/null && bad "[$n] 막힌 [5/10] 뒤에 [6/10] 으로 갔다"
   grep -qE '설치가 끝났습니다|설치는 여기까지 끝났습니다|자비스가 깨어났습니다' "$BASE/say-$n" && bad "[$n] 막혔는데 끝났다고 말한다"
-  grep -q '설치가 끝나지 않았습니다 — 「cys 설치 파일 받기」 단계에서 멈췄습니다' "$BASE/say-$n" || bad "[$n] 결과 줄 「설치가 끝나지 않았습니다 — 「cys 설치 파일 받기」 …」가 없다"
+  grep -q '설치가 끝나지 않았습니다 — 「cysr 설치 파일 받기」 단계에서 멈췄습니다' "$BASE/say-$n" || bad "[$n] 결과 줄 「설치가 끝나지 않았습니다 — 「cysr 설치 파일 받기」 …」가 없다"
   [ "$rc" = 5 ] || bad "[$n] 종료 코드가 5 가 아니다(rc=$rc · 막힌 설치를 다른 코드로 끝냄)"
   [ "$(grep -c '^5/10|info|blocked:no-wake ' "$BASE/ev-$n" 2>/dev/null)" = 1 ] || bad "[$n] 정보 이벤트 blocked:no-wake 가 정확히 1건이 아니다: $(tr '\n' ';' < "$BASE/ev-$n" 2>/dev/null)"
   grep -q '^9/10|' "$BASE/ev-$n" 2>/dev/null && bad "[$n] [9/10] 진행 이벤트가 나갔다"

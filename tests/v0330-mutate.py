@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-# 뮤턴트 — 0.3.30(데몬 선확인 · rotate 생략 판정 · rotate 경과 기록)의 검사가 **대상을 실제로 때리는가** (TICKET=installer-0330)
+# 뮤턴트 — 0.3.30(데몬 선확인 · rotate 생략 판정 · rotate 경과 기록)의 검사가 **대상을 실제로 때리는가**
 #
 # ★쓰는 법
 #   python3 tests/v0330-mutate.py --root <저장소>           전건(사본에서만 고친다 · 실물 무접촉)

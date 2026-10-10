@@ -135,14 +135,14 @@ BLOCKED_STEP=""
 #   ⚠맥은 판번 대조에 CDHash(설치된 프로그램의 내용 지문)를 이미 함께 쓴다 — 판번이 같아도 CDHash 가 다르면 바꿔 넣는다(step_install_cys).
 #   화면 머리글 = 「<이름> <판> · 설치 도우미 <설치기 판>」(설치기 판 = INSTALLER_VERSION · 별도 semver).
 CYS_DISPLAY_NAME="cysr"
-# 0.3.34: 핀 = 1.1.5 드래프트 발행 자산 실측값(2026-09-23 · TICKET=v115-installer · 1.1.4 미발행 승계 · 9차 절단 fd356c06)
-# 0.3.35: 핀 값 = 1.1.5 11차 절단 발행 자산 실측값(태그 커밋 526325bf · SUMS 418a1b6e · 11차 재핀에서 채움) · 바뀐 것 = 맥: 저희 자산 404 의 원작자 판 폴백 제거(J-DL-05 · F1) · 재설치가 「지웁니다」를 묻지 않음(F2) · [5/10]~[8/10] 막힘 뒤 각성 금지(F3) / 윈: 배포 한 줄이 받기 실패면 옛 파일을 안 돌림(F5) · [2/10] 빠른 종료 판정 수리(F6) · 32비트 창 재실행 경로 인용(F7) · 끝맺음 오류 가르기 캐시(F9) · [5/10]~[8/10] 막힘 뒤 각성 금지(F3 짝 · r2 결정 A) / 양쪽: 코드 없는 실패 끝에도 실패 이벤트(F10①) · 맥 407 즉시 끝(F10③) · TICKET=installer-0335 dbg-D5
+# 0.3.34: 핀 = 1.1.5 드래프트 발행 자산 실측값(2026-09-23 · 1.1.4 미발행 승계 · 9차 절단 fd356c06)
+# 0.3.35: 핀 값 = 1.1.5 11차 절단 발행 자산 실측값(태그 커밋 526325bf · SUMS 418a1b6e · 11차 재핀에서 채움) · 바뀐 것 = 맥: 저희 자산 404 의 원작자 판 폴백 제거(J-DL-05 · F1) · 재설치가 「지웁니다」를 묻지 않음(F2) · [5/10]~[8/10] 막힘 뒤 각성 금지(F3) / 윈: 배포 한 줄이 받기 실패면 옛 파일을 안 돌림(F5) · [2/10] 빠른 종료 판정 수리(F6) · 32비트 창 재실행 경로 인용(F7) · 끝맺음 오류 가르기 캐시(F9) · [5/10]~[8/10] 막힘 뒤 각성 금지(F3 짝 · r2 결정 A) / 양쪽: 코드 없는 실패 끝에도 실패 이벤트(F10①) · 맥 407 즉시 끝(F10③) · dbg-D5
 # 0.3.36: 핀 값 그대로(1.1.5 · 태그 커밋 526325bf) · SUMS 주석만 발행본 값으로 · 바뀐 것 = 재설치 끝 rc 25 뒤 60초 다시 보기(X-5) · 재설치 끝 안내를 「다음에 할 일」 한 줄로(F13)
 # 0.3.36(재절단 핀): 1.1.6 재절단 드래프트(2026-09-26 · 릴리스 id 396787705 · 대상 커밋 76d2b5e9 · build_id 76d2b5e9d2c2.20260925T1540Z) 자산 실측값으로 윈·맥 함께 교체
 # 0.3.37: 핀 값 그대로(cysr 1.1.6 재절단) · 바뀐 것 = 원격 해결만: 윈 파일·폴더 읽기는 연 핸들로만(연 핸들의 최종 경로가 작업 폴더 아래일 때만 · 이음줄을 따라가지 않고 엶) · 깨우기 성공 = 종료 코드 0 그리고 surface: · 오래돼 보이는 실행 기록 잠금을 추측으로 치우지 않음
 # 0.3.38: 핀 값 그대로(cysr 1.1.6) · 맥 코드 변경 0 — 판번만 윈과 함께 올림(한 릴리스 = 한 판번 · 윈 = 설치 결함 묶음)
 # 0.3.39: cysr 1.1.7 과 함께 내는 판(핀은 1.1.7 절단 뒤) · 맥 바뀐 것 = 원격 해결이 부르는 cys 도 [7/10] 이 고른 CYS_CLI(절대 경로) 먼저
-CYS_FORK_VERSION="1.1.7"
+CYS_FORK_VERSION="1.1.8"
 CYS_FORK_DIR="https://github.com/oogisoogi/cys-ro/releases/download/v${CYS_FORK_VERSION}/"
 # 1.0.1 부터 zip 최상위 = cysr.app(안의 실행 파일 = Contents/MacOS/cys · cys-app · cysd · CFBundleName cysr · 로컬 빌드 실측 2026-09-16).
 CYS_FORK_FILE="cysr-macos-arm64-v${CYS_FORK_VERSION}.zip"
@@ -154,13 +154,13 @@ CYS_FORK_FILE="cysr-macos-arm64-v${CYS_FORK_VERSION}.zip"
 #         발행 자산 zip 실물(arm64·x64 · gh release download) — 크기·sha256 은 파일에서 셌고(릴리스 API digest·SUMS 줄과 3/3 일치), CDHash 는 풀어서(ditto -x -k) codesign -dvvv 로 쟀다(지시값 6/6 일치).
 #   ⚠태그가 옮겨지면 이 값도 함께 바뀐다(v1.1.0 라운드에만 네 번 옮겨졌다) — 값을 문서에 복제하지 말고 발행 자산에서 다시 재라.
 #   CDHash 는 **발행된 그 zip** 을 풀어(ditto -x -k) `codesign -dvvv` 로 쟀다(서명 = cys-local · zip 최상위 = cysr.app 하나).
-CYS_FORK_BYTES="208107459"
-CYS_FORK_SHA256="6d92f0fd8d5524b360e5b111601dc6e79f2a08148eb72e22d2e27de9f1fe7f94"
+CYS_FORK_BYTES="220957953"
+CYS_FORK_SHA256="82c8224b0c499bb9755ef60b5968bbe12b871583a6647d20e3077d0949352381"
 # 설치된 프로그램이 「바로 이 판」인가를 가르는 값. 판본 숫자는 원작자 판도 같은 숫자를 쓸 수 있어서
 #   숫자만 보면 **원작자 판을 우리 판으로 읽고 건너뛴다**(어제 원작자 판을 깐 맥이 그대로 남는다).
-CYS_FORK_CDHASH="3075e43311d07460ae291584453dece7d11b6114"
+CYS_FORK_CDHASH="092d568439b68deb28349af0dae3514b62e9bc49"
 
-# ★★인텔(x86_64) 맥 핀 — v1.1 부터 우리 판이 인텔 맥도 덮는다 (2026-09-20 · TICKET=v110-mac-x64).
+# ★★인텔(x86_64) 맥 핀 — v1.1 부터 우리 판이 인텔 맥도 덮는다 (2026-09-20).
 #   까닭: v1.0.2 까지 우리 맥 자산은 arm64 하나뿐이라 **인텔 맥만 원작자 판으로 갈라졌다**. 같은 날 같은 방에서
 #     두 참가자가 서로 다른 cys 를 쓰는 일이 실제로 있었다(2026-09-15 전환 주석의 그 사유) — 그 갈림을 여기서 닫는다.
 #   ✅아래 세 값은 v1.1.6 재절단 x64 드래프트 zip 에서 **실측으로 채웠다**(2026-09-26 · 릴리스 id 396787705 · 대상 커밋 76d2b5e9 · 1.1.5 값(45b629ff · 215440455)을 대신한다).
@@ -169,9 +169,9 @@ CYS_FORK_CDHASH="3075e43311d07460ae291584453dece7d11b6114"
 #   ⛔자리표가 남아 있는 동안 인텔 맥은 **원작자 판으로 돌아가지 않고 멈춘다**(cys_fork_x64_pin_ready · step_download_cys 머리).
 #     조용히 원작자 판을 깔면 이 바꿈이 없애려던 그 갈림이 그대로 되살아난다 — 말없이 다른 판을 까느니 멈춰서 말하는 쪽을 고른다.
 CYS_FORK_X64_FILE="cysr-macos-x64-v${CYS_FORK_VERSION}.zip"
-CYS_FORK_X64_BYTES="215736642"
-CYS_FORK_X64_SHA256="7bbf71a7cd59b5c606288a21ca29555f6903588882b03bd8bd014b9801058c28"
-CYS_FORK_X64_CDHASH="d9bab44f9b183e404b03be0087586b56a50750a2"
+CYS_FORK_X64_BYTES="228831709"
+CYS_FORK_X64_SHA256="9e2e03b10c1135290fb0fd7179d47874b9e736da365b751bf474dd2b9d705799"
+CYS_FORK_X64_CDHASH="b1c032d657105722bda69bb465887e4503c13fe7"
 # 저희 판이 놓이는 자리 = /Applications/cysr.app · 옛 이름 자리 = /Applications/cys.app(0.14.x·1.0.0 이 깔린 자리 · 원작자 판도 이 이름).
 CYS_FORK_APP="/Applications/cysr.app"
 CYS_OLD_APP="/Applications/cys.app"
@@ -281,7 +281,7 @@ say() { printf '%s\n' "$*"; log "$*"; say_error_text_hook "$*"; }   # 오류 글
 #   **진짜 사건을 못 찾는다.** 기다림은 「지금 보는 사람」을 위한 말이고, 기록은 「나중 사람」을 위한 것이다.
 tell() { printf '%s\n' "$*" >&2; }
 
-# ══ 진행 자동 전송·진단 자료(증거) — 맥 (TICKET=mac-parity-t2-telemetry · 2026-09-16) ═══════════════════════════════
+# ══ 진행 자동 전송·진단 자료(증거) — 맥 (2026-09-16) ═══════════════════════════════
 # 정본 = 윈도우판 bootstrap.ps1(5a1cd67) 4888~5471줄 — Get-InstallId · Send-Progress · Protect-EvidenceText · Get-EvidenceText ·
 #   Send-EvidenceOnce · Update-StepBaselines · Test-StepSlow · Send-EvidenceEvent · Send-EvidenceImage(s) · Receive-CaptureRequest ·
 #   Invoke-CaptureRequested · Send-CaptureEvidence · Send-PostInstallEvidence 를 **함수 단위로** 옮겼다(이름은 셸 관례로 바꿨다).
@@ -295,7 +295,7 @@ tell() { printf '%s\n' "$*" >&2; }
 #   ⑶창 그림 = screencapture -l <창 번호>. 창 번호는 CoreGraphics 창 목록(osascript 안 ObjC 다리 · AppleEvent 아님)으로 찾는다.
 #     ⛔앱 이름으로 AppleEvent 를 보내지 않는다(2026-09-16 실측: cys 앱에 보낸 AppleEvent 가 -1712 로 약 2분 멈췄다).
 #   ⑷로그인 창·첫 자리는 맥에서 그림이 없다 — 맥의 로그인은 설치 창 안에서 진행되고, 첫 자리는 앱 창 안의 한 칸이다.
-#   ⑸🔴창 그림은 **기본 꺼짐**이다(TICKET=mac-parity-t4-fix N1 · master 판정 「화면 기록 권한 미요청」).
+#   ⑸🔴창 그림은 **기본 꺼짐**이다(N1 · 운영자 판정 「화면 기록 권한 미요청」).
 #     screencapture 는 화면 기록 권한이 없는 맥에서 macOS 「화면 기록 허용」 창을 띄울 수 있다 — 처음 설치하는 사람 앞에 창이 하나 더 뜬다.
 #     권한을 묻지 않고 확인하는 API 를 쓰지 않는다(깨끗한 맥에 pyobjc·swift 가 없고 결과가 기계마다 갈린다) ⇒ 켜는 길 = JARVIS_EVIDENCE_IMAGES=1 하나.
 #     꺼져 있으면 촬영기를 부르지 않고 기록 1줄만 남긴다 · 서버로는 글자 증거만 간다(그림 자리를 받아도 올릴 그림이 없다).
@@ -1140,7 +1140,7 @@ next_rerun() { NEXT_STEP="$1"; SHOW_RERUN=1; }
 show_rerun_how() {
   printf '%s\n' ""
   printf '%s\n' "  == 다시 하시는 법 (이대로 따라 하시면 됩니다) =="
-  printf '%s\n' "   1) Command(⌘)+스페이스를 누르고 터미널 이라고 치신 뒤 [터미널] 을 여십시오 (맥 터미널 앱 · 검은 창 — cys 창이 아닙니다)."
+  printf '%s\n' "   1) Command(⌘)+스페이스를 누르고 터미널 이라고 치신 뒤 [터미널] 을 여십시오 (맥 터미널 앱 · 검은 창 — cysr 창이 아닙니다)."
   printf '%s\n' "   2) 아래 명령을 처음부터 끝까지 끌어 선택한 뒤 Command(⌘)+C 를 누르십시오."
   printf '%s\n' "   3) 터미널 창을 한 번 누르고 Command(⌘)+V 로 붙여넣은 뒤 Enter(리턴) 를 누르십시오."
   printf '%s\n' ""
@@ -1306,7 +1306,7 @@ help_way_lines() {   # help_way_lines <코드> — 두 번째 방법 줄들(정�
   case "$1" in
     # 윈도우에서만 나는 코드(tests/help-rules.tsv 7번째 칸 = win)는 두지 않는다 — 맥에서는 찍힐 일이 없다.
     # 백신: 끄라고 하지 않고 우리가 예외를 등록하지도 않는다 — 사람이 직접 예외에 넣고 되돌리는 법까지 말한다.
-    J-AV-02)    printf '%s\n' '백신의 보호 기록(격리함)에 cys 설치 파일이 있으면 [복원]을 골라 주십시오.' \
+    J-AV-02)    printf '%s\n' '백신의 보호 기록(격리함)에 cysr 설치 파일이 있으면 [복원]을 골라 주십시오.' \
                   '안 되면 install-jarvis 폴더를 백신의 「예외(허용)」에 추가하신 뒤' \
                   '다시 실행해 주십시오. 설치 뒤 예외에서 지우시면 원래대로입니다.' ;;
     J-NET-01)   printf '%s\n' '휴대폰 핫스팟 같은 다른 인터넷에 연결하신 뒤 다시 실행해 주십시오.' ;;
@@ -1816,7 +1816,7 @@ detect_stage1() {
   else
     cys_state="판정 불가"; cys_enum="unknown"; cys_note="-"
   fi
-  row "1-4" "cys 상태" "$cys_state (앱=$cysapp · 명령=${cyscmd:-없음} · 계정 준비=$cys_onboard)" "$cys_enum" "$cys_note"
+  row "1-4" "cysr 상태" "$cys_state (앱=$cysapp · 명령=${cyscmd:-없음} · 계정 준비=$cys_onboard)" "$cys_enum" "$cys_note"
 
   # 1-5 놓을 자리에 쓸 수 있는가
   if [ -w /Applications ]; then
@@ -1852,9 +1852,9 @@ detect_stage1() {
     link_state="cysd 를 못 찾음"; link_enum="failed"
     link_note="링크도 끊어졌고 앱 안에도 없다 — 다시 설치해야 한다"
   else
-    link_state="해당 없음(cys 미설치)"; link_enum="ok"; link_note="아직 cys 가 없다 — 정상"
+    link_state="해당 없음(cysr 미설치)"; link_enum="ok"; link_note="아직 cysr 이 없다 — 정상"
   fi
-  row "1-8" "cys 실행 링크" "$link_state" "$link_enum" "$link_note"
+  row "1-8" "cysr 실행 링크" "$link_state" "$link_enum" "$link_note"
 
   # 1-7 네트워크 — 연결 성립 여부만 본다 (응답 내용을 판정에 쓰면 형식 변경에 약해진다)
   local u code net_enum="ok" net_val=""
@@ -1886,13 +1886,13 @@ detect_stage1() {
 detect_stage2() {
   # 이 단은 명령이 잡힐 때만 돈다. 안 잡히면 한 행짜리 unknown 으로 접는다 —
   if [ "$S1_CYS_PRESENT" != "1" ]; then
-    row "2-*" "cys 이후 전 행" "-" "unknown" "cys 명령이 아직 없습니다 — 다음 단계에서 합니다"
+    row "2-*" "cysr 이후 전 행" "-" "unknown" "cysr 명령이 아직 없습니다 — 다음 단계에서 합니다"
     return
   fi
   local v
   v="$(cys phoenix-identity 2>/dev/null)"
-  if [ -n "$v" ]; then row "2-1" "cys 판본·팩 해시" "$v" "ok" "데몬 없어도 답한다"
-  else row "2-1" "cys 판본·팩 해시" "-" "failed" "명령이 답하지 않았다"; fi
+  if [ -n "$v" ]; then row "2-1" "cysr 판본·팩 해시" "$v" "ok" "데몬 없어도 답한다"
+  else row "2-1" "cysr 판본·팩 해시" "-" "failed" "명령이 답하지 않았다"; fi
 
   #     소켓 파일 자체가 없음  = `No such file or directory (os error 2)`  ⇒ 이 계정에 온보딩이 안 된 것(정상 가능)
   #     소켓은 있는데 무응답    = `Connection refused (os error 61)`        ⇒ 데몬이 안 떠 있다(기동 직후 지연 포함)
@@ -1915,8 +1915,8 @@ detect_stage2() {
   # (installer-speed-pin-0320) [8/10] 이 방금 돌린 자가진단이 있으면 그 출력을 쓴다 — 같은 명령을 한 실행에 두 번 부르지 않는다.
   if [ -n "$DOCTOR_TEXT" ]; then v="$(printf '%s\n' "$DOCTOR_TEXT" | grep '^요약' | head -1)"
   else v="$(cys doctor 2>/dev/null | grep '^요약' | head -1)"; fi
-  if [ -n "$v" ]; then row "2-5" "cys 자가점검" "$v" "ok" "요약 줄만 옮겨 적습니다"
-  else row "2-5" "cys 자가점검" "-" "unknown" "-"; fi
+  if [ -n "$v" ]; then row "2-5" "cysr 자가점검" "$v" "ok" "요약 줄만 옮겨 적습니다"
+  else row "2-5" "cysr 자가점검" "-" "unknown" "-"; fi
 
   row "2-8" "첫 세션 지시 주입" "-" "unknown" "아직 확인하는 방법이 없습니다"
 
@@ -1950,13 +1950,13 @@ write_report() {
     # 화면·기록 파일과 **같은 문자열**을 여기에도 남긴다 — 셋을 맞춰 보는 일이 사람 몫이 되면 안 된다.
     [ -n "$J_CODE" ] && printf '%s\n' "- 진단 코드: **$J_CODE** (${HELP_CODE_URL}${J_CODE})"
     printf '%s\n' "  - \`unknown\` 은 「완료됨」으로 세지 않는다."
-    # v0.3.29(TICKET=installer-0329 ④ · 윈판 Write-Report 짝): 사람 손 두 줄 — 설치 창 [9/10] 에 찍힌 수와 같은 값을 적는다.
+    # v0.3.29(④ · 윈판 Write-Report 짝): 사람 손 두 줄 — 설치 창 [9/10] 에 찍힌 수와 같은 값을 적는다.
     printf '%s\n' "- 사람 손 (프로그램이 센 것): **${HUMAN_HANDS}번** — 미리 아는 자리만 셉니다."
     printf '%s\n\n' "- 사람 손 (실제로 누른 횟수): **${HUMAN_HANDS}번** — 설치 창 [9/10] 에 나온 수와 같습니다."
     printf '\n## 지금 상태 → 다음 행동\n'
     if [ "${DAEMON_TEMPORARY:-0}" = "1" ]; then   # ps1 1411~1417 — 앱을 직접 열어 켠 실행
-      printf -- '- ⓘ **cys 를 직접 열어 켰습니다.** %s\n' "$(cys_autostart_words "$AUTOSTART_STATE")"
-      printf -- '  다음에 컴퓨터를 켜시면 **cys 를 한 번 열어 주시면** 됩니다 — 그러면 그때부터 다시 돕니다. 따로 하실 일은 없습니다.\n'
+      printf -- '- ⓘ **cysr 을 직접 열어 켰습니다.** %s\n' "$(cys_autostart_words "$AUTOSTART_STATE")"
+      printf -- '  다음에 컴퓨터를 켜시면 **cysr 을 한 번 열어 주시면** 됩니다 — 그러면 그때부터 다시 돕니다. 따로 하실 일은 없습니다.\n'
     fi
     if [ "$MODE" = "dry" ]; then
       #   dry 모드에서는 아래 「앞 단계는 이미 끝났습니다」가 거짓이다 — 아무것도 안 했기 때문이다.
@@ -1970,12 +1970,12 @@ write_report() {
       printf -- '- 앞 단계(클로드 설치·로그인·자비스 준비)는 **이미 끝났습니다.** 여기부터 다시 이어서 갑니다.\n'
       printf -- '- 그 **다음 단계들은 아직 하지 않았습니다** — 실패한 것이 아니라 순서가 안 온 것입니다.\n'
     printf -- '- 아래 명령을 다시 실행하면 **끝난 단계는 건너뛰고 막힌 자리부터** 갑니다.\n'
-      # 「어느 창에서」를 적는다(09-16 실기 — 사람이 cys 창에 설치 명령을 쳤다 · TICKET=mac-parity-t1-core)
-      printf -- '- 명령은 **맥 터미널 앱(검은 창)** 에서 실행하십시오 — cys 창이 아닙니다.\n'
+      # 「어느 창에서」를 적는다(09-16 실기 — 사람이 cys 창에 설치 명령을 쳤다)
+      printf -- '- 명령은 **맥 터미널 앱(검은 창)** 에서 실행하십시오 — cysr 창이 아닙니다.\n'
       printf -- '\n```\n%s\n```\n' "$(rerun_cmd)"
     else
       printf -- '- 막힌 단계 없음.\n'
-      printf -- '- 이제 **cys 창의 master 자리** 에서 자비스와 이어서 이야기하시면 됩니다. 설치 창(검은 터미널)은 닫으셔도 됩니다.\n'
+      printf -- '- 이제 **cysr 창의 master 자리** 에서 자비스와 이어서 이야기하시면 됩니다. 설치 창(검은 터미널)은 닫으셔도 됩니다.\n'
     fi
     printf '\n| # | 무엇 | 값 | 판정 | 비고 |\n|---|---|---|---|---|\n'
     while IFS="$(printf '\t')" read -r a b c d e; do
@@ -2271,7 +2271,7 @@ step_install_claude() {
     if wait_for_connection "[2/10]" '( set -o pipefail; curl -fsSL --max-time 600 "$CLAUDE_INSTALL_URL" | bash -s "$CLAUDE_CHANNEL" )'; then
       rc=0
     elif [ ! -x "$HOME/.local/bin/claude" ] && [ "$NET_FAILED" = 1 ]; then
-      # v0.3.32(TICKET=installer-0332 · master 판정 abb77ec4 · 윈 종료 코드 갈래의 맥 짝): 기다림(일시 끊김 흡수)은 그대로 두고,
+      # v0.3.32(운영자 판정 · 윈 종료 코드 갈래의 맥 짝): 기다림(일시 끊김 흡수)은 그대로 두고,
       #   끝내 안 붙었는데 파일도 없고 1-7 에도 실패 행이 있으면 처방을 「다른 인터넷으로」(J-DL-07 과 같은 처방)로 준다.
       log "J-DL-07 by: net-failed rc=$rc (after wait)"
       say "     내려받는 자리 점검 결과: $(dl_probe_words)"
@@ -2294,7 +2294,7 @@ step_install_claude() {
   if ! claude --version >/dev/null 2>&1; then
     # 🔴설치기가 **곧바로 죽고 파일도 안 생겼다**면 새 창(J-PATH-01)은 처방이 아니다 — 받아 오지 못한 것이다.
     #   (윈판 J-DL-07 과 같은 갈래 · 맥에는 32비트 갈래가 없어 이것이 첫 갈래다.)
-    # v0.3.32(TICKET=installer-0332 · 도움 KW67JGJG 윈판 짝): 파일이 없고 1-7 망 점검에 실패 행이 있으면 걸린 시간과 무관하게 이 갈래.
+    # v0.3.32(도움 KW67JGJG 윈판 짝): 파일이 없고 1-7 망 점검에 실패 행이 있으면 걸린 시간과 무관하게 이 갈래.
     local fast_exit=0; [ "$w" -lt "$CLAUDE_INSTALL_FAST_EXIT_SEC" ] && fast_exit=1
     if [ "$direct" != "1" ] && [ ! -x "$HOME/.local/bin/claude" ] && { [ "$fast_exit" = 1 ] || [ "$NET_FAILED" = 1 ]; }; then
       log "J-DL-07 by: $([ "$fast_exit" = 1 ] && echo fast-exit || echo net-failed) (elapsed=$w netFailed=$NET_FAILED)"
@@ -2685,7 +2685,7 @@ write_directive() {
 |---|---|
 | 어떤 칸이 「blocked」 인데 **계정 성격 때문**이다(표준 계정) | **고장이 아니라고 설명만** 하고 넘어간다. 사람을 부르지 않는다 |
 | 「cys」 상태가 **「앱만」**(프로그램은 있는데 이 계정에 자리를 안 잡음) | ★**계정 준비는 관리자 권한 없이 되는 일이다.** 다음 단계에서는 **묻지 말고 대행하는 것이 기본**이다(지금 범위에서는 그 사실을 보고만 한다) |
-| 「cys 실행 링크」 가 **끊어짐**으로 나온다 | ★**고장으로 보고하지 마라.** 앱 안 실경로를 직접 부르면 되고 **관리자 권한이 필요 없다.** 링크 자체를 고치는 것(「sudo ln」)은 **우리 일이 아니다 — 제안만 하고 실행하지 마라** |
+| 「cysr 실행 링크」 가 **끊어짐**으로 나온다 | ★**고장으로 보고하지 마라.** 앱 안 실경로를 직접 부르면 되고 **관리자 권한이 필요 없다.** 링크 자체를 고치는 것(「sudo ln」)은 **우리 일이 아니다 — 제안만 하고 실행하지 마라** |
 | 「unknown」 인 칸 | 「됐다」로 세지 않는다. **왜 모르는지**를 한 줄로 말한다 |
 | 사람이 진짜로 필요한 자리 | **그때만** 부른다. 무엇을·왜·어디를·되면·안 되면 다섯 가지를 함께 말한다 |
 ## 첫 응답 말미에 반드시 붙이는 한 줄
@@ -2698,7 +2698,7 @@ write_directive() {
 설치를 처음 하는 사람에게 **「내가 안 한 일이 일어났다」는 인상은 신뢰를 깎는다.** 한 줄이면 사라진다.
 ## 지금 할 일의 범위
 
-- **cys 설치·계정 준비 대행은 아직 네 일이 아니다**(다음 단계).
+- **cysr 설치·계정 준비 대행은 아직 네 일이 아니다**(다음 단계).
 - 네가 지금 하는 일은 **환경 보고를 사람 말로 옮겨 주고, 막힌 칸의 원인을 갈라 주는 것**이다.
 - ★**「blocked」 가 곧 고장은 아니다.** ⑴표준 계정이라 그런 것인지 ⑵이 계정에 아직 자리를 안 잡아서 그런 것인지를 **먼저 갈라서** 말해라.
 DIRECTIVE
@@ -3103,11 +3103,11 @@ step_download_cys() {
   fi
   for try in 1 2; do
     rm -f "$dst"
-    # 크기 핀이 숫자가 아닐 때(발행 전 자리표)는 크기를 말하지 않는다 — 산술에 글자를 넣으면 셸 오류가 화면에 섞인다(이종 검토 1R 지적 2026-09-16).
+    # 크기 핀이 숫자가 아닐 때(발행 전 자리표)는 크기를 말하지 않는다 — 산술에 글자를 넣으면 셸 오류가 화면에 섞인다(외부 검토 1차 지적 2026-09-16).
     if [ "$CYS_MAC_BYTES" -gt 0 ] 2>/dev/null; then
-      say "[5/10] cys 설치 파일을 받습니다 (약 $((CYS_MAC_BYTES / 1000000))MB · 잠시 걸립니다)."
+      say "[5/10] cysr 설치 파일을 받습니다 (약 $((CYS_MAC_BYTES / 1000000))MB · 잠시 걸립니다)."
     else
-      say "[5/10] cys 설치 파일을 받습니다 (잠시 걸립니다)."
+      say "[5/10] cysr 설치 파일을 받습니다 (잠시 걸립니다)."
     fi
     # 🔴0.3.36 F12: 멈춘 받기는 1분 안에 돌려받는다 — 초당 1KB 아래로 60초가 이어지면(--speed-limit/--speed-time) ·
     #   연결 맺기 자체는 20초(--connect-timeout). 앞 판은 전체 상한(900초)만 있어, 흐름이 멎은 받기가
@@ -3121,7 +3121,7 @@ step_download_cys() {
         404|410)
           rm -f "$dst"
           # ⛔저희 판 자산이 없어도 **원작자 판으로 돌아가지 않는다**(운영 결정 2026-09-18 절대 규칙 · 참가자 기기도 저희 릴리스로만).
-          #   윈판(bootstrap.ps1 J-DL-05)과 같은 끝·같은 문구·같은 rc 5 — 기다려도 생기는 파일이 아니다(TICKET=dbg-D5 F1).
+          #   윈판(bootstrap.ps1 J-DL-05)과 같은 끝·같은 문구·같은 rc 5 — 기다려도 생기는 파일이 아니다(F1).
           say "[5/10] 받을 자리에 그 판본이 없습니다 (응답 $code)."
           say "     받으려던 곳 = $CYS_DOWNLOAD_URL"
           jcode "J-DL-05" "받을 자리에 그 판본이 없습니다"
@@ -3225,7 +3225,7 @@ cys_app_cdhash() {
   codesign -dvvv "$1" 2>&1 | sed -n 's/^CDHash=//p' | head -1
 }
 
-# ── 옛 판 안내 (TICKET=installer-speed-pin-0320 · 2026-09-16) ─────────
+# ── 옛 판 안내 (2026-09-16) ─────────
 #   0.14.x 로 깔린 cys 는 앱 안 업데이트가 안 된다(서명 열쇠가 바뀌었다) — 저희 판을 받는 맥에서는 [6/10] 이 새 판으로 다시 깐다.
 #   ★묻지 않는다 · 막지 않는다 — 한 줄 알리고 그대로 간다(사람 손 0). 원작자 판 길(인텔·자산 없음)과 판본을 못 읽는 경우는 아무 말도 하지 않는다.
 note_old_cys_app() {
@@ -3234,7 +3234,7 @@ note_old_cys_app() {
   v="$(defaults read "$CYS_OLD_APP/Contents/Info" CFBundleShortVersionString 2>/dev/null)"
   case "$v" in
     0.14.*)
-      say "     깔려 있는 cys ${v} 는 앱 안에서 업데이트할 수 없는 옛 판입니다 — 이번 설치에서 새 판(${CYS_DISPLAY_NAME} ${CYS_FORK_VERSION})으로 다시 설치합니다(하실 일은 없습니다)."
+      say "     깔려 있는 cysr ${v} 는 앱 안에서 업데이트할 수 없는 옛 판입니다 — 이번 설치에서 새 판(${CYS_DISPLAY_NAME} ${CYS_FORK_VERSION})으로 다시 설치합니다(하실 일은 없습니다)."
       log "old cys app: ${v} -> reinstall ${CYS_FORK_VERSION}" ;;
   esac
   return 0
@@ -3243,7 +3243,7 @@ step_install_cys() {
   local dst swap_note=""
   if [ "$CYS_KIND" != "fork" ]; then
     if [ -d /Applications/cys.app ]; then
-      say "[6/10] cys 가 이미 설치돼 있습니다 — 건너뜁니다."
+      say "[6/10] cysr 이 이미 설치돼 있습니다 — 건너뜁니다."
       return 0
     fi
   elif [ -d "$CYS_FORK_APP" ] || [ -d "$CYS_OLD_APP" ]; then
@@ -3251,13 +3251,13 @@ step_install_cys() {
     #   어제까지 깐 원작자 판이 그대로 남으면 이 전환이 그 맥에서는 일어나지 않는다.
     #   (installer-speed-pin-0320) 1.0.1 부터 이름이 cysr.app 이다 — 건너뛰는 것은 새 자리가 이번 판이고 옛 이름 자리(cys.app)가 없을 때뿐.
     if [ "$(cys_app_cdhash "$CYS_FORK_APP")" = "$CYS_FORK_CDHASH" ] && [ ! -d "$CYS_OLD_APP" ]; then
-      say "[6/10] cys 가 이미 설치돼 있습니다 (판본 ${CYS_FORK_VERSION} 확인) — 건너뜁니다."
+      say "[6/10] cysr 이 이미 설치돼 있습니다 (판본 ${CYS_FORK_VERSION} 확인) — 건너뜁니다."
       return 0
     fi
     if [ -d "$CYS_OLD_APP" ]; then
       swap_note="설치돼 있는 cys(옛 이름 cys.app)를 이번 판(${CYS_DISPLAY_NAME} ${CYS_FORK_VERSION} · cysr.app)으로 바꿔 넣습니다."
     else
-      swap_note="설치돼 있는 cys 가 이번 판(${CYS_FORK_VERSION})이 아니어서 이번 판으로 바꿔 넣습니다."
+      swap_note="설치돼 있는 cysr 이 이번 판(${CYS_FORK_VERSION})이 아니어서 이번 판으로 바꿔 넣습니다."
     fi
   fi
   if [ "$MODE" = "dry" ]; then
@@ -3312,10 +3312,10 @@ EOF_PS
 #   ★확인을 **끄기보다 앞에** 둔다 — 새 것이 멀쩡한지 모르는 채 돌던 cys 를 끄지 않는다.
 #   ★넣기는 같은 디스크 안의 이름 바꾸기(mv)라 **반쪽 프로그램이 보이는 순간이 없다**
 #     (원작자 설치 도우미가 막으려던 「손상되었습니다」 경합이 여기서는 생기지 않는다).
-# 받은(또는 넣은) 프로그램이 **실제로 실행되는가**(TICKET=mac-parity-t1-core · 2026-09-16).
+# 받은(또는 넣은) 프로그램이 **실제로 실행되는가**(2026-09-16).
 # 🔴2026-09-16 실기 2대 동일 실패: 라이브 0.3.19 가 핀한 v1.0.0 zip 안의 Contents/MacOS/cys·cysd 가 -rw-r--r--(실행 비트 없음)였다.
 #   [6/10] 은 지문·서명·CDHash·판번을 전부 통과해 「설치를 마쳤습니다」를 찍었지만 cys 는 한 번도 실행되지 않았다
-#   (서명은 파일 모드를 봉인하지 않는다 — 실행 가능성은 서명 검사가 재지 않는 축이다).
+#   (서명은 파일 모드를 묶어 두지 않는다 — 실행 가능성은 서명 검사가 재지 않는 축이다).
 # ⇒ 실행 비트 둘 + `cys --version` 의 실제 답을 함께 본다. 윈도우판에는 짝이 없다(실행 비트라는 개념이 없는 OS).
 # ⚠`perl -e 'exec @ARGV'` 는 exec 가 실패해도 0 으로 끝난다(2026-09-16 실측) ⇒ `or exit 126` 을 붙이고, 답 글자(판번 모양)도 함께 본다.
 CYS_APP_EXEC_WHY=""
@@ -3337,13 +3337,13 @@ CYS_APP_EXEC_CAP_SEC=10   # `cys --version` 한 번의 상한(맥에는 timeout 
 cys_install_from_zip() {
   local zip="$1" stage app ver cdh bak prev oldprev swap rc attempt=1
   if { [ -d "$CYS_OLD_APP" ] || [ -d "$CYS_FORK_APP" ]; } && cys_run_from_inside_cys; then
-    say "[6/10] 이 창이 cys 안에서 열려 있어 cys 를 바꿔 넣을 수 없습니다(바꾸는 동안 이 창도 꺼집니다)."
+    say "[6/10] 이 창이 cysr 안에서 열려 있어 cysr 을 바꿔 넣을 수 없습니다(바꾸는 동안 이 창도 꺼집니다)."
     say "     [터미널] 앱을 새로 여시고 아래 「다시 하시는 법」대로 다시 실행해 주십시오."; SHOW_RERUN=1
     return 6
   fi
-  say "[6/10] cys 를 설치합니다 (풀어서 넣습니다 · 1분쯤 걸립니다)."
+  say "[6/10] cysr 을 설치합니다 (풀어서 넣습니다 · 1분쯤 걸립니다)."
   stage="$DL_DIR/cys-stage"; app="$stage/cysr.app"   # 1.0.1 부터 zip 최상위 = cysr.app
-  # ★원자화(TICKET=mac-parity-t1-core): 임시 자리에 풀기 → 서명·판본 → **실행 확인** → 그때만 프로그램 폴더로 바꿔 넣는다.
+  # ★원자화: 임시 자리에 풀기 → 서명·판본 → **실행 확인** → 그때만 프로그램 폴더로 바꿔 넣는다.
   #   실행 확인이 걸리면 설치 파일을 버리고 **한 번만** 다시 받아(지문 재확인 포함) 처음부터 다시 잰다. 두 번째도 걸리면 넣지 않는다.
   while :; do
     rm -rf "$stage" 2>/dev/null
@@ -3355,7 +3355,7 @@ cys_install_from_zip() {
     # 격리 속성이 붙어 있으면 처음 열 때 확인 창이 뜬다 — 우리가 지운다(사람 손 0).
     xattr -cr "$app" >>"$LOG_FILE" 2>&1 || true
     # 🔴실행 비트 벨트 — 받은 판이 실행 비트를 잃었어도(2026-09-16 v1.0.0 실기) 여기서 되살린다.
-    #   서명·CDHash 는 파일 모드를 봉인하지 않으므로 이 줄이 아래 서명 검사를 깨지 않는다(깨진 zip 이 서명 검사를 통과한 것이 그 증거).
+    #   서명·CDHash 는 파일 모드를 묶어 두지 않으므로 이 줄이 아래 서명 검사를 깨지 않는다(깨진 zip 이 서명 검사를 통과한 것이 그 증거).
     chmod +x "$app/Contents/MacOS/"* >>"$LOG_FILE" 2>&1 || log "app exec belt: chmod failed"
     ver="$(defaults read "$app/Contents/Info" CFBundleShortVersionString 2>/dev/null)"
     cdh="$(cys_app_cdhash "$app")"
@@ -3373,7 +3373,7 @@ cys_install_from_zip() {
     rm -rf "$stage" 2>/dev/null
     if [ "$attempt" -ge 2 ]; then
       say "[6/10] 받은 프로그램이 이 맥에서 실행되지 않습니다 (${CYS_APP_EXEC_WHY}) — 설치하지 않습니다."
-      { [ -d "$CYS_OLD_APP" ] || [ -d "$CYS_FORK_APP" ]; } && say "     전에 있던 cys 는 그 자리에 그대로 있습니다."
+      { [ -d "$CYS_OLD_APP" ] || [ -d "$CYS_FORK_APP" ]; } && say "     전에 있던 cysr 은 그 자리에 그대로 있습니다."
       say "     자세한 내용은 기록 파일에 있습니다: $(redact "$LOG_FILE")"
       SHOW_RERUN=1
       return 6
@@ -3387,7 +3387,7 @@ cys_install_from_zip() {
     fi
   done
   if [ -d "$CYS_OLD_APP" ] || [ -d "$CYS_FORK_APP" ]; then
-    say "     돌고 있는 cys 가 있으면 먼저 끕니다."
+    say "     돌고 있는 cysr 이 있으면 먼저 끕니다."
     cys_stop_old_app
   fi
   bak="$JARVIS_HOME/backup"; prev="$bak/cysr.app.prev"; oldprev="$bak/cys.app.prev"
@@ -3434,8 +3434,8 @@ EOF_SWAP
   fi
   rm -f "$swap"; rm -rf "$stage" 2>/dev/null
   if [ "$rc" != "0" ]; then
-    say "[6/10] cys 를 프로그램 폴더에 넣지 못했습니다 (종료 코드 $rc)."
-    { [ -d "$CYS_OLD_APP" ] || [ -d "$CYS_FORK_APP" ]; } && say "     전에 있던 cys 는 그 자리에 그대로 있습니다."
+    say "[6/10] cysr 을 프로그램 폴더에 넣지 못했습니다 (종료 코드 $rc)."
+    { [ -d "$CYS_OLD_APP" ] || [ -d "$CYS_FORK_APP" ]; } && say "     전에 있던 cysr 은 그 자리에 그대로 있습니다."
     say "     자세한 내용은 기록 파일에 있습니다: $(redact "$LOG_FILE")"
     SHOW_RERUN=1
     return 6
@@ -3444,7 +3444,7 @@ EOF_SWAP
     say "[6/10] 넣은 뒤 다시 확인했더니 이번 판이 아닙니다 — 설치가 확인되지 않았습니다."
     return 6
   fi
-  [ -d "$prev" ] && say "     전에 있던 cys 는 한 벌 남겨 두었습니다: $(redact "$prev")"
+  [ -d "$prev" ] && say "     전에 있던 cysr 은 한 벌 남겨 두었습니다: $(redact "$prev")"
   [ -d "$oldprev" ] && [ ! -d "$CYS_OLD_APP" ] && say "     옛 이름의 cys(cys.app)는 한 벌 남겨 두었습니다: $(redact "$oldprev")"
   if [ -d "$CYS_OLD_APP" ]; then
     log "old app still present after swap: $CYS_OLD_APP"
@@ -3452,7 +3452,7 @@ EOF_SWAP
   fi
   # 넣은 자리에서도 한 번 더 실행해 본다 — 옮기는 동안 모드가 바뀌는 길(관리자 권한 복사 등)을 여기서 잡는다.
   if ! cys_app_exec_ok "$CYS_FORK_APP"; then
-    say "[6/10] 넣은 뒤 실행해 보았더니 cys 가 실행되지 않습니다 (${CYS_APP_EXEC_WHY}) — 설치가 확인되지 않았습니다."
+    say "[6/10] 넣은 뒤 실행해 보았더니 cysr 이 실행되지 않습니다 (${CYS_APP_EXEC_WHY}) — 설치가 확인되지 않았습니다."
     say "     자세한 내용은 기록 파일에 있습니다: $(redact "$LOG_FILE")"
     SHOW_RERUN=1
     return 6
@@ -3464,7 +3464,7 @@ EOF_SWAP
 # ── 6-나. 원작자 판(dmg) 설치 — 인텔 맥 · 저희 자산이 없을 때 ──────────
 cys_install_from_dmg() {
   local dst="$1" core src rc
-  say "[6/10] cys 를 설치합니다."
+  say "[6/10] cysr 을 설치합니다."
 
   # ⚠`-quiet` 를 주면 안 된다(위 ⑴). 사람에게 보일 필요는 없으니 화면 대신 기록 파일로만 흘린다.
   CYS_DMG_MNT="$(hdiutil attach -nobrowse "$dst" 2>>"$LOG_FILE" | awk '/\/Volumes\//{ $1=""; $2=""; sub(/^[ \t]+/,""); print; exit }')"
@@ -3619,7 +3619,7 @@ cys_autostart_state() { # cys_autostart_state [cli]
 cys_autostart_words() {
   case "$1" in
     yes)   printf '%s\n' "자동 시작 등록됨 (LaunchAgent ${CYS_LAUNCHD_LABEL} · 다음 로그인부터 저절로 켜집니다)." ;;
-    off)   printf '%s\n' "자동 시작 등록은 있는데 꺼져 있습니다 — 컴퓨터를 켜실 때 cys 를 한 번 열어 주십시오." ;;
+    off)   printf '%s\n' "자동 시작 등록은 있는데 꺼져 있습니다 — 컴퓨터를 켜실 때 cysr 을 한 번 열어 주십시오." ;;
     other) printf '%s\n' "${CYS_LAUNCHD_LABEL} 라는 이름의 등록이 있지만 우리 것이 아닙니다 — 자동 시작은 등록되지 않았습니다." ;;
     no)    printf '%s\n' "자동으로 켜지도록 등록되지 않았습니다(까닭은 이 화면만으로는 갈리지 않습니다)." ;;
     *)     printf '%s\n' "자동 시작 등록 여부를 확인하지 못했습니다(이 컴퓨터의 정책이 조회를 막았을 수 있습니다)." ;;
@@ -3669,14 +3669,14 @@ step_verify_cys() {
   #   전부 dry 분기를 갖고 있었고, 이 단만 없어서 미리보기가 기계 상태에 따라 다른 길을 갔다.
   #   ⇒ cys 가 이미 깔린 기계(개발기)에서는 안 드러나고 깨끗한 기계에서만 드러나는 형태였다.
   if [ "$MODE" = "dry" ]; then
-    say "[7/10] (dry-run) cys 를 확인하지 않았습니다."
+    say "[7/10] (dry-run) cysr 을 확인하지 않았습니다."
     return 0
   fi
   if [ ! -d "$(cys_app_dir)" ]; then
-    say "[7/10] cys 프로그램을 찾지 못했습니다."
+    say "[7/10] cysr 프로그램을 찾지 못했습니다."
     return 7
   fi
-  say "[7/10] cys 프로그램을 찾았습니다: $(cys_app_dir)"
+  say "[7/10] cysr 프로그램을 찾았습니다: $(cys_app_dir)"
   # 부르는 길이 판본에 따라 다르다. 새 판은 사용자 폴더 안에 두고, 옛 판은 시스템 폴더에 두었다.
   # 옛 자리의 링크가 끊어져 있는 경우가 실제로 있으므로, 찾은 순서대로 쓰되 답하는 것만 쓴다.
   # 프로그램 안쪽 경로는 마지막 수단이고, 우리가 링크를 새로 만들지는 않는다.
@@ -3720,7 +3720,7 @@ step_verify_cys() {
 DAEMON_PING_CAP_SEC=20   # 데몬 응답을 기다리는 상한(초) — 종전 2초×10회와 같다
 DAEMON_PING_GAP=0.5      # 다시 묻기 전 간격(초) — 뜬 것을 보면 곧바로 넘어간다(installer-speed-pin-0320)
 DOCTOR_TEXT=""           # [8/10] 자가진단 출력 — 뒤의 보고 갱신(2단)이 같은 명령을 다시 부르지 않고 이것을 쓴다
-# ── 로그인 이어 두기(윈도우판 Copy-LoginToIsolated 2590 의 맥 짝 · TICKET=mac-parity-t1-core) ──
+# ── 로그인 이어 두기(윈도우판 Copy-LoginToIsolated 2590 의 맥 짝) ──
 # 🔴09-16 실기: 설치기는 기본 프로필에 로그인했는데 자비스 자리는 `~/.cys/claude` 프로필로 떠 **로그인을 다시 요구**했다(사람 손 +1).
 # 맥은 로그인 정보를 파일(.credentials.json)이 아니라 **키체인**에 둔다 — 윈도우판처럼 파일을 복사하면 아무 일도 안 일어난다.
 #   실측(2026-09-16 · claude 2.1.273): 기본 프로필 = 서비스 「Claude Code-credentials」 · CLAUDE_CONFIG_DIR=<경로> 프로필 =
@@ -3734,7 +3734,7 @@ ISO_CLAUDE_DIR_REL=".cys/claude"
 claude_profile_logged_in() { # <설정 폴더> → rc 0 = 로그인돼 있다
   CLAUDE_CONFIG_DIR="$1" perl -e 'alarm shift; exec @ARGV or exit 126' 20 claude auth status 2>/dev/null | grep -q '"loggedIn"[[:space:]]*:[[:space:]]*true'
 }
-# 🔴v0.3.32(TICKET=installer-0332 B2 · master 판정 70ab51cf = A1 · 윈 Get-LoginCopyPlan 짝): 앞 판은 「이미 로그인됨이면 건드리지 않음」이었다 —
+# 🔴v0.3.32(B2 · 운영자 판정 = A1 · 윈 Get-LoginCopyPlan 짝): 앞 판은 「이미 로그인됨이면 건드리지 않음」이었다 —
 #   auth status 는 항목이 있으면 참이라, 자비스 쪽이 옛것이어도 안 고쳤고(윈은 반대로 무조건 덮었다) 두 OS 판정이 갈렸다.
 #   ⇒ 두 OS 같은 규칙: 자비스 쪽이 없거나 더 옛것일 때만 개인 → 자비스 · 비교 = claudeAiOauth.expiresAt · 하나라도 없으면 항목 수정 시각(mdat).
 #   덮기 전 사본 1세대 = 키체인 「<서비스>.bak-jarvis」(-U 로 덮어 누적하지 않는다). 개인 항목은 읽기만 한다.
@@ -3785,7 +3785,7 @@ copy_login_to_isolated() {
     say '     (로그인 정보를 이어 두지 못했습니다. 동료들이 로그인을 물을 수 있습니다.)'
     return 1
   fi
-  # v0.3.32(TICKET=installer-0332 · master 판정 1b01748b · 윈 Test-CredHasLogin 짝): 원본에 로그인 토큰이 없으면 옮기지 않는다.
+  # v0.3.32(운영자 판정 · 윈 Test-CredHasLogin 짝): 원본에 로그인 토큰이 없으면 옮기지 않는다.
   #   (맥은 로그아웃하면 항목 자체가 사라져 위에서 이미 끝난다 — 항목이 남았는데 토큰이 빠진 경우도 윈과 같은 판정·같은 기록 줄로 막는다.)
   if ! printf '%s' "$hex" | xxd -r -p | cred_has_login; then
     hex=""
@@ -3820,7 +3820,7 @@ copy_login_to_isolated() {
   log "login copy failed: after copy the isolated profile still reports not logged in ($svc)"
   return 1
 }
-# ── rotate 생략 판정 (v0.3.30 · TICKET=installer-0330 · 윈 Get-CysDaemonPid·Get-RotatePlan 짝) ──
+# ── rotate 생략 판정 (v0.3.30 · 윈 Get-CysDaemonPid·Get-RotatePlan 짝) ──
 DAEMON_PID_BEFORE=""; DAEMON_PID_AFTER=""
 ROTATE_PLAN="run:unset"   # [8/10] 이 판정을 못 남겼으면(dry 등) 종전대로 rotate 를 부른다
 daemon_pid_of() { # daemon_pid_of <cli> → cys identify(JSON)의 daemon_pid · 못 읽으면 빈 출력
@@ -3847,11 +3847,11 @@ step_prepare_account() {
   copy_login_to_isolated || true
   # 프로그램 안의 실제 파일을 직접 부른다 — 중간 연결 고리가 끊겨 있어도 이 길은 열려 있다.
   local daemon_rc=0
-  # 🔴v0.3.29(TICKET=installer-0329 · 09-21 맥 VM 재설치 실기): 재설치에서 cys 가 이미 돌고 있으면 `daemon install` 은
+  # 🔴v0.3.29(09-21 맥 VM 재설치 실기): 재설치에서 cys 가 이미 돌고 있으면 `daemon install` 은
   #   「error: 데몬이 이미 가동 중 …」으로 거절하고, 그 글이 창에 찍혀 **성공한 재설치가 오류(error-text)로 계상**됐다.
   #   ⇒ 먼저 물어보고 이미 답하면 등록을 건너뛴다(그 명령이 거절하는 조건과 같은 조건 = 소켓이 살아 있다).
   #   증거 수집기(say_error_text_hook)의 조준은 그대로다 — 오류가 아닌 것을 오류 글로 찍지 않을 뿐이다.
-  #   v0.3.30(TICKET=installer-0330): 앞뒤 데몬 pid 를 남긴다 — [9/10] 이 「이미 새 데몬인가」를 이것으로 가른다(rotate_plan · 윈 Get-RotatePlan 짝).
+  #   v0.3.30: 앞뒤 데몬 pid 를 남긴다 — [9/10] 이 「이미 새 데몬인가」를 이것으로 가른다(rotate_plan · 윈 Get-RotatePlan 짝).
   local pre_pong=0
   DAEMON_PID_BEFORE=""
   if "$cli" ping 2>/dev/null | grep -q pong; then
@@ -3863,12 +3863,12 @@ step_prepare_account() {
   fi
   # ★등록됐는지는 **자리를 직접 보고** 정한다(cys_autostart_state 머리 주석) — 이 값 하나로 아래 문구가 갈린다(ps1 3105).
   AUTOSTART_STATE="$(cys_autostart_state "$cli")"
-  # v0.3.32(TICKET=installer-0332 C1 · 윈 22:2x 실기 사진의 맥 짝): 앞 판은 여기 앞에서 「그대로 둡니다」를 말하고
+  # v0.3.32(C1 · 윈 22:2x 실기 사진의 맥 짝): 앞 판은 여기 앞에서 「그대로 둡니다」를 말하고
   #   아래 「등록 여부는 따로 말한다」가 「자동 시작 등록됨」을 또 찍어 두 줄이 모순처럼 읽혔다(등록이 없으면 정말 모순).
   #   ⇒ 이미 돌고 등록도 우리 것(yes)이면 이 한 줄로 끝낸다 · 등록이 없거나 다르면 아래 줄 하나만 사실대로 말한다.
   local autostart_said=0
   if [ "$pre_pong" = 1 ] && [ "$AUTOSTART_STATE" = yes ]; then
-    say "     cys 가 이미 돌고 있고 자동 시작도 등록돼 있어(LaunchAgent ${CYS_LAUNCHD_LABEL}) 그대로 둡니다."
+    say "     cysr 이 이미 돌고 있고 자동 시작도 등록돼 있어(LaunchAgent ${CYS_LAUNCHD_LABEL}) 그대로 둡니다."
     autostart_said=1
   fi
   log "daemon install rc=$daemon_rc · launchd ${CYS_LAUNCHD_LABEL} = $AUTOSTART_STATE"
@@ -3908,7 +3908,7 @@ step_prepare_account() {
         say "[8/10] 켜졌습니다."
         # ⛔까닭을 단정하지 않는다 — 우리는 그것을 잰 적이 없다.
         say "     $(cys_autostart_words "$AUTOSTART_STATE")"
-        [ "$AUTOSTART_STATE" = "yes" ] || say "     다음에 컴퓨터를 켜시면 cys 를 한 번 열어 주시면 됩니다. 그러면 그때부터 다시 돕니다."
+        [ "$AUTOSTART_STATE" = "yes" ] || say "     다음에 컴퓨터를 켜시면 cysr 을 한 번 열어 주시면 됩니다. 그러면 그때부터 다시 돕니다."
         log "daemon started by launching the app (launchd ${CYS_LAUNCHD_LABEL} = $AUTOSTART_STATE)"
       fi
     fi
@@ -3980,18 +3980,18 @@ step_prepare_account() {
 
 # ── 하는 일 10 — 첫 함대 부르기 ───────────────────────────────────
 # 자비스는 「너는 마스터다」라는 말을 들어야 깨어나 동료를 부른다.
-# 🔴2026-09-16 맥판 동등화(TICKET=mac-parity-t1-core · 윈도우판 2026-09-15 결정과 같다) — 그 말을 사람이 치지 않는다.
+# 🔴2026-09-16 맥판 동등화(윈도우판 2026-09-15 결정과 같다) — 그 말을 사람이 치지 않는다.
 #   [9/10] 이 자비스를 띄울 때 **첫 프롬프트의 첫 줄**로 함께 넘긴다(wake.sh 안 · cys 명령줄에는 우리말 0).
 #   ⛔창에 글을 밀어 넣는 길(cys send)은 쓰지 않는다 — 자비스가 기계 배달로 보고 동료를 부르지 않는다(2026-09-05 실측).
 #     첫 프롬프트는 배달 기록에 없어 선언으로 읽힌다(팩 v0.14.36 판정기 2026-09-15 실측 · 메모리 installer-auto-declaration-first-prompt-not-cys-send).
 #   앞 판 맥 주석(「사람이 직접 친 선언만 … 우리가 대신 넣지 않는다」)은 cys send 경로에 대한 말이었다 — 첫 프롬프트 경로는 그 장치에 걸리지 않는다.
-# 우리가 하는 일 = ⑴마스터가 실제로 일을 시작했는지 잰다 ⑵동료 자리가 서는지 본다(최대 7분) ⑶안 서면 그때만 사람에게 부탁한다.
+# 우리가 하는 일 = ⑴마스터 자리가 실제로 일을 시작했는지 잰다 ⑵동료 자리가 서는지 본다(최대 7분) ⑶안 서면 그때만 사람에게 부탁한다.
 FLEET_TRIGGER='너는 마스터다'
 FLEET_POLL_SEC=2      # 자리 목록을 몇 초마다 보는가 · 종전 5초(installer-speed-pin-0320 — 먼저 보고 나서 기다린다)
-FLEET_AWAKE_TRIES=210 # 2초 × 210 = 420초(7분). 옛 240초(4분)에 팩 자원 게이트 재측정 상한(1.0.2 A2 · load 트립 시 30s×6=180s)을 더해 늘림(TICKET=installer-0325 c9 · 2026-09-18) — 윈도우판 $FleetAwakeTries 와 같은 값(90초에서 240초로 올린 까닭도 같다)
+FLEET_AWAKE_TRIES=210 # 2초 × 210 = 420초(7분). 옛 240초(4분)에 팩 자원 게이트 재측정 상한(1.0.2 A2 · load 트립 시 30s×6=180s)을 더해 늘림(c9 · 2026-09-18) — 윈도우판 $FleetAwakeTries 와 같은 값(90초에서 240초로 올린 까닭도 같다)
 FLEET_WAIT_TRIES=180  # 2초 × 180 = 6분. (자동이 안 닿았을 때) 사람이 창을 찾아 한 문장 치기에 넉넉한 시간
 FLEET_ROLES='master cso worker'
-# ── 마스터 각성 판정(윈도우판 TICKET=installer-0322-awaken 의 이식 · 상수·기록 글자·화면 문구는 ps1 과 같다) ──
+# ── 마스터 각성 판정(윈도우판 의 이식 · 상수·기록 글자·화면 문구는 ps1 과 같다) ──
 #   ⑴그 자리 클로드의 세션 기록(jsonl)에 답 레코드 ≥1 = 「지시를 받고 말을 했다」
 #   ⑵지침의 **준비 작업 1번**이 쓰는 표지 파일 = 「받은 뒤 실제로 일을 시작했다」 — 표지 하나가 곧 verified 다(ps1 Get-MasterStateName 주석).
 MASTER_MARK_NAME='awake-master.ok'   # 지침의 준비 작업 1번이 만드는 표지(우리가 만들지 않는다)
@@ -4062,7 +4062,7 @@ declaration_seen() { # declaration_seen "<live 목록>"
   done
   return 1
 }
-# ── 자식 자리 각성 검증(TICKET=installer-awaken-verify · 2026-09-15 → installer-awaken-jsonl · 2026-09-16 · 윈도우판 Confirm-ChildSeats 와 같은 모양) ──
+# ── 자식 자리 각성 검증(2026-09-15 → installer-awaken-jsonl · 2026-09-16 · 윈도우판 Confirm-ChildSeats 와 같은 모양) ──
 # 🔴자리가 선 것 ≠ 자리가 깨어난 것(샌드박스 실기 3회/3회). 팩이 자식 자리를 처음 띄울 때 각성 지시를 붙여넣기로
 #   보내는데, 막 뜬 클로드가 뒤따르는 Return 을 삼켜 입력줄에 「[Pasted text #1 +529 lines]」 가 실린 채 멈춘다.
 # 🔴화면을 읽어 판정하던 첫 판(09dcab0)은 거짓 양성을 냈다(2026-09-16 샌드박스 5차). ⇒ 그 자리 클로드의 세션 기록(jsonl)으로 잰다.
@@ -4180,7 +4180,7 @@ EOF_CHILD
   while IFS="$tab" read -r role ref cwd <&3; do
     [ -n "$role" ] || continue
     if confirm_child_seat "$cli" "$role" "$ref" "$cwd"; then
-      # ★이 판정이 재는 것은 **제출**이다(사용자 레코드 >=1) — 「받아들였다」가 아니다(TICKET=installer-0322-awaken).
+      # ★이 판정이 재는 것은 **제출**이다(사용자 레코드 >=1) — 「받아들였다」가 아니다.
       say "     ${role} 자리 지시 제출 확인"
       log "awaken child: role=${role} seat=${ref} marker=awaken:child-verified retries=${CHILD_RETRY} evidence=jsonl u=${CHILD_U} a=${CHILD_A}"
       progress_send '10/10' 'info' '' 'awaken:child-verified' ''   # ps1 3675
@@ -4197,10 +4197,10 @@ $seats
 EOF_SEATS
   return 0
 }
-# ── 지난 라운드 잔재를 옮긴다(v0.3.29 · TICKET=installer-0329 ⑤ · master 판정 180d303e = B) ──
+# ── 지난 라운드 잔재를 옮긴다(v0.3.29 · ⑤ · 운영자 판정 = B) ──
 #   재설치는 install-jarvis 를 다시 쓴다 — 그 안의 _round(체크포인트·옛 라운드 기록)가 남으면 새 자비스가 옛 라운드를 이어받는다.
 #   ⛔지우지 않는다 — _round/archive/<시각>/ 로 **옮기기만** 한다(되돌리기 = 그 폴더의 것을 _round 로 다시 옮기면 된다).
-#   ⚠승인 Feed 의 옛 티켓(req-…)은 이 폴더가 아니라 데몬 쪽(feed.jsonl)에 있다 — 그 처방은 데몬 몫이다(890 · 판정 C).
+#   ⚠승인 Feed 의 옛 작업(req-…)은 이 폴더가 아니라 데몬 쪽(feed.jsonl)에 있다 — 그 처방은 데몬 몫이다(890 · 판정 C).
 archive_old_round() {
   local r="$JARVIS_HOME/_round" ts dst moved="" e n
   if [ ! -d "$r" ]; then log "round archive: _round 없음"; return 0; fi
@@ -4260,7 +4260,7 @@ wait_master_signs() { # wait_master_signs <상한초> → MS_MARK(True|False) ·
 send_master_retry() { # send_master_retry <명령> <자리> → rc 0 = 보냈다
   local cli="$1" ref="$2" msg
   [ -n "$ref" ] || return 1
-  # ⚠맥판 문구는 **ASCII 영문**이다(브리프 H-M2 회피 — 창에 밀어 넣는 글이 지나는 층의 인코딩 축을 없앤다).
+  # ⚠맥판 문구는 **ASCII 영문**이다(지시서 H-M2 회피 — 창에 밀어 넣는 글이 지나는 층의 인코딩 축을 없앤다).
   #   뜻은 ps1 Send-MasterRetry 3730 의 우리말 문구와 같다. ⛔선언(「너는 마스터다」)을 다시 보내지 않는다.
   msg="$MASTER_RETRY_MSG"
   # 🔴보내기가 실패하면 Return 을 넣지 않는다(762 보고서 D2 — 입력줄에 남은 제안 글이 제출되는 경로).
@@ -4312,10 +4312,10 @@ say_master_state() { # 셋을 **서로 다른 문구**로 찍는다(ps1 Write-Ma
   esac
 }
 master_request_card() { # 받았는데 시작 안 한 끝에서만 · ⛔「너는 마스터다」를 적지 않는다(이미 들어갔다)
-  human '자비스' '자비스가 아직 준비 작업을 시작하지 않아 한 줄만 부탁드립니다 — cys 창에서 입력해 주십시오'
+  human '자비스' '자비스가 아직 준비 작업을 시작하지 않아 한 줄만 부탁드립니다 — cysr 창에서 입력해 주십시오'
   say ''
   say '   ┌───────────────────────────────────────────────────────────────┐'
-  say '   │   cys 창의 master 자리에 이렇게 입력해 주십시오:              │'
+  say '   │   cysr 창의 master 자리에 이렇게 입력해 주십시오:              │'
   say '   │                                                               │'
   say '   │     install-jarvis 폴더의 install-directive.md 를 읽고,       │'
   say '   │     거기 적힌 준비 작업을 해 주세요.                          │'
@@ -4326,7 +4326,7 @@ master_request_card() { # 받았는데 시작 안 한 끝에서만 · ⛔「너�
 }
 master_unknown_card() { # 「판정 못 함」은 「거절했다」가 아니다 — 문구가 다르다
   say ''
-  say '   cys 창의 master 자리를 열어 자비스가 무엇을 하고 있는지 보아 주십시오.'
+  say '   cysr 창의 master 자리를 열어 자비스가 무엇을 하고 있는지 보아 주십시오.'
   say '   아무 말도 하지 않고 있으면 이렇게 입력해 주시면 됩니다: install-jarvis 폴더의 install-directive.md 를 읽고, 거기 적힌 준비 작업을 해 주세요.'
 }
 # 기다리는 동안 설치 창에 친 글자를 비운다(ps1 Clear-FleetStrayKeys 3508 의 짝) — 비우지 않으면 설치가 끝난 뒤 셸이 그 줄을 **명령으로** 읽는다
@@ -4347,18 +4347,18 @@ set_fleet_finished() { # 끝났다고 적는다 — 안 적으면 끝맺음이 �
   SHOW_RERUN=0
 }
 set_fleet_needs_master() {
-  NEXT_STEP='cys 창의 master 자리에 있는 자비스에게 위 한 줄을 전해 주십시오. 그것으로 설치가 끝납니다.'
+  NEXT_STEP='cysr 창의 master 자리에 있는 자비스에게 위 한 줄을 전해 주십시오. 그것으로 설치가 끝납니다.'
   SHOW_RERUN=0
 }
-# 설치 창을 멈춰도(Ctrl-C) 자비스 창은 그대로 둔다(TICKET=mac-parity-t1-core · 09-16 실기 「jarvis 칸 exited · 설치기 ^C 동반 종료 추정」).
+# 설치 창을 멈춰도(Ctrl-C) 자비스 창은 그대로 둔다(09-16 실기 「jarvis 칸 exited · 설치기 ^C 동반 종료 추정」).
 #   자비스 자리는 cys 데몬의 자식이지 이 창의 자식이 아니다 — 이 창이 끝나도 자리가 죽을 까닭이 없게 만드는 것이 목표다.
 #   ⑴여기서는 기다림만 끝내고 「자비스 창은 그대로 둡니다」를 말한다(자리를 끄는 명령을 보내지 않는다).
 #   ⑵데몬이 이 창과 같은 프로세스 묶음에 있으면(= Ctrl-C 가 데몬까지 간다) 그 사실을 기록에 남긴다 — 실기에서 원인을 가를 증거.
 fleet_on_interrupt() {
   trap - INT
-  printf '\n%s\n' '   설치 창의 기다림을 멈췄습니다 — 자비스 창(cys)은 그대로 둡니다. 거기서 이어서 이야기하시면 됩니다.'
+  printf '\n%s\n' '   설치 창의 기다림을 멈췄습니다 — 자비스 창(cysr)은 그대로 둡니다. 거기서 이어서 이야기하시면 됩니다.'
   log "fleet: interrupted by owner (Ctrl-C) — seats left running"
-  NEXT_STEP='cys 창의 master 자리에서 이어서 이야기하십시오. 이 설치 창은 닫으셔도 됩니다.'
+  NEXT_STEP='cysr 창의 master 자리에서 이어서 이야기하십시오. 이 설치 창은 닫으셔도 됩니다.'
   SHOW_RERUN=0
   exit 130
 }
@@ -4390,19 +4390,19 @@ step_fleet() {
   if [ "$MODE" = "dry" ]; then say "[10/10] (dry-run) 함대를 부르지 않았습니다."; return 0; fi
   if [ -z "$ref" ]; then
     say "[10/10] 자비스 창을 못 열어 동료들을 부르지 못했습니다."
-    say "     cys 창에서 자비스에게 이렇게 말해 주십시오: $FLEET_TRIGGER"
+    say "     cysr 창에서 자비스에게 이렇게 말해 주십시오: $FLEET_TRIGGER"
     return 10
   fi
   # ★기준선을 못 찍었으면 **여기서 멈춘다** — 세어 봐야 그 수가 무엇을 뜻하는지 모른다.
   if [ "$FLEET_BASELINE_OK" != "1" ]; then
     say "[10/10] 지금 열려 있는 자리 목록을 읽지 못해, 동료들이 섰는지 판정하지 않습니다."
-    say "     cys 창에서 자비스에게 이렇게 말해 주십시오: $FLEET_TRIGGER"
+    say "     cysr 창에서 자비스에게 이렇게 말해 주십시오: $FLEET_TRIGGER"
     say "     그 뒤 자비스에게 「동료들 다 섰어?」라고 물어보시면 자비스가 직접 확인해 알려 드립니다."
     return 10
   fi
   note_daemon_group
   trap 'fleet_on_interrupt' INT
-  # ── ① 마스터가 **실제로** 깼는지 먼저 잰다(ps1 Step-Fleet 3842 와 같은 순서 — 동료 자리는 편성 자동 복구로도 선다) ──
+  # ── ① 마스터 자리가 **실제로** 깼는지 먼저 잰다(ps1 Step-Fleet 3842 와 같은 순서 — 동료 자리는 편성 자동 복구로도 선다) ──
   say '[10/10] 자비스(master)가 지시를 받고 준비 작업을 시작하는지 봅니다 (최대 2분 · 사람이 하실 일은 없습니다).'
   confirm_master_awake "$cli" "$ref"
   say_master_state
@@ -4444,7 +4444,7 @@ step_fleet() {
     if [ "$MASTER_STATE" = verified ]; then
       raise_cys_app_window   # c7 — 다 선 지금이 참가자가 창을 찾는 순간이다(재기동 없이 앞으로만)
       say '   자비스가 깨어났습니다 — 이제 설치 창을 닫으셔도 됩니다.'
-      say '   (설치 창을 닫아도 자비스 창은 그대로 둡니다 — 이어서 cys 창의 자비스와 이야기하시면 됩니다.)'
+      say '   (설치 창을 닫아도 자비스 창은 그대로 둡니다 — 이어서 cysr 창의 자비스와 이야기하시면 됩니다.)'
       say '   cysr 창이 앞에 보이지 않으면 Dock 의 cysr 아이콘을 한 번 눌러 주세요(다시 실행하지 않습니다).'
       set_fleet_finished
       drain_tty_keys
@@ -4461,22 +4461,22 @@ step_fleet() {
   # 상한 안에 동료 자리가 하나도 안 섰다 = 자동 각성이 닿지 않았다 ⇒ **그때만** 사람에게 부탁한다(원인은 단정하지 않는다).
   log "fleet awaken: no child seat within $((FLEET_AWAKE_TRIES * FLEET_POLL_SEC))s -> manual fallback card"
   progress_send '10/10' 'info' "$(( $(date +%s) - fleet_start ))" 'awaken:manual-fallback' ''
-  # 🔴N13(t4-fix) — 마스터가 이미 깼으면(verified) 선언을 다시 치게 하지 않는다. 동료가 늦는 것뿐이다(사람 손 0).
-  #   선언 카드는 마스터가 깼는지 모르거나(unknown) 시작하지 않았을 때(no-start)에만 낸다.
+  # 🔴N13(t4-fix) — 마스터 자리가 이미 깼으면(verified) 선언을 다시 치게 하지 않는다. 동료가 늦는 것뿐이다(사람 손 0).
+  #   선언 카드는 마스터 자리가 깼는지 모르거나(unknown) 시작하지 않았을 때(no-start)에만 낸다.
   if [ "$MASTER_STATE" = verified ]; then
     say "[10/10] 마스터는 깨어났습니다 · 동료 자리는 자비스가 세우는 중입니다($((FLEET_WAIT_TRIES * FLEET_POLL_SEC / 60))분 더 기다립니다) · 사람이 하실 일은 없습니다."
     log "fleet: master verified - waiting for child seats without declaration card in $ref"
   else
-    human "자비스" "자비스가 저절로 깨어나지 않아 한마디만 부탁드립니다 — cys 창에서 입력해 주십시오"
+    human "자비스" "자비스가 저절로 깨어나지 않아 한마디만 부탁드립니다 — cysr 창에서 입력해 주십시오"
     say ""
     say "   ┌──────────────────────────────────────────────────┐"
-    say "   │   cys 창의 master 자리에 이렇게 입력해 주십시오: │"
+    say "   │   cysr 창의 master 자리에 이렇게 입력해 주십시오: │"
     say "   │                                                  │"
     say "   │        ${FLEET_TRIGGER}                             │"
     say "   │                                                  │"
     say "   └──────────────────────────────────────────────────┘"
     say ""
-    say "   cys 창 = 방금 열린 cys 앱 창입니다(이 검은 터미널 창이 아닙니다). 안 보이면 Dock 의 cys 아이콘을 누르십시오."
+    say "   cysr 창 = 방금 열린 cysr 앱 창입니다(이 검은 터미널 창이 아닙니다). 안 보이면 Dock 의 cysr 아이콘을 누르십시오."
     say "   그 한마디를 들으면 자비스가 동료들을 부릅니다. 여기서 기다리다가 다 서면 알려 드립니다."
     log "fleet: waiting for owner declaration in $ref"
   fi
@@ -4506,7 +4506,7 @@ step_fleet() {
     log "fleet awaken: success after fallback card - seats=$(printf '%s' "$live" | tr ' ' ',')"
     confirm_child_seats "$cli"
     post_install_evidence "$cli" "$ref"
-    # 카드 뒤 6분 사이에 마스터가 시작했을 수 있다 ⇒ **한 번만 다시 본다**(재시도는 하지 않는다 · 이미 1회 썼다).
+    # 카드 뒤 6분 사이에 마스터 자리가 시작했을 수 있다 ⇒ **한 번만 다시 본다**(재시도는 하지 않는다 · 이미 1회 썼다).
     master_state_now
     say_master_state
     trap - INT
@@ -4529,12 +4529,12 @@ step_fleet() {
     say "     남은 자리를 다시 세우려면 cysr 창의 master 자리에 『너는 마스터다.』 한 줄을 다시 쳐 주십시오(이 설치 창이 아닙니다)."
   elif [ "$MASTER_STATE" = verified ]; then
     say "     마스터는 깨어 있습니다. 남은 자리를 다시 세우려면 cysr 창의 master 자리에 『너는 마스터다.』 한 줄을 다시 쳐 주십시오(이 설치 창이 아닙니다)."
-    say "     오래 서지 않으면 cys 창의 자비스에게 무엇이 걸렸는지 물어보십시오."
-    NEXT_STEP='cys 창의 master 자리에 있는 자비스와 이어서 이야기하십시오 — 남은 자리가 왜 안 섰는지 물어보시면 됩니다.'
+    say "     오래 서지 않으면 cysr 창의 자비스에게 무엇이 걸렸는지 물어보십시오."
+    NEXT_STEP='cysr 창의 master 자리에 있는 자비스와 이어서 이야기하십시오 — 남은 자리가 왜 안 섰는지 물어보시면 됩니다.'
     SHOW_RERUN=0
   else
-    say "     아직 그 한마디를 입력하지 않으셨다면, cys 창에서 지금 입력해 주시면 됩니다."
-    say "     치셨는데도 서지 않았다면 cys 창의 자비스에게 물어보십시오 — 무엇이 걸렸는지 사람 말로 알려 줍니다."
+    say "     아직 그 한마디를 입력하지 않으셨다면, cysr 창에서 지금 입력해 주시면 됩니다."
+    say "     치셨는데도 서지 않았다면 cysr 창의 자비스에게 물어보십시오 — 무엇이 걸렸는지 사람 말로 알려 줍니다."
   fi
   log "fleet missing: $(printf '%s' "${missing# }" | tr ' ' ',')"
   drain_tty_keys
@@ -4561,11 +4561,11 @@ cys_open_master_seat() {   # $1 = 여는 명령 · 화면으로 나가는 것 = 
 #   거절했는데 앞 판은 「열지 못했다」로만 읽고 **이 창에서 자비스를 또 띄웠다** ⇒ [10/10] 이 영영 오지 않았다.
 #   ★거절의 뜻은 「자비스는 이미 저 앱 안에 있다」다 — 두 번째를 띄우지 않고 앱 창을 쓰시게 한다.
 #   ⚠순수 함수로 둔다(답 문자열만 주입해 갈래를 태울 수 있게).
-# ── 재설치 끝의 자동 재시작(v0.3.29 · TICKET=installer-0329 ③ · master 판정 859ceeb2) ──
+# ── 재설치 끝의 자동 재시작(v0.3.29 · ③ · 운영자 판정) ──
 #   앱의 [재시작] 버튼(rotate_daemon)과 **같은 한 명령** `cys rotate`(cys 포크 1.1.2)를 부른다.
 #   ⛔그 5단(drain → 표식 → 정지 → 기동 → 복원)을 이 스크립트에 옮겨 적지 않는다 — 버튼·sh·ps1 세 벌이 표류한다.
 #   CYS_NO_AUTOSTART 를 걸지 않는다 — rotate 가 새 cysd 를 스스로 띄워야 한다(cys_capped 와 다른 까닭).
-# 값 두 개(master 판정 aa4419f8 · 2026-09-21 · TICKET=v112-vm-verify):
+# 값 두 개(운영자 판정 · 2026-09-21):
 #   rotate --timeout 은 전체가 아니라 drain --verify 의 **노드별** 대기다 — 저장 확인 전역 상한 = timeout×2+5(cys fanout_global_cap).
 #   120 ⇒ ① 최대 245s · 벽시계 상한 360 ⇒ ②데몬 교체 ~ ⑤복원에 115s 여유(0.3.29 판단 · 0.3.31 에서 180 으로 줄임 — 아래 ROTATE_WALL_CAP_SEC 주석). 상한이 ② 도중에 끊으면 함대가 내려간 채 남는다(최악) —
 #   그래서 ① 를 줄이고 ②~⑤ 여유를 남기는 쪽을 골랐다. ⚠한쪽만 올리면 그 여유가 사라진다(둘을 함께 본다).
@@ -4579,12 +4579,12 @@ rotate_skip_depts_flag() { # <cys --version 한 줄> → --skip-depts(1.1.3 이�
   return 0
 }
 ROTATE_WALL_CAP_SEC=180        # 설치기가 rotate 전체를 기다리는 벽시계 상한 · 닿으면 관측 판정 한 번 뒤 버튼 안내로 폴백한다
-# v0.3.31(TICKET=installer-0331 · 2026-09-21 19:1x 결정): 상한 360 → 180. 까닭 = 09-21 18:57 윈 실기에서 결과는 성공(새 데몬 · 새 자리 3)인데
+# v0.3.31(2026-09-21 19:1x 결정): 상한 360 → 180. 까닭 = 09-21 18:57 윈 실기에서 결과는 성공(새 데몬 · 새 자리 3)인데
 #   rotate 가 stage 2-daemon-up 에서 새 데몬을 알아보지 못해 rc 를 돌려주지 않았다(cys 1.1.2 윈 결함) ⇒ 설치기가 rc 가 아니라
 #   **관측**(rotate_observe)으로 결과를 가른다. 실측 드레인 45s(윈)·전체 85s(맥) + 데몬·복원 여유 = 180.
 #   ⚠드레인 전역 상한(timeout×2+5 = 245s)보다 짧다 — 드레인이 180s 를 넘기면 상한이 드레인 도중에 끊는다(옛 데몬·자리는 그대로 남아
 #   함대는 서 있다 · 폴백 안내로 간다). 관측 판정이 rotate 를 끊는 것은 드레인 뒤(단계 2 이후)에만이다.
-# 종료코드 표(cys 1.1.2 rotate_rc doc · v112-restore) — 설치기 판정(TICKET=v112-vm-verify):
+# 종료코드 표(cys 1.1.2 rotate_rc doc · v112-restore) — 설치기 판정:
 #   0 전부 성공 · 21 끝까지(저장 일부 미확인) ⇒ ok        — 안내 = rotate 표준 출력 마지막 줄(사후 알림) 그대로
 #                                                            21 이면 「저장 확인 일부 미완 — 대화는 복원됨」 1줄을 덧붙인다
 #   25 끝까지(복원 실패·보류)                ⇒ held      — 「창을 확인해 주세요」 · [재시작] 을 부탁하지 않는다(이미 새 데몬)
@@ -4608,11 +4608,11 @@ rotate_log_new() { # rotate_log_new <파일> <이미 옮긴 줄 수> <시작 SEC
   [ "$n" -gt "$2" ] 2>/dev/null && awk -v a="$2" -v b="$n" 'NR>a && NR<=b && NF' "$1" 2>/dev/null | while IFS= read -r ln; do log "rotate [t=$((SECONDS - $3))s] $ln"; done
   [ "$n" -gt "$2" ] 2>/dev/null && echo "$n" || echo "$2"
 }
-# ── rotate 결과 관측 (v0.3.31 · TICKET=installer-0331 · 윈 Get-RotateObserveVerdict·Invoke-RotateObserve 짝) ──
+# ── rotate 결과 관측 (v0.3.31 · 윈 Get-RotateObserveVerdict·Invoke-RotateObserve 짝) ──
 #   rc 를 기다리는 대신 세 축을 본다: ⓐ ping 에 pong ⓑ 데몬 pid(cys identify) ⓒ cys list 의 살아 있는 자리.
 #   성공 = pid 가 rotate 앞 기준선과 다르다 + 기준선 자리가 하나도 살아 있지 않다 + 역할 자리 3개 이상 살아 있다(exited=false).
 ROTATE_OBSERVE_SEC=10   # 관측 간격
-# v0.3.31 판정 C(TICKET=installer-0331 · 2026-09-21 19:56 결정): 상한에 닿았을 때 1-drain 이면 끊지 않고 드레인이 끝날 때까지
+# v0.3.31 판정 C(2026-09-21 19:56 결정): 상한에 닿았을 때 1-drain 이면 끊지 않고 드레인이 끝날 때까지
 #   더 기다린다(드레인 자체 상한 = timeout×2+5 안). 드레인이 끝나면 관측 1회 → 성공이면 observed-ok · 아니면 폴백하되
 #   ⛔rotate 는 끊지 않는다 — 드레인 직후는 데몬 교체 단계라 거기서 끊으면 함대가 내려간 채 남는다(최악). 끝까지 가게 둔다.
 #   안전 한도 = 드레인 자체 상한 + 30s(드레인이 그래도 안 끝나면 드레인 도중에 끊는다 — 옛 데몬·자리는 그대로).
@@ -4679,12 +4679,12 @@ rotate_held_recheck() { # rotate_held_recheck <cli> <기준 pid> <기준 자리>
 cys_rotate_state() { # cys_rotate_state <cli> → 찍는 값 = 「<판정>\t<rc>\t<rotate 마지막 알림 줄>」 한 줄(판정 = ok · observed-ok · held · absent · timeout · fail-<rc>)
   local out rc ln tf te note
   # ⚠명령 치환 $( ) 로 받지 않는다 — rotate 가 띄운 새 데몬이 표준 출력을 물려받아 쥐고 있으면 파이프가 안 닫혀
-  #   rotate 가 끝나도 이 창이 영원히 기다린다(alarm 도 이미 끝난 프로세스라 소용없다 · 이종 검토 1R 지적 M).
+  #   rotate 가 끝나도 이 창이 영원히 기다린다(alarm 도 이미 끝난 프로세스라 소용없다 · 외부 검토 1차 지적 M).
   #   ⇒ 파일로 받는다 — 파일은 누가 쥐고 있어도 읽는 쪽을 막지 않는다.
   #   표준 출력과 오류를 **따로** 받는다 — 사후 알림 1줄은 표준 출력의 마지막 줄이다(단계 진행은 오류 쪽).
   tf="$(mktemp -t jarvis-rotate 2>/dev/null)" || tf="$JARVIS_HOME/.rotate-out"
   te="$(mktemp -t jarvis-rotate-err 2>/dev/null)" || te="$JARVIS_HOME/.rotate-err"
-  # v0.3.30(TICKET=installer-0330 ③): 뒤로 돌리고 **파일을 들여다보며** 기록한다 — 줄은 도착하는 대로 경과초와 함께,
+  # v0.3.30(③): 뒤로 돌리고 **파일을 들여다보며** 기록한다 — 줄은 도착하는 대로 경과초와 함께,
   #   단계는 rotate 가 지금 부르는 자식 명령(rotate_stage_of)으로. 상한은 그대로 perl alarm 이 진다(rc 142).
   local rp t0 st stage="" stage_at=0 no=0 ne=0 last=""
   local base_pid base_refs obs_at=0 observed=0 v el capped=0 drain_ext=0 left=0
@@ -4694,7 +4694,7 @@ cys_rotate_state() { # cys_rotate_state <cli> → 찍는 값 = 「<판정>\t<rc>
   log "rotate baseline pid=${base_pid:-?} seats=${base_refs:-(none)}"
   t0="$SECONDS"
   # v0.3.31: 상한은 아래 고리가 진다(단계를 보고 끊을지 정해야 한다 — alarm 은 단계를 모른다).
-  # v0.3.32(TICKET=installer-0332 · master 판정 0c0f5705 · 윈 Get-RotateSkipDeptsFlag 짝): 부서 순회 생략 — env 는 언제나 · 인자는 cys 1.1.3 이상만.
+  # v0.3.32(운영자 판정 · 윈 Get-RotateSkipDeptsFlag 짝): 부서 순회 생략 — env 는 언제나 · 인자는 cys 1.1.3 이상만.
   local skip_flag
   skip_flag="$(rotate_skip_depts_flag "$(cys_capped 5 "${1:-cys}" --version | head -1)")"
   CYS_ROTATE_SKIP_DEPTS=1 "${1:-cys}" rotate --timeout "$ROTATE_DRAIN_TIMEOUT_SEC" $skip_flag >"$tf" 2>"$te" </dev/null &
@@ -4828,15 +4828,15 @@ step_wake() {
   local first_prompt cli ref fleet_rc seat_rc=""
   # 🔴**cys 에 넘기는 인자**는 ASCII 로만 쓴다(자리 여는 명령 · 창 이름) — 윈도우에서 우리말 인자가 깨져 거절당했다.
   #   첫 지시는 cys 를 지나지 않는다: wake.sh 안에 적혀 claude 에게 바로 가고, 이 창 폴백에서도 claude 의 인자로 바로 간다.
-  # 🔴2026-09-16 개정(TICKET=installer-0322-awaken · 윈도우판과 같은 문구로 맞춘다).
+  # 🔴2026-09-16 개정(윈도우판과 같은 문구로 맞춘다).
   #   앞 문구(... do exactly what it says. Your first line must be the fixed line specified there.)가
   #   같은 날 윈도우 샌드박스에서 **거부**를 불렀다 — 모델이 거절한 것은 지령의 내용이 아니라
   #   (1)읽어 보기 전에 그대로 실행하라 (2)첫마디를 이 대본으로 하라는 **요구의 형태**였다.
   #   문구만 의뢰형으로 바꾼 같은 자리에서 같은 모델이 같은 파일을 읽고 수행했다(2026-09-16 13:25 A/B 실측).
-  # 🔴2026-09-16 맥판 동등화(TICKET=mac-parity-t1-core · 목표 「사람 손이 클로드 로그인 외에 필요 없게」) —
+  # 🔴2026-09-16 맥판 동등화(목표 「사람 손이 클로드 로그인 외에 필요 없게」) —
   #   앞 판 주석(「맥은 선언을 첫 지시에 싣지 않는다 · 표지 판정도 없다」)은 폐기한다. 윈도우판 Step-Wake 3244~ 와 같이
   #   ⑴선언을 첫 프롬프트의 **첫 줄**로 싣고 ⑵[10/10] 이 표지 파일(awake-master.ok)로 마스터를 실제로 잰다.
-  #   ⛔첫 줄 「너는 마스터다」는 인사말이 아니라 **팩 훅의 선언 트리거**다(javis_detect.py · 의뢰 문구 단독 = 선언 없음 실측).
+  #   ⛔첫 줄 「너는 마스터다」는 인사말이 아니라 **팩 훅의 선언 트리거**다(팩의 선언 감지 스크립트 · 의뢰 문구 단독 = 선언 없음 실측).
   first_prompt="install-jarvis 폴더의 install-directive.md(${DIRECTIVE_FILE}) 를 읽고, 거기 적힌 준비 작업을 해 주세요."
   local wake_prompt
   wake_prompt="${FLEET_TRIGGER}
@@ -4864,20 +4864,20 @@ ${first_prompt}"
     # ★cys 앱 창을 **자리를 열기 전에** 연다(09-16 실기 「앱 창 미가시 · 사람이 open 을 쳤고 오타」 · 윈도우는 앱이 창과 함께 뜬다).
     #   앞에 두는 까닭 = 앱이 뜨며 편성 복구로 지난 자리를 세울 수 있다 — 기준선보다 앞이어야 그 자리가 「이번 설치의 것」으로 안 세어진다.
     open_cys_app
-    # ★지난 설치가 남긴 표지를 먼저 치운다 — 남아 있으면 이번 마스터가 아무 일도 안 해도 「시작했다」로 읽힌다(ps1 Clear-MasterMark).
+    # ★지난 설치가 남긴 표지를 먼저 치운다 — 남아 있으면 이번 마스터 자리가 아무 일도 안 해도 「시작했다」로 읽힌다(ps1 Clear-MasterMark).
     clear_master_mark
     archive_old_round
     # ★자리를 열기 **전에** 기준선을 찍는다(2차 검토 N2). 이 줄이 자리 여는 줄보다 뒤에 오면
     #   우리가 만든 master 자리까지 기준선에 들어가 영영 안 세어진다.
     set_fleet_baseline "$cli"
-    # 🔴2026-09-17(TICKET=installer-0325 c1 · 09-16 756 발견 · 미수정 이월): 위 4070 은 wake.sh **안**의 문장만 지켰다 —
+    # 🔴2026-09-17(c1 · 09-16 756 발견 · 미수정 이월): 위 4070 은 wake.sh **안**의 문장만 지켰다 —
     #   여는 명령(cmd_line)에 실리는 것은 **경로**(wake_file)인데, 사용자 이름(홈 경로)에 작은따옴표가 있으면
     #   그 글자가 그대로 실려 나가 이 명령을 다시 셈 파싱하는 쪽(cys → 터미널)에서 따옴표가 거기서 끊긴다.
     #   ⇒ 경로에도 같은 방어(작은따옴표 이스케이프 후 통째로 홑따옴표로 감싼다)를 건다.
     wake_file_esc="$(printf '%s' "$wake_file" | sed "s/'/'\\\\''/g")"
     cmd_line="bash '$wake_file_esc'"
     if [ ! -f "$wake_file" ] || case "$wake_file" in *" "*) true ;; *) false ;; esac; then
-      say "     여는 파일의 경로를 쓸 수 없어 cys 안에서는 열지 못합니다. 이 창에서 띄웁니다."
+      say "     여는 파일의 경로를 쓸 수 없어 cysr 안에서는 열지 못합니다. 이 창에서 띄웁니다."
       log "wake path unusable: $wake_file"
       ref=""
     else
@@ -4890,8 +4890,8 @@ ${first_prompt}"
     fi
     case "${seat_rc:-1}:$ref" in
       0:*surface:*)
-        [ "$CYS_APP_OPENED" = "1" ] && say "     cys 앱 창을 열었습니다 — 자비스는 그 창의 master 자리에서 깨어납니다."
-        say "     cys 안에서 자비스를 열었습니다 ($ref). cys 창에서 이어서 이야기하십시오."
+        [ "$CYS_APP_OPENED" = "1" ] && say "     cysr 앱 창을 열었습니다 — 자비스는 그 창의 master 자리에서 깨어납니다."
+        say "     cysr 안에서 자비스를 열었습니다 ($ref). cysr 창에서 이어서 이야기하십시오."
         # 깨우기가 **성공한 뒤에만** 세운다(검토 지적 · D1 기각) — 깨우기가 실패한 끝은 원격 해결이 돈다.
         #   이 창에서 띄우는 갈래(exec)는 성공하면 이 프로세스가 자비스로 바뀌어 끝맺음이 오지 않고, 실패하면 이 깃발 없이 끝맺음이 온다.
         REACHED_WAKE=1
@@ -4914,7 +4914,7 @@ ${first_prompt}"
         started) say "     cysr 앱을 띄웠습니다." ;;
       esac
       # 앱의 [재시작] 을 사람 대신 누른다(같은 명령) — 되면 알림 1줄, 안 되면(옛 cys·실패) 종전 안내 1클릭으로 돌아간다.
-      # v0.3.30(TICKET=installer-0330 ②): [8/10] 에서 이미 새 데몬이 섰으면 rotate 를 또 부르지 않는다(윈 짝 · 09-21 18:19 윈 실기).
+      # v0.3.30(②): [8/10] 에서 이미 새 데몬이 섰으면 rotate 를 또 부르지 않는다(윈 짝 · 09-21 18:19 윈 실기).
       case "$ROTATE_PLAN" in
         skip:*)
           log "reinstall rotate skipped: plan=${ROTATE_PLAN} pid ${DAEMON_PID_BEFORE}->${DAEMON_PID_AFTER}"
@@ -4958,7 +4958,7 @@ ${first_prompt}"
           NEXT_STEP="응용 프로그램 폴더의 cysr 을 눌러 실행한 뒤, 앱 오른쪽 위의 [재시작] 을 한 번 눌러 주세요. 그러면 자비스가 새로 깨어납니다."
         fi
       fi
-      # v0.3.32(TICKET=installer-0332 B9 · 【관측】 progress.tsv sLqY6Au1 22:18:15 = 10/10 end 는 서버에 **도착해 있었다**):
+      # v0.3.32(B9 · 【관측】 progress.tsv sLqY6Au1 22:18:15 = 10/10 end 는 서버에 **도착해 있었다**):
       #   이 갈래는 화면에 [10/10] 줄이 없어서, 뒤에 나가는 설치 끝 증거(post-install)가 「마지막 [n/10]」(current_step)을 따라
       #   9/10 으로 붙었다 ⇒ 서버 목록의 마지막 행이 9/10 으로 보였다. 끝맺음 줄에 [10/10] 을 달아 단계를 사실대로 둔다(위 두 갈래 모두).
       REACHED_WAKE=1
@@ -4972,10 +4972,10 @@ ${first_prompt}"
       post_install_evidence "$cli" "$(master_seat_ref "$cli")" reinstall
       return 0
     fi
-    say "     cys 안에서 열지 못했습니다. 프로그램이 답한 내용은 이렇습니다:"
+    say "     cysr 안에서 열지 못했습니다. 프로그램이 답한 내용은 이렇습니다:"
     printf '%s\n' "$ref" | while IFS= read -r ln; do [ -n "$ln" ] && say "       $ln"; done
     say ""
-    say "     cys 창 안에서 이어서 하고 싶으시면, cys 를 열고 그 안에서 아래 한 줄을 입력해 주십시오:"
+    say "     cysr 창 안에서 이어서 하고 싶으시면, cysr 을 열고 그 안에서 아래 한 줄을 입력해 주십시오:"
     say "       $cmd_line"
     say ""
     say "     자리를 열지 못해 이 설치 창에서 깨웁니다."
@@ -5003,7 +5003,7 @@ ${first_prompt}"
   exec "$claude_bin" --dangerously-skip-permissions "$wake_prompt"
 }
 
-# cys 앱 창을 연다(TICKET=mac-parity-t1-core) — 첫 설치의 확인 창(격리 속성)은 [6/10] 이 이미 지웠다.
+# cys 앱 창을 연다 — 첫 설치의 확인 창(격리 속성)은 [6/10] 이 이미 지웠다.
 #   ★여는 것은 창이고, 데몬은 [8/10] 이 launchd 에 올렸다. 앱이 뜨며 데몬에 닿는 동안 자리를 열지 않도록 답을 한 번 기다린다(최대 20초).
 #   ⚠앱이 데몬을 다시 띄우는지 여기서 단정하지 않는다 — 앞뒤 cysd 번호를 기록에 남겨 실기에서 가른다.
 CYS_APP_OPEN_WAIT_SEC=20
@@ -5015,7 +5015,7 @@ open_cys_app() {
   before="$(pgrep -x cysd 2>/dev/null | tr '\n' ' ')"
   if ! open -a "$app" >>"$LOG_FILE" 2>&1; then
     log "app open failed: $app"
-    say "     cys 앱 창을 자동으로 열지 못했습니다 — 응용 프로그램 폴더에서 $(basename "$app") 을 열어 주십시오(자비스는 그대로 깨웁니다)."
+    say "     cysr 앱 창을 자동으로 열지 못했습니다 — 응용 프로그램 폴더에서 $(basename "$app") 을 열어 주십시오(자비스는 그대로 깨웁니다)."
     return 0
   fi
   # 🔴N3(t4-fix) — 「그 창에서 깨어납니다」는 여기서 말하지 않는다. 자리(여는 명령)가 성공해야 참이 되는 문장이다
@@ -5032,7 +5032,7 @@ open_cys_app() {
   return 0
 }
 
-# cys 앱 창을 **앞으로** 가져온다(TICKET=installer-0325 c7 · 09-17 연수 실증 2/2 맥).
+# cys 앱 창을 **앞으로** 가져온다(c7 · 09-17 연수 실증 2/2 맥).
 #   open_cys_app() 은 [9/10] 초입에 단 한 번 부른다 — 그 뒤 [10/10] 동료 자동 각성을 최대 7분
 #   기다리는 동안 참가자가 다른 창을 보고 있으면 cysr 창이 뒤에 남는다. 실기 2건에서 참가자가
 #   「자동 실행되지 않았다」고 보고 앱을 **손으로 다시 열어** 살아 있던 자리를 exited 로 만들었다.
@@ -6057,7 +6057,7 @@ detect_stage2
 write_report
 note_old_cys_app
 progress_send '1/10' 'end' '' '' ''     # ps1 5651
-# 환경 칸에 **칩**을 함께 싣는다(2026-09-20 · TICKET=v110-mac-x64). 인텔 맥이 몇 대인지·어디서 멈추는지를
+# 환경 칸에 **칩**을 함께 싣는다(2026-09-20). 인텔 맥이 몇 대인지·어디서 멈추는지를
 #   운영팀이 지금은 셀 수 없다 — 맥 이벤트에 아키텍처 칸이 아예 없었다.
 #   ⚠새 env 열쇠(arch)를 만들지 않고 **detail**(서버가 이미 받는 자유 칸)에 싣는다: 서버가 받는 env 열쇠는
 #     claude_ver·cys_ver·win_build·ps_ver·av·browser·mac_ver·hw_model·mem_gb·disk_free_gb(0.3.36)·admin 로 **정해져 있어**(web-install telemetry.ts
@@ -6081,13 +6081,13 @@ step_login;          rc=$?; progress_send '3/10' 'end' '' "rc=$rc${LOGIN_SWEEP:+
 progress_send '4/10' 'start' '' '' ''
 step_prepare;        rc=$?; progress_send '4/10' 'end' '' "rc=$rc" ''; [ "$rc" -eq 0 ] || exit "$rc"
 
-# 🔴[5/10]~[8/10] 이 막히면 **자비스를 깨우지 않고 여기서 끝낸다**(dbg-D5 F3 · master 확정 2026-09-23 16:14).
+# 🔴[5/10]~[8/10] 이 막히면 **자비스를 깨우지 않고 여기서 끝낸다**(dbg-D5 F3 · 운영자 확정 2026-09-23 16:14).
 #   앞 판은 막힌 단을 적어 두고 자비스를 깨웠는데, 이미 깔린 옛 cys(1.0.2 등)가 있으면 그 옛 판으로 함대가 깨어나
 #   「설치가 끝났습니다」가 찍혔다(같은 화면에 J-DL-05) — 사람은 옛 판을 새 판으로 믿는다(거짓 초록).
 #   ⇒ 막히면 「설치가 끝나지 않았습니다 · 진단 코드」 한 줄로 끝내고, 진단 코드가 있으니 원격 해결이 이어서 돕는다.
 # ps1 5683~5701 — 단계마다 시작·끝(경과 초·종료 코드) · 기준선 두 배를 넘으면 느림 증거 · 받아 둔 촬영 요청 처리 · 막히면 그 단에서 멈춘다.
-for st_row in '5/10|cys 설치 파일 받기|step_download_cys' '6/10|cys 설치|step_install_cys' \
-              '7/10|cys 확인|step_verify_cys' '8/10|계정 준비|step_prepare_account'; do
+for st_row in '5/10|cysr 설치 파일 받기|step_download_cys' '6/10|cysr 설치|step_install_cys' \
+              '7/10|cysr 확인|step_verify_cys' '8/10|계정 준비|step_prepare_account'; do
   IFS='|' read -r st_step st_name st_fn <<EOF_STEP
 $st_row
 EOF_STEP

@@ -1,5 +1,5 @@
 #!/bin/bash
-# 맥 진행 전송·증거·첨부 실측 러너 (TICKET=mac-parity-t2-telemetry · 2026-09-16)
+# 맥 진행 전송·증거·첨부 실측 러너 (2026-09-16)
 # ★실물 install-master/bootstrap.sh 를 JARVIS_LIB_ONLY=1 로 통째로 읽고 함수를 부른다 — 떼어 낸 조각이 아니다.
 # ★가짜 서버(127.0.0.1)만 쓴다 · 바깥에 닿지 않는다 · 실 서버 주소(HELP_API_URL 기본값)로 한 줄도 안 나가는지도 잰다.
 # 쓰는 법: bash tests/mac-telemetry-run.sh [bootstrap.sh 경로]   → 끝 줄 「PASS n / FAIL m」 · FAIL 이 있으면 rc 1
@@ -226,7 +226,7 @@ t $? "실패 증거도 기본은 창 그림 꺼짐 · 창 번호를 찾지 않�
 ls "$SB/p8/home/install-jarvis"/.progress.* >/dev/null 2>&1; [ $? -ne 0 ]; t $? "임시 폴더를 남기지 않았다"
 
 echo "== ⑥-2 진단 코드(jcode) — 막힌 자리 fail 전송 + 실패 증거(윈판 Write-JCode 동형) =="
-mkdir -p "$SB/p8b/home/install-jarvis"; printf '%s\n' "2026-09-16T22:00:00+0900 [6/10] cys 를 설치합니다." > "$SB/p8b/home/install-jarvis/bootstrap.log"
+mkdir -p "$SB/p8b/home/install-jarvis"; printf '%s\n' "2026-09-16T22:00:00+0900 [6/10] cysr 을 설치합니다." > "$SB/p8b/home/install-jarvis/bootstrap.log"
 before=$(reqcount)
 run_lib p8b 'MODE=full; NOTICE_SHOWN=1; HELP_API_URL="$T_URL"; JARVIS_PROGRESS_URL="$T_URL/api/progress"; INSTALLER_VERSION=0.3.26; jcode J-CYS-07 "설치 실패"' T_URL="$URL"
 python3 - "$REQ" "$before" <<'PY2'
@@ -351,7 +351,7 @@ t $? "post-install 1건(seat=master · hook_errors=2 · 가림) · 자식 stall 
 [ "$(grep -c '창 그림 = 꺼짐(기본) · 글자 증거만' "$SB/p16/home/install-jarvis/bootstrap.log")" = "1" ] && ! grep -q 'app window skip\|app_window skip' "$SB/p16/home/install-jarvis/bootstrap.log"
 t $? "기본(켜라는 말 없음) = 앱 창 번호도 찾지 않고 「창 그림 = 꺼짐」 기록 한 줄(N1)" "$(grep -iE '창 그림|app' "$SB/p16/home/install-jarvis/bootstrap.log" | head -2)"
 
-echo "== ⑪-2 창 그림 기본 꺼짐(N1 · master 판정 「화면 기록 권한 미요청」) — 가짜 촬영기로 「불렸는가」를 잰다 =="
+echo "== ⑪-2 창 그림 기본 꺼짐(N1 · 운영자 판정 「화면 기록 권한 미요청」) — 가짜 촬영기로 「불렸는가」를 잰다 =="
 # ⛔진짜 /usr/sbin/screencapture 는 어느 갈래에서도 부르지 않는다 — 운영 맥에서 권한 창을 띄우는 것이 바로 이 결함이다.
 cat > "$SB/bin/fakeshot" <<'EOF'
 #!/bin/bash

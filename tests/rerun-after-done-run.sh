@@ -1,7 +1,7 @@
 #!/bin/bash
-# 완료 직후 재실행 시험 — TICKET=installer-0326 C1 (2026-09-18 · 실전 2건 09-17 PhsTjiL0 · 09-18 UHHFFFZJ)
+# 완료 직후 재실행 시험 — C1 (2026-09-18 · 실전 2건 09-17 PhsTjiL0 · 09-18 UHHFFFZJ)
 #
-# 무엇을 재는가 (계약 = master#eeaa7413 A안 · 브리프 C1 처방)
+# 무엇을 재는가 (계약 = 운영자 결정 A안 · 지시서 C1 처방)
 #   ⓐ 성공 끝(Set-FleetFinished)이 작업 폴더에 완료 표지(install-done.txt · 한 줄 「done <시각> installer <판> cys <판>」)를 쓴다
 #   ⓑ Test-RecentInstallDone — 표지가 쓰인 지 10분(600초) 안이면 맞다 · 600초 경계 포함 · 601초면 아니다 · 미래 시각(시계 되돌림)이면 아니다
 #   ⓒ 표지가 없는 옛 판 완료 — 지난 기록의 **마지막 실행**이 「다음에 할 일: 없습니다 — 설치가 끝났습니다」로 끝났고 그 시각이 창 안이면 맞다 ·
@@ -18,7 +18,7 @@
 #   rc 0 = 전건 통과 · 1 = 실패 있음 · 2 = 잴 수 없음(pwsh 가 없다)
 # ⛔바깥에 닿지 않는다 — USERPROFILE·HOME·JARVIS_HOME 은 mktemp -d 안 · PATH 에는 가짜 claude 만(진짜 claude·cys 를 안 본다) ·
 #   ⓕ 는 [1/10] 뒤로 진행하므로 네트워크를 닫은 대리 서버(127.0.0.1:9)로 막고 60초 상한으로 끊는다 · 진행 기록 레버 JARVIS_NO_PROGRESS=1.
-# ⚠여기서 안 재는 것(윈 실기 몫): 진짜 윈도우 콘솔에서 재기동이 왜 일어났는가(원인 미확정 · HANDOFF) · Windows PowerShell 5.1 자체.
+# ⚠여기서 안 재는 것(윈 실기 몫): 진짜 윈도우 콘솔에서 재기동이 왜 일어났는가(원인 미확정 · 인계 기록) · Windows PowerShell 5.1 자체.
 export JARVIS_NO_PROGRESS=1
 set -u
 HERE="$(cd "$(dirname "$0")" && pwd)"

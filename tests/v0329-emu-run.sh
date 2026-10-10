@@ -1,14 +1,14 @@
 #!/bin/bash
-# 0.3.29 흉내 실행 시험 — 새 갈래를 **실제로 부른다**(글자 대조가 아니라 실행 · TICKET=installer-0329).
+# 0.3.29 흉내 실행 시험 — 새 갈래를 **실제로 부른다**(글자 대조가 아니라 실행).
 #
 # 재는 것
 #   ⓐ 재시작 한 명령(윈 Get-CysRotateState · 맥 cys_rotate_state)이 가짜 cys 네 가지에서 정확히 갈린다
 #      — 성공(rc 0) → ok · 옛 cys(모르는 하위명령 · rc 2) → absent · 실패(rc 1) → fail-1 · 실행 파일 없음 → absent
-#      ⇒ ok 가 아닌 셋은 설치기가 종전 [재시작] 1클릭 안내로 돌아가는 갈래다(master 판정 859ceeb2 ⓑ).
-#   ⓐ-2 cys 1.1.2 rotate 종료코드 표(TICKET=v112-vm-verify · master 판정 aa4419f8) —
+#      ⇒ ok 가 아닌 셋은 설치기가 종전 [재시작] 1클릭 안내로 돌아가는 갈래다(운영자 판정 ⓑ).
+#   ⓐ-2 cys 1.1.2 rotate 종료코드 표(운영자 판정) —
 #      21 → ok(rc 21) · 25 → held · 22·23·24 → fail-<rc> · 호출 인자 = rotate --timeout 120 ·
 #      사후 알림 = **표준 출력**의 마지막 줄(오류 쪽 단계 진행 줄이 아니다)
-#   ⓑ 살아 있는 master 자리 찾기(윈 Get-MasterSeatRef · 맥 master_seat_ref) — 끝난(exited=true) master 는 안 센다
+#   ⓑ 살아 있는 master 자리 찾기(윈 Get-MasterSeatRef · 맥 master_seat_ref) — 끝난(exited=true) master 자리는 안 센다
 #   ⓒ 옛 라운드 옮기기(윈 Move-OldRound · 맥 archive_old_round) — 전부 _round/archive/<시각>/ 로 가고
 #      이미 있던 archive 는 그대로 · 지워진 파일 0 · _round 가 없으면 「_round 없음」 한 줄
 #   ⓓ 환경 보고의 「사람 손 (실제로 누른 횟수)」 칸에 화면 계수와 같은 값이 적힌다(빈칸 0)
@@ -51,7 +51,7 @@ printf "surface:3\trole=worker\tpid=11\texited=false\tworker\t/x\n"
 printf "surface:5\trole=master\tpid=12\texited=true\tmaster\t/x\n"
 printf "surface:7\trole=master\tpid=13\texited=false\tmaster\t/x\n"
 exit 0 ;; esac; exit 9'
-# rotate 가 끝나며 새 데몬을 남기는 모양 — 자식이 표준 출력을 쥔 채 30초 산다(agy 1R 지적 M: 명령 치환 파이프가 안 닫혀 설치 창이 멈춘다)
+# rotate 가 끝나며 새 데몬을 남기는 모양 — 자식이 표준 출력을 쥔 채 30초 산다(검토 1차 지적 M: 명령 치환 파이프가 안 닫혀 설치 창이 멈춘다)
 mkstub cys-leak   'case "$1" in rotate) sleep 30 & echo "rotated"; exit 0 ;; esac; exit 9'
 NOPE="$BASE/no-such-cys"
 

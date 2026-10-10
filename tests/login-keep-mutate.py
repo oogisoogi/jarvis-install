@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-# 뮤턴트 — 재설치 길 로그인·이전 대화 남기기(0.3.36 · TICKET=installer-login-keep)가 「실제로 서 있는가」를 잰다.
+# 뮤턴트 — 재설치 길 로그인·이전 대화 남기기(0.3.36)가 「실제로 서 있는가」를 잰다.
 #   변이 하나씩 install-master 사본에 넣고 tests/login-keep-run.sh 를 돌려 **적색**(rc≠0)이면 KILLED.
 #   바깥에 닿지 않는다 — 사본·시험 모두 mktemp 안(시험 자체의 규율 = login-keep-run.sh 머리 주석).
 # 쓰는 법: python3 tests/login-keep-mutate.py [--jobs N] [--only a,b] [--timeout 초]   · rc 0 = 전부 KILLED
@@ -73,7 +73,7 @@ ONLY = sys.argv[sys.argv.index('--only') + 1].split(',') if '--only' in sys.argv
 TIMEOUT = int(sys.argv[sys.argv.index('--timeout') + 1]) if '--timeout' in sys.argv else 900
 
 def main():
-    # 원본이 먼저 초록이어야 뮤턴트 적색이 뜻을 가진다(적대 1R 지적 — 시간 초과로 붉어진 칸을 KILLED 로 세지 않게).
+    # 원본이 먼저 초록이어야 뮤턴트 적색이 뜻을 가진다(적대 1차 지적 — 시간 초과로 붉어진 칸을 KILLED 로 세지 않게).
     r0 = subprocess.run(['bash', RUN, '--dir', SRC], capture_output=True, text=True, timeout=1800)
     if r0.returncode != 0:
         print('원본이 초록이 아니다 — 뮤턴트를 재지 않는다'); print(r0.stdout[-2000:]); return 2

@@ -185,7 +185,7 @@ def checks(path):
     fb_at = wc.find("& $fallbackExe --dangerously-skip-permissions $fallbackPrompt")
     ck("ps1-wire-wake", code(src).count("$script:ReachedWake = $true") == 3 and len(rw) == 3
        and 0 <= cd_at < rw[1] < fb_at and rw[0] < cd_at
-       and re.search(r"if \(\$null -ne \$seatRc -and \$seatRc -eq 0 -and \$ref -match 'surface:'\) \{\n\s+Say \"     cys 안에서 자비스를 열었습니다[^\n]*\n(?:\s+#[^\n]*\n)*\s+\$script:ReachedWake = \$true\n", wake)
+       and re.search(r"if \(\$null -ne \$seatRc -and \$seatRc -eq 0 -and \$ref -match 'surface:'\) \{\n\s+Say \"     cysr 안에서 자비스를 열었습니다[^\n]*\n(?:\s+#[^\n]*\n)*\s+\$script:ReachedWake = \$true\n", wake)
        and code(wake).count("$global:LASTEXITCODE = -1\n                $ref = (& $cli new-surface") == 2 and "$seatRc = $global:LASTEXITCODE" in wake
        and ordered(wake, "$global:LASTEXITCODE = -1", "& $fallbackExe --dangerously-skip-permissions $fallbackPrompt", "if ($global:LASTEXITCODE -eq 0) { $script:ReachedWake = $true }"),
        "깨우기 성공 뒤에만 ReachedWake 를 세우지 않는다")

@@ -9,10 +9,10 @@
 #            · 지난 설치가 남긴 자리 · 자리 번호 없는 경고 줄의 역할 글자를 이번 동료로 세지 않는다 · 카드에 안전장치 설명 없음
 #   ③ 폴백 뒤 섬 — 카드가 뜬 뒤 동료가 서면 성공 줄을 기록하고 끝맺음이 「설치가 끝났습니다」(「다시 실행」 없음) · 성공 끝맺음은 ①도 같다
 #   ④ 창 못 엶(도달 실패) — 종전 폴백(이 창에서 띄움) 그대로 · 「깨어났습니다」 없음
-#   ⑤ 마스터 각성 판정(TICKET=installer-0322-awaken) — 첫 지시가 **의뢰형**이고 선언 첫 줄은 그대로 · 판정이 master 자리를 실제로 잰다
+#   ⑤ 마스터 각성 판정 — 첫 지시가 **의뢰형**이고 선언 첫 줄은 그대로 · 판정이 master 자리를 실제로 잰다
 #      (표지∧답=각성 확인 · 답만=받았으나 시작 안 함 → 재시도 1회 → 사람 카드 · 둘 다 없음=판정 못 함)
 #      ⚠거부 갈래의 **전제** = 훅이 정상 실행돼 마스터 자리에 SessionStart 주입(팩 1.0.1 · 45,644자)이 실린 상태다
-#        (1.0.0 은 윈도우에 bash 가 없어 훅이 전부 실패 = 주입 0 이었고, 그때는 거부가 한 번도 안 났다 — 박사님 실측 2026-09-16).
+#        (1.0.0 은 윈도우에 bash 가 없어 훅이 전부 실패 = 주입 0 이었고, 그때는 거부가 한 번도 안 났다 — 운영자 실측 2026-09-16).
 #
 # 쓰는 법: bash tests/awaken-emu-run.sh [--dir <install-master 자리>]
 #   rc 0 = 전건 통과 · 1 = 실패 있음 · 2 = 잴 수 없음(pwsh 가 없다)
@@ -20,7 +20,7 @@
 # ⚠여기서 **안 재는 것**(윈도우 실기에서만 있는 것): wake.ps1 을 PS 5.1 이 아니라 pwsh 7 로 돌린다(인자 조립 규칙이 다를 수 있다) ·
 #   claude.exe/.cmd 고르기 · 첫 프롬프트에도 자비스의 선언 훅이 실제로 도는가 · 콘솔 입력 버퍼(맥 흉내엔 콘솔 입력이 없어 비우기는 -1 로 적힌다) ·
 #   동료가 자동 관측 상한(7분) 안에 서는가.
-export JARVIS_NO_PROGRESS=1   # 🔴흉내·검사는 라이브 서버로 진행 이벤트를 보내지 않는다(2026-09-15 15:49 master 게이트 실행이 라이브 progress에 가짜 4건을 남긴 사고 · Send-Progress의 레버)
+export JARVIS_NO_PROGRESS=1   # 🔴흉내·검사는 라이브 서버로 진행 이벤트를 보내지 않는다(2026-09-15 15:49 출고 전 점검 실행이 라이브 progress에 가짜 4건을 남긴 사고 · Send-Progress의 레버)
 set -u
 HERE="$(cd "$(dirname "$0")" && pwd)"
 DIR="$HERE/../install-master"
@@ -45,7 +45,7 @@ bad() { fail=$((fail+1)); printf '  FAIL %s  ← %s\n' "$1" "$2"; }
 t() { if [ "$1" -eq 0 ]; then ok "$2"; else bad "$2" "$3"; fi; }
 run_ps() { perl -e 'alarm shift; exec @ARGV' 60 "$PW" -NoProfile -File "$@" </dev/null; }
 has() { grep -qE -- "$2" "$1"; }
-# 윈 재시도 보충 한 줄의 정본을 **읽어서** 쓴다(TICKET=installer-0325 c2 · 사본을 박으면 문구를 고칠 때마다
+# 윈 재시도 보충 한 줄의 정본을 **읽어서** 쓴다(c2 · 사본을 박으면 문구를 고칠 때마다
 #   이 축이 거짓 적색이 된다 — 09-16 우리말 장문이 ASCII 영문으로 바뀌면서 실제로 한 번 그랬다).
 WIN_RETRY_MSG="$([ -n "$PW" ] && sed -n "s/^\\\$MasterRetryMsg = '\(.*\)'\$/\1/p" "$PS")"
 WIN_RETRY_MSG_RE="$(printf '%s' "$WIN_RETRY_MSG" | sed -e 's/[.[\*^$()+?{|]/\\&/g')"
@@ -60,7 +60,7 @@ for s in success claim-denied fallback-success no-surface child-awake paste-late
   [ -n "$JH" ] && [ -f "$L" ] || { bad "[$s] 기록 파일" "흉내가 기록을 남기지 못했다(err: $(head -c 200 "$SB/err.txt"))"; continue; }
   has "$L" 'TEST finally'; t $? "[$s] 흉내가 끝까지 돌았다" "마지막 줄이 없다 — 멈췄거나 죽었다(err: $(head -c 160 "$SB/err.txt"))"
   # 자비스 창에는 글도 키도 넣지 않는다 · 예외는 둘뿐이다: 자식 자리(surface:10·11)의 Return(installer-awaken-verify)
-  #   과 마스터가 「받았으나 시작 안 함」일 때의 **보충 한 줄 1회**(installer-0322-awaken · 선언은 다시 보내지 않는다).
+  #   과 마스터 자리가 「받았으나 시작 안 함」일 때의 **보충 한 줄 1회**(installer-0322-awaken · 선언은 다시 보내지 않는다).
   ! grep -qvE "^send-key --surface surface:1[01] Return\$|^send --surface surface:9 ${WIN_RETRY_MSG_RE}\$|^send-key --surface surface:9 Return\$" "$SB/sent" 2>/dev/null
   t $? "[$s] 창에 밀어 넣는 것은 자식 Return 과 마스터 보충 한 줄뿐" "$(grep -vE "^send-key --surface surface:1[01] Return\$|^send --surface surface:9 ${WIN_RETRY_MSG_RE}\$|^send-key --surface surface:9 Return\$" "$SB/sent" 2>/dev/null | head -2 | tr '\n' '|')"
   msend9() { [ -f "$SB/sent" ] || { echo 0; return; }; grep -cE '^send --surface surface:9 ' "$SB/sent" || true; }
@@ -144,7 +144,7 @@ PYEOF
       t $? "[성공] 마스터 판정 상한 = 120초 · 재시도 1회 · 재시도 뒤 60초" "$(grep 'default master' "$L")"
       # 표지를 만든 것이 **설치기가 아니라는 것**을 내용으로 잰다 — 가짜 마스터만 pid=4242 를 적는다.
       grep -q '^pid=4242$' "$JH/awake-master.ok" 2>/dev/null
-      t $? "[성공] 표지는 마스터가 만든 것이다(설치기가 스스로 만들지 않는다)" "$(head -2 "$JH/awake-master.ok" 2>/dev/null | tr '\n' '|')"
+      t $? "[성공] 표지는 마스터 자리가 만든 것이다(설치기가 스스로 만들지 않는다)" "$(head -2 "$JH/awake-master.ok" 2>/dev/null | tr '\n' '|')"
       ;;
     claim-denied)
       has "$L" 'fleet awaken: no child seat within' && grep -q '사람 손 #1 · 시킨 쪽: 자비스' "$O" && grep -q '너는 마스터다' "$O" \
@@ -219,10 +219,10 @@ PYEOF
       t $? "[마스터 거부] 답은 있고 표지가 없으면 재시도 1회 뒤 「받았으나 시작 안 함」 · 「깨어났습니다」 없음" "$(grep 'awaken master' "$L" | tr '\n' '|' | cut -c1-220)"
       grep -q '동료 자리는 섰지만, 자비스(master)가 준비 작업을 시작한 것은 확인하지 못했습니다' "$O" \
         && has "$L" 'fleet awaken: auto - seats=master,cso,worker$'
-      t $? "[마스터 거부] 동료가 서도 그것을 마스터 각성으로 세지 않는다(거짓 초록 봉합)" "$(grep -E 'fleet awaken|확인하지 못' "$L" "$O" | tail -2 | tr '\n' '|' | cut -c1-220)"
+      t $? "[마스터 거부] 동료가 서도 그것을 마스터 각성으로 세지 않는다(거짓 초록 막기)" "$(grep -E 'fleet awaken|확인하지 못' "$L" "$O" | tail -2 | tr '\n' '|' | cut -c1-220)"
       grep -q 'install-jarvis 폴더의 install-directive.md 를 읽고,' "$O" && ! grep -q '│        너는 마스터다' "$O"
       t $? "[마스터 거부] 사람 카드에 적히는 것은 **실제로 받아들여진 문장**이다(선언 재입력이 아니다)" "$(grep -n '쳐 주십시오' "$O" | head -2 | tr '\n' '|' | cut -c1-200)"
-      grep -q '다음에 할 일: cys 창의 master 자리에 있는 자비스에게 위 한 줄을 전해 주십시오' "$O" && ! grep -q '설치가 끝났습니다' "$O"
+      grep -q '다음에 할 일: cysr 창의 master 자리에 있는 자비스에게 위 한 줄을 전해 주십시오' "$O" && ! grep -q '설치가 끝났습니다' "$O"
       t $? "[마스터 거부] 끝맺음이 「끝났습니다」라고 말하지 않는다 · 남은 일을 그대로 적는다" "$(grep '다음에 할 일' "$O" | head -1)"
       ;;
     master-retry-late)
@@ -334,7 +334,7 @@ EOF
 done
 echo "== [9/10]~[10/10] 마스터 각성 판정 — 맥판(bootstrap.sh · bash · mac-parity-0323 · ps1 master-* 동형 + master-late-fleet) =="
 # ★윈도우판 fleet.ps1 구역의 master-* 판정을 맥 bash 로 그대로 옮겨 잰다 — 기록 줄·화면 문구는 **ps1 과 글자 동일**이 계약이다
-#   (브리프 mac-parity-t3-gates §5-3 · ps1 과 글자 대조 가능하게). 상한 변수 이름 = ps1 이름의 대문자 뱀 표기(MasterAwakeCapSec → MASTER_AWAKE_CAP_SEC).
+#   (지시서 mac-parity-t3-gates 절 5-3 · ps1 과 글자 대조 가능하게). 상한 변수 이름 = ps1 이름의 대문자 뱀 표기(MasterAwakeCapSec → MASTER_AWAKE_CAP_SEC).
 #   ⚠이 구역은 T1 이식(선언·판정) **전에** 쓰였다 — 이식 전 판에서는 전건 붉은 것이 정상이다(검사기가 대상을 때린다는 증명 · 보고서 기준선 참조).
 # ⛔입구는 실물 step_wake 하나(fleet.ps1 이 Step-Wake 를 부르는 것과 동형) · 끝맺음은 실물 closing_note(EXIT 트랩) · 바깥 호출 0.
 # 마스터 보충 한 줄의 기대 글 = **정본(bootstrap.sh send_master_retry 의 msg='…' 한 줄)을 읽어 쓴다**(master#63749eda).
@@ -414,7 +414,7 @@ PYEOF
       grep -q '다음에 할 일: 없습니다 — 설치가 끝났습니다. 이 창을 닫으셔도 됩니다.' "$O"
       t $? "[맥 master 성공] 끝맺음이 「설치가 끝났습니다」" "$(grep '다음에 할 일' "$O" | head -1)"
       grep -q '^pid=4242$' "$JH/awake-master.ok" 2>/dev/null
-      t $? "[맥 master 성공] 표지는 마스터가 만든 것이다(설치기가 스스로 만들지 않는다)" "$(head -2 "$JH/awake-master.ok" 2>/dev/null | tr '\n' '|')"
+      t $? "[맥 master 성공] 표지는 마스터 자리가 만든 것이다(설치기가 스스로 만들지 않는다)" "$(head -2 "$JH/awake-master.ok" 2>/dev/null | tr '\n' '|')"
       # c7 — [10/10] 완주 성공 순간 cysr 창을 앞으로(재기동 없이 activate 만)
       grep -qF "tell application \"$SB/cys.app\" to activate" "$SB/osascript-calls" 2>/dev/null
       t $? "[맥 c7] 완주 성공 시 cysr 창을 activate 로 앞에 올린다" "$(cat "$SB/osascript-calls" 2>/dev/null | tr '\n' '|')"
@@ -428,10 +428,10 @@ PYEOF
         && grep -q '거절했거나, 표지 파일을 쓰지 못했을 수 있습니다' "$O" && ! grep -q '자비스가 깨어났습니다' "$O"
       t $? "[맥 마스터 거부] 답은 있고 표지가 없으면 재시도 1회 뒤 「받았으나 시작 안 함」 · 「깨어났습니다」 없음" "$(grep 'awaken master' "$L" 2>/dev/null | tr '\n' '|' | cut -c1-220)"
       grep -q '동료 자리는 섰지만, 자비스(master)가 준비 작업을 시작한 것은 확인하지 못했습니다' "$O" && mhas 'fleet awaken: auto - seats=master,cso,worker$'
-      t $? "[맥 마스터 거부] 동료가 서도 그것을 마스터 각성으로 세지 않는다(거짓 초록 봉합)" "$(grep -E '확인하지 못' "$O" | head -1 | cut -c1-200)"
+      t $? "[맥 마스터 거부] 동료가 서도 그것을 마스터 각성으로 세지 않는다(거짓 초록 막기)" "$(grep -E '확인하지 못' "$O" | head -1 | cut -c1-200)"
       grep -q 'install-jarvis 폴더의 install-directive.md 를 읽고,' "$O" && ! grep -q '│        너는 마스터다' "$O"
       t $? "[맥 마스터 거부] 사람 카드에 적히는 것은 실제로 받아들여진 문장(선언 재입력 아님)" "$(grep -n '쳐 주십시오' "$O" | head -2 | tr '\n' '|' | cut -c1-200)"
-      grep -q '다음에 할 일: cys 창의 master 자리에 있는 자비스에게 위 한 줄을 전해 주십시오' "$O" && ! grep -q '설치가 끝났습니다' "$O"
+      grep -q '다음에 할 일: cysr 창의 master 자리에 있는 자비스에게 위 한 줄을 전해 주십시오' "$O" && ! grep -q '설치가 끝났습니다' "$O"
       t $? "[맥 마스터 거부] 끝맺음이 「끝났습니다」라고 말하지 않는다 · 남은 일을 그대로 적는다" "$(grep '다음에 할 일' "$O" | head -1)" ;;
     master-retry-late)
       mhas 'awaken master: marker=awaken:master-verified mark=True a=1 retry=1$' && grep -q '     자비스(master) 각성 확인' "$O" && grep -q '자비스가 깨어났습니다' "$O"
@@ -451,7 +451,7 @@ PYEOF
         && ! grep -q '준비 작업을 시작하지 않았습니다' "$O" && ! grep -q '자비스가 깨어났습니다' "$O"
       t $? "[맥 판정 못 함] 답도 표지도 없으면 「판정 못 함」 — 「거절했다」라고 말하지 않는다" "$(grep 'awaken master' "$L" 2>/dev/null | tr '\n' '|' | cut -c1-220)" ;;
     master-late-fleet)
-      # H-M1(2026-09-16 실행 확정): 첫 판정은 no-start 였지만 동료가 서는 동안 마스터가 표지를 썼다 — 최종 판정 직전에 다시 재야 한다.
+      # H-M1(2026-09-16 실행 확정): 첫 판정은 no-start 였지만 동료가 서는 동안 마스터 자리가 표지를 썼다 — 최종 판정 직전에 다시 재야 한다.
       mhas 'awaken master: marker=awaken:master-no-start mark=False a=1 retry=1$'
       t $? "[맥 늦은 표지] 첫 판정은 no-start 였다(전제 성립)" "$(grep 'awaken master' "$L" 2>/dev/null | tr '\n' '|' | cut -c1-220)"
       grep -q '^pid=4242$' "$JH/awake-master.ok" 2>/dev/null
@@ -460,10 +460,10 @@ PYEOF
         && grep -q '다음에 할 일: 없습니다 — 설치가 끝났습니다' "$O"
       t $? "[맥 늦은 표지] 최종 판정 직전에 다시 재서 「깨어났습니다」 · 거짓 no-start 카드 없음(H-M1)" "$(grep -E '깨어났습니다|동료 자리는 섰지만|다음에 할 일' "$O" | tr '\n' '|' | cut -c1-240)" ;;
     master-verified-fleet-late)
-      # N13(t4-fix · codex 새2): 마스터는 깼는데(verified) 동료 자리가 상한 안에 안 섰다 — 이미 깬 자비스에게 선언을 또 치게 하면 거짓 카드다.
+      # N13(t4-fix · 검토 새2): 마스터는 깼는데(verified) 동료 자리가 상한 안에 안 섰다 — 이미 깬 자비스에게 선언을 또 치게 하면 거짓 카드다.
       mhas 'awaken master: marker=awaken:master-verified mark=True a=1 retry=0$' && mhas 'fleet awaken: no child seat within'
       t $? "[맥 마스터 깸·동료 늦음] 전제 성립(마스터 verified · 동료 자동 관측 상한 안에 0)" "$(grep -E 'awaken master|fleet awaken' "$L" 2>/dev/null | tr '\n' '|' | cut -c1-220)"
-      # v0324 C2(master#4c9d14e3 A): N13 의 뜻 = 「기다리는 동안 이미 깬 마스터에게 선언을 치게 하지 마라」 ⇒ 재는 범위 = 대기 단계 출력(최종 카드 줄 앞).
+      # v0324 C2(운영자 결정 A): N13 의 뜻 = 「기다리는 동안 이미 깬 마스터 자리에 선언을 치게 하지 마라」 ⇒ 재는 범위 = 대기 단계 출력(최종 카드 줄 앞).
       #   상한 소진 뒤 최종 카드는 복구 국면이라 재선언 한 줄을 안내한다(아래 축) — 범위를 좁혀도 대기 카드에 선언이 새면 mac-wait-card-redecl-inject 뮤턴트가 붉힌다.
       W="$SB/wait-stage.txt"; awk '/\[10\/10\] 아직 서지 않은 자리가 있습니다/{exit} {print}' "$O" > "$W"
       grep -q '\[10/10\] 아직 서지 않은 자리가 있습니다' "$O" && grep -q '마스터는 깨어났습니다 · 동료 자리는 자비스가 세우는 중입니다' "$W" && ! grep -q '너는 마스터다' "$W" && ! grep -q '쳐 주십시오' "$W" \
@@ -471,7 +471,7 @@ PYEOF
       t $? "[맥 마스터 깸·동료 늦음] 카드 문구에 「너는 마스터다」·「쳐 주십시오」 없음(대기 단계 · 최종 카드 줄 앞) · 「사람이 하실 일은 없습니다」(N13)" "$(grep -nE '너는 마스터다|쳐 주십시오|깨어나지 않아|마스터는 깨어|아직 서지 않은' "$O" | head -4 | tr '\n' '|' | cut -c1-240)"
       grep -qF '     마스터는 깨어 있습니다. 남은 자리를 다시 세우려면 cysr 창의 master 자리에 『너는 마스터다.』 한 줄을 다시 쳐 주십시오(이 설치 창이 아닙니다).' "$O" && ! grep -q '이어서 세웁니다' "$O" && ! grep -q '다시 치실 필요는 없습니다' "$O"
       t $? "[맥 마스터 깸·동료 늦음] 상한 소진 뒤 최종 카드는 cysr 창 master 자리 재선언 한 줄을 안내 · 「이어서 세웁니다」 거짓 약속 없음(v0324 C2)" "$(grep -nE '남은 자리|치실 필요' "$O" | head -3 | tr '\n' '|' | cut -c1-240)"
-      grep -q '다음에 할 일: cys 창의 master 자리에 있는 자비스와 이어서 이야기하십시오' "$O" && ! grep -q '다시 하시는 법' "$O"
+      grep -q '다음에 할 일: cysr 창의 master 자리에 있는 자비스와 이어서 이야기하십시오' "$O" && ! grep -q '다시 하시는 법' "$O"
       t $? "[맥 마스터 깸·동료 늦음] 끝맺음이 「다시 실행」이 아니라 자비스와 이어서 이야기(N13)" "$(grep '다음에 할 일' "$O" | head -1)" ;;
   esac
 done
@@ -509,7 +509,7 @@ EOF
       [ -n "$w" ] && [ "${w% *}" -ge 5 ] && [ "${w#* }" = "2" ]
       t $? "[맥 앱 창 $s] 대기 기록 waited 는 실제 흐른 초(ping 2초 × 2바퀴 + 쉼 → 5초 이상 · tries=2 · N16)" "기록: $(grep 'app open:' "$L" 2>/dev/null | tail -1 | sed 's/.*ping_ok/ping_ok/')"
       a="$(grep -n 'app open: ' "$L" 2>/dev/null | head -1 | cut -d: -f1)"; b="$(grep -n '자비스는 그 창의 master 자리에서 깨어납니다' "$L" 2>/dev/null | head -1 | cut -d: -f1)"
-      c="$(grep -n 'cys 안에서 자비스를 열었습니다 (surface:9)' "$L" 2>/dev/null | head -1 | cut -d: -f1)"
+      c="$(grep -n 'cysr 안에서 자비스를 열었습니다 (surface:9)' "$L" 2>/dev/null | head -1 | cut -d: -f1)"
       [ -n "$a" ] && [ -n "$b" ] && [ -n "$c" ] && [ "$b" -gt "$a" ] && [ "$c" -eq $((b + 1)) ] && [ -s "$SB/newsurface-args" ]
       t $? "[맥 앱 창 $s] 「그 창에서 깨어납니다」는 자리가 열린 뒤에 말한다(앱 대기 기록 뒤 · 「자비스를 열었습니다」 바로 앞 · N3)" "줄 app-open=$a 문장=$b 열었습니다=$c" ;;
     app-no-surface)
@@ -542,7 +542,7 @@ t $? "[윈 정적] 로그인 대기 구간에서는 빠른 편집을 켠다(로�
   && [ "$(grep -cE '^[[:space:]]+\[void\]\(Confirm-ChildSeats \$cli\)$' "$DIR/bootstrap.ps1")" = "2" ]
 t $? "[맥·윈] 자식 자리 확인을 [10/10] 두 자리에서 부른다" "맥 $(grep -cE 'confirm_child_seats "\$cli"' "$DIR/bootstrap.sh") · 윈 $(grep -cE 'Confirm-ChildSeats \$cli' "$DIR/bootstrap.ps1")"
 
-echo "== [9/10] wake.sh 경로에 작은따옴표(TICKET=installer-0325 c1 · 09-16 756 발견 · 사용자 이름에 ' 포함) =="
+echo "== [9/10] wake.sh 경로에 작은따옴표(c1 · 09-16 756 발견 · 사용자 이름에 ' 포함) =="
 # 무엇을 재는가: 4070 은 wake.sh **안**의 문장(wake_prompt)만 지켰다 — 여는 명령(cmd_line)에 실리는 것은
 # **경로**(wake_file)라, 홈 경로에 작은따옴표가 있으면 그 글자가 그대로 실려 나간다. cys(→터미널)가 이 문자열을
 # 다시 셈으로 파싱하는 자리(bash -c 로 흉내)에서 따옴표가 거기서 끊기는지가 이 시험의 핵심이다.

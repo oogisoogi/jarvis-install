@@ -44,7 +44,7 @@ MUTANTS = [
     # ① 판본 비교가 빠지면(앞 판 = 몸통만 보고 건너뜀) 옛 판 기기에 새 판이 안 들어간다
     ("ver-compare-drop", PS,
      "    $b0 = Test-CysBody\n    if ($b0.Body) {\n        $have0 = Get-CysInstalledVersion $b0\n        if ($have0 -eq $CysVersion) {\n            $cs0 = Get-CysContentState $b0\n",
-     "    $b0 = Test-CysBody\n    if ($b0.Body) { Say '[6/10] cys 가 이미 설치돼 있습니다 — 건너뜁니다.'; return 0 }\n    if ($false) {\n        $have0 = Get-CysInstalledVersion $b0\n        if ($have0 -eq $CysVersion) {\n            $cs0 = Get-CysContentState $b0\n",
+     "    $b0 = Test-CysBody\n    if ($b0.Body) { Say '[6/10] cysr 이 이미 설치돼 있습니다 — 건너뜁니다.'; return 0 }\n    if ($false) {\n        $have0 = Get-CysInstalledVersion $b0\n        if ($have0 -eq $CysVersion) {\n            $cs0 = Get-CysContentState $b0\n",
      "[① 옛 판]"),
     # ① 덮어 깐 뒤 몸통만 보고 마쳤다고 하면 판본이 안 바뀐 실패가 성공으로 보인다
     ("ver-done-by-body", PS,
@@ -71,12 +71,12 @@ MUTANTS = [
      "    if (-not $file -or $ln -le 0 -or $col -le 0) { return $lineQuiet }\n",
      "    return $lineQuiet\n",
      "[⑤ 조용한 형태]"),
-    # ⑤ 바깥 명령으로 올라가 보지 않으면 & { … } 2>$null 로 막은 오류가 참고 오류로 적힌다(교차 검토 1R F4)
+    # ⑤ 바깥 명령으로 올라가 보지 않으면 & { … } 2>$null 로 막은 오류가 참고 오류로 적힌다(교차 검토 1차 F4)
     ("quiet-parent-walk-drop", PS,
      "    for ($node = $hit; $node; $node = $node.Parent) {\n",
      "    for ($node = $hit; $node; $node = $null) {\n",
      "[⑤ 조용한 형태]"),
-    # ⑤ 줄 글자 필터를 앞에서 먼저 쓰면 같은 줄의 다른 명령 -EA 로 조용하지 않은 오류가 거짓 통과한다(교차 검토 1R F3)
+    # ⑤ 줄 글자 필터를 앞에서 먼저 쓰면 같은 줄의 다른 명령 -EA 로 조용하지 않은 오류가 거짓 통과한다(교차 검토 1차 F3)
     ("quiet-line-fastpath-back", PS,
      "    $file = [string]$ii.ScriptName; $ln = [int]$ii.ScriptLineNumber; $col = [int]$ii.OffsetInLine\n",
      "    if ($lineQuiet) { return $true }\n    $file = [string]$ii.ScriptName; $ln = [int]$ii.ScriptLineNumber; $col = [int]$ii.OffsetInLine\n",
@@ -244,7 +244,7 @@ MUTANTS = [
      "  [[ \"$s\" =~ ^[A-Za-z0-9._~-]+#[A-Za-z0-9._~-]+$ ]] || return 1\n",
      "  [[ \"$s\" =~ ^[A-Za-z0-9._~-]{16,512}#[A-Za-z0-9._~-]{16,512}$ ]] || return 1\n",
      "[맥 로그인 · 새 코드]"),
-    # 자리표(sentinel)를 건너뛰고 표식을 곧바로 쓰면 이름 치환이 C:\Users\ 접두사·<EMAIL> 표식을 뭉갠다(대조표 order_dependency_3·4)
+    # 자리표를 건너뛰고 표식을 곧바로 쓰면 이름 치환이 C:\Users\ 접두사·<EMAIL> 표식을 뭉갠다(대조표 order_dependency_3·4)
     ("mask-sentinel-drop", PS,
      "            return ([string][char]0 + 'M' + ($sentinels.Count - 1) + [string][char]0)\n",
      "            return $res\n",

@@ -19,7 +19,7 @@ WT = pathlib.Path(_ap.parse_args().root).expanduser().resolve()
 # (이름, 파일, 찾을 것, 바꿀 것, 붉어져야 하는 축의 조각)
 MUTANTS = [
  ("M1 맥 종료 안내를 표준출력으로 되돌린다", "install-master/reset-clean.sh",
-  'tell "  cys 자리에서 도는 것을 멈춥니다:"', 'say "  cys 자리에서 도는 것을 멈춥니다:"',
+  'tell "  cysr 자리에서 도는 것을 멈춥니다:"', 'say "  cysr 자리에서 도는 것을 멈춥니다:"',
   ["[②] 끄는 대상 인쇄가 그 통로로 간다", "[②] 표준출력으로 찍던 옛 형태 0건"]),
  ("M2 확인 없이 번호로만 TERM 한다", "install-master/reset-clean.sh",
   '  kill_verified TERM "$targets"', '  for pid in $(table_pids "$targets"); do kill -TERM "$pid" 2>/dev/null; done',
@@ -226,8 +226,8 @@ MUTANTS = [
   ["[핀] 지문을 두 자리에서 본다(남아 있던 것·방금 받은 것)"]),
 
  # ── 맥 저희 판 전환으로 선 축들 (2026-09-15) ────────────────────
- # ★M56 재조준(2026-09-20 · TICKET=v110-mac-x64): 옛 M56 은 「인텔도 저희 판을 받는다」를 **결함**으로
- #   겨눴다. 그 사이 오너 결정으로 **두 칩 모두 저희 판**이 정답이 됐다(인텔 갈림이 워크숍에서 실제 사고였다).
+ # ★M56 재조준(2026-09-20): 옛 M56 은 「인텔도 저희 판을 받는다」를 **결함**으로
+ #   겨눴다. 그 사이 운영자 결정으로 **두 칩 모두 저희 판**이 정답이 됐다(인텔 갈림이 워크숍에서 실제 사고였다).
  #   ⇒ 겨누는 방향을 뒤집는다: 이제 결함은 **인텔이 원작자 판으로 되돌아가는 것**이다.
  #   옛 축 이름("애플 실리콘만 저희 판 · 인텔은 원작자 판")은 checks.sh 에서 함께 폐기했다.
  ("M56 인텔을 원작자 판으로 되돌린다", "install-master/bootstrap.sh",
@@ -266,7 +266,7 @@ MUTANTS = [
   '  : >>"$LOG_FILE"',
   ["[전환] 격리 지우기→서명 확인→옛 것 끄기→바꿔 넣기 순서"]),
  ("M60 서명 확인을 옛 것 끄기 뒤로 민다", "install-master/bootstrap.sh",
-  '  if [ -d "$CYS_OLD_APP" ] || [ -d "$CYS_FORK_APP" ]; then\n    say "     돌고 있는 cys 가 있으면 먼저 끕니다."\n    cys_stop_old_app\n  fi\n',
+  '  if [ -d "$CYS_OLD_APP" ] || [ -d "$CYS_FORK_APP" ]; then\n    say "     돌고 있는 cysr 이 있으면 먼저 끕니다."\n    cys_stop_old_app\n  fi\n',
   '',
   ["[전환] 격리 지우기→서명 확인→옛 것 끄기→바꿔 넣기 순서"]),
  ("M61 옛 cys 를 명령줄로 끈다", "install-master/bootstrap.sh",
@@ -294,8 +294,8 @@ MUTANTS = [
   "c=\"$(curl -sSI -L -o /dev/null -w '%{http_code}'",
   ["[핀] 자리 물음은 받기와 같은 GET(첫 1바이트)으로 한다"]),
  ("M63 맥 지우개가 --keep-app 을 무시한다", "install-master/reset-clean.sh",
-  '  if [ "$KEEP_APP" = "1" ]; then\n    say "  [남김] cys 프로그램',
-  '  if false; then\n    say "  [남김] cys 프로그램',
+  '  if [ "$KEEP_APP" = "1" ]; then\n    say "  [남김] cysr 프로그램',
+  '  if false; then\n    say "  [남김] cysr 프로그램',
   ["[전환] 맥 지우개는 --keep-app 이면 프로그램을 안 지운다"]),
 ]
 

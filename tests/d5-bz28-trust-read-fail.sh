@@ -138,7 +138,7 @@ for kind in dangling loop; do
   if [ $kind = dangling ]; then [ "$r" = "0|0|0" ]; t $? "[F4 대조군] 끊긴 링크(가리키는 파일 없음) → 칸 없음 · FAIL 0" "$r"
   else case "$r" in [1-9]*) true ;; *) false ;; esac; t $? "[F4] 고리 링크 → 조용히 넘기지 않고 정리 실패로 센다" "$r"; fi
 done
-# 이종 검토 3회차(Opus) 반례: 잘린 설정 — 그 키 이름이 글자로도 없으면 칸 없음(다시 해도 같은 영구 rc 7 방지) · 있으면 못 뺌으로 센다
+# 외부 검토 3회차(검토) 반례: 잘린 설정 — 그 키 이름이 글자로도 없으면 칸 없음(다시 해도 같은 영구 rc 7 방지) · 있으면 못 뺌으로 센다
 TRUNC='{"theme":"dark","model":"x"'
 for c in "tr1 hasCompletedOnboarding 0" "tr2 theme 1"; do
   set -- $c; H="$BASE/$1/firstlast"; mkdir -p "$H/install-jarvis"; printf '%s' "$TRUNC" > "$H/.claude.json"

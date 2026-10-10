@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-# 뮤턴트 — 0.3.32(C1 문구 한 줄 · C2 원문 숨김 · B9 끝 단계 10/10 · B2 로그인 승계 A1)의 시험이 **대상을 실제로 때리는가** (TICKET=installer-0332)
+# 뮤턴트 — 0.3.32(C1 문구 한 줄 · C2 원문 숨김 · B9 끝 단계 10/10 · B2 로그인 승계 A1)의 시험이 **대상을 실제로 때리는가**
 #
 # ★쓰는 법
 #   python3 tests/v0332-mutate.py --root <저장소>           전건(사본에서만 고친다 · 실물 무접촉)
@@ -32,7 +32,7 @@ MUTANTS = [
     # C2 — 원문 줄을 선점 판정 앞으로 되돌리면 영문이 창에 찍힌다.
     ("win-c2-raw-before-claim", PS,
      '        Write-Log "new-surface failed: $ref"\n',
-     '        Say \'     cys 안에서 열지 못했습니다. 프로그램이 답한 내용은 이렇습니다:\'\n        foreach ($ln in ($ref -split "`n")) { if ($ln.Trim()) { Say "       $ln" } }\n        Write-Log "new-surface failed: $ref"\n',
+     '        Say \'     cysr 안에서 열지 못했습니다. 프로그램이 답한 내용은 이렇습니다:\'\n        foreach ($ln in ($ref -split "`n")) { if ($ln.Trim()) { Say "       $ln" } }\n        Write-Log "new-surface failed: $ref"\n',
      "[윈 C2] 선점 거절 → 설치 창에 영문 원문 0줄", "emu"),
     # B9 — 끝맺음 줄에서 [10/10] 을 빼면 끝 증거가 9/10 으로 붙는다.
     ("win-b9-step-drop", PS,
@@ -98,10 +98,10 @@ MUTANTS = [
      "",
      "[윈 ③] 설치기가 예외로 죽으면 오류 글이 기록", "emu"),
     ("win-rc-branch-tail-drop", PS,
-     "        # v0.3.32(TICKET=installer-0332 ③ · 도움 KW67JGJG): 이 갈래는 설치기가 한 말을 한 줄도 남기지 않았다 — 다음 진단이 추정이 되지 않게 꼬리를 붙인다.\n        Show-ClaudeInstallLogTail\n",
+     "        # v0.3.32(③ · 도움 KW67JGJG): 이 갈래는 설치기가 한 말을 한 줄도 남기지 않았다 — 다음 진단이 추정이 되지 않게 꼬리를 붙인다.\n        Show-ClaudeInstallLogTail\n",
      "",
      "[윈 ③] 종료 코드 실패 갈래도 그 오류 글", "emu"),
-    # master 판정 abb77ec4 — 종료 코드 실패 갈래도 같은 축
+    # 운영자 판정 — 종료 코드 실패 갈래도 같은 축
     ("win-rc-dl07-drop", PS,
      "if ((-not (Test-Path -LiteralPath $rcExe)) -and $script:NetFailed) {",
      "if ($false) {",
@@ -110,7 +110,7 @@ MUTANTS = [
      '    elif [ ! -x "$HOME/.local/bin/claude" ] && [ "$NET_FAILED" = 1 ]; then',
      '    elif false; then',
      "[맥 종료코드] 기다림 끝에도 안 붙고", "emu"),
-    # master 판정 0c0f5705 — rotate 부서 순회 생략(env 언제나 · 인자는 1.1.3 이상)
+    # 운영자 판정 — rotate 부서 순회 생략(env 언제나 · 인자는 1.1.3 이상)
     ("win-skip-env-drop", PS,
      "        $psi.EnvironmentVariables['CYS_ROTATE_SKIP_DEPTS'] = '1'\n",
      "",
@@ -123,7 +123,7 @@ MUTANTS = [
      "($a -eq 1 -and $b -eq 1 -and $c -ge 3)",
      "($a -eq 1 -and $b -eq 1 -and $c -ge 2)",
      "[윈 rotate] 1.1.3 = 인자+env", "emu"),
-    # master 판정 1b01748b · 899 L5 — 개인 쪽 로그아웃이면 옮기지 않는다
+    # 운영자 판정 · 899 L5 — 개인 쪽 로그아웃이면 옮기지 않는다
     ("win-src-logged-out-drop", PS,
      "        if (-not (Test-CredHasLogin $src)) {",
      "        if ($false) {",

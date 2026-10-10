@@ -1,5 +1,5 @@
 #!/bin/bash
-# 0.3.36 — 재설치 길에서 자비스 창의 로그인·이전 대화를 지우지 않는다(두 OS · TICKET=installer-login-keep)
+# 0.3.36 — 재설치 길에서 자비스 창의 로그인·이전 대화를 지우지 않는다(두 OS)
 #   설계 = docs/install-master/DESIGN-login-keep-0336.md · 09-25 윈 실기: 재설치 한 줄 뒤 본부 세 자리 모두 「Login expired」.
 #
 # 재는 것
@@ -82,7 +82,7 @@ win_run "$SB" 'KeepApp,KeepHistory,Yes'
 after="$(digest "$C" $KEEP5)"
 [ -n "$before" ] && [ "$before" = "$after" ] && [ "$(printf '%s\n' "$before" | wc -l | tr -d ' ')" -ge 5 ]
 t $? "[윈] 남길 다섯 자리가 바이트 그대로 남는다" "앞 $(printf '%s\n' "$before" | wc -l | tr -d ' ')줄 · 뒤 $(printf '%s\n' "$after" | grep -c . )줄"
-# 0.3.37(뜻 변경 · TICKET=installer-0337-delete-path): 나머지는 지우지 않고 보관 폴더(cys-home)로 · 부서 좌석 프로필(claude-*)은 제자리로 되옮긴다(부서 보존)
+# 0.3.37(뜻 변경): 나머지는 지우지 않고 보관 폴더(cys-home)로 · 부서 좌석 프로필(claude-*)은 제자리로 되옮긴다(부서 보존)
 BK="$(find "$SB/C:/Users/emu" -mindepth 1 -maxdepth 1 -name 'install-jarvis-backup-*' | LC_ALL=C sort | head -1)"
 left="$(gone_all "$C")"; [ -z "$left" ] && [ ! -e "$SB/C:/Users/emu/.cys/pack" ] && [ -f "$BK/cys-home/pack/f.txt" ] && [ -f "$SB/C:/Users/emu/.cys/claude-default-dept-1/projects/x.jsonl" ]
 t $? "[윈] 나머지(설정·라우터·팩·옛 사본)는 보관 폴더로 옮기고 새 자리에 없다 · 부서 좌석 프로필은 제자리(0.3.37)" "남은 것:$left $( [ -e "$SB/C:/Users/emu/.cys/pack" ] && echo pack) · 보관 팩=$( [ -f "$BK/cys-home/pack/f.txt" ] && echo 있음 || echo 없음) · 부서=$( [ -e "$SB/C:/Users/emu/.cys/claude-default-dept-1" ] && echo 제자리 || echo 없음)"
@@ -134,7 +134,7 @@ BK="$(find "$SB/C:/Users/emu" -mindepth 1 -maxdepth 1 -name 'install-jarvis-back
 [ -L "$C/history.jsonl" ] && [ -f "$BK/cys-home/pack/f.txt" ] && [ -f "$BK/cys-home/claude/CLAUDE.md" ] && [ ! -e "$C/CLAUDE.md" ] && [ "$(cat "$SB/rc.txt")" = "0" ]
 t $? "[윈] 남길 자리가 끊어진 바로가기 → 이름표째 제자리 · 팩·라우터는 보관 폴더에(지운 것 0) · rc 0(0.3.37)" "링크=$( [ -L "$C/history.jsonl" ] && echo 있음 || echo 없음) · 보관 팩=$( [ -f "$BK/cys-home/pack/f.txt" ] && echo 있음 || echo 없음) · rc=$(cat "$SB/rc.txt")"
 
-echo "== [윈] ⓕ-2 남길 자리가 ~\\.cys 안 다른 자리를 가리키는 바로가기(적대 1R 반례) =="
+echo "== [윈] ⓕ-2 남길 자리가 ~\\.cys 안 다른 자리를 가리키는 바로가기(적대 1차 반례) =="
 SB="$(win_sb f2)"; C="$SB/C:/Users/emu/.cys/claude"
 rm -rf "$C/projects"; ln -s "$SB/C:/Users/emu/.cys/pack" "$C/projects"
 win_run "$SB" 'KeepApp,KeepHistory,Yes'
@@ -143,7 +143,7 @@ BK="$(find "$SB/C:/Users/emu" -mindepth 1 -maxdepth 1 -name 'install-jarvis-back
 [ -f "$BK/cys-home/pack/f.txt" ] && [ -L "$C/projects" ] && [ "$(cat "$SB/rc.txt")" = "0" ] && grep -q '\[안내\] 아래 바로가기가 가리키던 자료는 보관 폴더' "$SB/out.txt" && ! grep -q '지움: .*\.cys (로그인' "$SB/out.txt"
 t $? "[윈] pack 을 가리키는 바로가기 → pack 은 보관 폴더에 온전 · 이름표 제자리 · [안내] 1줄 · rc 0(0.3.37)" "rc=$(cat "$SB/rc.txt") · 보관 팩=$( [ -f "$BK/cys-home/pack/f.txt" ] && echo 있음 || echo 없음) · $(grep -E '안내|지움: .*cys' "$SB/out.txt" | head -2 | tr '\n' '|')"
 
-echo "== [윈] ⓔ-2 남길 폴더 안의 바로가기 · ⓕ-3 프로필 자체가 바로가기 (이종 1R) =="
+echo "== [윈] ⓔ-2 남길 폴더 안의 바로가기 · ⓕ-3 프로필 자체가 바로가기 (이종 1차) =="
 SB="$(win_sb e2)"; C="$SB/C:/Users/emu/.cys/claude"; O="$SB/C:/Users/emu/outside-saved"
 mkdir -p "$O"; printf 'saved' > "$O/s.jsonl"; ln -s "$O" "$C/projects/saved"
 win_run "$SB" 'KeepApp,KeepHistory,Yes'
@@ -156,7 +156,7 @@ t $? "[윈] ~\\.cys\\claude 자체가 바로가기 → 못 풂(삭제 0 · rc 7)
 
 # ═════════ [맥] ═════════
 echo "== [맥] 함수 떼어 내기(제거기 전체는 안 돌린다) =="
-# 0.3.37(TICKET=installer-0337-delete-path): ~/.cys 토막이 보관 이동·되옮기기(R2)를 부르게 되어 떼는 함수를 넓혔다 —
+# 0.3.37: ~/.cys 토막이 보관 이동·되옮기기(요건 2)를 부르게 되어 떼는 함수를 넓혔다 —
 #   기계 자리를 건드리는 함수(프로세스 끄기·열쇠고리·osascript)는 여전히 빼고, 아래 첫 칸이 그 부재를 잰다.
 { awk '/^(PRESERVE_CANON|PRESERVE_CANON_FAIL|PRESERVE_CANON_BAD|HIST_KEEPS|PRUNE_FAIL|PRUNE_WHY|JARVIS_OWNER_MARK|JARVIS_BACKUP_PREFIX|JARVIS_BACKUP_KEEP|JARVIS_BACKUP_INSTALLER_NAMES|RESTORE_MARK|ARCHIVE_DEST|PRESCAN_BAD|DEPT_KEEPS)=/{print}
        /^(HISTORY_KEEP_NAMES|STATE_FORMATION_NAMES)="/{h=1} h{print; if($0 ~ /"$/ && $0 !~ /^[A-Z_]+="$/) h=0}
@@ -183,7 +183,7 @@ H="$(mac_run h 1)"; C="$H/.cys/claude"
 mkdir -p "$BASE/mac-ref"; seed_profile "$BASE/mac-ref/claude"
 [ "$(digest "$C" $KEEP5)" = "$(digest "$BASE/mac-ref/claude" $KEEP5)" ] && [ -n "$(digest "$C" $KEEP5)" ]
 t $? "[맥] ⓗ 재설치 길 = 남길 다섯 자리가 바이트 그대로 남는다" "$(sed -n '1,6p' "$BASE/mac-h/out.txt" | tr '\n' '|' | cut -c1-240)"
-# 0.3.37 뜻 변경: 나머지는 지우지 않고 보관 폴더로(R2) · 부서 좌석 프로필은 이제 제자리(📌1 「안 남김」 → 박사님 범위 ⓑ)
+# 0.3.37 뜻 변경: 나머지는 지우지 않고 보관 폴더로(요건 2) · 부서 좌석 프로필은 이제 제자리(📌1 「안 남김」 → 운영자 범위 ⓑ)
 left="$(gone_all "$C")"; [ -z "$left" ] && [ ! -e "$H/.cys/pack" ] && [ -f "$H/.cys/claude-default-dept-1/projects/x.jsonl" ] && grep -q '^KEPT_FAIL=0$' "$BASE/mac-h/out.txt" && grep -q '제자리로 되옮겼습니다' "$BASE/mac-h/out.txt" \
   && [ -f "$(ls -d "$H"/install-jarvis-backup-*/cys-home 2>/dev/null | head -1)/pack/f.txt" ]
 t $? "[맥] ⓗ 나머지는 보관 폴더로(pack 보관본에) · 부서 프로필 제자리 · 못 지움 0 · 「제자리로 되옮겼습니다」" "남은 것:$left · $(tail -2 "$BASE/mac-h/out.txt" | tr '\n' '|')"
@@ -202,7 +202,7 @@ chmod 755 "$H/.cys/claude/projects" 2>/dev/null
 t $? "[맥] ⓚ 남길 자리를 못 열면 ~/.cys 를 하나도 안 지우고 못 지움 1" "$(tail -3 "$BASE/mac-k/out.txt" | tr '\n' '|')"
 
 H="$(mac_run l 1 'rm -rf .cys/claude/projects && ln -s "$PWD/.cys" .cys/claude/projects')"
-# 0.3.37 뜻 변경: R2 는 지우지 않는다 — pack 은 보관본으로 가고 「지움: ~/.cys」 줄은 없다(사전 훑기가 [안내] 로 알린다 · delete-path 반례①)
+# 0.3.37 뜻 변경: 요건 2 는 지우지 않는다 — pack 은 보관본으로 가고 「지움: ~/.cys」 줄은 없다(사전 훑기가 [안내] 로 알린다 · delete-path 반례①)
 [ -f "$(ls -d "$H"/install-jarvis-backup-*/cys-home 2>/dev/null | head -1)/pack/f.txt" ] && ! grep -q '^  지움: ~/.cys' "$BASE/mac-l/out.txt"
 t $? "[맥] ⓛ-2 ~/.cys 자신을 가리키는 바로가기 → 「지움」이라 말하지 않고 삭제 0(pack 은 보관본에)" "$(tail -3 "$BASE/mac-l/out.txt" | tr '\n' '|')"
 H="$(mac_run m 1 'printf hist > .cys/pack/hist.jsonl && rm -f .cys/claude/history.jsonl && ln -s "$PWD/.cys/pack/hist.jsonl" .cys/claude/history.jsonl')"

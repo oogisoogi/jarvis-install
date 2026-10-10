@@ -3,7 +3,7 @@
 #
 # 까닭: 맥 설치기는 진행 단계·기기 정보를 보내면서 첫 화면에 그 고지가 없었다(윈만 있었다 · 개인정보 원칙 위반 · master#ecd6c2b5).
 # 재는 것
-#   ⓐ 두 OS 첫 화면 고지 문구 = 박사님 확정 문구 그대로(윈 = 문단 첫 문장 · 맥 = 한 줄)
+#   ⓐ 두 OS 첫 화면 고지 문구 = 운영자 확정 문구 그대로(윈 = 문단 첫 문장 · 맥 = 한 줄)
 #   ⓑ 본문 순서(주석 걷음): 「[1/10]」 → 고지 줄 → 첫 전송 호출 — 두 OS 모두 고지가 첫 전송보다 앞
 #   ⓒ 맥 행동: NOTICE_SHOWN=1 전에는 progress_send·증거 전송이 가짜 curl 을 한 번도 부르지 않는다(끝맺음 실패 이벤트 포함)
 #      대조군: NOTICE_SHOWN=1 뒤에는 부른다(0건이 공허하지 않다)
@@ -77,8 +77,8 @@ out.append("win-flag=" + ("1" if None not in (wn, wf, ws) and wn < wf < ws and s
 print(" ".join(out))
 PY
 )"
-case "$r" in *mac-text=1*) true ;; *) false ;; esac; t $? "[ⓐ 맥] 첫 화면 고지 한 줄 = 박사님 확정 문구 그대로" "$r"
-case "$r" in *win-text=1*) true ;; *) false ;; esac; t $? "[ⓐ 윈] 첫 화면 고지 첫 문장 = 박사님 확정 문구 그대로" "$r"
+case "$r" in *mac-text=1*) true ;; *) false ;; esac; t $? "[ⓐ 맥] 첫 화면 고지 한 줄 = 운영자 확정 문구 그대로" "$r"
+case "$r" in *win-text=1*) true ;; *) false ;; esac; t $? "[ⓐ 윈] 첫 화면 고지 첫 문장 = 운영자 확정 문구 그대로" "$r"
 case "$r" in *mac-order=1*) true ;; *) false ;; esac; t $? "[ⓑ 맥] 본문 순서 [1/10] → 고지 → 첫 전송" "$r"
 case "$r" in *win-order=1*) true ;; *) false ;; esac; t $? "[ⓑ 윈] 본문 순서 [1/10] → 고지 → 첫 전송" "$r"
 case "$r" in *mac-cap-text=1*) true ;; *) false ;; esac; t $? "[ⓔ 맥] 창 글자 고지 반 줄 = 확정 문구 글자 그대로" "$r"

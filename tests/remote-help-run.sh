@@ -757,7 +757,7 @@ EOF
   fresh gate
   echo 410 > "$STATE/poll.status"
   inst <<'EOF'
-MODE=full; J_CODE=J-DL-04; NOTICE_SHOWN=1; BLOCKED_STEP="cys 설치 파일 받기"
+MODE=full; J_CODE=J-DL-04; NOTICE_SHOWN=1; BLOCKED_STEP="cysr 설치 파일 받기"
 CYS_CLI="$T_SB/no-such-cys"; PATH="/usr/bin:/bin:/usr/sbin:/sbin"
 step_wake
 echo "WAKE_RC=$? REACHED_WAKE=$REACHED_WAKE" > "$T_SB/wake"
@@ -775,7 +775,7 @@ EOF
   printf '#!/bin/bash\nexit 1\n' > "$SB/fake-cys"
   chmod +x "$SB/fake-cys"
   inst <<'EOF'
-MODE=full; J_CODE=J-DL-04; NOTICE_SHOWN=1; BLOCKED_STEP="cys 설치 파일 받기"
+MODE=full; J_CODE=J-DL-04; NOTICE_SHOWN=1; BLOCKED_STEP="cysr 설치 파일 받기"
 CYS_CLI="$T_SB/fake-cys"; PATH="/usr/bin:/bin:/usr/sbin:/sbin"
 JARVIS_HOME="$(mktemp -d -t rhwake)"
 cys_open_master_seat() { printf 'error: could not open surface:42\n'; return 1; }
@@ -836,7 +836,7 @@ PY
   check "wire-notice 본문 [1/10] 바로 뒤에 고지를 찍고(진행·창 글자 고지까지) 그때만 NOTICE_SHOWN=1" $? "배선이 없다"
   # D1 기각(외부 검토 1차) — REACHED_WAKE=1 은 파일에 한 자리뿐 · cys 창에 자비스를 연 줄 바로 뒤(주석 건너뜀) · 그 다음이 함대 부르기
   awk '/^[[:space:]]*#/{next}
-       /REACHED_WAKE=1/{n++; if (prev ~ /cys 안에서 자비스를 열었습니다/) at=1; want=1; prev=$0; next}
+       /REACHED_WAKE=1/{n++; if (prev ~ /cysr 안에서 자비스를 열었습니다/) at=1; want=1; prev=$0; next}
        want{ if ($0 ~ /^[[:space:]]*step_fleet /) nxt=1; want=0 }
        {prev=$0}
        END{exit !(n == 1 && at && nxt)}' "$SRC"

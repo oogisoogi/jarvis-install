@@ -10,7 +10,7 @@
 #   paste-late   = (installer-awaken-verify) worker 가 옛 모양 입력줄(╭╮)에 붙여넣기가 남아 Return 두 번째에 비워진다 · 답 머리표 없이 화면만 바뀐다
 #                  · 비워진 뒤 위쪽 대화 기록에 「[Pasted text …」 가 남는다(이미 보낸 것 — 멈춘 것으로 세면 안 된다)
 #   child-stall  = (installer-awaken-verify) worker 가 Return 을 몇 번 넣어도 붙여넣기가 남는다 · 화면에 로그인 이름·이메일이 섞여 있다
-#   ── TICKET=installer-0322-awaken (마스터 각성 판정) · 전제 = 훅이 정상 실행돼 SessionStart 주입(45,644자)이 마스터 자리에 실린 상태 ──
+#   ── (마스터 각성 판정) · 전제 = 훅이 정상 실행돼 SessionStart 주입(45,644자)이 마스터 자리에 실린 상태 ──
 #   master-refuse     = 동료 자리는 서는데 **마스터는 말만 하고 준비 작업을 시작하지 않는다**(2026-09-16 거부의 모양) → 재시도 1회 뒤에도 표지 없음 → no-start + 사람 카드
 #   master-retry-late = 같은 모양인데 **재시도 한 줄을 받고 나서 표지를 쓴다** → verified(재시도가 헛일이 아님을 잰다)
 #   master-unknown    = 마스터 자리가 아무 말도 하지 않는다(답 레코드 0 · 표지 0) → unknown(「거절」이라고 말하지 않는다)

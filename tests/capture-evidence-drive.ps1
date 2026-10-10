@@ -1,4 +1,4 @@
-# 캡처 증거 흉내 몰이 (pwsh 7 · 맥 · TICKET=installer-capture-evidence 2026-09-16)
+# 캡처 증거 흉내 몰이 (pwsh 7 · 맥 · 2026-09-16)
 #   실물 bootstrap.ps1 을 함수 묶음(JARVIS_LIB_ONLY)으로 읽고 새 함수들을 직접 몬다.
 #   ⛔바깥에 닿지 않는다 — 주소는 전부 127.0.0.1 의 가짜 서버이고 쓰기는 $Sb 안에서만.
 param([string]$Src, [string]$Sb, [string]$Url)
@@ -113,14 +113,14 @@ Out-Fact 'after_cap_done' $script:EvidenceImageDone
 Out-Fact 'after_fail' 'SURVIVED'
 Remove-Item -Path "$Sb/state/image.status", "$Sb/state/image.error" -ErrorAction SilentlyContinue   # 아래 두 시험엔 무관 — 정상 응답으로 되돌린다
 
-# ⑫ TICKET=installer-0325 c5(2026-09-18) — 못 읽으면(원본 파일이 없다) 빈 글이 아니라 사유 코드를 돌려준다
+# ⑫ c5(2026-09-18) — 못 읽으면(원본 파일이 없다) 빈 글이 아니라 사유 코드를 돌려준다
 $script:LogFileSaved = $LogFile
 $LogFile = (Join-Path $Sb 'no-such-log-c5.log')   # 존재하지 않는 자리 — Get-FileBytesCapped 가 $null 을 준다
 $script:TranscriptOn = $false
 Out-Fact 'evtext_empty_reason' (Get-EvidenceText)
 $LogFile = $script:LogFileSaved
 
-# ⑬ TICKET=installer-0325 c5(2026-09-18) — 그림 찍기가 예외로 죽어도 그 사유가 evidence_text 칸에 실려 서버에 닿는다
+# ⑬ c5(2026-09-18) — 그림 찍기가 예외로 죽어도 그 사유가 evidence_text 칸에 실려 서버에 닿는다
 #   (옛 판은 catch 가 Write-Log 로 이 기계의 파일에만 적고 서버엔 아무 신호도 안 갔다 · 09-17 10:01 실기 WHm7yvpu)
 function Get-InstallerWindowJpeg { throw 'boom-c5-capture' }
 $script:EvidenceImageSent = 0
