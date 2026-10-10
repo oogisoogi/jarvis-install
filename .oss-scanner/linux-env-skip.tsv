@@ -1,0 +1,35 @@
+# 리눅스(OSS Scanner 이미지)에서 「잴 수 없어」 건너뛰는 검사 — .oss-scanner/run-tests.sh 가 **맥이 아닐 때만** 읽는다.
+# 형식: <검사 이름의 머리(install-master/checks.sh 의 ck 이름과 글자 그대로)><탭><왜 리눅스에서 잴 수 없는가 · 근거 자리>
+# 뜻: 이 설치기는 맥(BSD 사용자 도구 + osascript·plutil·ditto·codesign…)용이다. 아래 검사는 그 도구·문법을 실제로 부르므로
+#   리눅스에서 붉은 것은 「설치기가 틀렸다」가 아니라 「이 환경에서 잴 수 없다」다. 그런 검사의 **실패만** 「건너뜀 + 사유」로 옮긴다
+#   (통과하면 통과로 센다 · 표에 없는 검사의 실패는 그대로 붉다 · 맥에서는 이 표를 읽지 않는다 = 맥 판정 불변).
+# 근거 = 2026-10-11 러너 첫 실행(oogisoogi/jarvis-install run 38095357915 · 실패 30)의 줄별 원인 — 시험·설치기 코드 판독(리눅스 재실행으로
+#   하나하나 확인한 것은 아니다). 줄을 지우면 그 검사는 리눅스에서 다시 붉어진다.
+[v0316] 흉내 실행 시험	BSD mktemp 문법 — tests/v0316-emu-run.sh:36 `mktemp -d -t <이름>`(X 없는 틀은 GNU mktemp 가 거절)
+[v0317] 흉내 실행 시험	BSD mktemp 문법 — tests/v0317-emu-run.sh:35
+[awaken] 흉내 실행 시험	BSD mktemp 문법 — tests/awaken-emu-run.sh:38 · 맥 구간은 /usr/bin/stat -f(BSD)도 쓴다
+[v0318] 흉내 실행 시험	BSD mktemp 문법 — tests/v0318-emu-run.sh:27 · 맥 로그인 구간은 BSD script -q 도 쓴다
+[재설치] 흉내 실행 시험	BSD mktemp 문법 — tests/reinstall-keepapp-emu-run.sh:35
+[재설치] 입력 닫힌 채 목록	BSD mktemp 문법(설치기 쪽) — install-master/reset-clean.sh:1621 `mktemp -t jarvis-pk` · 뒤에 stat -f·/usr/bin/osascript·plutil
+[대기] 더블이 전건 통과한다	BSD mktemp 문법(설치기 쪽) — install-master/bootstrap.sh:1553 `mktemp -t jarvis-rows` 의 오류 줄이 「오류 출력 0」 단언을 깬다
+[기기 모델명]	맥 전용 값 — tests/hw-model-env.sh:38 `/usr/sbin/sysctl -n hw.model`·hw.memsize(리눅스에 그 열쇠가 없다) · 첫 줄은 BSD mktemp(:24)
+[F11·F17]	BSD mktemp 문법 — tests/d5-f11-f17-interrupt-close.sh:16
+[원격 해결 cys · 맥]	BSD mktemp 문법 — tests/defect-0930-mac-rh.sh:15
+[F11 소유]	BSD mktemp 문법 — tests/d5-f11-kill-owner.sh:15
+[F15] 마침표 든 홈	맥 전용 도구 — tests/d5-f15-dotted-home-trust.sh:34 가 /usr/bin/osascript(JXA) 실재를 요구 · plutil · stat -f
+[고지 순서]	맥 전용 도구 — install-master/bootstrap.sh:343 progress_js 가 /usr/bin/osascript(절대 경로 · JXA)로 전송 본문을 꾸린다 → 대조군 전송이 0건
+[라이브 차단] LIB_ONLY 셸	맥 전용 도구 — install-master/bootstrap.sh:343 /usr/bin/osascript(JXA) 없이는 전송 시도 자체가 없다(대조군 0건)
+[라이브 차단] 도움 주소 손잡이	BSD mktemp 문법 — tests/help-url-lever.sh:26 `mktemp -t helplever`
+[B-Z28]	맥 전용 도구 — install-master/reset-clean.sh:1709 plutil · :1028 /usr/bin/osascript(JXA)로 설정 파일을 읽는다
+[X-5·F13]	BSD mktemp 문법 — tests/d5-x5-f13-reinstall-ending.sh:35
+[c0326-1]	BSD date 문법 — tests/rerun-after-done-run.sh:126 `date -v-11M`(GNU date 에 -v 없음)
+[텔레메트리] 흉내 실행 시험	BSD mktemp 문법 — tests/telemetry-emu-run.sh:28
+[0328] 흉내 실행 시험	BSD mktemp 문법 — tests/v0328-emu-run.sh:30
+[0329] 흉내 실행 시험	BSD mktemp 문법 — tests/v0329-emu-run.sh:33 · 설치기 bootstrap.sh:1553 도 같다
+[0330] 흉내 실행 시험	BSD mktemp 문법 — tests/v0330-emu-run.sh:25
+[0331] 흉내 실행 시험	BSD mktemp 문법 — tests/v0331-emu-run.sh:25
+[맥동등 6/10] 가짜 zip 실행 시험	맥 전용 도구 — tests/mac-install-mutate.sh:91 ditto 로 zip 을 만들고 설치기(bootstrap.sh:3350)가 ditto -x -k 로 푼다 · 첫 줄은 BSD mktemp(:40)
+[맥동등 전송] JARVIS_NO_PROGRESS=1	맥 전용 도구 — install-master/bootstrap.sh:343 /usr/bin/osascript(절대 경로라 가짜로 못 바꾼다) → 대조군에서 curl 호출 0건
+[맥동등 전송] 실물 전송 러너	맥 전용 도구 — /usr/bin/osascript(bootstrap.sh:343) · /usr/bin/sw_vers(:398) · tests/mac-telemetry-run.sh:113 stat -f
+[전환] 윈 핀 = 릴리스 실측	망 없음 — 릴리스의 SHA256SUMS 를 받아야 재는 검사(망이 있으면 리눅스에서도 돈다)
+[전환] 저희 판 핀 = 발행 zip 실측	맥 전용 도구 — tests/mac-pin-release.sh 가 발행 zip 을 ditto 로 풀어 codesign 으로 CDHash 를 잰다(망 없으면 검사가 스스로 건너뛴다)

@@ -26,6 +26,14 @@ on:
 permissions:
   contents: read
 
+# 기본 셸을 명시한다 — `shell:` 을 안 적으면 러너는 `bash -e {0}` 로 돌아 **pipefail 이 없다**. 그러면
+#   `시험 | tee 로그 || rc=$?` 의 rc 가 tee 의 것(0)이 되어, 시험이 붉어도 잡이 초록으로 끝난다
+#   (2026-10-11 첫 실행에서 실측: image 잡 = 실패 34건인데 「offline tests: rc=0」 · success).
+#   `shell: bash` 를 적으면 러너가 `bash --noprofile --norc -eo pipefail {0}` 로 돈다.
+defaults:
+  run:
+    shell: bash
+
 jobs:
   image:
     runs-on: ubuntu-latest
@@ -53,7 +61,7 @@ jobs:
 
       - name: ② 망 없이 시험 (--network none)
         run: |
-          # 기본 셸 = bash -eo pipefail — 붉어도 요약을 먼저 남기려고 rc 를 받아 둔다(pipefail 이라 rc = docker 쪽)
+          # 셸 = bash -eo pipefail(위 defaults) — 붉어도 요약을 먼저 남기려고 rc 를 받아 둔다(pipefail 이라 rc = docker 쪽)
           start=$(date +%s)
           rc=0
           docker run --rm --network none --user tester oss-scanner-check:jarvis-install bash .oss-scanner/run-tests.sh 2>&1 | tee /tmp/oss-offline.log || rc=$?

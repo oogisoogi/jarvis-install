@@ -10,7 +10,7 @@ FROM ubuntu:24.04
 ENV DEBIAN_FRONTEND=noninteractive
 RUN apt-get update && apt-get install -y --no-install-recommends \
       ca-certificates curl git bash python3 shellcheck jq file procps psmisc unzip zip \
-      bsdextrautils util-linux build-essential libicu74 \
+      bsdextrautils util-linux build-essential libicu74 xxd \
     && rm -rf /var/lib/apt/lists/*
 
 # PowerShell, pinned to the version the maintainers test with (7.6.6), from the official release archive.

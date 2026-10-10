@@ -76,6 +76,13 @@ The scripts run as the participant, in the participant's home folder, and never 
   `JARVIS_PROGRESS_URL=http://127.0.0.1:9/x` and `JARVIS_HELP_API_URL=http://127.0.0.1:9/x` (the test runners
   already do), and use a throwaway `HOME`.
 
+- The installers target macOS (BSD userland plus `osascript`, `plutil`, `ditto`, `codesign`) and Windows. On Linux,
+  behaviour tests that call those tools or BSD-only syntax cannot be measured; `run-tests.sh` reports the failure of
+  such a check as `skip` with the reason, from `.oss-scanner/linux-env-skip.tsv` (one line per check, with the file
+  and line that needs macOS). Checks not listed there stay red when they fail. The bash installer's behaviour is
+  therefore only partly exercised in this image — read `install-master/bootstrap.sh` and `reset-clean.sh` statically
+  for those paths; the PowerShell parser checks, the static check suite and the remaining emulation tests do run.
+
 ## How we rate severity
 
 - **Critical**: the help server or a network attacker gets a command outside the table executed, or a path outside
