@@ -269,3 +269,28 @@ Remove-CysInstallMemory	-	na	윈 설치 자리 기억 키 지우기 · 레지스
 Clear-CysStaleInstallMemory	-	na	[6/10] 뒤 옛 이름 설치 자리 기억이 쓸 수 없는 자리를 가리키면 지움(\cysr 무접촉) · 레지스트리 = 윈 전용
 Write-LogChecked	-	na	되돌리기용 원래 값처럼 꼭 남아야 하는 기록 한 줄(못 적으면 거짓) · 지금 부르는 곳 = 윈 설치 자리 기억 정리(레지스트리 · 윈 전용)
 Get-AvButtonHint	-	na	백신 창 제목이 V3(안랩)일 때만 「파일 전송」 단추 예시 · 윈도우 백신 알림 창 전용
+Get-CysTxnStartTime	txn_proc_start	sh	1.1.8 U5(설치 링크 잠금·위임) · 프로세스 시작 시각(epoch 초) — 소유자 기록의 start_time 칸(윈 = 프로세스 정보 · 맥 = ps lstart → perl)
+New-CysTxnDir	txn_hold_try	sh	1.1.8 U5(설치 링크 잠금·위임) · 갱신 폴더를 소유자 전용으로 만든다 — 맥은 잠금을 쥐는 perl 본문 안에서 같은 일(0700 · 없고 못 만들면 nodir)
+Test-CysTxnSddlPrivate	-	na	윈 ACL(SDDL) 규칙 판정(순수) — 맥은 SDDL 이 없고 파일 모드 비트(소유 uid · 그룹·기타 0)로 본다(txn_hold_try 의 perl 본문)
+Test-CysTxnPathPrivate	txn_hold_try	sh	1.1.8 U5(설치 링크 잠금·위임) · 폴더·잠금·소유자 기록 = 소유자 전용 · 바로가기 아님(아니면 unsafe) — 맥은 perl 본문의 lstat 검사
+Rename-CysTxnReplace	-	na	윈 공유 위반(다른 프로세스가 읽는 중) 재시도 100ms×30 뒤 지우고 옮기기 폴백 — 맥 rename(2) 는 열려 있는 파일도 원자적으로 바꿔 이 고리가 없다(perl 본문의 rename 한 줄)
+Write-CysTxnFile	txn_hold_try	sh	1.1.8 U5(설치 링크 잠금·위임) · 소유자 기록을 임시 파일에 쓰고 바꿔치기 — 맥은 perl 본문(임시 .u5. 파일 → rename)
+ConvertTo-CysTxnOwnerJson	txn_hold_try	sh	1.1.8 U5(설치 링크 잠금·위임) · 소유자 기록 JSON(holder·pid·start_time·epoch·released) — 맥은 perl JSON::PP 로 같은 칸
+Test-CysTxnFree	txn_hold_try	sh	1.1.8 U5(설치 링크 잠금·위임) · 잠금이 비었는가(배타 잠금 시도) — 맥은 flock LOCK_EX|LOCK_NB(perl)
+Lock-CysTxnOnce	txn_hold_try	sh	1.1.8 U5(설치 링크 잠금·위임) · 한 번 잡아 본다 → ok·busy·nolock·nodir·unsafe(상태 낱말 같음)
+Unlock-CysTxn	txn_release	sh	1.1.8 U5(설치 링크 잠금·위임) · 놓기 = 묘비(released:true) 뒤 해제 · 묘비 실패면 쥔 채 · 토큰·env 는 언제나 거둔다
+Invoke-WithCysTxnEnv	cys_txn_env	sh	1.1.8 U5(설치 링크 잠금·위임) · 그 한 호출에만 토큰 env(셸·프로세스 전체에 두지 않는다)
+Invoke-WithoutCysTxnEnv	-	na	오래 사는 자식(앱 창·자비스)을 띄울 때 프로세스 env 의 토큰을 잠깐 걷는다 — 맥은 토큰을 셸 env 에 두지 않아(cys_txn_env 가 그 호출에만 건다) 걷을 것이 없다
+Get-CysTxnJournalWord	txn_journal_verdict	sh	1.1.8 U5(설치 링크 잠금·위임) · 저널 상태 한 줄(JSON) → wait·go(순수 판독) — 맥은 txn_journal_verdict 안의 perl 한 줄
+Get-CysSetupArgs	-	na	윈 설치 파일(NSIS) 인자 한 문자열(/S · /CYSTXN=<토큰> · /D) — 맥은 앱 묶음을 놓는 방식이라 설치 파일 인자가 없다(위임은 init-pack·rotate 의 --txn 으로 간다 · txn_invoke_logged)
+Get-CysTxnJournalVerdict	txn_journal_verdict	sh	1.1.8 U5(설치 링크 잠금·위임) · 지난 갱신 기록 판정 = 깔린 cys 에게 묻는다(wait·go·nojudge)
+Enter-CysTxn	txn_enter	sh	1.1.8 U5(설치 링크 잠금·위임) · 본문 시작 직후 잠금 참가 — busy = 30초×3 뒤 J-UPD-01 · 마무리 대기 = J-UPD-02 · 자리 이상 = J-UPD-03 · rc 26
+Test-CysTxnJournalTerminal	txn_journal_terminal	sh	1.1.8 U5(설치 링크 잠금·위임) · 판정할 cys 가 없을 때만 — 두 슬롯 중 generation 큰 쪽의 state 가 종결인가
+Test-CysTxnJournalStale	txn_journal_stale	sh	1.1.8 U5(설치 링크 잠금·위임) · 저널이 30분보다 오래됐는가(기다려도 안 풀림 판정)
+Write-CysTxnOdd	txn_odd	sh	1.1.8 U5(설치 링크 잠금·위임) · J-UPD-03 「자리 이상」 원인별 문구 1줄 + 끝(unsafe·nolock·refused·nojudge)
+Stop-CysTxnRefused	txn_refused	sh	1.1.8 U5(설치 링크 잠금·위임) · 위임 거부(rc 26) = 문구로 끝 · 잠금 없이 다시 하지 않는다
+Invoke-CysTxnLogged	txn_invoke_logged	sh	1.1.8 U5(설치 링크 잠금·위임) · 참가 명령(init-pack 등)을 --txn + 그 호출 env 로 부르고 기록 · 거부면 끝
+Get-CysAssetsWord	-	na	윈 전용 — 롤백 자산 = 깔린 판의 설치 파일 묶음을 installers\<seq>\ 에 챙겨 두는 일(seq = cys.exe 판 정보 4번째 칸) · 맥 설치기에는 이 일이 없다(1.1.8 U5 맥 편입분 = 잠금 참가·위임뿐 · 맥에 필요한지는 이 표가 판정하지 않았다) · 이 함수 = cys 의 자산 판정 한 줄 판독(순수)
+Test-CysRollbackAssetsPresent	-	na	윈 전용 — 롤백 자산 = 깔린 판의 설치 파일 묶음을 installers\<seq>\ 에 챙겨 두는 일(seq = cys.exe 판 정보 4번째 칸) · 맥 설치기에는 이 일이 없다(1.1.8 U5 맥 편입분 = 잠금 참가·위임뿐 · 맥에 필요한지는 이 표가 판정하지 않았다) · 이 함수 = 챙겨 둔 자산이 쓸 만한가(cys 판정)
+Receive-CysSetupForAssets	-	na	윈 전용 — 롤백 자산 = 깔린 판의 설치 파일 묶음을 installers\<seq>\ 에 챙겨 두는 일(seq = cys.exe 판 정보 4번째 칸) · 맥 설치기에는 이 일이 없다(1.1.8 U5 맥 편입분 = 잠금 참가·위임뿐 · 맥에 필요한지는 이 표가 판정하지 않았다) · 이 함수 = 같은 판인데 자산이 없을 때 설치 파일만 받는다(다시 깔지 않음)
+Save-CysRollbackAssets	-	na	윈 전용 — 롤백 자산 = 깔린 판의 설치 파일 묶음을 installers\<seq>\ 에 챙겨 두는 일(seq = cys.exe 판 정보 4번째 칸) · 맥 설치기에는 이 일이 없다(1.1.8 U5 맥 편입분 = 잠금 참가·위임뿐 · 맥에 필요한지는 이 표가 판정하지 않았다) · 이 함수 = 받아 둔 설치 파일로 자산을 챙긴다(cys 에 위임)

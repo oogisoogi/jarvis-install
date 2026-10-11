@@ -44,6 +44,21 @@ jobs:
           PYTHONUTF8: 1
         run: bash install-master/checks.sh
 
+      # 검사 축이 붉을 때만 돈다 — 전송 시험 둘(가짜 서버)이 이 러너에서만 붉다(개발 맥·깨끗한 맥은 통과 · 2026-09-21 이전부터).
+      #   검사 축은 근거를 한 줄로 잘라 적어 까닭이 안 보인다 ⇒ 두 시험을 그대로 돌려 전체 출력을 남긴다(판정은 위 스텝이 이미 했다 · 이 스텝은 읽기만).
+      - name: 전송 시험 진단 (맥 · 검사 축이 붉을 때만)
+        if: failure() && runner.os == 'macOS'
+        env:
+          PYTHONUTF8: 1
+        run: |
+          echo "── 기계: $(sw_vers -productVersion) · $(uname -m) · python3=$(command -v python3) $(python3 --version 2>&1) · pwsh=$(command -v pwsh)"
+          echo "── JXA 한 줄: $(/usr/bin/osascript -l JavaScript -e '1+1' 2>&1 | head -2 | tr '\n' ' ')"
+          echo "── JXA(환경 비움): $(env -i PATH=/usr/bin:/bin HOME="$RUNNER_TEMP" /usr/bin/osascript -l JavaScript -e '1+1' </dev/null 2>&1 | head -2 | tr '\n' ' ')"
+          echo "═════ tests/mac-telemetry-run.sh ═════"
+          bash tests/mac-telemetry-run.sh 2>&1 | grep -E 'FAIL|PASS [0-9]+ / FAIL|^== ' | cut -c1-600 || true
+          echo "═════ tests/telemetry-emu-run.sh ═════"
+          bash tests/telemetry-emu-run.sh --dir install-master 2>&1 | tail -40 | cut -c1-600 || true
+
       # 윈 cys 핀 3값(판본·크기·지문)이 우리 릴리스가 실제로 적은 값과 같은가 — 네트워크로 릴리스를 읽는다.
       #   checks.sh 는 글자만 본다. 릴리스와 대조하는 곳은 이 단계뿐이고, 뮤턴트는 그 대조가 눈먼 초록이 아닌지 잰다.
       #   릴리스를 못 읽으면(망·404) 통과가 아니라 실패다 — 사유는 FAIL 줄에 있다.
@@ -376,11 +391,12 @@ jobs:
           echo "───── 재실행 고착(밖에 반쪽이 남아 있다) ─────"
           bash tests/agora-preserve-run.sh --dir install-master --sandbox "$RUNNER_TEMP/ag-stale" \
             --stale-out --expect-cys-kept --expect-cleaner-says '손으로 정리하신 뒤' 
-          # ★열거·삭제 실패를 **실제로 주입**한다(2차-NEW-ENUM) — 권한을 뺏은 하위 자리를 심는다.
-          #   지우개는 「지웠다」가 아니라 「일부 남음」이라 말하고 **비영으로** 끝나야 한다.
-          echo "───── 못 여는 자리를 심는다(열거·삭제가 진짜로 실패한다) ─────"
+          # ★열거 실패를 **실제로 주입**한다(2차-NEW-ENUM) — 권한을 뺏은 하위 자리를 심는다.
+          #   0.3.37 부터 지우기 전 「사전 훑기」 가 먼저 문다: 목록을 끝까지 못 읽는 자리가 있으면 **아무것도 바꾸지 않고** 비영(7)으로 끝낸다
+          #   (앞 판 기대 = 「일부 남음」 — 지우다 만 상태 · 지금은 그 앞에서 멈춘다 · 흉내 시험 = tests/delete-path-run.sh A1 「못 여는 자리」 칸).
+          echo "───── 못 여는 자리를 심는다(목록을 못 읽으면 아무것도 바꾸지 않는다) ─────"
           bash tests/agora-preserve-run.sh --dir install-master --sandbox "$RUNNER_TEMP/ag-lock" \
-            --unreadable --expect-partial
+            --unreadable --expect-cys-kept --expect-cleaner-says '이번에는 아무것도 바꾸지 않았습니다'
           # ★바깥을 가리키는 링크 — 지우개는 **링크만** 지우고 대상은 손대면 안 된다.
           #   맥은 `rm -rf` 가 원래 그렇다(실측). 이 축은 그 사실을 **묶어 두는** 자리다 —
           #   윈도우 쪽 수정과 같은 것을 재고 있음을 두 OS 로 확인한다(윈 5.1 이 뚫는지는 판본에 따라
@@ -691,9 +707,10 @@ jobs:
           Write-Host '----- 재실행 고착(밖에 반쪽이 남아 있다) -----'
           & pwsh -NoProfile -File tests\agora-preserve-run.ps1 -Dir install-master -Sandbox "$env:RUNNER_TEMP\ag-stale" -StaleOut -ExpectCysKept -ExpectCleanerSays '손으로 정리하신 뒤'
           if ($LASTEXITCODE -ne 0) { Write-Host '::error::반쪽이 남은 재실행에서 원본을 지켰어야 한다'; exit 1 }
-          Write-Host '----- 못 여는 자리를 심는다(열거·삭제가 진짜로 실패한다) -----'
-          & pwsh -NoProfile -File tests\agora-preserve-run.ps1 -Dir install-master -Sandbox "$env:RUNNER_TEMP\ag-lock" -Unreadable -ExpectPartial
-          if ($LASTEXITCODE -ne 0) { Write-Host '::error::실패를 심었는데 그대로 말하지 않았다'; exit 1 }
+          # 0.3.37 부터 지우기 전 「사전 훑기」 가 먼저 문다 - 목록을 끝까지 못 읽는 자리가 있으면 아무것도 바꾸지 않고 7 로 끝낸다(맥 짝과 같은 기대).
+          Write-Host '----- 못 여는 자리를 심는다(목록을 못 읽으면 아무것도 바꾸지 않는다) -----'
+          & pwsh -NoProfile -File tests\agora-preserve-run.ps1 -Dir install-master -Sandbox "$env:RUNNER_TEMP\ag-lock" -Unreadable -ExpectCysKept -ExpectCleanerSays '이번에는 아무것도 바꾸지 않았습니다'
+          if ($LASTEXITCODE -ne 0) { Write-Host '::error::못 여는 자리가 있는데 멈추지 않았거나 그대로 말하지 않았다'; exit 1 }
           # ★삭제 루트 **자신이** junction 인 경우 - 이름표만 지우고 가리키던 자리는 통째로 남아야 한다.
           Write-Host '----- 삭제 루트 자신이 링크(이름표만 지우는가) -----'
           & pwsh -NoProfile -File tests\agora-preserve-run.ps1 -Dir install-master -Sandbox "$env:RUNNER_TEMP\ag-root" -RootLink -ExpectClean
@@ -750,7 +767,15 @@ jobs:
           #   재귀 삭제는 되는 상태여야 하기 때문이다). 그 폴더 안에 바깥을 가리키는 링크가 있다.
           $enumFrom = '    try { $kids = @(Get-ChildItem -LiteralPath $dir -Force -ErrorAction Stop) }'
           $enumTo   = '    try { if ($dir -like ''*\sub'') { throw ''열거 실패 대역'' }; $kids = @(Get-ChildItem -LiteralPath $dir -Force -ErrorAction Stop) }'
-          $d1 = New-Mut 'mut-enumfail' @(,@($enumFrom, $enumTo))
+          #   0.3.37 부터 같은 열거 실패를 지우기 전 「사전 훑기」 가 먼저 문다(변경 0 으로 끝) ⇒ 삭제층까지 가려면 그 앞 층을 끈다.
+          #   재는 것 = **앞 층이 뚫려도 뒷 층(비재귀 삭제·옮기기)이 막는가**(두 층 방어 · 한 층만 믿지 않는다).
+          $preFrom = '        if ($script:EnumFail -gt 0) { $script:PrescanBad = (Short $r) + '' (목록을 끝까지 읽지 못했습니다)''; return $false }'
+          $preTo   = '        if ($false) { return $false }'
+          $d0 = New-Mut 'mut-enumfail-prescan-on' @(,@($enumFrom, $enumTo))
+          Write-Host '----- 실사격 0: 하위 열거가 실패하면 사전 훑기가 멈춘다(변경 0) -----'
+          & pwsh -NoProfile -File tests\agora-preserve-run.ps1 -Dir $d0 -Sandbox "$env:RUNNER_TEMP\ag-sr0" -OutsideLink -LinkInSubdir -ExpectCysKept -ExpectCleanerSays '이번에는 아무것도 바꾸지 않았습니다'
+          if ($LASTEXITCODE -ne 0) { Write-Host '::error::열거 실패인데 사전 훑기가 멈추지 않았다'; exit 1 }
+          $d1 = New-Mut 'mut-enumfail' @(@($enumFrom, $enumTo), @($preFrom, $preTo))
           Write-Host '----- 실사격: 하위 열거가 실패해도 그 안 링크를 뚫지 않는다 -----'
           & pwsh -NoProfile -File tests\agora-preserve-run.ps1 -Dir $d1 -Sandbox "$env:RUNNER_TEMP\ag-sr1" -OutsideLink -LinkInSubdir -ExpectPartial
           if ($LASTEXITCODE -ne 0) { Write-Host '::error::열거 실패 조합에서 바깥을 건드렸거나 사실대로 말하지 않았다'; exit 1 }
@@ -761,7 +786,7 @@ jobs:
           #   ★막는 까닭(모르는 채로 지운다)은 그대로다. 다만 **축은 실제로 무는 것으로** 놓는다.
           $recFrom = '        [System.IO.Directory]::Delete($p, $false)'
           $recTo   = '        if (Test-IsReparse $it) { [System.IO.Directory]::Delete($p, $false) } else { Remove-Item -LiteralPath $p -Recurse -Force -ErrorAction Stop }'
-          $d2 = New-Mut 'mut-secondrec' @(@($enumFrom, $enumTo), @($recFrom, $recTo))
+          $d2 = New-Mut 'mut-secondrec' @(@($enumFrom, $enumTo), @($preFrom, $preTo), @($recFrom, $recTo))
           Write-Host '----- 뮤턴트: 삭제층 재귀를 되돌리면 붉어지는가 -----'
           & pwsh -NoProfile -File tests\agora-preserve-run.ps1 -Dir $d2 -Sandbox "$env:RUNNER_TEMP\ag-sr2" -OutsideLink -LinkInSubdir -ExpectFail
           if ($LASTEXITCODE -ne 0) { Write-Host '::error::삭제층 재귀를 되돌렸는데 붉어지지 않았다'; exit 1 }

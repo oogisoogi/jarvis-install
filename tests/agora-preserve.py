@@ -386,9 +386,22 @@ def verify(home, expect_fail, expect_cys_kept=False):
     if nr and os.path.exists(nr):
         bad.append("보존과 무관한 정상 자리를 못 지웠다: " + nr)
 
-    # ⑵ 중첩 루트의 나머지는 지워졌는가
+    # ⑵ 중첩 루트의 나머지는 그 자리에서 사라졌는가
     if os.path.exists(e["must_die"]):
         bad.append("보존이 삭제를 통째로 막았다(지워졌어야 할 것이 남았다): " + e["must_die"])
+    else:
+        # ⑵-1 (0.3.40 · A1) 사라진 것은 **지워진 것이 아니라 보관 폴더로 옮겨진 것**이어야 한다 —
+        #   완전 삭제는 자료를 지우지 않는다(0.3.37). 참가 자리가 안에 있어도 그 약속은 같다:
+        #   참가 자리만 제자리에 두고 나머지를 보관 폴더(install-jarvis-backup-*/cys-home*)로 옮긴다.
+        import glob
+        rel = os.path.relpath(e["must_die"], os.path.join(home, ".cys"))
+        kept = [p for p in glob.glob(os.path.join(home, "install-jarvis-backup-*", "cys-home*", rel)) if os.path.isfile(p)]
+        if not kept:
+            bad.append("나머지를 보관 폴더로 옮기지 않고 지웠다(보관 폴더에 없다): " + rel)
+        # 참가 자리(열쇠)는 한 번도 옮기지 않는다 — 보관 폴더에 사본이 생기면 안 된다
+        krel = os.path.relpath(e["key"], os.path.join(home, ".cys"))
+        if glob.glob(os.path.join(home, "install-jarvis-backup-*", "cys-home*", krel)):
+            bad.append("참가 열쇠가 보관 폴더에 들어갔다(참가 자리는 옮기지 않는다): " + krel)
 
     # ⑶ 1차 — cys 안의 안내는 사라지고, 밖에 **바이트까지 같은 것**이 있어야 한다.
     #   ⛔「폴더가 있다」로 판정하지 않는다 — 반쪽 복사가 그 판정을 통과하고 영구히 고착된다.
@@ -441,7 +454,7 @@ def verify(home, expect_fail, expect_cys_kept=False):
     for b in bad:
         print("  어긋남: " + b)
     if ok:
-        print("  대조 통과: 열쇠 바이트 동일 · 나머지는 지워짐 · 안내는 밖으로 옮겨짐")
+        print("  대조 통과: 열쇠 바이트 동일(제자리) · 나머지는 보관 폴더로 옮겨짐 · 안내는 밖으로 옮겨짐")
 
     if expect_fail:
         if ok:

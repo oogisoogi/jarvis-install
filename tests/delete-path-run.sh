@@ -276,6 +276,33 @@ MH="$BASE/mac-xm/home"; mkdir -p "$MH/root/forum" "$MH/outside"; printf o > "$MH
 ( HOME="$MH" bash -c 'set -u; . "$1"; PRESERVE_PATHS="$HOME/root/forum"; KEPT_FAIL=0; REMOVED=0; PRESERVED=0; resolve_preserve_paths; drop_dir "$HOME/root"; echo "KF=$KEPT_FAIL"' _ "$LIB" ) > "$BASE/mac-xm.txt" 2>&1
 [ -L "$MH/root/forum/lnk" ] && [ -f "$MH/outside/o" ] && [ ! -e "$MH/root/junk" ] && grep -q '^KF=0$' "$BASE/mac-xm.txt"
 t $? "[맥] ⓓM 표지 없는 길 · 참가 자리 안 바로가기는 남는다(자리 비교 · 0.3.36 동작 고정)" "$(tr '\n' '|' < "$BASE/mac-xm.txt" | cut -c1-300)"
+# ── 0.3.40 A1(완전 삭제 + 참가 자리가 ~/.cys 안) = 참가 자리만 제자리 · 나머지는 보관 폴더로(지우지 않는다) ──
+#   0.3.37~0.3.39 는 이 경우 ~/.cys 를 통째로 그대로 두고 「못 지운 것 없음」 으로 끝났다(공개 「삭제-재설치 검증」 보존 축 적색의 까닭).
+H="$(AGH="$BASE/mac-y1/home/.cys/forum" mac_purge y1 0 0 "$AGF")"; B="$(bk_of "$H")"
+[ "$(rc_of y1)" = "0" ] && [ "$(cat "$H/.cys/forum/key" 2>/dev/null)" = "key" ] && [ "$(ls -A "$H/.cys" 2>/dev/null | tr '\n' ' ')" = "forum " ] && [ "$(nbk "$H")" = "1" ]
+t $? "[맥] A1 완전 삭제 · 참가 자리 안(~/.cys/forum) → rc 0 · 열쇠 제자리 · ~/.cys 에는 참가 자리만 · 보관 폴더 1개" "rc=$(rc_of y1) · $(ls -A "$H/.cys" 2>/dev/null | tr '\n' ' ') · $(why y1 8)"
+[ "$(digest "$B/cys-home/claude/projects")" = "$(digest "$REF/.cys/claude/projects")" ] && [ -f "$B/cys-home/pack/memory/MEMORY.md" ] && [ -f "$B/cys-home/depts.json" ] \
+  && [ -f "$B/cys-home/pack-dept-dept-1/round/WORKER_TODO.md" ] && [ -f "$B/cys-home/claude-default-dept-1/projects/p/x.jsonl" ] && [ ! -e "$B/cys-home/forum" ]
+t $? "[맥] A1 나머지는 보관 폴더에(대화 지문 같음 · 팩 기억 · 부서 기록·할 일·좌석 대화) · 참가 자리는 보관 폴더에 없다(한 번도 안 옮김)" "$(ls -A "$B/cys-home" 2>/dev/null | tr '\n' ' ')"
+[ ! -e "$B/cys-home/claude/.credentials.json" ] && [ ! -e "$B/cys-home/claude-default-dept-1/.credentials.json" ] && grep -q '보관본 속 자비스 창 로그인 파일' "$BASE/mac-y1/out.txt"
+t $? "[맥] A1 보관본에서 로그인 파일(본부·부서)은 빼고 지운다(통째 갈래와 같은 규율)" "$(find "$B" -name .credentials.json | head -2 | tr '\n' ' ')"
+grep -q '그것만 제자리에 두고\*\* 나머지는 보관 폴더로 옮깁니다' "$BASE/mac-y1/out.txt" && grep -q '의 나머지 → ' "$BASE/mac-y1/out.txt" && ! grep -q '옮기지 않고 그대로 두었습니다' "$BASE/mac-y1/out.txt"
+t $? "[맥] A1 화면 = 「그것만 제자리에 두고 나머지는 보관 폴더로」 · 「옮기지 않고 그대로 두었습니다」 0줄" "$(grep -n '보존(중첩)\|나머지' "$BASE/mac-y1/out.txt" | head -3 | tr '\n' '|')"
+# 못 여는 자리(목록을 못 읽음) = 사전 훑기가 먼저 멈춘다 — 변경 0 · rc 7(0.3.37 설계: 확인할 수 없는 자리가 있으면 아무것도 바꾸지 않는다 · 공개 보존 축 「못 여는 자리」 기대의 근거)
+H="$(AGH="$BASE/mac-y2/home/.cys/forum" mac_purge y2 0 0 "$AGF"' && mkdir -p .cys/locked && printf in > .cys/locked/in && chmod 000 .cys/locked')"
+[ "$(rc_of y2)" = "7" ] && grep -q 'PRESCAN_BAD=.*목록을 끝까지 읽지 못했습니다' "$BASE/mac-y2/out.txt" && [ -f "$H/.cys/pack/memory/MEMORY.md" ] && [ "$(cat "$H/.cys/forum/key" 2>/dev/null)" = "key" ] && [ "$(nbk "$H")" = "0" ] && [ -d "$H/install-jarvis" ]
+t $? "[맥] A1 못 여는 자리 → 사전 훑기가 멈춤 · 변경 0(보관 폴더 0 · 팩·열쇠·작업 폴더 그대로) · rc 7" "rc=$(rc_of y2) 보관본 $(nbk "$H") · $(why y2 3)"
+chmod 700 "$H/.cys/locked" 2>/dev/null
+# 옮기기 실패(읽기 전용 폴더 — 목록은 읽히고 안엣것을 꺼낼 수 없다) = 그 자리는 그대로 · 「일부 남음」 rc 7 · 나머지는 옮겨짐 · 열쇠 그대로 · 지운 것 0
+H="$(AGH="$BASE/mac-y4/home/.cys/forum" mac_purge y4 0 0 "$AGF"' && chmod 555 .cys/pack/memory')"; B="$(bk_of "$H")"
+[ "$(rc_of y4)" = "7" ] && grep -q '일부 남음' "$BASE/mac-y4/out.txt" && grep -q '옮기지 못한 자리:' "$BASE/mac-y4/out.txt" && [ "$(cat "$H/.cys/pack/memory/MEMORY.md" 2>/dev/null)" = "mem" ] \
+  && [ "$(cat "$H/.cys/forum/key" 2>/dev/null)" = "key" ] && [ -f "$B/cys-home/pack/bin/cys-dept" ] && [ -f "$B/cys-home/depts.json" ] && [ ! -e "$H/.cys/claude" ]
+t $? "[맥] A1 옮기기 실패(읽기 전용 폴더) → 그 자리 자료 그대로 · 「일부 남음」 + 못 옮긴 자리 · rc 7 · 나머지는 보관 폴더로 · 열쇠 그대로" "rc=$(rc_of y4) · $(ls -A "$H/.cys" 2>/dev/null | tr '\n' ' ') · $(why y4 6)"
+chmod 755 "$H/.cys/pack/memory" 2>/dev/null
+# 바깥을 가리키는 바로가기 = 이름표만 사라지고 바깥 자료는 바이트 그대로(보관 폴더로 딸려 가지 않는다)
+H="$(AGH="$BASE/mac-y3/home/.cys/forum" mac_purge y3 0 0 "$AGF"' && mkdir -p outside && printf OUT > outside/keep && ln -s "$PWD/outside" .cys/lnk && ln -s "$PWD/outside" .cys/pack/lnk2')"; B="$(bk_of "$H")"
+[ "$(rc_of y3)" = "0" ] && [ "$(cat "$H/outside/keep" 2>/dev/null)" = "OUT" ] && [ ! -L "$H/.cys/lnk" ] && [ ! -e "$H/.cys/pack" ] && [ -z "$(find "$B" -name keep 2>/dev/null)" ] && [ "$(cat "$H/.cys/forum/key" 2>/dev/null)" = "key" ]
+t $? "[맥] A1 바깥을 가리키는 바로가기(맨 위·하위 폴더 안) → 이름표만 사라짐 · 바깥 자료 그대로 · 보관 폴더에 딸려 가지 않음" "rc=$(rc_of y3) · $(ls -A "$H/.cys" "$H/outside" 2>/dev/null | tr '\n' ' ') · $(why y3 5)"
 
 # ── 새 결함 ⓑ(0337 후임 · 결정 3) 보관본 속 로그인 파일 지우기가 1회차에 실패 → 다시 해 보기가 그 파일을 다시 지운다(비밀값을 남긴 채 rc 0 금지) ──
 H="$(LOOPRUN=1 mac_purge rb 0 0 '' 'eval "orig_dac() $(declare -f drop_archived_credentials | tail -n +2)"; _dacn=0; drop_archived_credentials() { _dacn=$((_dacn+1)); if [ "$_dacn" -eq 1 ]; then KEPT_FAIL=$((KEPT_FAIL+1)); say "  (시험) 보관본 속 로그인 파일 지우기 실패 흉내"; return 0; fi; orig_dac "$@"; }')"
@@ -578,6 +605,11 @@ SBx1="$(win_prep x1 "$AGF")"
 SBx2="$(win_prep x2 "$AGF"' && mkdir -p .cys/pack/talk && printf talk > .cys/pack/talk/s.jsonl && ln -s "$PWD/.cys/pack/talk" .cys/claude/projects/lnk')"
 SBx5="$(win_prep x5 "$AGF"' && rm -rf .cys/pack && mkdir -p .cys/claude/projects/p && printf k > .cys/claude/projects/p/k.jsonl && ln -s "$PWD/.cys/claude/projects/p" .cys/pack')"
 SBn="$(win_prep e2n '' '' nop)"; SBy="$(win_prep e2p '' '' p)"
+# 0.3.40 A1(완전 삭제 + 참가 자리가 ~\.cys 안)
+SBz1="$(win_prep z1 "$AGF")"
+SBz2="$(win_prep z2 "$AGF"' && mkdir -p outside && printf OUT > outside/keep && ln -s "$PWD/outside" .cys/lnk && ln -s "$PWD/outside" .cys/pack/lnk2')"
+SBz3="$(win_prep z3 "$AGF"' && mkdir -p .cys/locked && printf in > .cys/locked/in && chmod 000 .cys/locked')"
+SBz4="$(win_prep z4 "$AGF"' && chmod 555 .cys/pack/memory')"
 SBcr="$(win_prep cr '' "$WPATCH/credro.ps1")"; SBg2="$(win_prep g2 '' "$WPATCH/onefail-nores.ps1")"; SBal="$(win_prep al '' "$WPATCH/alive.ps1")"; SBal2="$(win_prep al2 '' "$WPATCH/alive.ps1")"; SBx1f="$(win_prep x1f 'L=AppData/Local/cys; printf mine > $L/my-tool.exe; printf d > $L/helper.dll; printf r > $L/other.exe.prev3; printf n > $L/cys-app.new.exe; printf t > $L/cysd.prev123456.exe; printf s > $L/cys.exe.prev77; printf w > $L/WebView2Loader.dll.prev5')"; SBc0="$WB/win-c0"; mkdir -p "$SBc0/C:/Users/emu/install-jarvis-backup-20260101-000000/cys-home/claude" "$SBc0/C:/Users/emu/AppData/Local/Temp" "$SBc0/reg"   # 보관본 하나뿐인 기계(다른 자국 0)
 ln -s "$SBc0/C:" "$SBc0/cdrv"; cp "$RP" "$SBc0/reset-clean.ps1"
 ( B0="$SBc0/C:/Users/emu/install-jarvis-backup-20260101-000000"; printf '%s\n' "$MARK" > "$B0/.jarvis-owned"; : > "$B0/cys-home/.jarvis-cred-pending"
@@ -632,7 +664,9 @@ jobs_run "win_go '$SBa' ''" "win_go '$SBb' 'KeepApp,KeepHistory,Yes'" "win_go '$
   "win_go '$SBp5' 'KeepApp,KeepHistory,Yes'" "win_go '$SBq' 'KeepApp,KeepHistory,Yes'" "win_go '$SBx1' 'KeepApp,KeepHistory,Yes' out '$AGX'" "win_go '$SBx2' 'KeepApp,KeepHistory,Yes' out '$AGX'" \
   "win_go '$SBx5' 'KeepApp,KeepHistory,Yes' out '$AGX'" "win_go '$SBn' 'Yes'" "win_go '$SBy' 'Yes'" \
   "win_go '$SBrb' 'Yes'" "win_go '$SBra' 'Yes'" "win_go '$SBrc' 'Yes'" "win_go '$SBrc2' 'Yes'" \
-  "win_chain_ov '$SBov'" "win_chain '$SBhf'" "win_chain_cr '$SBcr'" "win_go '$SBg2' 'KeepApp,KeepHistory,Yes'" "win_go '$SBal' 'Yes'" "win_go '$SBal2' 'KeepApp,KeepHistory,Yes'" "win_go '$SBx1f' 'Yes'" "win_go '$SBc0' 'Yes'" "win_go '$SBcu' 'Yes'" "win_go '$SBka' 'KeepApp,Yes'"
+  "win_chain_ov '$SBov'" "win_chain '$SBhf'" "win_chain_cr '$SBcr'" "win_go '$SBg2' 'KeepApp,KeepHistory,Yes'" "win_go '$SBal' 'Yes'" "win_go '$SBal2' 'KeepApp,KeepHistory,Yes'" "win_go '$SBx1f' 'Yes'" "win_go '$SBc0' 'Yes'" "win_go '$SBcu' 'Yes'" "win_go '$SBka' 'KeepApp,Yes'" \
+  "win_go '$SBz1' 'Yes' out '$AGX'" "win_go '$SBz2' 'Yes' out '$AGX'" "win_go '$SBz3' 'Yes' out '$AGX'" "win_go '$SBz4' 'Yes' out '$AGX'"
+chmod 700 "$SBz3/C:/Users/emu/.cys/locked" 2>/dev/null; chmod 755 "$SBz4/C:/Users/emu/.cys/pack/memory" 2>/dev/null
 chmod 755 "$SBc/C:/Users/emu" 2>/dev/null; chmod 755 "$SBp4/C:/Users/emu/.cys/pack/locked" 2>/dev/null
 
 # ── ⓐ 완전 삭제(스위치 없음 · 입력 닫힘) = 손 0 · 자료는 보관 폴더 한 곳 · 프로그램 파일만 지움 ──
@@ -808,6 +842,28 @@ t $? "[윈] 예외 F① 남길 자리 안 바로가기가 남길 것 밖(pack)�
 U="$SBx5/C:/Users/emu"
 [ "$(wrc x5)" = "0" ] && [ ! -e "$U/.cys/pack" ] && [ ! -L "$U/.cys/pack" ] && [ -f "$U/.cys/claude/projects/p/k.jsonl" ]
 t $? "[윈] 예외 F⑤ pack 이 projects 안을 가리키는 바로가기 → pack 이름표 지움 · 대화 그대로" "rc=$(wrc x5) · $(wwhy x5)"
+
+# ── 0.3.40 A1(완전 삭제 + 참가 자리가 ~\.cys 안) = 참가 자리만 제자리 · 나머지는 보관 폴더로(지우지 않는다) ──
+U="$SBz1/C:/Users/emu"; B="$(wbk z1)"
+[ "$(wrc z1)" = "0" ] && [ "$(cat "$U/.cys/forum/key" 2>/dev/null)" = "key" ] && [ "$(ls -A "$U/.cys" 2>/dev/null | tr '\n' ' ')" = "forum " ] && [ "$(wnbk z1)" = "1" ]
+t $? "[윈] A1 완전 삭제 · 참가 자리 안(~\\.cys\\forum) → rc 0 · 열쇠 제자리 · ~\\.cys 에는 참가 자리만 · 보관 폴더 1개" "rc=$(wrc z1) · $(ls -A "$U/.cys" 2>/dev/null | tr '\n' ' ') · $(wwhy z1 8)"
+[ "$(digest "$B/cys-home/claude/projects")" = "$(digest "$RU/.cys/claude/projects")" ] && [ -f "$B/cys-home/pack/memory/MEMORY.md" ] && [ -f "$B/cys-home/depts.json" ] \
+  && [ -f "$B/cys-home/pack-dept-dept-1/round/WORKER_TODO.md" ] && [ -f "$B/cys-home/claude-default-dept-1/projects/p/x.jsonl" ] && [ ! -e "$B/cys-home/forum" ]
+t $? "[윈] A1 나머지는 보관 폴더에(대화 지문 같음 · 팩 기억 · 부서 기록·할 일·좌석 대화) · 참가 자리는 보관 폴더에 없다" "$(ls -A "$B/cys-home" 2>/dev/null | tr '\n' ' ')"
+[ ! -e "$B/cys-home/claude/.credentials.json" ] && [ ! -e "$B/cys-home/claude-default-dept-1/.credentials.json" ] && grep -q '보관본 속 자비스 창 로그인 파일' "$SBz1/out.txt"
+t $? "[윈] A1 보관본에서 로그인 파일(본부·부서)은 빼고 지운다" "$(find "$B" -name .credentials.json 2>/dev/null | head -2 | tr '\n' ' ')"
+grep -q '그것만 제자리에 두고 나머지는 보관 폴더로 옮깁니다' "$SBz1/out.txt" && grep -q '의 나머지 -> ' "$SBz1/out.txt" && ! grep -q '옮기지 않고 그대로 두었습니다' "$SBz1/out.txt" && grep -q '못 지운 것은 없습니다' "$SBz1/out.txt"
+t $? "[윈] A1 화면 = 「그것만 제자리에 두고 나머지는 보관 폴더로」 · 「옮기지 않고 그대로 두었습니다」 0줄" "$(grep -n '보존(중첩)\|나머지\|끝났습니다' "$SBz1/out.txt" | head -4 | tr '\n' '|')"
+U="$SBz2/C:/Users/emu"; B="$(wbk z2)"
+[ "$(wrc z2)" = "0" ] && [ "$(cat "$U/outside/keep" 2>/dev/null)" = "OUT" ] && [ ! -L "$U/.cys/lnk" ] && [ ! -e "$U/.cys/pack" ] && [ -z "$(find "$B" -name keep 2>/dev/null)" ] && [ "$(cat "$U/.cys/forum/key" 2>/dev/null)" = "key" ]
+t $? "[윈] A1 바깥을 가리키는 바로가기(맨 위·하위 폴더 안) → 이름표만 사라짐 · 바깥 자료 그대로 · 보관 폴더에 딸려 가지 않음" "rc=$(wrc z2) · $(ls -A "$U/.cys" "$U/outside" 2>/dev/null | tr '\n' ' ') · $(wwhy z2 5)"
+U="$SBz3/C:/Users/emu"
+[ "$(wrc z3)" = "7" ] && grep -q '이번에는 아무것도 바꾸지 않았습니다' "$SBz3/out.txt" && grep -q '목록을 끝까지 읽지 못했습니다' "$SBz3/out.txt" && [ -f "$U/.cys/pack/memory/MEMORY.md" ] && [ "$(cat "$U/.cys/forum/key" 2>/dev/null)" = "key" ] && [ "$(wnbk z3)" = "0" ]
+t $? "[윈] A1 못 여는 자리 → 사전 훑기가 멈춤 · 「이번에는 아무것도 바꾸지 않았습니다」 · 변경 0 · rc 7" "rc=$(wrc z3) 보관본 $(wnbk z3) · $(wwhy z3 4)"
+U="$SBz4/C:/Users/emu"; B="$(wbk z4)"
+[ "$(wrc z4)" = "7" ] && grep -q '일부 남음' "$SBz4/out.txt" && [ "$(cat "$U/.cys/pack/memory/MEMORY.md" 2>/dev/null)" = "mem" ] && [ "$(cat "$U/.cys/forum/key" 2>/dev/null)" = "key" ] \
+  && [ -f "$B/cys-home/pack/bin/cys-dept" ] && [ -f "$B/cys-home/depts.json" ] && [ ! -e "$U/.cys/claude" ]
+t $? "[윈] A1 옮기기 실패(읽기 전용 폴더) → 그 자리 자료 그대로 · 「일부 남음」 rc 7 · 나머지는 보관 폴더로 · 열쇠 그대로" "rc=$(wrc z4) · $(ls -A "$U/.cys" 2>/dev/null | tr '\n' ' ') · $(wwhy z4 6)"
 
 # ── 새 결함 ⓑ(결정 3) 보관본 속 로그인 파일 지우기가 1회차에 실패 → 다시 해 보기가 다시 지운다 ──
 U="$SBrb/C:/Users/emu"

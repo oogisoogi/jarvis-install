@@ -101,7 +101,10 @@ out.append("ps=" + ("1" if ok else "0:assign=%d,write=%d" % (len(assign), write)
 def before(lines, pat, n):
     k = next((i for i, l in enumerate(lines) if re.search(pat, l)), None)
     if k is None: return None
-    got = [l.strip() for l in lines[:k] if l.strip()][-n:]
+    # 1.1.8 U5: 띄우기 직전의 자동 갱신 잠금 놓기 줄(놓기 · 못 놓았을 때 안내 1줄)은 환경값과 무관하다 — 그 줄은 건너뛰고 본다
+    #   (두 값이 띄우기 앞에 있다는 뜻은 그대로 · 놓기 줄의 자리는 U5 잠금 시험이 따로 잰다)
+    lock = re.compile(r'^(txn_release\b|\[ "\$TXN_STUCK" = 1 \] && say |Unlock-CysTxn\b|if \(\$script:CysTxnLock\) \{ Say )')
+    got = [l.strip() for l in lines[:k] if l.strip() and not lock.search(l.strip())][-n:]
     return got
 bs = [l.split("#", 1)[0] for l in body(sh, "\nstep_wake() {", "\n}\n")]
 g = before(bs, r'^\s*exec "\$claude_bin" --dangerously-skip-permissions', 1)

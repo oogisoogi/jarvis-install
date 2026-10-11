@@ -230,6 +230,10 @@ T = [
  # 0.3.38(윈 결함 묶음 · 백신 보류 1분 판정) — 윈 직접 받기가 자식 PowerShell 로 옮겨 가며 그 고리도 30초마다 대기를 보낸다(판정 재료 = 연속 실패 수).
  #   맥 짝 없음(맥 직접 받기는 curl 동기 받기 · 백신 보류 판정이 윈 전용) — sh 정규식 None.
  ('2/10 wait 직접 받기(윈 전용)', r"Send-Progress '2/10' 'wait' \(\[int\]\(\$waited / 1000\)\)", None, 0),
+ # 1.1.8 U5(윈 롤백 자산 보존) — 같은 판인데 되돌림 파일이 없어 설치 파일만 받다 실패 · 챙기기 실패를 정보 이벤트로 남긴다.
+ #   맥 짝 없음(맥 설치기에는 롤백 자산 챙기기가 없다 — U5 맥 편입분은 잠금 참가·위임뿐) — sh 정규식 None.
+ ('5/10 rollback-assets:dl-fail(윈 전용)', r"Send-Progress '5/10' 'info' \$null 'rollback-assets:dl-fail' \$null", None, 0),
+ ('6/10 rollback-assets:fail(윈 전용)',    r"Send-Progress '6/10' 'info' \$null \('rollback-assets:fail rc=' \+ \$rc\) \$null", None, 0),
  ('3/10 wait',            r"Send-Progress '3/10' 'wait'",                             s_rx('3/10', 'wait'), 1),
  ('6/10 wait',            r"Send-Progress '6/10' 'wait'",                             s_rx('6/10', 'wait'), 1),
  ('child-retry',          r"'awaken:child-retry ' \+ \$retry",                        s_rx('10/10', 'info', 'awaken:child-retry'), 1),
@@ -279,12 +283,12 @@ for ev in ('start', 'end'):
     if not (lit or var): bad.append('sh 없음: 5~8/10 %s(반복 변수 또는 단계 넷)' % ev)
 extra = [P[i].strip()[:80] for i in range(len(P)) if i not in used]
 if extra: bad.append('표에 없는 ps1 부르는 자리 %d: %s' % (len(extra), ' | '.join(extra[:3])))
-if len(P) != 36: bad.append('ps1 부르는 자리 %d줄(표 = 36 · 0.3.35 F10 에서 32→34 · r2 F3 윈 짝 34→35 · 0.3.38 윈 직접 받기 대기 35→36)' % len(P))
+if len(P) != 38: bad.append('ps1 부르는 자리 %d줄(표 = 38 · 0.3.35 F10 에서 32→34 · r2 F3 윈 짝 34→35 · 0.3.38 윈 직접 받기 대기 35→36 · 1.1.8 U5 윈 롤백 자산 36→38)' % len(P))
 print('ps1 부르는 자리 %d줄 · sh 부르는 자리 %d줄 · 문제 %d' % (len(P), len(S), len(bad)))
 for b in bad[:14]: print('  - ' + b)
 sys.exit(1 if bad else 0)
 PYEOF
-  ck "[맥동등 전송] ps1 진행 전송 36자리(윈 전용 1 · 단계 변수 4줄 × 5~8 넷 전개 시 48건)가 sh 에 전건 있다(윈 전용은 사유 행)(표 대조 · 표에 없는 ps1 자리도 붉음)" $? "$(head -8 "${TMPDIR:-/tmp}/mp-tx.$$" | tr '\n' '|' | cut -c1-420)"
+  ck "[맥동등 전송] ps1 진행 전송 38자리(윈 전용 3 · 단계 변수 4줄 × 5~8 넷 전개 시 50건)가 sh 에 전건 있다(윈 전용은 사유 행)(표 대조 · 표에 없는 ps1 자리도 붉음)" $? "$(head -8 "${TMPDIR:-/tmp}/mp-tx.$$" | tr '\n' '|' | cut -c1-420)"
   rm -f "${TMPDIR:-/tmp}/mp-tx.$$"
   # 레버 — JARVIS_NO_PROGRESS=1 이면 한 바이트도 안 나간다 · 대조군(레버 끔)에서는 실제로 보내려 한다(레버 축이 비어 있지 않다는 증명)
   #   ⚠이 파일 머리의 export JARVIS_NO_PROGRESS=1 이 대조군까지 눈멀게 하지 않도록 대조군은 env -u 로 뺀다
@@ -417,8 +421,9 @@ axes_0329() {
   #   ⚠각 축은 「되돌리면 붉어진다」를 tests/v0329-mutate.py 가 잰다 · 동작(분류·기입·이동)은 tests/v0329-emu-run.sh 가 실행으로 잰다.
   echo "== 0.3.29 재설치 텔레메트리·자동 재시작·손 횟수·옛 라운드 =="
   # ② 이미 도는 데몬에 등록을 다시 시키지 않는다 — 그 거절 글이 오류(error-text)로 계상됐다(맥 전용 · 윈 daemon install 은 스스로 이관한다)
-  codegrep "$SH" 'if "\$cli" ping 2>/dev/null \| grep -q pong; then'; ck "[0329 전송] 맥: 등록 전에 데몬이 이미 도는지 묻는다" $? "묻지 않고 등록하면 「error: 데몬이 이미 가동 중」이 오류로 계상된다"
-  awk '/if "\$cli" ping 2>\/dev\/null \| grep -q pong; then/{a=NR} /invoke_logged .daemon install./{b=NR} END{exit !(a&&b&&a<b)}' "$SH"
+  # 1.1.8 U5: 그 물음도 데몬을 띄울 수 있는 호출이라 cys_txn_env 를 앞에 단다(잠금을 쥔 동안 그 호출에만 토큰) — 앵커를 다시 겨눴다(뜻 동일).
+  codegrep "$SH" 'if cys_txn_env "\$cli" ping 2>/dev/null \| grep -q pong; then'; ck "[0329 전송] 맥: 등록 전에 데몬이 이미 도는지 묻는다" $? "묻지 않고 등록하면 「error: 데몬이 이미 가동 중」이 오류로 계상된다"
+  awk '/if cys_txn_env "\$cli" ping 2>\/dev\/null \| grep -q pong; then/{a=NR} /invoke_logged .daemon install./{b=NR} END{exit !(a&&b&&a<b)}' "$SH"
   ck "[0329 전송] 맥: 그 물음이 등록 명령보다 앞이다" $? "등록 뒤에 물으면 거절 글이 이미 찍혔다"
   codegrep "$PS" "Send-PostInstallEvidence \\\$cli \(Get-MasterSeatRef \\\$cli\) 'reinstall'"; ck "[0329 전송] 윈: 재설치 끝에도 post-install 증거를 보낸다(재설치 표식)" $? "재설치 갈래의 10/10 증거가 없다"
   codegrep "$SH" 'post_install_evidence "\$cli" "\$\(master_seat_ref "\$cli"\)" reinstall'; ck "[0329 전송] 맥: 같은 증거를 보낸다" $? "맥 재설치 갈래의 10/10 증거가 없다"
@@ -435,7 +440,8 @@ axes_0329() {
   codegrep "$PS" '^\$RotateWallCapMs       = 180000 '; ck "[v112→0331 rotate] 윈: 벽시계 상한 = 180s" $? "맥과 갈린다"
   # v0.3.31: 상한은 perl alarm 이 아니라 고리가 진다(단계를 보고 끊을지 정한다) — 호출 줄 + 고리의 상한 비교 두 곳을 잰다.
   #   v0.3.32: 호출 줄에 부서 순회 생략(env·인자)이 붙어 앵커를 다시 겨눴다(뜻 동일).
-  codegrep "$SH" '^  CYS_ROTATE_SKIP_DEPTS=1 "\$\{1:-cys\}" rotate --timeout "\$ROTATE_DRAIN_TIMEOUT_SEC" \$skip_flag >' && codegrep "$SH" 'if \[ "\$el" -ge "\$ROTATE_WALL_CAP_SEC" \]; then'; ck "[v112 rotate] 맥: 두 값을 실제 호출·상한 고리에 쓴다" $? "변수만 있고 호출은 옛 값이다"
+  #   1.1.8 U5: 호출 줄에 잠금 위임(env·--txn)이 붙어 앵커를 다시 겨눴다(뜻 동일).
+  codegrep "$SH" '^  CYS_ROTATE_SKIP_DEPTS=1 CYS_UPDATE_TXN="\$TXN_TOKEN" "\$\{1:-cys\}" rotate --timeout "\$ROTATE_DRAIN_TIMEOUT_SEC" \$skip_flag \$\{TXN_TOKEN:\+--txn \$TXN_TOKEN\} >' && codegrep "$SH" 'if \[ "\$el" -ge "\$ROTATE_WALL_CAP_SEC" \]; then'; ck "[v112 rotate] 맥: 두 값을 실제 호출·상한 고리에 쓴다" $? "변수만 있고 호출은 옛 값이다"
   codegrep "$PS" "Arguments = 'rotate --timeout ' \+ \\\$RotateDrainTimeoutSec"; ck "[v112 rotate] 윈: 같은 호출" $? "변수만 있고 호출은 옛 값이다"
   codegrep "$PS" "' rotate=' \+ \\\$rotateState"; ck "[0329 재시작] 윈: 10/10 끝에 rotate 결과를 싣는다" $? "부재·실패가 기록에 안 남는다"
   codegrep "$SH" 'rotate=\$\{rotate_state\}'; ck "[0329 재시작] 맥: 같은 결과를 싣는다" $? "부재·실패가 기록에 안 남는다"
@@ -448,7 +454,7 @@ axes_0329() {
   # ⑤ 옛 라운드 잔재 = 옮긴다(지우지 않는다) · 자리 열기 전에
   codegrep "$PS" '^    Move-OldRound$'; ck "[0329 라운드] 윈: 자리 열기 전에 옛 _round 를 옮긴다" $? "부르는 자리가 없다"
   codegrep "$SH" '^    archive_old_round$'; ck "[0329 라운드] 맥: 같은 자리가 있다" $? "부르는 자리가 없다"
-  awk '/^    Move-OldRound$/{a=NR} /\$ref = \(& \$cli new-surface/{if(!b)b=NR} END{exit !(a&&b&&a<b)}' "$PS"
+  awk '/^    Move-OldRound$/{a=NR} /\$ref = Invoke-WithCysTxnEnv \{ \(& \$cli new-surface/{if(!b)b=NR} END{exit !(a&&b&&a<b)}' "$PS"
   ck "[0329 라운드] 윈: 옮기기가 자리 열기보다 앞이다" $? "새 자비스가 옛 라운드를 먼저 읽는다"
   awk '/^    archive_old_round$/{a=NR} /ref="\$\(cys_open_master_seat/{b=NR} END{exit !(a&&b&&a<b)}' "$SH"
   ck "[0329 라운드] 맥: 옮기기가 자리 열기보다 앞이다" $? "새 자비스가 옛 라운드를 먼저 읽는다"
@@ -498,8 +504,9 @@ axes_0331() {
   codegrep "$PS" "rotateState -eq 'observed-ok' -or"; ck "[0331 성공 갈래] 윈: 같음" $? "관측 성공이 [재시작] 1클릭 안내로 떨어진다"
   codegrep "$SH" 'if \[ "\$stage" = 1-drain \] && \[ "\$el" -lt "\$ROTATE_DRAIN_HARD_SEC" \]; then'; ck "[0331 판정 C] 맥: 상한이 드레인 도중이면 연장한다" $? "드레인 도중에 끊겨 옛 자리+1클릭 안내가 나간다"
   codegrep "$PS" "if \(\\\$stage -eq '1-drain' -and \\\$sw\.ElapsedMilliseconds -lt \\\$RotateDrainHardMs\) \{"; ck "[0331 판정 C] 윈: 같음" $? "드레인 도중에 끊겨 옛 자리+1클릭 안내가 나간다"
-  codegrep "$SH" '^INSTALLER_VERSION="0\.3\.3[1-9]"'; ck "[0331 판번] 맥 0.3.31 이상" $? "판번이 안 올랐다"
-  codegrep "$PS" "^\\\$InstallerVersion       = '0\.3\.3[1-9]'"; ck "[0331 판번] 윈 0.3.31 이상" $? "판번이 안 올랐다"
+  # 0.3.40: 「이상」 을 둘째 자리 3 에만 묶어 두어 0.3.40 에서 붉었다 — 0.3.31~0.3.99 로 넓혔다(아래 0332 두 줄도)
+  codegrep "$SH" '^INSTALLER_VERSION="0\.3\.(3[1-9]|[4-9][0-9])"'; ck "[0331 판번] 맥 0.3.31 이상" $? "판번이 안 올랐다"
+  codegrep "$PS" "^\\\$InstallerVersion       = '0\.3\.(3[1-9]|[4-9][0-9])'"; ck "[0331 판번] 윈 0.3.31 이상" $? "판번이 안 올랐다"
 }
 axes_0332() {
   # ══ 0.3.32 — 문구 모순·오류 원문·10/10 단계·로그인 승계 A1 (2026-09-21) ═════
@@ -518,8 +525,8 @@ axes_0332() {
   codegrep "$PS" "^    \\\$script:NetFailed = \(\\\$netEnum -eq 'failed'\)\$"; ck "[0332 KW67] 윈: 1-7 실패 행이 깃발을 세운다([2/10] 이 읽는다)" $? "망 막힌 기계가 재시작 처방(J-PATH-01)으로 떨어진다(도움 KW67JGJG)"
   codegrep "$SH" '^  \[ "\$net_enum" = failed \] && NET_FAILED=1$'; ck "[0332 KW67] 맥: 같음" $? "동형 깨짐"
   codegrep "$PS" '"catch \{ try \{ Write-Host \(.\[claude-install error\] '; ck "[0332 KW67 ③] 윈: 자식 설치기 오류 글을 기록을 닫기 전에 적는다" $? "빨간 오류 글이 claude-install.log 에 안 남는다"
-  codegrep "$SH" '^INSTALLER_VERSION="0\.3\.3[2-9]"'; ck "[0332 판번] 맥 0.3.32 이상" $? "판번이 안 올랐다"
-  codegrep "$PS" "^\\\$InstallerVersion       = '0\.3\.3[2-9]'"; ck "[0332 판번] 윈 0.3.32 이상" $? "판번이 안 올랐다"
+  codegrep "$SH" '^INSTALLER_VERSION="0\.3\.(3[2-9]|[4-9][0-9])"'; ck "[0332 판번] 맥 0.3.32 이상" $? "판번이 안 올랐다"
+  codegrep "$PS" "^\\\$InstallerVersion       = '0\.3\.(3[2-9]|[4-9][0-9])'"; ck "[0332 판번] 윈 0.3.32 이상" $? "판번이 안 올랐다"
 }
 if [ "${CHECKS_ONLY:-}" = "login-keep" ]; then
   # 0.3.36: 재설치 길 로그인·이전 대화 남기기 — 실물 윈 지우개 흉내 + 맥 함수 떼기 + 정적(약 3분 · pwsh 필요).
@@ -917,7 +924,8 @@ codegrep "$PS" "CysWinSha256 += '[0-9a-f]{64}'"; ck "[5] 윈 설치 파일 sha25
 codegrep "$PS" 'Get-FileHash -Algorithm SHA256'; ck "[5] 받은 뒤 지문 대조" $? "지문을 재지 않는다"
 codegrep "$PS" 'got -ne \$CysWinBytes'; ck "[5] 받은 뒤 크기를 대조한다" $? "부분 파일을 그대로 설치기에 넘긴다"
 codegrep "$PS" 'if \(\(Test-CysDirHasBins \$dir\) -and \(\(Get-VersionNumber'; ck "[6] 완료 판정 = 설치기 종료코드가 아니라 실체(0.3.38 = 설치 자리 파일 3종 + 판)" $? "설치기가 0 을 냈다는 이유로 성공으로 친다"
-codegrep "$PS" "Start-Process -FilePath \\\$dst -ArgumentList \('/S /D=' \+ \\\$dir\)"; ck "[6] 조용한 설치(/S) + 설치 자리(/D)(0.3.38 · 설치 창 폴백 삭제)" $? "조용한 설치가 아니거나 자리를 우리가 정하지 않는다"
+# 1.1.8 U5: 인자 꾸리기가 Get-CysSetupArgs 로 옮겨 갔다(잠금을 쥐었으면 /CYSTXN=<토큰> 이 사이에 낀다 · /D 는 여전히 마지막) — 부르는 줄 + 꾸리는 줄 두 곳을 잰다.
+codegrep "$PS" "Start-Process -FilePath \\\$dst -ArgumentList \(Get-CysSetupArgs \\\$dir\)" && codegrep "$PS" "return \('/S' \+ \\\$txnArg \+ ' /D=' \+ \\\$Dir\)"; ck "[6] 조용한 설치(/S) + 설치 자리(/D)(0.3.38 · 설치 창 폴백 삭제)" $? "조용한 설치가 아니거나 자리를 우리가 정하지 않는다"
 # 지난 설치가 끝까지 못 간 컴퓨터에서 설치기가 「먼저 지우겠다」로 가 멈추는 것을 막는다
 codegrep "$PS" 'reg export'; ck "[6] 잔재 항목은 백업 후에만 지운다" $? "되돌릴 길 없이 남의 레지스트리를 지운다"
 codegrep "$PS" 'CysBodyMissing\) \{'; ck "[6] 실체가 없을 때에만 잔재를 손댄다" $? "멀쩡한 설치의 항목을 지운다"
@@ -1004,7 +1012,8 @@ echo "== 바깥 프로그램에 넘기는 인자 (2026-09-05 실측 · 우리말
 # 받는 쪽은 인자를 바이트로 읽는다 — 우리말이 섞이면 깨진 글자로 보고 「알 수 없는 인자」라며 거절한다.
 # 그래서 이 줄들에는 ASCII 밖의 바이트가 하나도 없어야 한다.
 nonascii() { # nonascii <파일> <줄 고르는 패턴>  — 고른 줄에 ASCII 밖 바이트가 몇 개인가
-  grep "$2" "$1" | LC_ALL=C tr -d '\000-\177' | wc -c | tr -d ' '
+  # 주석만 있는 줄은 뺀다(명령줄이 아니다 — 1.1.8 U5 머리 주석이 그 낱말을 우리말로 설명한다)
+  grep "$2" "$1" | grep -v '^[[:space:]]*#' | LC_ALL=C tr -d '\000-\177' | wc -c | tr -d ' '
 }
 n=$(nonascii "$PS" 'new-surface'); [ "${n:-1}" -eq 0 ]; ck "[9] ps1 창 여는 명령줄이 ASCII 뿐" $? "우리말 ${n}바이트 — 받는 쪽이 거절한다"
 n=$(nonascii "$SH" 'new-surface'); [ "${n:-1}" -eq 0 ]; ck "[9] sh 도 같음" $? "우리말 ${n}바이트"
@@ -2543,6 +2552,20 @@ else
   fi
   rm -f "${TMPDIR:-/tmp}/mpr.$$"
 fi
+# 0.3.40: 인텔 맥 핀(CYS_FORK_X64_*)도 릴리스와 대조한다 — 앞 판까지 위 시험은 arm64 값만 쟀다(인텔 값은 한 글자 틀려도 어느 축도 붉지 않았다).
+#   tests/mac-pin-x64-release.sh = 지문·파일 이름(SUMS 줄) · 크기(HEAD) · CDHash 는 모양만(zip 을 받지 않는다). 오프라인 = 건너뜀(통과 아님).
+MPX="$(cd "$(dirname "$0")/.." 2>/dev/null && pwd)/tests/mac-pin-x64-release.sh"
+if [ ! -f "$MPX" ]; then
+  ck "[전환] 인텔 맥 핀 = 릴리스 대조(크기·지문 · tests/mac-pin-x64-release.sh)" 1 "시험 파일이 없다: $MPX"
+else
+  bash "$MPX" "$SH" > "${TMPDIR:-/tmp}/mpx.$$" 2>&1; mpxrc=$?
+  if [ "$mpxrc" -eq 2 ]; then
+    sk "[전환] 인텔 맥 핀 = 릴리스 대조(크기·지문 · tests/mac-pin-x64-release.sh)" "오프라인 — 릴리스를 못 때렸다(측정 못 함)"
+  else
+    ck "[전환] 인텔 맥 핀 = 릴리스 대조(크기·지문 · tests/mac-pin-x64-release.sh)" "$mpxrc" "$(grep '^  FAIL' "${TMPDIR:-/tmp}/mpx.$$" | head -3 | sed -e 's/^  FAIL //' -e 's/  ← / : /g' | tr '\n' '|' | cut -c1-300)"
+  fi
+  rm -f "${TMPDIR:-/tmp}/mpx.$$"
+fi
 # 1.0.1 부터 zip 최상위·설치 자리 = cysr.app · 옛 이름 cys.app 은 넣은 **뒤에** 보관 자리로 옮긴다(넣기 실패 시 손대지 않는다).
 codegrep "$SH" 'app="\$stage/cysr\.app"' && codegrep "$SH" '^CYS_FORK_APP="/Applications/cysr\.app"$'
 ck "[전환] 저희 판은 zip 안 cysr.app 을 /Applications/cysr.app 으로 넣는다" $? "옛 이름으로 풀거나 넣어 zip 을 못 찾는다"
@@ -2968,8 +2991,8 @@ for f in "$PS" "$RESET" "$REIN_PS"; do
   codegrep "$f" '1\) ⊞ 윈도우 키\(키보드 왼쪽 아래, Ctrl과 Alt 사이\)를 누르고 powershell' && no_code "$f" '시작 단추를 누르고'; rc=$?
   ck "[v0317] 다시 하시는 법 첫 줄은 윈도우 키(사이트와 같은 말) · $(basename "$f")" "$rc" "(${GREP_WHY})"
 done
-codegrep "$PS" "^\\\$InstallerVersion *= '0\.3\.39'" && codegrep "$SH" '^INSTALLER_VERSION="0\.3\.39"'
-ck "[v0322] 판본 0.3.39(두 설치기 · 한 릴리스 = 한 판번)" $? "보고의 판본이 갈린다"
+codegrep "$PS" "^\\\$InstallerVersion *= '0\.3\.40'" && codegrep "$SH" '^INSTALLER_VERSION="0\.3\.40"'
+ck "[v0322] 판본 0.3.40(두 설치기 · 한 릴리스 = 한 판번)" $? "보고의 판본이 갈린다"
 # 확인 명령 한 번에도 상한 — 없으면 벤더 도구가 멈추는 순간 20분 상한까지 함께 멈춘다(외부 검토 1차 지적 채택).
 awk '/^function Get-LoginStatusText/{f=1}
      f&&/Start-Process -FilePath \$exe -ArgumentList .auth.,.status. .*-RedirectStandardOutput/{s=1}

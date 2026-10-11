@@ -540,9 +540,9 @@ function Remove-TreeSafe($path) {
     return $fails
 }
 # 담아 둔 실패 사유를 인쇄한다. 없으면 아무 말도 하지 않는다(빈 제목만 찍지 않는다).
-function Write-TreeFailWhy {
+function Write-TreeFailWhy($head = '지우지 못한 자리:') {
     if ($script:TreeFailWhy.Count -eq 0) { return }
-    Write-Host '         지우지 못한 자리:'
+    Write-Host ('         ' + $head)
     foreach ($w in $script:TreeFailWhy) { Write-Host ('           ' + $w) }
 }
 # 0.3.37(DESIGN-0337 6-1절 ⑤): 남길 목록을 **둘로 가른다** —
@@ -562,6 +562,28 @@ function Test-KeepHitSplit($it, $rootLiteral, $rootCanon, $keeps, $hkeeps) {
     if ((@($hkeeps).Count -gt 0) -and (Test-KeepHit $c $hkeeps)) { return $true }
     return $false
 }
+# 0.3.40(A1 · 완전 삭제 + 참가 자리가 안에 있음): 값이 있으면 Remove-ExceptPreserved 가 지우는 대신 **그 보관 자리로 옮긴다**.
+#   훑기(Get-TreeItems) · 남길 것 판정(Test-KeepHitSplit) · 검산은 한 글자도 같다 — 바뀌는 것은 항목 하나에 하는 일뿐이다:
+#   파일 = 보관 자리의 같은 상대 자리로 이름 바꾸기(복사하지 않는다 · 같은 이름이 있으면 덮지 않고 실패) ·
+#   폴더·바로가기 = 종전 Remove-OneItem 그대로(폴더는 **비어 있을 때만** · 바로가기는 이름표만 — 가리키던 자료는 무접촉).
+$script:PruneMoveDest = ''
+$script:DropMoveRel   = ''   # Drop 에 「옮기기 모드」 를 거는 값(보관 폴더 안 이름 · 부르는 쪽이 걸고 곧 비운다)
+$script:DropMoveDest  = ''   # 이번 실행이 쓰는 보관 자리(회차 사이에 기억한다)
+function Move-OneItemAside($it, $rootLiteral) {
+    if ($it.PSIsContainer -or (Test-IsReparse $it)) { Remove-OneItem $it; return }
+    # 상대 자리 = 「루트의 전체 이름」 을 앞머리로 뗀 나머지 — 항목 이름은 열거가 루트 전체 이름에 붙여 만든 것이라 글자가 그대로 맞는다
+    #   (받은 루트 글자와 비교하면 모양이 다를 때 빗나간다 · 안 맞으면 옮기지 않는다)
+    $full = [string]$it.FullName
+    $rf = Norm-Path ([string](Get-Item -LiteralPath $rootLiteral -Force -ErrorAction Stop).FullName)
+    if ((-not $rf) -or ($full.Length -le ($rf.Length + 1)) -or (-not $full.StartsWith($rf, [System.StringComparison]::OrdinalIgnoreCase)) -or (@('\', '/') -notcontains [string]$full[$rf.Length])) {
+        throw '예상 밖의 자리 모양이라 옮기지 않았습니다'
+    }
+    $dst = Join-Path $script:PruneMoveDest $full.Substring($rf.Length + 1)
+    $dp = Split-Path -Parent $dst
+    if (-not [System.IO.Directory]::Exists($dp)) { [void][System.IO.Directory]::CreateDirectory($dp) }
+    if ([System.IO.File]::Exists($dst) -or [System.IO.Directory]::Exists($dst)) { throw '보관 폴더에 같은 이름이 이미 있어 옮기지 않았습니다' }
+    [System.IO.File]::Move($it.FullName, $dst)
+}
 function Remove-ExceptPreserved($rootLiteral, $rootCanon, $keeps, $hkeeps = @()) {
     $script:TreeFailWhy = @()
     $enumFail = 0
@@ -572,7 +594,7 @@ function Remove-ExceptPreserved($rootLiteral, $rootCanon, $keeps, $hkeeps = @())
     }
     foreach ($it in $items) {
         if (Test-KeepHitSplit $it $rootLiteral $rootCanon $keeps $hkeeps) { continue }
-        try { Remove-OneItem $it } catch { }
+        try { if ($script:PruneMoveDest) { Move-OneItemAside $it $rootLiteral } else { Remove-OneItem $it } } catch { }
     }
     # 검산 - 남은 것을 **다시 열거해서** 센다. 지우기 실패든 열거 실패든 결과 한 칸으로 모인다.
     #   ★남은 자리도 **적어 둔다**(R2) - 개수만으로는 사용자도 우리도 다음 손을 못 정한다.
@@ -712,10 +734,42 @@ function Drop($label, $path, $histKeeps = @()) {
     #     화면에는 이 자리 안의 것만 적는다.
     $hist = @($histKeeps | Where-Object { $_ })
     $histShow = @($hist | Where-Object { Path-IsUnder $_ $t })
+    # 0.3.40(A1): 완전 삭제에서 참가 자리가 이 안에 있으면 「그것만 제자리에 두고 나머지는 보관 폴더로 옮긴다」($script:DropMoveRel = 보관 폴더 안 이름).
+    #   옮길 자리를 못 정하면 아무것도 건드리지 않는다(지우는 길로 떨어지지 않는다).
+    $script:PruneMoveDest = ''
+    if ($script:DropMoveRel) {
+        if (($keeps.Count -eq 0) -or ($hist.Count -gt 0)) {
+            $script:KeptFail++
+            Write-Host ('  [남음] ' + (Short $path) + ' - 남길 자리를 다시 확인하지 못해 그대로 두었습니다(지운 것 없음).')
+            return
+        }
+        if (-not (Set-ArchiveRoot)) {
+            $script:ArchiveFail = 1; $script:KeptFail++
+            Write-Host ('  [남음] ' + (Short $path) + ' - 보관 폴더를 만들지 못해 옮기지 않고 그대로 두었습니다(지운 것 없음).')
+            return
+        }
+        if (-not (Test-SameVolume $script:ARoot $path)) {
+            $script:ArchiveFail = 1; $script:KeptFail++
+            Write-Host ('  [남음] ' + (Short $path) + ' - 보관 폴더와 다른 드라이브에 있어 옮기지 않았습니다(복사하지 않습니다 · 지운 것 없음).')
+            return
+        }
+        # 다시 해 보기(회차)는 같은 보관 자리에 이어서 옮긴다 — 옮겨진 것은 원 자리에 없으므로 이름이 겹치지 않는다
+        if ((-not $script:DropMoveDest) -or (-not [System.IO.Directory]::Exists($script:DropMoveDest)) -or (Test-IsReparsePath $script:DropMoveDest)) {
+            $script:DropMoveDest = Join-Path $script:ARoot (Get-FreeRel $script:ARoot $script:DropMoveRel)
+            try { [void][System.IO.Directory]::CreateDirectory($script:DropMoveDest) } catch { }
+            if (-not [System.IO.Directory]::Exists($script:DropMoveDest)) {
+                $script:DropMoveDest = ''; $script:ArchiveFail = 1; $script:KeptFail++
+                Write-Host ('  [남음] ' + (Short $path) + ' - 보관 폴더 안에 자리를 만들지 못해 그대로 두었습니다(지운 것 없음).')
+                return
+            }
+        }
+        $script:PruneMoveDest = Norm-Path $script:DropMoveDest
+    }
     if (($keeps.Count -gt 0) -or ($hist.Count -gt 0)) {
         if ($keeps.Count -gt 0) {
             $script:Preserved++
-            Write-Host ("  보존(중첩): " + (Short $path) + " 안에 참가 자리가 있어 그것만 남기고 지웁니다.")
+            if ($script:PruneMoveDest) { Write-Host ("  보존(중첩): " + (Short $path) + " 안에 참가 자리가 있어 그것만 제자리에 두고 나머지는 보관 폴더로 옮깁니다.") }
+            else { Write-Host ("  보존(중첩): " + (Short $path) + " 안에 참가 자리가 있어 그것만 남기고 지웁니다.") }
             foreach ($k in $keeps) { Write-Host ("           남기는 자리: " + (Short $k)) }
         }
         if ($hist.Count -gt 0) {
@@ -725,6 +779,18 @@ function Drop($label, $path, $histKeeps = @()) {
         $what = if ($hist.Count -eq 0) { '참가 자리' } elseif ($keeps.Count -eq 0) { '로그인·이전 대화' } else { '참가 자리와 로그인·이전 대화' }
         # ★원문 경로로 열거하고, 실경로는 비교에만 · 참가 자리와 재설치 남길 것은 갈라 넘긴다(0.3.37 · Test-KeepHitSplit)
         $fails = Remove-ExceptPreserved $path $t @($keeps) @($hist)
+        if ($script:PruneMoveDest) {
+            $script:PruneMoveDest = ''
+            if ($fails -gt 0) {
+                $script:ArchiveFail = 1; $script:KeptFail++
+                Write-Host ("  [일부 남음] " + (Short $path) + " - {0}가지를 보관 폴더로 옮기지 못했습니다({1}는 그대로입니다 · 지운 것 없음)." -f $fails, $what)
+                Write-TreeFailWhy '옮기지 못한 자리:'
+                return
+            }
+            $script:Archived++; $script:ArchiveLast = $script:DropMoveDest
+            Write-Host ("  보관: " + (Short $path) + " 의 나머지 -> " + (Short $script:DropMoveDest) + " (" + $what + "는 제자리에 그대로)")
+            return
+        }
         if ($fails -gt 0) {
             $script:KeptFail++
             Write-Host ("  [일부 남음] " + (Short $path) + " - {0}가지를 지우지 못했습니다({1}는 그대로입니다)." -f $fails, $what)
@@ -1416,6 +1482,7 @@ function Move-OneEntry($src, $dst) {
 }
 # 자료 한 자리를 보관 폴더로 옮긴다 — 돌려주는 값 = 성공($true: 옮김 · 없음 · 남김) / 실패($false: ArchiveFail · 못 지움 +1).
 #   바로가기면 종전대로 이름표만 지운다(가리키던 실제 자료는 무접촉 · Drop) · 참가 자리가 안에 있으면 옮기지 않고 그대로 둔다(옮겼다 되돌리기 금지).
+#   (~\.cys 완전 삭제는 0.3.40 부터 이 함수에 오기 전에 갈린다 — 참가 자리가 안에 있으면 Drop 옮기기 모드 · 본체 W-CYSHOME 줄)
 #   ⚠「목록을 못 읽었다」를 「없다」로 읽지 않는다 — Get-Item 이 실패했는데 Test-Path 가 있다고 하면 실패로 센다.
 function Archive-Move($src, $rel, $what) {
     $it = $null
@@ -2388,7 +2455,8 @@ function Invoke-Purge {
         # 0.3.37(DESIGN-0337 3·4절): 지우지 않고 보관 폴더로 옮긴다 — 완전 삭제 = 통째로 · 재설치(-KeepHistory) = 통째로 옮긴 뒤 남길 것만 되옮긴다.
         #   ★작업 폴더 보관(위 Keep-JarvisDir)이 먼저다 — 그 보관 폴더에 모은다(Set-ArchiveRoot). 신뢰 칸 기록은 이미 위에서 다 썼다.
         #   참가 자리가 ~\.cys 안이면(사람이 AGORA_HOME 을 옮겨 둔 드문 경우) 통째로 옮길 수 없다 — 재설치는 0.3.36 장치(남기고 지우기)에
-        #   부서 남길 것을 더해서, 완전 삭제는 옮기지 않고 그대로 둔다(Archive-Move 가 「남김」 으로 말한다 · 옮겼다 되돌리기 금지).
+        #   부서 남길 것을 더해서, 완전 삭제는 **참가 자리만 제자리에 두고 나머지를 보관 폴더로 옮긴다**(0.3.40 · A1 · Drop 의 옮기기 모드 — 참가 자리는 한 번도 옮기지 않는다).
+        #   (0.3.37~0.3.39 는 이 경우 ~\.cys 를 통째로 그대로 두었다 — 지운 것이 없는데 「못 지운 것은 없습니다」 로 끝났다.)
         if ($agoraMigrateOk) {
             $cysNested = $false
             $hi = $null
@@ -2419,7 +2487,14 @@ function Invoke-Purge {
                 # 0.3.37(설계 결정 3): 보관한 옛 ~\.cys 자리를 회차 사이에 기억해 두고 **회차마다** 그 안 로그인 파일을 지운다 —
                 #   앞 판은 이번 회차에 옮긴 때만 지워, 1회차 지우기가 실패하면 다시 해 보기가 그 파일을 안 보고 rc 0 으로 끝났다(비밀값이 보관 폴더에 남음).
                 $script:ArchiveLast = ''
-                if (Archive-Move $CysHome 'cys-home' 'cysr 계정 자리(대화·부서 기록)') {
+                if ($cysNested) {
+                    # 0.3.40(A1): 일부만 옮겨졌어도 그 보관 자리의 로그인 파일은 회차마다 지운다(비밀값이 보관 폴더에 남지 않게 · 아래 통째 갈래와 같은 규율)
+                    $script:DropMoveRel = 'cys-home'
+                    Drop 'cysr 계정 자리' $CysHome
+                    $script:DropMoveRel = ''
+                    if ($script:DropMoveDest -and [System.IO.Directory]::Exists($script:DropMoveDest)) { $script:CysHomeArchived = $script:DropMoveDest }
+                    if ($script:CysHomeArchived) { Remove-ArchivedCredentials $script:CysHomeArchived }
+                } elseif (Archive-Move $CysHome 'cys-home' 'cysr 계정 자리(대화·부서 기록)') {
                     if ($script:ArchiveLast) { $script:CysHomeArchived = $script:ArchiveLast }
                     if ($script:CysHomeArchived) { Remove-ArchivedCredentials $script:CysHomeArchived }
                 }

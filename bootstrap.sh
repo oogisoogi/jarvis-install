@@ -142,12 +142,16 @@ CYS_DISPLAY_NAME="cysr"
 # 0.3.37: 핀 값 그대로(cysr 1.1.6 재절단) · 바뀐 것 = 원격 해결만: 윈 파일·폴더 읽기는 연 핸들로만(연 핸들의 최종 경로가 작업 폴더 아래일 때만 · 이음줄을 따라가지 않고 엶) · 깨우기 성공 = 종료 코드 0 그리고 surface: · 오래돼 보이는 실행 기록 잠금을 추측으로 치우지 않음
 # 0.3.38: 핀 값 그대로(cysr 1.1.6) · 맥 코드 변경 0 — 판번만 윈과 함께 올림(한 릴리스 = 한 판번 · 윈 = 설치 결함 묶음)
 # 0.3.39: cysr 1.1.7 과 함께 내는 판(핀은 1.1.7 절단 뒤) · 맥 바뀐 것 = 원격 해결이 부르는 cys 도 [7/10] 이 고른 CYS_CLI(절대 경로) 먼저
+# 0.3.40: cysr 1.1.8 핀(값은 0.3.39 뒤 편입분 그대로) · 바뀐 것 = 자동 새 판 바꾸기와의 잠금 참가·위임(진단 코드 J-UPD-01~03) · 지우개: 참가 자리가 ~/.cys 안이어도 그것만 제자리에 두고 나머지는 보관 폴더로 · 인텔 맥 핀을 릴리스와 대조하는 시험(tests/mac-pin-x64-release.sh)
 CYS_FORK_VERSION="1.1.8"
 CYS_FORK_DIR="https://github.com/oogisoogi/cys-ro/releases/download/v${CYS_FORK_VERSION}/"
 # 1.0.1 부터 zip 최상위 = cysr.app(안의 실행 파일 = Contents/MacOS/cys · cys-app · cysd · CFBundleName cysr · 로컬 빌드 실측 2026-09-16).
 CYS_FORK_FILE="cysr-macos-arm64-v${CYS_FORK_VERSION}.zip"
-# ✅아래 크기·지문·CDHash = **v1.1.6 재절단 드래프트(릴리스 id 396787705 · 대상 커밋 76d2b5e9)** 의 zip 에서 실측으로 채웠다(2026-09-26 · 1.1.5 값(71e285ea · 207818466)을 대신한다).
-#   출처 = 릴리스 v1.1.6 의 SHA256SUMS.txt(그 파일 자신의 sha256 = ca54d259b460340f33541181b1711e0183e036dc6a1c3110771480c2496b4ff2 · 1157 B · 13행 · 재절단 드래프트 자산)와
+# ✅아래 크기·지문·CDHash = **v1.1.8 발행 zip** 의 값이다(2026-10-11 대조 · 1.1.7 값을 대신한다).
+#   출처 = 릴리스 v1.1.8 의 SHA256SUMS.txt(그 파일 자신의 sha256 = 2187b046cd39bc583836b843eded79a4a0de447caf624b7aacd5f066a80dd8b9 · 1157 B · 13행) — 지문·파일 이름은 그 줄과 바이트 일치,
+#         크기는 릴리스 zip 의 크기, CDHash 는 발행 zip 을 풀어(ditto -x -k) codesign -dvvv 로 잰 값. 세 값 모두 tests/mac-pin-release.sh 가 릴리스를 때려 다시 잰다.
+#   (이전 기록 · 1.1.6) **v1.1.6 재절단 드래프트(릴리스 id 396787705 · 대상 커밋 76d2b5e9)** 의 zip 에서 실측(2026-09-26 · 1.1.5 값(71e285ea · 207818466)을 대신했다).
+#   (이전 기록 · 1.1.6 출처) 릴리스 v1.1.6 의 SHA256SUMS.txt(그 파일 자신의 sha256 = ca54d259b460340f33541181b1711e0183e036dc6a1c3110771480c2496b4ff2 · 1157 B · 13행 · 재절단 드래프트 자산)와
 #         드래프트 자산 zip 실물(arm64·x64 · 인증 받기) — 크기·sha256 은 파일에서 셌고(릴리스 API digest·SUMS 줄과 3/3 일치), CDHash 는 풀어서(ditto -x -k) codesign -dvvv 로 쟀다.
 #   (이전 기록) 크기·지문·CDHash = **v1.1.5 태그가 가리키는 커밋 526325bf**(태그 객체 15eb2155 · 11차 절단) 의 발행 zip 에서 실측으로 채웠다(2026-09-24 · 11차 재핀 · 10차 값(9d695ec8)을 대신한다).
 #   (이전 기록 · 1.1.5 출처) 릴리스 v1.1.5 의 SHA256SUMS.txt(그 파일 자신의 sha256 = d424a3d72e8f5493bc8410129721c4507689007d0714259d57f02782ce02338c · 13행 · 2026-09-24 14:32 발행본 재측정 — 발행 뒤 알림 문구 정정으로 latest.json 줄 하나만 바뀌어 파일 지문이 드래프트 값 418a1b6e… → 발행 d9b61ee0… → 지금 값으로 옮겼다 · 설치 자산 줄 3개와 위 핀 값은 그대로)와
@@ -163,7 +167,9 @@ CYS_FORK_CDHASH="092d568439b68deb28349af0dae3514b62e9bc49"
 # ★★인텔(x86_64) 맥 핀 — v1.1 부터 우리 판이 인텔 맥도 덮는다 (2026-09-20).
 #   까닭: v1.0.2 까지 우리 맥 자산은 arm64 하나뿐이라 **인텔 맥만 원작자 판으로 갈라졌다**. 같은 날 같은 방에서
 #     두 참가자가 서로 다른 cys 를 쓰는 일이 실제로 있었다(2026-09-15 전환 주석의 그 사유) — 그 갈림을 여기서 닫는다.
-#   ✅아래 세 값은 v1.1.6 재절단 x64 드래프트 zip 에서 **실측으로 채웠다**(2026-09-26 · 릴리스 id 396787705 · 대상 커밋 76d2b5e9 · 1.1.5 값(45b629ff · 215440455)을 대신한다).
+#   ✅아래 값은 **v1.1.8 발행 x64 zip** 의 값이다(2026-10-11 대조 · 지문·파일 이름 = 릴리스 SHA256SUMS.txt 의 그 줄 · 크기 = 릴리스 zip 크기 — tests/mac-pin-x64-release.sh 가 릴리스를 때려 다시 잰다).
+#     CDHash 는 발행 zip 을 풀어 codesign -dvvv 로 잰 값이다(그 시험은 모양만 본다 — zip 약 230MB 를 받아야 해서 · 값을 바꿀 때는 풀어서 다시 잰다).
+#     (이전 기록) v1.1.6 재절단 x64 드래프트 zip 에서 실측(2026-09-26 · 릴리스 id 396787705 · 대상 커밋 76d2b5e9 · 1.1.5 값(45b629ff · 215440455)을 대신했다).
 #     (이전 기록) v1.1.5 x64 발행 zip 에서 실측(2026-09-24 · 11차 재핀 · 11차 절단 태그 커밋 526325bf · Mach-O thin x86_64 · 서명 cys-local).
 #     ⚠실기 검증은 arm64 에서만 했다 — x64 는 Tart(arm64 호스트)에서 실행할 수 없어 **미검증**이다(로제타 스모크만 · v110-mac-x64 라운드).
 #   ⛔자리표가 남아 있는 동안 인텔 맥은 **원작자 판으로 돌아가지 않고 멈춘다**(cys_fork_x64_pin_ready · step_download_cys 머리).
@@ -1323,11 +1329,14 @@ help_way_lines() {   # help_way_lines <코드> — 두 번째 방법 줄들(정�
     J-DL-03)    printf '%s\n' '컴퓨터를 한 번 다시 시작하신 뒤 새 창에서 다시 실행해 주십시오.' ;;
     J-DL-04)    printf '%s\n' '휴대폰 핫스팟 같은 다른 인터넷으로 연결하신 뒤 다시 실행해 주십시오.' ;;
     J-DL-07)    printf '%s\n' '클로드를 내려받는 서버에 닿지 못했습니다.' '휴대폰 핫스팟 같은 다른 인터넷으로 연결하신 뒤 다시 실행해 주십시오.' '회사·학교 망이면 그 망이 막아 둔 것일 수 있습니다.' ;;
+    # 1.1.8 U5: 새 판 바꾸기 기다림 — 두 번째에도 같으면 더 기다리기(01) · 다시 켜기(02) · 03 은 기다려도 안 풀려 곧바로 담당자(help_is_direct)
+    J-UPD-01)   printf '%s\n' '10분쯤 뒤에 다시 실행해 주십시오.' ;;
+    J-UPD-02)   printf '%s\n' '컴퓨터를 한 번 다시 시작하신 뒤 다시 실행해 주십시오.' ;;
   esac
 }
 help_is_direct() {   # 다른 방법이 없는 코드 — 2회째부터 곧바로 담당자 안내(정본 direct)
   # J-DL-06(인텔용 판 준비 전)도 사람이 할 수 있는 일이 없다 — 두 번째부터 곧바로 담당자에게 잇는다.
-  case "$1" in J-DL-05|J-DL-06) return 0 ;; esac
+  case "$1" in J-DL-05|J-DL-06|J-UPD-03) return 0 ;; esac
   return 1
 }
 
@@ -1479,6 +1488,7 @@ closing_note() {
   local end_rc=$?   # EXIT 트랩에서 첫 명령으로 불리므로 이 값 = 스크립트의 끝 코드
   [ "$CLOSING_DONE" = "1" ] && return 0
   CLOSING_DONE=1
+  txn_release   # 1.1.8 U5 — 자동 갱신 잠금은 끝맺음(원격 해결 대기) 전에 놓는다
   # 🔴0.3.36(F11): 로그인 대기 중 Ctrl-C 로 끝나면 배경 대기 감시자(login_waiter)가 20분 동안 고아로 남아 안내를 찍고
   #   다음 실행의 표식·승인 번호 파일을 건드릴 수 있었다(비대화 셸의 배경 자식은 SIGINT 를 무시 · 가상 터미널 실측).
   #   ⇒ 끝나는 자리가 어디든 표식이 아직 있으면 지우고 감시자에게 TERM(감시자 트랩이 자기 sleep 까지 데려간다).
@@ -1890,13 +1900,13 @@ detect_stage2() {
     return
   fi
   local v
-  v="$(cys phoenix-identity 2>/dev/null)"
+  v="$(cys_txn_env cys phoenix-identity 2>/dev/null)"   # 1.1.8 U5 3판(N9): ps1 짝 — 잠금을 쥔 동안 cys 호출 = 그 호출에만 토큰 env
   if [ -n "$v" ]; then row "2-1" "cysr 판본·팩 해시" "$v" "ok" "데몬 없어도 답한다"
   else row "2-1" "cysr 판본·팩 해시" "-" "failed" "명령이 답하지 않았다"; fi
 
   #     소켓 파일 자체가 없음  = `No such file or directory (os error 2)`  ⇒ 이 계정에 온보딩이 안 된 것(정상 가능)
   #     소켓은 있는데 무응답    = `Connection refused (os error 61)`        ⇒ 데몬이 안 떠 있다(기동 직후 지연 포함)
-  v="$(cys ping 2>&1)"
+  v="$(cys_txn_env cys ping 2>&1)"   # 1.1.8 U5: ping 은 자동 기동하지 않는다(cys.rs 순수 프로브) — ps1 짝 맞춤일 뿐
   case "$v" in
     pong*)
       row "2-2" "데몬 생존" "pong" "ok" "-" ;;
@@ -1908,13 +1918,13 @@ detect_stage2() {
       row "2-2" "데몬 생존" "${v:-무응답}" "unknown" "처음 보는 응답이다 — 위 두 갈래 어느 쪽인지 모른다" ;;
   esac
 
-  v="$(cys agent-detect 2>/dev/null | head -5)"
+  v="$(cys_txn_env cys agent-detect 2>/dev/null | head -5)"
   if [ -n "$v" ]; then row "2-4" "어댑터 감지" "$(printf '%s' "$v" | tr '\n' ' ')" "ok" "-"
   else row "2-4" "어댑터 감지" "-" "unknown" "-"; fi
 
   # (installer-speed-pin-0320) [8/10] 이 방금 돌린 자가진단이 있으면 그 출력을 쓴다 — 같은 명령을 한 실행에 두 번 부르지 않는다.
   if [ -n "$DOCTOR_TEXT" ]; then v="$(printf '%s\n' "$DOCTOR_TEXT" | grep '^요약' | head -1)"
-  else v="$(cys doctor 2>/dev/null | grep '^요약' | head -1)"; fi
+  else v="$(cys_txn_env cys doctor 2>/dev/null | grep '^요약' | head -1)"; fi
   if [ -n "$v" ]; then row "2-5" "cysr 자가점검" "$v" "ok" "요약 줄만 옮겨 적습니다"
   else row "2-5" "cysr 자가점검" "-" "unknown" "-"; fi
 
@@ -3841,7 +3851,7 @@ step_prepare_account() {
   say "[8/10] 이 계정에 자리를 잡습니다."
   # (installer-speed-pin-0320) 이 단계 안에서 무엇이 오래 걸리는지 기록에 초 단위로 남긴다(실기 비교용 · 화면에는 안 나간다).
   local t0="$SECONDS"
-  invoke_logged 'init-pack' "$cli" init-pack || true   # ps1 3094 — 출력을 화면·기록 양쪽에
+  txn_invoke_logged 'init-pack' "$cli" init-pack || true   # ps1 3094 — 출력을 화면·기록 양쪽에 · 1.1.8 U5: 잠금을 쥐었으면 --txn 위임
   log "timing 8/10 init-pack t=$((SECONDS - t0))s"
   # 윈도우판과 같은 자리(init-pack 뒤 · 데몬 등록 앞) — 자비스 자리가 뜨기 전에 로그인을 이어 둔다(로그인 1회).
   copy_login_to_isolated || true
@@ -3854,12 +3864,12 @@ step_prepare_account() {
   #   v0.3.30: 앞뒤 데몬 pid 를 남긴다 — [9/10] 이 「이미 새 데몬인가」를 이것으로 가른다(rotate_plan · 윈 Get-RotatePlan 짝).
   local pre_pong=0
   DAEMON_PID_BEFORE=""
-  if "$cli" ping 2>/dev/null | grep -q pong; then
+  if cys_txn_env "$cli" ping 2>/dev/null | grep -q pong; then   # 1.1.8 U5: 이하 데몬을 띄울 수 있는 cys 호출 = cys_txn_env(그 호출에만 토큰 env)
     pre_pong=1
     DAEMON_PID_BEFORE="$(daemon_pid_of "$cli")"
     log "daemon install skipped: already running (reinstall) — cys daemon install 은 --takeover 없이 거절한다"
   else
-    invoke_logged 'daemon install' "$cli" daemon install || daemon_rc=$?
+    invoke_logged 'daemon install' cys_txn_env "$cli" daemon install || daemon_rc=$?
   fi
   # ★등록됐는지는 **자리를 직접 보고** 정한다(cys_autostart_state 머리 주석) — 이 값 하나로 아래 문구가 갈린다(ps1 3105).
   AUTOSTART_STATE="$(cys_autostart_state "$cli")"
@@ -3877,7 +3887,7 @@ step_prepare_account() {
   #   (installer-speed-pin-0320) 0.5초 간격 · 상한은 시계로 20초 그대로(종전 2초×10회) — 뜬 것을 보면 곧바로 넘어간다.
   local alive=0 pstart="$SECONDS"
   while :; do
-    pong="$("$cli" ping 2>&1 | tr -d '\n')"
+    pong="$(cys_txn_env "$cli" ping 2>&1 | tr -d '\n')"
     case "$pong" in *pong*) alive=1; break ;; esac
     [ $((SECONDS - pstart)) -ge "$DAEMON_PING_CAP_SEC" ] && break
     sleep "$DAEMON_PING_GAP"
@@ -3898,7 +3908,7 @@ step_prepare_account() {
       open -a "$app" >>"$LOG_FILE" 2>&1 || say "       직접 열지 못했습니다: open -a $(redact "$app") 실패"
       pstart="$SECONDS"
       while :; do
-        pong="$("$cli" ping 2>&1 | tr -d '\n')"
+        pong="$(cys_txn_env "$cli" ping 2>&1 | tr -d '\n')"
         case "$pong" in *pong*) alive=1; break ;; esac
         [ $((SECONDS - pstart)) -ge "$DAEMON_PING_CAP_SEC" ] && break
         sleep "$DAEMON_PING_GAP"
@@ -3918,7 +3928,7 @@ step_prepare_account() {
   if [ "$alive" -ne 1 ]; then
     say "[8/10] 준비는 됐는데 아직 응답이 없습니다."
     # 어느 층에서 멈췄는지 알려 주는 값이 따로 있다 — 추측하지 말고 그것을 그대로 보인다.
-    invoke_logged 'daemon status' "$cli" daemon status || true
+    invoke_logged 'daemon status' cys_txn_env "$cli" daemon status || true
     side="$(cys_app_dir)/Contents/MacOS/cysd"
     say "       짝 파일 있음 = $([ -x "$side" ] && echo True || echo False) ($(redact "$side"))"
     say "     잠시 뒤 아래 「다시 하시는 법」대로 다시 실행해 주십시오. 그래도 같으면 위 세 줄을 알려 주십시오."; SHOW_RERUN=1
@@ -4548,9 +4558,9 @@ step_fleet() {
 cys_open_master_seat() {   # $1 = 여는 명령 · 화면으로 나가는 것 = cys 가 답한 내용
   local cli="${CYS_CLI:-cys}"
   if cys_supports_agent_flag; then
-    "$cli" new-surface --role master --cwd "$JARVIS_HOME" --agent claude --cmd "$1" 2>&1
+    cys_txn_env "$cli" new-surface --role master --cwd "$JARVIS_HOME" --agent claude --cmd "$1" 2>&1
   else
-    "$cli" new-surface --role master --cwd "$JARVIS_HOME" --cmd "$1" 2>&1
+    cys_txn_env "$cli" new-surface --role master --cwd "$JARVIS_HOME" --cmd "$1" 2>&1
   fi
 }
 
@@ -4697,7 +4707,8 @@ cys_rotate_state() { # cys_rotate_state <cli> → 찍는 값 = 「<판정>\t<rc>
   # v0.3.32(운영자 판정 · 윈 Get-RotateSkipDeptsFlag 짝): 부서 순회 생략 — env 는 언제나 · 인자는 cys 1.1.3 이상만.
   local skip_flag
   skip_flag="$(rotate_skip_depts_flag "$(cys_capped 5 "${1:-cys}" --version | head -1)")"
-  CYS_ROTATE_SKIP_DEPTS=1 "${1:-cys}" rotate --timeout "$ROTATE_DRAIN_TIMEOUT_SEC" $skip_flag >"$tf" 2>"$te" </dev/null &
+  # 1.1.8 U5: 잠금을 쥐었으면 --txn 위임 + 이 호출에만 env(토큰은 16진·쌍점뿐이라 따옴표 없이 두 낱말로 펼쳐진다 · 빈 env = 토큰 없음)
+  CYS_ROTATE_SKIP_DEPTS=1 CYS_UPDATE_TXN="$TXN_TOKEN" "${1:-cys}" rotate --timeout "$ROTATE_DRAIN_TIMEOUT_SEC" $skip_flag ${TXN_TOKEN:+--txn $TXN_TOKEN} >"$tf" 2>"$te" </dev/null &
   rp=$!
   log "rotate start pid=$rp --timeout $ROTATE_DRAIN_TIMEOUT_SEC skip-depts=env${skip_flag:++arg} cap=${ROTATE_WALL_CAP_SEC}s"
   while :; do
@@ -4756,6 +4767,9 @@ cys_rotate_state() { # cys_rotate_state <cli> → 찍는 값 = 「<판정>\t<rc>
   out="$(cat "$tf" "$te" 2>/dev/null)"; rm -f "$tf" "$te"
   log "rotate rc=$rc [t=$((SECONDS - t0))s] last stage=${stage:-(none seen)}"
   [ "$observed" = 1 ] && { printf 'observed-ok\t%s\t%s\n' "$rc" '자비스가 새 판으로 다시 깨어났습니다.'; return 0; }
+  if [ "$rc" = 26 ] && [ -n "$TXN_TOKEN" ]; then   # 2판(교차 검토 1): 위임 거부 = 끝(이 함수는 $( ) 안에서 불린다 — 표지만 찍고 부르는 쪽이 끝낸다)
+    printf 'txn-refused\t26\t\n'; return 0
+  fi
   case "$rc" in
     0|21) printf 'ok\t%s\t%s\n' "$rc" "$note"; return 0 ;;
     25)   # v0.3.36(X-5): 곧바로 held 로 말하지 않는다 — 늦게 서는 자리를 정해진 창 동안 더 본다(rotate_held_recheck 머리 주석).
@@ -4778,7 +4792,7 @@ cys_rotate_state() { # cys_rotate_state <cli> → 찍는 값 = 「<판정>\t<rc>
 }
 master_seat_ref() { # master_seat_ref <cli> → 살아 있는 master 자리 번호(surface:N) 하나 · 없으면 빈 글
   # cys list 한 줄 = <surface:N>\trole=<역할>\tpid=…\texited=<bool>\t… (cys.rs Command::List)
-  "${1:-cys}" list 2>/dev/null | awk -F'\t' '$2=="role=master" && $4!="exited=true" {print $1; exit}'
+  cys_txn_env "${1:-cys}" list 2>/dev/null | awk -F'\t' '$2=="role=master" && $4!="exited=true" {print $1; exit}'
 }
 seat_claim_denied() { # <자리를 여는 명령이 답한 글> → rc 0 = 이미 살아 있는 지휘 자리가 있다는 답이다
   case "${1:-}" in
@@ -4920,12 +4934,14 @@ ${first_prompt}"
           log "reinstall rotate skipped: plan=${ROTATE_PLAN} pid ${DAEMON_PID_BEFORE}->${DAEMON_PID_AFTER}"
           rotate_out="$(printf 'skipped-restarted\t\t자비스가 새 판으로 이미 다시 깨어났습니다.')" ;;
         *)
+      txn_check_holder   # 3판(N4): 위임 rotate 직전 — 잠금을 쥔 배경 프로세스가 살아 있는가
       rotate_out="$(cys_rotate_state "$cli")" ;;
       esac
       rotate_state="$(printf '%s' "$rotate_out" | cut -f1)"
       rotate_rc="$(printf '%s' "$rotate_out" | cut -f2)"
       rotate_note="$(printf '%s' "$rotate_out" | cut -f3-)"
       log "reinstall rotate: $rotate_state"
+      [ "$rotate_state" = txn-refused ] && txn_refused rotate   # 2판(교차 검토 1): 위임 거부 = 끝
       # v0.3.36(F13 · 윈 짝 같은 자리): 한 화면에 「무엇을 해 주세요」와 「다음에 할 일: 없습니다」가 함께 나왔다
       #   (재시작 실패 · 복원 보류 · 앱 못 띄움). ⇒ 위 줄들은 **있었던 일**만 말하고, 사람이 할 일은 끝맺음의 「다음에 할 일」 한 줄에만 둔다.
       if [ "$rotate_state" = ok ] || [ "$rotate_state" = observed-ok ] || [ "$rotate_state" = held ] || [ "$rotate_state" = skipped-restarted ]; then
@@ -5000,6 +5016,10 @@ ${first_prompt}"
   # 이 창에서 띄울 때도 선언을 첫 줄로 함께 넘긴다(ps1 3421 — cys 안에서 여는 wake.sh 와 같은 두 줄).
   # 0.3.36: 이 창 폴백도 wake.sh 와 같은 환경값 두 개(키가 없을 때만 · 이 프로세스에서만 · 값 정본 = 위 WAKE_CLAUDE_ENV 한 곳).
   eval "$WAKE_CLAUDE_ENV"
+  # 1.1.8 U5: exec 는 끝맺음(EXIT 트랩)을 건너뛰고 이 셸의 pid 를 자비스에게 넘긴다 — 놓지 않으면 자비스가 도는 내내 자동 갱신 잠금이 쥐어지고
+  #   토큰 env 가 자비스에게 물려가 그 안의 rotate·팩 명령이 rc 26 이 된다 ⇒ 넘기기 직전에 놓는다.
+  txn_release
+  [ "$TXN_STUCK" = 1 ] && say "     (자비스의 새 판 바꾸기 자리를 아직 정리하지 못해, 이 창의 자비스를 닫을 때까지 자동 새 판 바꾸기는 기다립니다.)"   # 3판(N5)
   exec "$claude_bin" --dangerously-skip-permissions "$wake_prompt"
 }
 
@@ -5061,7 +5081,7 @@ raise_cys_app_window() {
 # ★언제 도는가 = 자비스를 깨우기 **전에** 진단 코드를 남기고 멈춘 끝. 자비스를 깨운 뒤에는 돌지 않는다
 #   (자비스가 이 창을 넘겨받으므로 두 쪽이 한 화면에 섞이지 않게).
 # ⚠JSON·재검사·스크럽은 macOS 기본 `osascript`(JavaScript)가 한다 — 깨끗한 맥에는 jq·python 이 없다.
-INSTALLER_VERSION="0.3.39"      # 보고의 installer_version · BOOTSTRAP_VERSION 은 화면 머리글 용도 그대로(보내지 않는다)
+INSTALLER_VERSION="0.3.40"      # 보고의 installer_version · BOOTSTRAP_VERSION 은 화면 머리글 용도 그대로(보내지 않는다)
 # 0.3.36: JARVIS_HELP_API_URL = CI·흉내가 도움 보고를 로컬로 돌리는 손잡이(JARVIS_PROGRESS_URL 과 같은 모양 · 사람이 쓰는 길이 아니다 ·
 #   없으면 종전 주소 그대로 — tests/help-url-lever.sh 가 잰다). CI(reinstall-matrix.yml)의 full 부분 설치가 라이브 도움 채널로 가던 길을 막는다.
 HELP_API_URL="${JARVIS_HELP_API_URL:-https://jarvis-install.godmeyou.kr}"
@@ -5649,6 +5669,9 @@ remote_help() {
   local line
   [ -n "$J_CODE" ] || return 0
   [ "$REACHED_WAKE" = "1" ] && return 0
+  # 1.1.8 U5: 자동 갱신이 쥐고 있음·마무리 중(J-UPD-01·02)은 막힘이 아니라 기다림이다 — 5분 뒤 다시 하면 되는 일에 원격 해결을 열지 않는다
+  #   (3판: J-UPD-03 「잠금 자리 이상」 은 기다려도 안 풀린다 — 원격 해결을 연다)
+  case "$J_CODE" in J-UPD-01|J-UPD-02) return 0 ;; esac
   if [ "$MODE" != "full" ]; then
     [ "$MODE" = "dry" ] && say "  (dry-run) 원격 해결 진단을 보내지 않았습니다."
     return 0
@@ -6033,6 +6056,244 @@ remote_help_on_signal() {
   exit 129
 }
 
+# ── 자동 갱신 잠금 참가·위임 (cysr 1.1.8 · 설계 AUTO-UPDATE-118 3-2절 · 📌13′) ──
+#   1.1.8 부터 자비스가 스스로 새 판으로 바꾼다(데몬 러너). 바꾸는 동안(데몬 정지~새 판 기동) 사람이 이 한 줄을 다시 붙여 넣으면
+#   설치 링크가 데몬을 되살리거나 앱 번들을 덮어 두 쪽이 섞인다(09-19 HALT4 와 같은 계급) ⇒ 같은 전역 잠금에 참가한다.
+#   · 잠금 = ~/.cys/update/txn.lock 의 flock 배타(cys lock.rs 와 같은 OS 잠금 · 같은 파일) — 쥐는 것은 이 셸의 배경 perl(아래 TXN_HOLDER_PL).
+#     소유자 기록 txn.owner.json 의 pid = **이 셸**($$) — 이 셸이 부르는 cys(init-pack·rotate)가 「소유자가 내 조상」으로 위임을 받는다.
+#     start_time = 이 셸의 커널 시작 시각(초) — cys 가 sysinfo 로 다시 재어 같아야 위임이 선다(③′ · pid 재사용 차단).
+#   · 남이 쥐고 있으면(busy) 30초 간격 3번 더 해 보고 문구 한 줄로 끝(설계 「재시도 3」 · J-UPD-01) — 그사이 아무것도 바꾸지 않았다.
+#     기다려도 안 풀리는 것(소유자 전용 아님·심링크 · 잠금 파일을 못 엶·씀 · 위임 거부 · 판정할 cys 없는 오래된 저널) = J-UPD-03(원격 해결 열림 · 3판 · nolock 만 제자리 재확인 3 뒤 · 4판 m4).
+#     폴더가 없고 만들 수도 없으면 cys lock.rs participate 처럼 잠금 없이 진행(기록 1줄).
+#     ⚠배경 perl 만 따로 죽으면(SIGKILL) 잠금 풀림 + 묘비 없음 창이 생긴다 — 이 셸이 위임 호출 직전마다 perl 생존을 보고 죽었으면 토큰을 거두고 끝(txn_check_holder · 3판 N4).
+#   · 잡은 뒤 지난 갱신 기록(저널)이 온전한데 끝나지 않았으면 복구기가 먼저다 → 「마무리 중」 문구로 끝.
+#     기록이 망가졌으면(📌18 「링크 한 줄을 다시 붙여 넣어 주세요」 안내를 보고 온 경우) 끝까지 간다 — 이 설치가 그 복구 길이다.
+#   · 위임 = 참가 명령(init-pack·rotate)에만 --txn <토큰> + 그 호출에만 env CYS_UPDATE_TXN · 데몬을 띄울 수 있는 cys 호출(ping·daemon·new-surface)도
+#     그 호출에만 env(cys_txn_env · 잠금을 쥔 동안 토큰 없는 자동 기동은 cys 가 거부한다). ⛔셸 전체 export 0(2판 이종 검토 1·교차 검토 4) — 클로드 설치기·로그인·
+#     앱 창·자비스는 토큰을 못 본다(그 후손이 토큰으로 참가 명령을 부르면 조상 검증까지 통과한다).
+#     위임이 거부되면(rc 26 — 시작 시각을 못 맞춘 기계 등) J-UPD-03 문구로 끝(2판 교차 검토 1 · 3판 N1 · 잠금 없이 다시 하지 않는다).
+#   · 놓기 = 끝맺음 맨 앞(원격 해결 대기 전) · 놓을 때 소유자 기록에 묘비(released:true)를 먼저 쓰고 잠금을 푼다(lock.rs 와 같은 순서).
+#     묘비를 못 쓰면(3초) 놓지 않고 이 셸이 끝날 때까지 쥔다(2판 교차 검토 3 · 묘비 없는 옛 기록 + 풀린 잠금 창 0).
+#     이 셸이 갑자기 죽어도 perl 이 0.5초 안에 알아채고 같은 순서로 놓는다(남는 잠금 0).
+CYS_UPDATE_DIR="$HOME/.cys/update"
+TXN_RETRY_MAX=3
+TXN_RETRY_SEC="${JARVIS_TXN_RETRY_SEC:-30}"   # 시험만 줄인다(사람이 쓰는 길 = 30)
+TXN_TOKEN=""
+TXN_HOLDER=""
+TXN_STATE=""
+TXN_BUSY_SAY='자비스가 지금 새 판으로 바꾸는 중이에요. 5분 뒤 다시 실행해 주세요.'
+TXN_RECOVER_SAY='자비스가 지난번 새 판 바꾸기를 마무리하는 중이에요. 5분 뒤 다시 실행해 주세요.'
+TXN_WAIT_SAY='자비스가 지금 새 판으로 바꾸는 중이라 잠시 기다려 봅니다(최대 약 2분).'   # 3판(2차 검토 N8): 첫 재시도에 화면 1줄
+TXN_JOURNAL_STALE_MIN=30   # 3판(N1 ⑥): 판정할 cys 가 없는 저널이 이보다 오래면 기다려도 안 풀린다 = J-UPD-03(종결 저널은 제외 · 4판 m2)
+TXN_RECHECK_MAX=3          # 4판(3차 검토 m4): nolock 은 J-UPD-03 전에 제자리 짧은 재확인 — 순간 실패 흡수 · busy 기다림과 별개
+TXN_RECHECK_SEC="${JARVIS_TXN_RECHECK_SEC:-1}"   # 상한 = 3 × (1초 + 배경 perl 응답 대기 최대 10초) · 시험만 줄인다
+TXN_STUCK=0                # 3판(N5): 묘비를 못 써 잠금을 쥔 채 놓기를 마쳤다(창 폴백 안내용)
+# 잠금을 쥐고 있는 배경 perl — 인자: <갱신 폴더> <소유자 pid> <소유자 시작 시각> <상태 파일>
+#   상태 파일 한 줄 = ok <txn_id>:<epoch> · busy <까닭> · nolock <까닭>(자리는 있는데 못 엶·씀 = 재확인 3 뒤 J-UPD-03) · nodir(없고 못 만듦 = 잠금 없이 진행) · unsafe <까닭>
+#   순서 = lock.rs acquire 그대로: txn.lock 배타 → 새 소유자 기록(epoch +1) → 위임 자식 잠금·참가자 잠금이 비었는지 → 아니면 직전 기록 되돌리고 놓음.
+TXN_HOLDER_PL='
+use strict; use warnings; use Fcntl qw(:flock O_RDWR O_WRONLY O_CREAT O_TRUNC); use JSON::PP;
+my ($dir, $owner_pid, $st, $out) = @ARGV;
+umask 077;
+sub tell_out { my $t = "$out.part"; open(my $o, ">", $t) or exit 9; print $o "@_\n"; close $o; rename($t, $out); }
+sub rd { my $p = shift; open(my $f, "<", $p) or return undef; local $/; my $b = <$f>; close $f; return $b; }
+sub wr { my ($p, $b) = @_; my $t = "$p.u5.$$"; sysopen(my $f, $t, O_WRONLY|O_CREAT|O_TRUNC, 0600) or return 0;
+         print $f $b; close $f or do { unlink $t; return 0 }; rename($t, $p) and return 1; unlink $t; return 0; }
+my $base = $dir; $base =~ s{/[^/]+$}{};
+mkdir($base, 0700) unless -d $base;
+mkdir($dir, 0700) unless -d $dir;
+-d $dir or do { tell_out(-e $dir ? "nolock notdir" : "nodir mkdir"); exit 0 };   # 3판(N1): 폴더가 없고 만들 수도 없음 = lock.rs participate 처럼 잠금 없이 진행
+chmod(0700, $dir) if (stat($dir))[4] == $< && !-l $dir;
+# 2판(교차 검토 5): 진입마다 — 폴더·잠금·소유자 기록 = 심링크 아님 · 소유 uid 나 · 그룹·기타 비트 0(cys ensure_private_dir·check_private_file 과 같은 규칙) · 없음 = 우리가 만든다
+sub priv { my ($p, $isdir) = @_; my @s = lstat($p) or return 1; return 0 if -l _; return 0 unless ($isdir ? -d _ : -f _); return 0 if $s[4] != $<; return 0 if ($s[2] & 077); return 1; }
+for my $pp ([$dir, 1], ["$dir/txn.lock", 0], ["$dir/txn.owner.json", 0]) { priv(@$pp) or do { tell_out("unsafe $pp->[0]"); exit 0 }; }
+sysopen(my $lk, "$dir/txn.lock", O_RDWR|O_CREAT, 0600) or do { tell_out("nolock open"); exit 0 };
+flock($lk, LOCK_EX|LOCK_NB) or do { tell_out("busy txn.lock"); exit 0 };
+my $prev = rd("$dir/txn.owner.json");
+my $epoch = 1;
+if (defined $prev) { my $o = eval { decode_json($prev) }; $epoch = (($o && $o->{epoch}) || 0) + 1; }
+open(my $r, "<", "/dev/urandom") or do { flock($lk, LOCK_UN); tell_out("nolock urandom"); exit 0 };
+read($r, my $rb, 16); close $r;
+my $boot = 0; if ((`sysctl -n kern.boottime 2>/dev/null` // "") =~ /sec = (\d+)/) { $boot = $1; }
+my %o = (owner => "install-link", pid => $owner_pid + 0, txn_id => unpack("H*", $rb), epoch => $epoch + 0,
+         started_at => time() + 0, boot_id => $boot + 0, start_time => $st + 0, released => JSON::PP::false);
+my $js = JSON::PP->new->canonical->pretty;
+wr("$dir/txn.owner.json", $js->encode(\%o)) or do { flock($lk, LOCK_UN); tell_out("nolock owner"); exit 0 };
+my @names = ("txn.child.lock", (grep { -e "$dir/$_" } map { "txn.child.lock.$_" } 1 .. 4), "txn.part.lock");
+for my $n (@names) {
+  my $c; my $ok = sysopen($c, "$dir/$n", O_RDWR|O_CREAT, 0600) && flock($c, LOCK_EX|LOCK_NB);
+  if ($ok) { flock($c, LOCK_UN); close $c; next; }
+  my $ok2 = defined $prev ? wr("$dir/txn.owner.json", $prev) : (unlink("$dir/txn.owner.json") || !-e "$dir/txn.owner.json");
+  flock($lk, LOCK_UN); tell_out($ok2 ? "busy $n" : "nolock restore $n"); exit 0;   # 3판(N6): 직전 기록 복원 실패 = 삼키지 않는다(J-UPD-03)
+}
+tell_out("ok $o{txn_id}:$o{epoch}");
+my $stop = 0; $SIG{TERM} = $SIG{INT} = $SIG{HUP} = sub { $stop = 1 };
+my $pp = getppid();
+while (!$stop && getppid() == $pp && kill(0, $owner_pid)) { select(undef, undef, undef, 0.5); }
+$o{released} = JSON::PP::true;
+my $tomb = $js->encode(\%o);
+sub tomb { for (1 .. 30) { return 1 if wr("$dir/txn.owner.json", $_[0]); select(undef, undef, undef, 0.1); } return 0; }
+# 2판(교차 검토 3): 묘비를 못 쓰면 놓지 않는다 — 소유 셸이 끝날 때까지 쥔다(끝나면 옛 토큰의 조상 검증이 깨진다) · 그 뒤 한 번 더 써 보고 놓는다
+unless (tomb($tomb)) {
+  $SIG{TERM} = $SIG{INT} = $SIG{HUP} = "IGNORE";
+  while (getppid() == $pp && kill(0, $owner_pid)) { select(undef, undef, undef, 0.5); }
+  tomb($tomb);
+}
+flock($lk, LOCK_UN);
+exit 0;
+'
+txn_proc_start() { # txn_proc_start <pid> → 그 프로세스의 시작 시각(epoch 초 · cys 가 재는 값과 같은 커널 시작 시각) · 못 읽으면 빈 출력
+  local s
+  s="$(TZ=UTC0 LC_ALL=C ps -o lstart= -p "$1" 2>/dev/null | sed 's/^ *//;s/ *$//')"
+  [ -n "$s" ] || return 0
+  TZ=UTC0 LC_ALL=C date -j -f '%a %b %e %T %Y' "$s" '+%s' 2>/dev/null
+}
+txn_hold_try() { # 한 번 잡아 본다 → TXN_STATE = ok · busy · nolock (ok 면 TXN_TOKEN · TXN_HOLDER)
+  local st tf line i
+  TXN_STATE=nolock
+  st="$(txn_proc_start "$$")"
+  if [ -z "$st" ]; then log "txn: 이 창의 시작 시각을 읽지 못함(nolock)"; return 0; fi
+  tf="$(mktemp -t jarvis-txn 2>/dev/null)" || { log "txn: 임시 파일 없음(nolock)"; return 0; }
+  rm -f "$tf"
+  perl -e "$TXN_HOLDER_PL" "$CYS_UPDATE_DIR" "$$" "$st" "$tf" </dev/null >/dev/null 2>&1 &
+  TXN_HOLDER=$!
+  for i in $(seq 1 100); do
+    [ -s "$tf" ] && break
+    kill -0 "$TXN_HOLDER" 2>/dev/null || { [ -s "$tf" ] || break; }
+    sleep 0.1
+  done
+  line="$(cat "$tf" 2>/dev/null)"; rm -f "$tf"
+  case "$line" in
+    ok\ *) TXN_TOKEN="${line#ok }"; TXN_STATE=ok ;;
+    busy*) TXN_STATE=busy; log "txn: $line"; TXN_HOLDER="" ;;
+    unsafe*) TXN_STATE=unsafe; log "txn: $line — 소유자 전용이 아니거나 심링크 · 끝(2판 교차 검토 5)"; TXN_HOLDER="" ;;
+    nodir*)  TXN_STATE=nodir; log "txn: $line"; TXN_HOLDER="" ;;
+    *)     log "txn: ${line:-holder 무응답}(nolock)"; kill_own_child "$TXN_HOLDER" TERM; TXN_HOLDER="" ;;
+  esac
+  return 0
+}
+txn_release() { # 잠금을 놓는다(묘비 → 해제는 perl 이 한다) · 쥔 것이 없으면 아무 일도 안 한다 · 토큰·env 는 언제나 거둔다
+  # 2판(교차 검토 3): perl 이 묘비를 3초 안에 못 쓰면 놓지 않고 이 셸이 끝날 때까지 쥔다 — 여기서는 5초만 기다리고 기록 1줄(기다리면 서로 끝을 기다리는 교착)
+  local i
+  if [ -n "$TXN_HOLDER" ]; then
+    kill_own_child "$TXN_HOLDER" TERM
+    for i in $(seq 1 50); do kill -0 "$TXN_HOLDER" 2>/dev/null || break; sleep 0.1; done
+    if kill -0 "$TXN_HOLDER" 2>/dev/null; then
+      log "txn: 묘비를 쓰지 못함 — 잠금은 이 창이 끝날 때까지 쥔다(2판 교차 검토 3 · holder pid $TXN_HOLDER)"; TXN_STUCK=1
+    else
+      wait "$TXN_HOLDER" 2>/dev/null
+      log "txn: released ${TXN_TOKEN:-?}"
+    fi
+  fi
+  TXN_HOLDER=""; TXN_TOKEN=""
+  unset CYS_UPDATE_TXN CYS_UPDATE_TXN_DEPTH
+  return 0
+}
+txn_journal_verdict() { # → go · wait · nojudge — 온전한데 끝나지 않았으면 wait · cys 가 degraded·corrupt 라고 말하면 go(📌18 재설치 길) ·
+  #   판정할 cys 가 없으면 nojudge(덮지 않는다 · 2판 교차 검토 6 · 저널이 오래면 txn_enter 가 J-UPD-03)
+  local c out v
+  if [ ! -e "$CYS_UPDATE_DIR/journal.json" ] && [ ! -e "$CYS_UPDATE_DIR/journal.prev.json" ]; then echo go; return 0; fi
+  for c in "$CYS_UPDATE_DIR/runner/cys" "$HOME/.local/bin/cys" "/usr/local/bin/cys" "$(cys_app_dir)/Contents/MacOS/cys"; do
+    [ -x "$c" ] || continue
+    out="$(CYS_NO_AUTOSTART=1 perl -e 'alarm shift; exec @ARGV or exit 126' 20 "$c" self-update --journal-state --json 2>/dev/null)" || continue
+    v="$(printf '%s' "$out" | perl -MJSON::PP -e 'local $/; my $j = eval { decode_json(<STDIN>) } or exit 1;
+          print((($j->{journal} // "") eq "ok" && defined $j->{terminal} && !$j->{terminal}) ? "wait" : "go")' 2>/dev/null)" || continue
+    log "txn: journal $out (판정 $v · $c)"
+    echo "$v"; return 0
+  done
+  if txn_journal_terminal; then log "txn: 판정할 cys 없음 · 저널 = 종결 상태 — 진행(4판 m2)"; echo go; return 0; fi
+  log "txn: 저널 판정 불가(판정할 cys 없음) — 덮지 않는다(2판 교차 검토 6)"
+  echo nojudge
+}
+txn_journal_terminal() { # rc 0 = 두 슬롯 중 generation 큰 쪽(cys 가 최신으로 읽는 쪽 · journal.rs commit_next)의 state 가 종결(cys is_terminal 칸) — 판정할 cys 가 없을 때만(4판 m2 · 5판 n1) · 둘 다 못 읽음 = rc 1
+  perl -MJSON::PP -e 'my %t = map { $_ => 1 } qw(DONE DEFERRED RB_DONE RB_FAILED PACK_DONE); my $best;
+    for my $p (@ARGV) { open(my $f, "<", $p) or next; local $/; my $j = eval { decode_json(<$f>) } or next; next unless defined $j->{state};
+      my $g = $j->{generation} // 0; $best = $j if !$best || $g > ($best->{generation} // 0); }
+    exit($best && $t{$best->{state}} ? 0 : 1)' "$CYS_UPDATE_DIR/journal.json" "$CYS_UPDATE_DIR/journal.prev.json" 2>/dev/null
+}
+txn_journal_stale() { # rc 0 = 저널(둘 중 새 것)이 TXN_JOURNAL_STALE_MIN 분보다 오래됐다 — 복구기가 도는 중이면 저널은 금방 바뀐다
+  perl -e 'my ($min, @f) = @ARGV; my @m = map { (stat $_)[9] } grep { -e $_ } @f; exit 1 unless @m; my ($n) = sort { $b <=> $a } @m; exit((time - $n) > $min * 60 ? 0 : 1)' \
+    "$TXN_JOURNAL_STALE_MIN" "$CYS_UPDATE_DIR/journal.json" "$CYS_UPDATE_DIR/journal.prev.json"
+}
+txn_odd() { # txn_odd <unsafe|nolock|refused|nojudge> — J-UPD-03 「잠금 자리 이상」(기다려도 안 풀림 · 원인별 문구 1줄 · 원격 해결은 열린다 · 3판 N1)
+  case "$1" in
+    unsafe)  say '자비스의 새 판 바꾸기 자리(~/.cys/update)가 이 계정 전용이 아니거나 다른 곳으로 이어져 있어, 안전을 위해 아무것도 바꾸지 않았습니다.' ;;
+    refused) say '자비스의 새 판 바꾸기 자리를 이 설치 도우미가 넘겨받지 못해 여기서 멈췄습니다.' ;;
+    nojudge) say '지난번 새 판 바꾸기 기록이 오래 남아 있는데 판정할 프로그램이 없어, 덮어 깔지 않고 멈췄습니다.' ;;
+    *)       say '자비스의 새 판 바꾸기 자리(잠금 파일)를 열거나 쓰지 못해 아무것도 바꾸지 않았습니다. 권한 때문일 수 있습니다.' ;;
+  esac
+  log "txn: J-UPD-03 $1"
+  jcode 'J-UPD-03' "자비스의 새 판 바꾸기 자리가 이상해 멈췄습니다($1)"
+}
+txn_check_holder() { # 3판(2차 검토 N4): 잠금을 쥔 배경 perl 이 혼자 죽었으면(SIGKILL 등 · 잠금 풀림 + 묘비 없음) 토큰을 더 쓰지 않고 끝 — 위임 호출 직전마다
+  [ -n "$TXN_TOKEN" ] || return 0
+  kill -0 "$TXN_HOLDER" 2>/dev/null && return 0
+  log "txn: 잠금을 쥔 배경 프로세스(pid ${TXN_HOLDER:-?})가 사라짐 — 토큰을 거두고 끝(3판 N4)"
+  TXN_TOKEN=""; TXN_HOLDER=""
+  txn_odd nolock
+  exit 26
+}
+txn_enter() { # 본문 시작 직후 · rc 0 = 계속 · rc 26 = 끝(문구·진단 코드를 찍었다)
+  [ "$MODE" = "full" ] || return 0
+  unset CYS_UPDATE_TXN CYS_UPDATE_TXN_DEPTH   # 2판(이종 검토 1·교차 검토 4): 물려받은 토큰도 셸 전체에 두지 않는다(그 호출에만 · cys_txn_env)
+  local n=0 v
+  while :; do
+    txn_hold_try
+    [ "$TXN_STATE" = busy ] || break   # 3판(N1): 다시 해 볼 값어치가 있는 것 = busy(남이 쥠) 하나뿐
+    n=$((n + 1))
+    [ "$n" -gt "$TXN_RETRY_MAX" ] && break
+    [ "$n" -eq 1 ] && say "$TXN_WAIT_SAY"
+    log "txn: busy — ${TXN_RETRY_SEC}s 뒤 다시($n/$TXN_RETRY_MAX)"
+    sleep "$TXN_RETRY_SEC"
+  done
+  # 4판(m4): 「자리 이상」 판정 전 제자리 재확인(최대 TXN_RECHECK_MAX 번) — 그사이 busy 가 되면 그대로 J-UPD-01(기다림 루프로 되돌아가지 않는다)
+  n=0
+  while [ "$TXN_STATE" = nolock ] && [ "$n" -lt "$TXN_RECHECK_MAX" ]; do
+    n=$((n + 1)); log "txn: nolock — 재확인 $n/$TXN_RECHECK_MAX"
+    sleep "$TXN_RECHECK_SEC"
+    txn_hold_try
+  done
+  case "$TXN_STATE" in
+    ok) ;;
+    nodir) log "txn: 갱신 폴더가 없고 만들 수도 없음 — 잠금 없이 진행(lock.rs participate 와 같이 · 3판 N1)"; return 0 ;;
+    busy)
+      say "$TXN_BUSY_SAY"
+      jcode 'J-UPD-01' '자비스가 새 판으로 바꾸는 중이라 이번에는 아무것도 바꾸지 않았습니다'
+      next_rerun '5분 뒤 아래 「다시 하시는 법」대로 다시 실행해 주십시오.'
+      return 26 ;;
+    *) txn_odd "$TXN_STATE"; return 26 ;;
+  esac
+  log "txn: held $TXN_TOKEN (holder pid $TXN_HOLDER · owner pid $$)"
+  v="$(txn_journal_verdict)"
+  [ "$v" = go ] && return 0
+  txn_release
+  if [ "$v" = nojudge ] && txn_journal_stale; then txn_odd nojudge; return 26; fi
+  say "$TXN_RECOVER_SAY"
+  jcode 'J-UPD-02' '지난번 새 판 바꾸기의 마무리를 기다립니다'
+  next_rerun '5분 뒤 아래 「다시 하시는 법」대로 다시 실행해 주십시오.'
+  return 26
+}
+txn_refused() { # 위임이 거부됐다(rc 26) — 설계 3-2절 「못 잡으면 문구로 끝」 · 잠금은 끝맺음이 놓는다
+  log "txn: $1 위임 거부(rc 26) — 끝(2판 교차 검토 1 · 무잠금 재실행 0)"
+  txn_odd refused   # 3판(N1): 위임 거부는 기계 결정적(시작 시각·기록 불일치) — 기다려도 안 풀린다 = J-UPD-03
+  exit 26
+}
+cys_txn_env() { # cys_txn_env <명령> [인자…] — 그 한 호출에만 토큰 env(잠금을 쥐지 않았으면 빈 값 = 토큰 없음 · 2판 이종 검토 1·교차 검토 4)
+  # 3판(N4): 잠금을 쥔 배경 perl 이 죽었으면 토큰을 싣지 않는다(이 함수는 $( ) 안에서도 불려 끝낼 수 없다 — 끝내기는 txn_check_holder 가 본 셸에서)
+  if [ -n "$TXN_TOKEN" ] && ! kill -0 "$TXN_HOLDER" 2>/dev/null; then CYS_UPDATE_TXN="" "$@"; return; fi
+  CYS_UPDATE_TXN="$TXN_TOKEN" "$@"
+}
+txn_invoke_logged() { # txn_invoke_logged <무엇> <cli> <참가 동사> [인자…] — 잠금을 쥐었으면 --txn 위임(env 는 이 호출에만) · 거부(26)면 끝
+  local what="$1" cli="$2" rc; shift 2
+  if [ -n "$TXN_TOKEN" ]; then
+    txn_check_holder
+    invoke_logged "$what" cys_txn_env "$cli" "$@" --txn "$TXN_TOKEN"; rc=$?
+    [ "$rc" -eq 26 ] || return "$rc"
+    txn_refused "$what"   # 2판(교차 검토 1): 위임 거부 = 문구 1줄 + 끝(잠금 없이 다시 하지 않는다)
+  fi
+  invoke_logged "$what" "$cli" "$@"
+}
+
 # 시험이 이 파일을 「함수 묶음」으로만 읽는 문. 여기서 멈추므로 본문은 한 줄도 돌지 않는다.
 #   왜 필요한가: 좌석 여는 자리가 실제로 무엇을 넘기는지는 **글자로 세면 알 수 없다** —
 #   조건 갈래 양쪽이 파일에 다 적혀 있기 때문이다. 재려면 그 함수를 실제로 불러야 하고,
@@ -6050,6 +6311,7 @@ say "     $CAPTURE_NOTICE"    # 0.3.36: 창 글자 고지 반 줄(진행 고지 
 # 0.3.36: 전송 문(NOTICE_SHOWN)은 고지 세 줄을 **다 찍은 뒤에** 연다 — 앞 판은 첫 줄 뒤에 열어, 그다음 줄을 찍는 사이
 #   멈추면(Ctrl-C) 끝맺음의 실패 진행 기록(J-UNK-00 · 단계·이벤트만 · 창 글자 0)이 진행 고지 없이 나갈 틈이 있었다(이종 검토 반례 · 실측 정정).
 NOTICE_SHOWN=1
+txn_enter || exit $?   # 1.1.8 U5 — 자동 갱신 잠금 참가(못 잡으면 문구 한 줄로 끝 · 위 「자동 갱신 잠금」 절)
 progress_send '1/10' 'start' '' '' ''   # ps1 5645
 step_baselines_update                   # ps1 5646 — 단계 소요 기준선을 한 번 받는다(못 받으면 「평소의 두 배」 축은 잠든다)
 detect_stage1

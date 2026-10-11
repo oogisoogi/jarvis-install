@@ -23,7 +23,8 @@ SH = "install-master/bootstrap.sh"
 MUTANTS = [
     # ② 등록 전 물음을 없애면 「error: 데몬이 이미 가동 중」이 다시 오류로 계상된다(09-21 맥 VM 재설치 실기).
     ("mac-daemon-precheck-drop", SH,
-     '  if "$cli" ping 2>/dev/null | grep -q pong; then\n',
+     # 1.1.8 U5: 그 물음 앞에 cys_txn_env 가 붙어 앵커를 다시 겨눴다(변이의 뜻 동일).
+     '  if cys_txn_env "$cli" ping 2>/dev/null | grep -q pong; then   # 1.1.8 U5: 이하 데몬을 띄울 수 있는 cys 호출 = cys_txn_env(그 호출에만 토큰 env)\n',
      '  if false; then\n',
      "[0329 전송] 맥: 등록 전에 데몬이 이미 도는지 묻는다", "checks"),
     # ② 재설치 끝의 post-install 증거를 빼면 서버가 「끝까지 갔다」를 모른다.
@@ -74,7 +75,8 @@ MUTANTS = [
      # v0.3.30: 받는 자리가 「뒤로 돌려 파일을 들여다보기」로 바뀌어 앵커를 다시 겨눴다 — 변이의 뜻은 같다(명령 치환 파이프로 되돌림).
      # v0.3.31: 상한을 고리가 지게 되어 perl alarm 감싸기가 빠졌다 — 앵커를 다시 겨눴다(변이의 뜻 동일).
      # v0.3.32: 호출 줄에 부서 순회 생략(env·인자)이 붙어 앵커를 다시 겨눴다(변이의 뜻 동일).
-     '  CYS_ROTATE_SKIP_DEPTS=1 "${1:-cys}" rotate --timeout "$ROTATE_DRAIN_TIMEOUT_SEC" $skip_flag >"$tf" 2>"$te" </dev/null &\n  rp=$!\n',
+     # 1.1.8 U5: 호출 줄에 잠금 위임(env·--txn)이 붙어 앵커를 다시 겨눴다(변이의 뜻 동일).
+     '  CYS_ROTATE_SKIP_DEPTS=1 CYS_UPDATE_TXN="$TXN_TOKEN" "${1:-cys}" rotate --timeout "$ROTATE_DRAIN_TIMEOUT_SEC" $skip_flag ${TXN_TOKEN:+--txn $TXN_TOKEN} >"$tf" 2>"$te" </dev/null &\n  rp=$!\n',
      '  out="$(perl -e \'alarm shift; exec @ARGV or exit 126\' "$ROTATE_WALL_CAP_SEC" "${1:-cys}" rotate --timeout "$ROTATE_DRAIN_TIMEOUT_SEC" 2>&1)"; printf \'%s\\n\' "$out" > "$tf"\n  rp=999999\n',
      "[맥 r5] rotate 가 자식(새 데몬)을 남겨도 설치 창이 기다리지 않는다", "emu"),
     # ⑥ cys 1.1.2 rotate 종료코드 표 — 21(저장 일부 미확인)을 실패로 읽으면

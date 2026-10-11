@@ -766,6 +766,23 @@ item_canon() { # item_canon <항목 원문> <루트 원문> <루트 실경로>
 #   앞 판은 실경로(`$t`)를 이 함수에 넘겼다. 그래서 삭제 루트가 링크면 **그 대상 폴더**를 훑어 지웠다.
 #   ⇒ 훑는 것은 언제나 원문 루트, 실경로는 **비교에만** 쓴다.
 PRUNE_WHY=""
+# 0.3.40(A1 · 완전 삭제 + 참가 자리가 안에 있음): 값이 있으면 prune_except 가 지우는 대신 **그 보관 자리로 옮긴다**.
+#   훑기·남길 것 판정·검산은 한 글자도 같다(같은 목록 · 같은 prune_keep_hit_split) — 바뀌는 것은 항목 하나에 하는 일뿐이다:
+#   파일 = 보관 자리의 같은 상대 자리로 이름 바꾸기(복사하지 않는다 · 같은 이름이 있으면 덮지 않고 실패) ·
+#   폴더 = **비어 있을 때만** 치운다(안엣것은 먼저 옮겨졌다 · 못 연 폴더는 안 비어 그대로 남고 실패로 센다) ·
+#   바로가기 = 이름표만 치운다(가리키던 자료는 무접촉 · archive_move 와 같다).
+PRUNE_MOVE_DEST=""
+DROP_MOVE_REL=""    # drop_dir 에 「옮기기 모드」 를 거는 값(보관 폴더 안 이름 · 부르는 쪽이 걸고 곧 비운다)
+DROP_MOVE_DEST=""   # 이번 실행이 쓰는 보관 자리(회차 사이에 기억한다)
+prune_move_one() { # prune_move_one <항목 원문> <루트 원문> → 실패 까닭을 찍는다(성공 = 아무것도 안 찍는다)
+  local p="$1" rel="${1#"$2"/}" d
+  if [ -L "$p" ]; then rm -f "$p" 2>&1; return; fi
+  if [ -d "$p" ]; then rmdir "$p" 2>&1; return; fi
+  d="$PRUNE_MOVE_DEST/$rel"
+  mkdir -p "$(dirname "$d")" 2>&1 || return
+  if [ -e "$d" ] || [ -L "$d" ]; then printf '%s\n' "$rel: 보관 폴더에 같은 이름이 이미 있어 옮기지 않았습니다"; return; fi
+  perl -e 'rename($ARGV[0], $ARGV[1]) or do { print "$ARGV[0]: $!\n"; exit 1 }' "$p" "$d" 2>&1
+}
 prune_except() {
   local root="$1" root_canon="$2" keeps="$3" hkeeps="${4:-}" list p c enum_fail left why
   PRUNE_FAIL=0; enum_fail=0; left=0
@@ -780,7 +797,7 @@ prune_except() {
     if [ ! -L "$p" ] && [ "${p#"$root"/}" != "$p" ]; then c="$root_canon${p#"$root"}"
     else c="$(item_canon "$p" "$root" "$root_canon")" || c=""; fi
     prune_keep_hit_split "$p" "$c" "$root" "$root_canon" "$keeps" "$hkeeps" && continue
-    why="$(rm -rf "$p" 2>&1)"
+    if [ -n "$PRUNE_MOVE_DEST" ]; then why="$(prune_move_one "$p" "$root")"; else why="$(rm -rf "$p" 2>&1)"; fi
     if [ -n "$why" ]; then
       PRUNE_WHY="$(printf '%s%s\n' "$PRUNE_WHY" "$why")"
     fi
@@ -800,7 +817,7 @@ prune_except() {
     say "         (이 자리의 목록을 끝까지 읽지 못했습니다 — 이 계정으로 못 여는 하위 자리가 있습니다.)"
   fi
   if [ "${PRUNE_FAIL:-0}" -ne 0 ] && [ -n "$PRUNE_WHY" ]; then
-    say "         지우지 못한 자리:"
+    if [ -n "$PRUNE_MOVE_DEST" ]; then say "         옮기지 못한 자리:"; else say "         지우지 못한 자리:"; fi
     printf '%s\n' "$PRUNE_WHY" | head -5 | while IFS= read -r l; do [ -n "$l" ] && say "           $l"; done
   fi
   [ "${PRUNE_FAIL:-0}" -eq 0 ]
@@ -873,10 +890,41 @@ drop_dir()  {
   # 0.3.36: 재설치 길에서 남길 로그인·이전 대화 — 이 자리 안에 든 것만 받는다(참가 자리와 말을 갈라 적는다).
   #   ⚠「이 안에 든 것」으로 거르지 않는다 — 바로가기가 가리키는 곳(②)은 밖에 있어도 비교에 있어야 그 바로가기가 남는다(history_keeps).
   hist="$(printf '%s' "${2:-}" | grep -v '^$')"
+  # 0.3.40(A1): 완전 삭제에서 참가 자리가 이 안에 있으면 「그것만 제자리에 두고 나머지는 보관 폴더로 옮긴다」(DROP_MOVE_REL = 보관 폴더 안 이름).
+  #   옮길 자리를 못 정하면 아무것도 건드리지 않는다(지우는 길로 떨어지지 않는다).
+  PRUNE_MOVE_DEST=""
+  if [ -n "${DROP_MOVE_REL:-}" ]; then
+    if [ -z "$keeps" ] || [ -n "$hist" ]; then
+      KEPT_FAIL=$((KEPT_FAIL+1))
+      say "  🔴못 옮김: $(short "$1") — 남길 자리를 다시 확인하지 못해 그대로 두었습니다(지운 것 없음)."
+      return 1
+    fi
+    if ! archive_root_set; then
+      ARCHIVE_FAIL=1; KEPT_FAIL=$((KEPT_FAIL+1))
+      say "  🔴못 옮김: $(short "$1") — 보관 폴더를 만들지 못해 그대로 두었습니다(지운 것 없음)."
+      return 1
+    fi
+    if ! same_volume "$AROOT" "$1"; then
+      ARCHIVE_FAIL=1; KEPT_FAIL=$((KEPT_FAIL+1))
+      say "  🔴못 옮김: $(short "$1") — 보관 폴더와 다른 디스크에 있어 옮기지 않았습니다(복사하지 않습니다 · 지운 것 없음)."
+      return 1
+    fi
+    # 다시 해 보기(회차)는 같은 보관 자리에 이어서 옮긴다 — 옮겨진 것은 원 자리에 없으므로 이름이 겹치지 않는다
+    if [ -z "${DROP_MOVE_DEST:-}" ] || [ ! -d "$DROP_MOVE_DEST" ] || [ -L "$DROP_MOVE_DEST" ]; then
+      DROP_MOVE_DEST="$AROOT/$(free_rel "$AROOT" "$DROP_MOVE_REL")"
+      if ! mkdir "$DROP_MOVE_DEST" 2>/dev/null; then
+        DROP_MOVE_DEST=""; ARCHIVE_FAIL=1; KEPT_FAIL=$((KEPT_FAIL+1))
+        say "  🔴못 옮김: $(short "$1") — 보관 폴더 안에 자리를 만들지 못해 그대로 두었습니다(지운 것 없음)."
+        return 1
+      fi
+    fi
+    PRUNE_MOVE_DEST="$DROP_MOVE_DEST"
+  fi
   if [ -n "$keeps" ] || [ -n "$hist" ]; then
     if [ -n "$keeps" ]; then
       PRESERVED=$((PRESERVED+1))
-      say "  보존(중첩): $(short "$1") 안에 참가 자리가 있어 **그것만 남기고** 지웁니다."
+      if [ -n "$PRUNE_MOVE_DEST" ]; then say "  보존(중첩): $(short "$1") 안에 참가 자리가 있어 **그것만 제자리에 두고** 나머지는 보관 폴더로 옮깁니다."
+      else say "  보존(중첩): $(short "$1") 안에 참가 자리가 있어 **그것만 남기고** 지웁니다."; fi
       printf '%s\n' "$keeps" | while IFS= read -r k; do [ -n "$k" ] && say "           남기는 자리: $(short "$k")"; done
     fi
     if [ -n "$hist" ]; then
@@ -884,6 +932,18 @@ drop_dir()  {
       paths_under "$t" "$hist" | while IFS= read -r k; do [ -n "$k" ] && say "           남기는 자리: $(short "$k")"; done
     fi
     if [ -z "$hist" ]; then what='참가 자리'; elif [ -z "$keeps" ]; then what='이전 대화'; else what='참가 자리와 이전 대화'; fi
+    if [ -n "$PRUNE_MOVE_DEST" ]; then
+      if prune_except "$1" "$t" "$keeps" "$hist"; then
+        PRUNE_MOVE_DEST=""
+        ARCHIVED=$((ARCHIVED+1)); ARCHIVE_LAST="$DROP_MOVE_DEST"
+        say "  보관: $(short "$1") 의 나머지 → $(short "$DROP_MOVE_DEST") (${what}는 제자리에 그대로)"
+        return 0
+      fi
+      PRUNE_MOVE_DEST=""
+      ARCHIVE_FAIL=1; KEPT_FAIL=$((KEPT_FAIL+1))
+      say "  🔴일부 남음: $(short "$1") — ${PRUNE_FAIL}가지를 보관 폴더로 옮기지 못했습니다(${what}는 그대로입니다 · 지운 것 없음)."
+      return 1
+    fi
     if prune_except "$1" "$t" "$keeps" "$hist"; then
       REMOVED=$((REMOVED+1)); say "  지움: $(short "$1") (${what}는 그대로)"
       return 0
@@ -1269,6 +1329,7 @@ new_backup_dir() { # new_backup_dir <부모> → 새 보관 폴더(우리 표식
 }
 # archive_move <원 자리> <보관 폴더 안 이름> <화면 이름> — 자료 한 자리를 보관 폴더로 옮긴다. 실패 = ARCHIVE_FAIL · 못 지움 +1 · rc 1
 #   링크면 종전대로 이름표만 지운다(가리키던 실제 자료는 무접촉) · 참가 자리가 안에 있으면 옮기지 않고 그대로 둔다(옮겼다 되돌리기 금지)
+#   (~/.cys 완전 삭제는 0.3.40 부터 이 함수에 오기 전에 갈린다 — 참가 자리가 안에 있으면 drop_dir 옮기기 모드 · 본체 M-CYSHOME 줄)
 #   ⚠보관 폴더는 하위 셸($(…))에서 정하면 ARCHIVE_HOME 이 부모에 안 남는다 — 그래서 archive_root_set 이 부모 셸에서 정해 AROOT 에 둔다.
 archive_root_set() { # 부모 셸에서 보관 폴더를 정해 AROOT 에 둔다 · 못 만들면 rc 1
   AROOT=""
@@ -2005,7 +2066,8 @@ EOF_TRUST_ROWS
   # 0.3.37(DESIGN-0337 3절 · 4절): 지우지 않고 보관 폴더로 옮긴다 — 완전 삭제 = 통째로 · 재설치 = 통째로 옮긴 뒤 남길 것만 되옮긴다(요건 2).
   #   ★작업 폴더 보관(위 keep_jarvis_dir)이 먼저다 — 그 보관 폴더에 모은다(archive_root_set). 신뢰 칸 기록은 이미 위에서 다 썼다.
   #   참가 자리가 ~/.cys 안이면(사람이 AGORA_HOME 을 옮겨 둔 드문 경우) 통째로 옮길 수 없다 — 재설치는 0.3.36 장치(남기고 지우기)로,
-  #   완전 삭제는 옮기지 않고 그대로 둔다(archive_move 가 「남김」 으로 말한다 · 옮겼다 되돌리기 금지).
+  #   완전 삭제는 **참가 자리만 제자리에 두고 나머지를 보관 폴더로 옮긴다**(0.3.40 · A1 · drop_dir 의 옮기기 모드 — 참가 자리는 한 번도 옮기지 않는다).
+  #   (0.3.37~0.3.39 는 이 경우 ~/.cys 를 통째로 그대로 두었다 — 지운 것이 없는데 「못 지운 것 없음」 으로 끝났다.)
   if [ "${PROC_BLOCKED:-0}" = "1" ]; then
     :   # r1 F6 — cys 가 아직 돌고 있다: ~/.cys 는 이번에 옮기지 않는다(윈 짝)
   elif [ "$AGORA_MIGRATE_OK" = "1" ]; then
@@ -2029,7 +2091,12 @@ EOF_TRUST_ROWS
       # 0.3.37(설계 결정 3): 보관한 옛 ~/.cys 자리를 회차 사이에 기억해 두고 **회차마다** 그 안 로그인 파일을 지운다 —
       #   앞 판은 이번 회차에 옮긴 때만 지워, 1회차 지우기가 실패하면 다시 해 보기가 그 파일을 안 보고 rc 0 으로 끝났다(비밀값이 보관 폴더에 남음).
       ARCHIVE_LAST=""
-      if archive_move "$HOME/.cys" "cys-home" "cysr 계정 자리(대화·부서 기록)"; then
+      if [ -n "$CYS_NESTED" ]; then
+        # 0.3.40(A1): 일부만 옮겨졌어도 그 보관 자리의 로그인 파일은 회차마다 지운다(비밀값이 보관 폴더에 남지 않게 · 아래 통째 갈래와 같은 규율)
+        DROP_MOVE_REL="cys-home"; drop_dir "$HOME/.cys"; DROP_MOVE_REL=""
+        [ -n "${DROP_MOVE_DEST:-}" ] && [ -d "$DROP_MOVE_DEST" ] && CYS_HOME_ARCHIVED="$DROP_MOVE_DEST"
+        [ -n "$CYS_HOME_ARCHIVED" ] && drop_archived_credentials "$CYS_HOME_ARCHIVED"
+      elif archive_move "$HOME/.cys" "cys-home" "cysr 계정 자리(대화·부서 기록)"; then
         [ -n "$ARCHIVE_LAST" ] && CYS_HOME_ARCHIVED="$ARCHIVE_LAST"
         [ -n "$CYS_HOME_ARCHIVED" ] && drop_archived_credentials "$CYS_HOME_ARCHIVED"
       fi
