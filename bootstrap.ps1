@@ -137,7 +137,8 @@ $CysDisplayName = 'cysr'
 # 0.3.38: 핀 값 그대로(cysr 1.1.6) · 바뀐 것 = 윈 설치 결함 묶음(2026-09-30 노트북): 설치 확인 = 파일 판 · 설치 자리 = /D 한 자리 · 설치 창 폴백 0 · 창 실행 파일 확인 · 백신 보류 1분 판정 · 쓸 수 없는 자리를 가리키는 옛 설치 자리 기억 정리 / 맥: 코드 변경 0(한 릴리스 = 한 판번)
 # 0.3.39: cysr 1.1.7 과 함께 내는 판(핀은 1.1.7 절단 뒤 · 그 전까지 1.1.6) · 바뀐 것 = 0.3.38 위에 [7/10]·창 찾기·원격 해결이 [6/10] 본체 폴더를 먼저 · 같은 판 덮어 깔기 기다림 · 옛 설치 자리 기억 정리 보강(숨김 파일 · 원래 값 기록 못 하면 안 지움) · 백신 창 단추 안내 = 본 창 기준 · 버린 설치 목록 후보 기록 1줄 · 없는 드라이브 항목 오류 0 / 맥: 원격 해결의 cys 도 [7/10] 이 고른 것 먼저
 # 0.3.40: cysr 1.1.8 핀(값은 0.3.39 뒤 편입분 그대로) · 바뀐 것 = 자동 새 판 바꾸기와의 잠금 참가·위임 + 되돌림 파일 챙기기(진단 코드 J-UPD-01~03) · 지우개: 참가 자리가 ~\.cys 안이어도 그것만 제자리에 두고 나머지는 보관 폴더로 / 맥: 같은 잠금 참가·위임 · 인텔 맥 핀 대조 시험
-$CysVersion     = '1.1.8'
+# 0.3.41: cysr 1.1.9 핀(발행 2026-10-17 · 릴리스 SHA256SUMS.txt 403a8be0…) · 코드 변경 0 — 핀 값과 판번만
+$CysVersion     = '1.1.9'
 $CysDownloadDir = "https://github.com/oogisoogi/cys-ro/releases/download/v${CysVersion}/"
 # ✅아래 세 값 = v1.1.6 재절단 드래프트 릴리스(2026-09-26 · 릴리스 id 396787705 · 대상 커밋 76d2b5e9) 의 자산에서 **실측으로 채웠다**(첫 절단 값(a8ab563b · 140837194 · 릴리스 id 396500235)을 대신한다).
 #   출처 = 릴리스 SHA256SUMS.txt(그 파일 자신의 sha256 = ca54d259b460340f33541181b1711e0183e036dc6a1c3110771480c2496b4ff2 · 1157 B · 13행 · 재절단 드래프트 자산) · 크기·지문은 릴리스 API 자산 digest·SUMS 줄·인증 받기 실물 sha256 과 대조(3/3 일치).
@@ -149,8 +150,8 @@ $CysDownloadDir = "https://github.com/oogisoogi/cys-ro/releases/download/v${CysV
 #   `${CysVersion}` 를 그대로 두는 것이 정본이다 — 판을 올릴 때 이름이 함께 따라 오르고, 뮤턴트 M508 이 그 따라오름을 잰다.
 #   지금 값은 풀면 cysr_1.1.6_x64-setup.exe = 릴리스 자산 이름과 글자 그대로 같다.
 $CysWinFile     = "cysr_${CysVersion}_x64-setup.exe"
-$CysWinBytes    = 151758258
-$CysWinSha256   = 'aeaad1475e7b8a45ad7295999ebf5448410118eba001b7cdaa6aa6d52b617179'   # 릴리스 v1.1.8 SHA256SUMS.txt 의 그 줄과 바이트 일치(tests/win-pin-release.sh 가 릴리스를 때려 다시 잰다)
+$CysWinBytes    = 152133980
+$CysWinSha256   = 'c351c1ab481238d24507a773be581f86d7beb486ef965006997fc4e56f9aebb4'   # 릴리스 v1.1.9 SHA256SUMS.txt 의 그 줄과 바이트 일치(tests/win-pin-release.sh 가 릴리스를 때려 다시 잰다)
 $CysDownloadUrl = $CysDownloadDir + $CysWinFile
 
 $LoginPollInterval = 2     # 초 — 승인 프로세스가 끝난 뒤 로그인을 다시 확인하는 간격
@@ -5273,7 +5274,7 @@ function Step-Fleet {
 #   글자 칸은 `\z` 로 끝을 못박아 다시 만든다. 이름·글자·판본 비교는 대소문자를 가르는 -ceq·-cmatch·-ccontains 만 쓴다.
 # ⚠PowerShell 은 `'true' -eq $true` 를 참으로 본다 ⇒ 칸마다 **형(type)을 먼저** 본다.
 # ⚠이 절은 맥에서 PowerShell 없이 **정적 검사 + 맥판과의 대조**로만 증명했다 — 윈도우 실기가 필요한 축은 내부 문서.
-$InstallerVersion       = '0.3.40'   # 보고의 installer_version · $BootstrapVersion 은 화면 머리글 용도 그대로(보내지 않는다)
+$InstallerVersion       = '0.3.41'   # 보고의 installer_version · $BootstrapVersion 은 화면 머리글 용도 그대로(보내지 않는다)
 # 0.3.36: JARVIS_HELP_API_URL = CI·흉내가 도움 보고를 로컬로 돌리는 손잡이(맥 짝 · 사람이 쓰는 길이 아니다 · 없으면 종전 주소 — tests/help-url-lever.sh).
 $HelpApiUrl             = if ($env:JARVIS_HELP_API_URL) { [string]$env:JARVIS_HELP_API_URL } else { 'https://jarvis-install.godmeyou.kr' }
 # 🔴0.3.36(이종 검토): 시험용 함수 묶음은 도움 보고(/api/help)·닫기도 라이브로 못 보낸다(맥 HELP_API_URL 짝) — 가짜 서버는 읽은 뒤 덮어쓴다.

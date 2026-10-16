@@ -143,12 +143,13 @@ CYS_DISPLAY_NAME="cysr"
 # 0.3.38: 핀 값 그대로(cysr 1.1.6) · 맥 코드 변경 0 — 판번만 윈과 함께 올림(한 릴리스 = 한 판번 · 윈 = 설치 결함 묶음)
 # 0.3.39: cysr 1.1.7 과 함께 내는 판(핀은 1.1.7 절단 뒤) · 맥 바뀐 것 = 원격 해결이 부르는 cys 도 [7/10] 이 고른 CYS_CLI(절대 경로) 먼저
 # 0.3.40: cysr 1.1.8 핀(값은 0.3.39 뒤 편입분 그대로) · 바뀐 것 = 자동 새 판 바꾸기와의 잠금 참가·위임(진단 코드 J-UPD-01~03) · 지우개: 참가 자리가 ~/.cys 안이어도 그것만 제자리에 두고 나머지는 보관 폴더로 · 인텔 맥 핀을 릴리스와 대조하는 시험(tests/mac-pin-x64-release.sh)
-CYS_FORK_VERSION="1.1.8"
+# 0.3.41: cysr 1.1.9 핀(발행 2026-10-17 · 릴리스 SHA256SUMS.txt 403a8be0…) · 코드 변경 0 — 핀 값과 판번만
+CYS_FORK_VERSION="1.1.9"
 CYS_FORK_DIR="https://github.com/oogisoogi/cys-ro/releases/download/v${CYS_FORK_VERSION}/"
 # 1.0.1 부터 zip 최상위 = cysr.app(안의 실행 파일 = Contents/MacOS/cys · cys-app · cysd · CFBundleName cysr · 로컬 빌드 실측 2026-09-16).
 CYS_FORK_FILE="cysr-macos-arm64-v${CYS_FORK_VERSION}.zip"
-# ✅아래 크기·지문·CDHash = **v1.1.8 발행 zip** 의 값이다(2026-10-11 대조 · 1.1.7 값을 대신한다).
-#   출처 = 릴리스 v1.1.8 의 SHA256SUMS.txt(그 파일 자신의 sha256 = 2187b046cd39bc583836b843eded79a4a0de447caf624b7aacd5f066a80dd8b9 · 1157 B · 13행) — 지문·파일 이름은 그 줄과 바이트 일치,
+# ✅아래 크기·지문·CDHash = **v1.1.9 발행 zip** 의 값이다(2026-10-17 대조 · 1.1.8 값(82c8224b · 220957953)을 대신한다).
+#   출처 = 릴리스 v1.1.9 의 SHA256SUMS.txt(그 파일 자신의 sha256 = 403a8be0c98fa2b59c4ab53707f6f90707d02efe356eeda9ff3032d6c1a191ae · 1157 B · 13행) — 지문·파일 이름은 그 줄과 바이트 일치,
 #         크기는 릴리스 zip 의 크기, CDHash 는 발행 zip 을 풀어(ditto -x -k) codesign -dvvv 로 잰 값. 세 값 모두 tests/mac-pin-release.sh 가 릴리스를 때려 다시 잰다.
 #   (이전 기록 · 1.1.6) **v1.1.6 재절단 드래프트(릴리스 id 396787705 · 대상 커밋 76d2b5e9)** 의 zip 에서 실측(2026-09-26 · 1.1.5 값(71e285ea · 207818466)을 대신했다).
 #   (이전 기록 · 1.1.6 출처) 릴리스 v1.1.6 의 SHA256SUMS.txt(그 파일 자신의 sha256 = ca54d259b460340f33541181b1711e0183e036dc6a1c3110771480c2496b4ff2 · 1157 B · 13행 · 재절단 드래프트 자산)와
@@ -158,16 +159,16 @@ CYS_FORK_FILE="cysr-macos-arm64-v${CYS_FORK_VERSION}.zip"
 #         발행 자산 zip 실물(arm64·x64 · gh release download) — 크기·sha256 은 파일에서 셌고(릴리스 API digest·SUMS 줄과 3/3 일치), CDHash 는 풀어서(ditto -x -k) codesign -dvvv 로 쟀다(지시값 6/6 일치).
 #   ⚠태그가 옮겨지면 이 값도 함께 바뀐다(v1.1.0 라운드에만 네 번 옮겨졌다) — 값을 문서에 복제하지 말고 발행 자산에서 다시 재라.
 #   CDHash 는 **발행된 그 zip** 을 풀어(ditto -x -k) `codesign -dvvv` 로 쟀다(서명 = cys-local · zip 최상위 = cysr.app 하나).
-CYS_FORK_BYTES="220957953"
-CYS_FORK_SHA256="82c8224b0c499bb9755ef60b5968bbe12b871583a6647d20e3077d0949352381"
+CYS_FORK_BYTES="221415320"
+CYS_FORK_SHA256="27a0f7918753206640619061b62a8e92653e5fe35b8e41b1cdb85ba2e142bf56"
 # 설치된 프로그램이 「바로 이 판」인가를 가르는 값. 판본 숫자는 원작자 판도 같은 숫자를 쓸 수 있어서
 #   숫자만 보면 **원작자 판을 우리 판으로 읽고 건너뛴다**(어제 원작자 판을 깐 맥이 그대로 남는다).
-CYS_FORK_CDHASH="092d568439b68deb28349af0dae3514b62e9bc49"
+CYS_FORK_CDHASH="2719058bec4af44f56d5dd8e48cba151c2ae9738"
 
 # ★★인텔(x86_64) 맥 핀 — v1.1 부터 우리 판이 인텔 맥도 덮는다 (2026-09-20).
 #   까닭: v1.0.2 까지 우리 맥 자산은 arm64 하나뿐이라 **인텔 맥만 원작자 판으로 갈라졌다**. 같은 날 같은 방에서
 #     두 참가자가 서로 다른 cys 를 쓰는 일이 실제로 있었다(2026-09-15 전환 주석의 그 사유) — 그 갈림을 여기서 닫는다.
-#   ✅아래 값은 **v1.1.8 발행 x64 zip** 의 값이다(2026-10-11 대조 · 지문·파일 이름 = 릴리스 SHA256SUMS.txt 의 그 줄 · 크기 = 릴리스 zip 크기 — tests/mac-pin-x64-release.sh 가 릴리스를 때려 다시 잰다).
+#   ✅아래 값은 **v1.1.9 발행 x64 zip** 의 값이다(2026-10-17 대조 · 지문·파일 이름 = 릴리스 SHA256SUMS.txt 의 그 줄 · 크기 = 릴리스 zip 크기 — tests/mac-pin-x64-release.sh 가 릴리스를 때려 다시 잰다).
 #     CDHash 는 발행 zip 을 풀어 codesign -dvvv 로 잰 값이다(그 시험은 모양만 본다 — zip 약 230MB 를 받아야 해서 · 값을 바꿀 때는 풀어서 다시 잰다).
 #     (이전 기록) v1.1.6 재절단 x64 드래프트 zip 에서 실측(2026-09-26 · 릴리스 id 396787705 · 대상 커밋 76d2b5e9 · 1.1.5 값(45b629ff · 215440455)을 대신했다).
 #     (이전 기록) v1.1.5 x64 발행 zip 에서 실측(2026-09-24 · 11차 재핀 · 11차 절단 태그 커밋 526325bf · Mach-O thin x86_64 · 서명 cys-local).
@@ -175,9 +176,9 @@ CYS_FORK_CDHASH="092d568439b68deb28349af0dae3514b62e9bc49"
 #   ⛔자리표가 남아 있는 동안 인텔 맥은 **원작자 판으로 돌아가지 않고 멈춘다**(cys_fork_x64_pin_ready · step_download_cys 머리).
 #     조용히 원작자 판을 깔면 이 바꿈이 없애려던 그 갈림이 그대로 되살아난다 — 말없이 다른 판을 까느니 멈춰서 말하는 쪽을 고른다.
 CYS_FORK_X64_FILE="cysr-macos-x64-v${CYS_FORK_VERSION}.zip"
-CYS_FORK_X64_BYTES="228831709"
-CYS_FORK_X64_SHA256="9e2e03b10c1135290fb0fd7179d47874b9e736da365b751bf474dd2b9d705799"
-CYS_FORK_X64_CDHASH="b1c032d657105722bda69bb465887e4503c13fe7"
+CYS_FORK_X64_BYTES="229334467"
+CYS_FORK_X64_SHA256="b4ce56aec3c93e34649197c2035c6570776064846ce167dd71ef59254b306acc"
+CYS_FORK_X64_CDHASH="f162ae2e3a632f52a6b361ae88eae5fff4878e47"
 # 저희 판이 놓이는 자리 = /Applications/cysr.app · 옛 이름 자리 = /Applications/cys.app(0.14.x·1.0.0 이 깔린 자리 · 원작자 판도 이 이름).
 CYS_FORK_APP="/Applications/cysr.app"
 CYS_OLD_APP="/Applications/cys.app"
@@ -5081,7 +5082,7 @@ raise_cys_app_window() {
 # ★언제 도는가 = 자비스를 깨우기 **전에** 진단 코드를 남기고 멈춘 끝. 자비스를 깨운 뒤에는 돌지 않는다
 #   (자비스가 이 창을 넘겨받으므로 두 쪽이 한 화면에 섞이지 않게).
 # ⚠JSON·재검사·스크럽은 macOS 기본 `osascript`(JavaScript)가 한다 — 깨끗한 맥에는 jq·python 이 없다.
-INSTALLER_VERSION="0.3.40"      # 보고의 installer_version · BOOTSTRAP_VERSION 은 화면 머리글 용도 그대로(보내지 않는다)
+INSTALLER_VERSION="0.3.41"      # 보고의 installer_version · BOOTSTRAP_VERSION 은 화면 머리글 용도 그대로(보내지 않는다)
 # 0.3.36: JARVIS_HELP_API_URL = CI·흉내가 도움 보고를 로컬로 돌리는 손잡이(JARVIS_PROGRESS_URL 과 같은 모양 · 사람이 쓰는 길이 아니다 ·
 #   없으면 종전 주소 그대로 — tests/help-url-lever.sh 가 잰다). CI(reinstall-matrix.yml)의 full 부분 설치가 라이브 도움 채널로 가던 길을 막는다.
 HELP_API_URL="${JARVIS_HELP_API_URL:-https://jarvis-install.godmeyou.kr}"
