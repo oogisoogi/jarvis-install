@@ -25,11 +25,14 @@ trap 'rm -rf "$BASE"' EXIT
 pass=0; fail=0
 t() { if [ "$1" -eq 0 ]; then pass=$((pass+1)); printf '  ok   %s\n' "$2"; else fail=$((fail+1)); printf '  FAIL %s  ← %s\n' "$2" "$3"; fi; }
 OWNER='설치가 잘 되는지 보려고 진행 단계와 기기 정보(모델, 메모리, 남은 공간)를 자동으로 보냅니다.'
+# 0.3.43(운영 결정 2026-10-30): 첫 문장 바로 뒤 1구절 = 로그인 대기 입력(서버 NOTICE_TEXT 둘째 문장과 같은 글)
+OWNER_LOGIN='로그인이 시간 안에 끝나지 않으면, 기다리시는 동안 키보드·마우스를 쓰셨는지 안 쓰셨는지만 함께 보냅니다(무엇을 누르셨는지는 보내지 않습니다).'
+AI_WEB="${AI_JARVIS_WEB:-$HOME/axdev/ai-jarvis/web-install}"
 OWNER_CAP='설치가 끝나거나 막히거나 이상이 보이면, 도와드리기 위해 이 창과 자비스 창의 글자를 운영팀에 보냅니다(개인정보는 가리고 30일 뒤 지웁니다).'
 
-r="$(OWNER="$OWNER" OWNER_CAP="$OWNER_CAP" python3 - "$SH" "$PS" <<'PY'
+r="$(OWNER="$OWNER" OWNER_LOGIN="$OWNER_LOGIN" OWNER_CAP="$OWNER_CAP" PAGE="$AI_WEB/src/page.ts" python3 - "$SH" "$PS" <<'PY'
 import os, re, sys
-own = os.environ["OWNER"]
+own = os.environ["OWNER"] + " " + os.environ["OWNER_LOGIN"]
 own_cap = os.environ["OWNER_CAP"]
 sh = open(sys.argv[1], encoding="utf-8").read()
 ps = open(sys.argv[2], encoding="utf-8-sig").read()
@@ -38,6 +41,16 @@ m = re.search(r'^PROGRESS_NOTICE="([^"]*)"', sh, re.M)
 out.append("mac-text=" + ("1" if m and m.group(1) == own else "0:" + (m.group(1) if m else "none")))
 m = re.search(r"^\$ProgressNotice = '([^']*)'", ps, re.M)
 out.append("win-text=" + ("1" if m and m.group(1).startswith(own + " ") else "0"))
+# 서버 정본(page.ts NOTICE_TEXT)과 세 곳 같은 글 — 윈 = 전문 같음 · 맥 = 정본의 앞 두 문장 · page.ts 가 없으면 skip(다른 저장소)
+win_txt = m.group(1) if m else None
+pg = os.environ.get("PAGE", "")
+if os.path.isfile(pg):
+    pm = re.search(r'export const NOTICE_TEXT =\s*"((?:[^"\\]|\\.)*)";', open(pg, encoding="utf-8").read())
+    mm = re.search(r'^PROGRESS_NOTICE="([^"]*)"', sh, re.M)
+    ok = pm and win_txt == pm.group(1) and mm and pm.group(1).startswith(mm.group(1) + " ")
+    out.append("page-canon=" + ("1" if ok else "0"))
+else:
+    out.append("page-canon=skip")
 def order(src, start, notice_pat, send_pat):
     i = src.index(start)
     lines = [l.split("#", 1)[0] for l in src[i:].splitlines()]   # 주석 걷음
@@ -78,6 +91,7 @@ print(" ".join(out))
 PY
 )"
 case "$r" in *mac-text=1*) true ;; *) false ;; esac; t $? "[ⓐ 맥] 첫 화면 고지 한 줄 = 운영자 확정 문구 그대로" "$r"
+case "$r" in *page-canon=1*) t 0 "[ⓐ 정본] 윈 고지 = page.ts NOTICE_TEXT 전문 · 맥 고지 = 그 앞 두 문장" "" ;; *page-canon=skip*) printf '  skip [ⓐ 정본] page.ts 없음(%s)\n' "$AI_WEB" ;; *) t 1 "[ⓐ 정본] 윈 고지 = page.ts NOTICE_TEXT 전문 · 맥 고지 = 그 앞 두 문장" "$r" ;; esac
 case "$r" in *win-text=1*) true ;; *) false ;; esac; t $? "[ⓐ 윈] 첫 화면 고지 첫 문장 = 운영자 확정 문구 그대로" "$r"
 case "$r" in *mac-order=1*) true ;; *) false ;; esac; t $? "[ⓑ 맥] 본문 순서 [1/10] → 고지 → 첫 전송" "$r"
 case "$r" in *win-order=1*) true ;; *) false ;; esac; t $? "[ⓑ 윈] 본문 순서 [1/10] → 고지 → 첫 전송" "$r"

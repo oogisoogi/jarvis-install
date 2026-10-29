@@ -138,6 +138,7 @@ $CysDisplayName = 'cysr'
 # 0.3.39: cysr 1.1.7 과 함께 내는 판(핀은 1.1.7 절단 뒤 · 그 전까지 1.1.6) · 바뀐 것 = 0.3.38 위에 [7/10]·창 찾기·원격 해결이 [6/10] 본체 폴더를 먼저 · 같은 판 덮어 깔기 기다림 · 옛 설치 자리 기억 정리 보강(숨김 파일 · 원래 값 기록 못 하면 안 지움) · 백신 창 단추 안내 = 본 창 기준 · 버린 설치 목록 후보 기록 1줄 · 없는 드라이브 항목 오류 0 / 맥: 원격 해결의 cys 도 [7/10] 이 고른 것 먼저
 # 0.3.40: cysr 1.1.8 핀(값은 0.3.39 뒤 편입분 그대로) · 바뀐 것 = 자동 새 판 바꾸기와의 잠금 참가·위임 + 되돌림 파일 챙기기(진단 코드 J-UPD-01~03) · 지우개: 참가 자리가 ~\.cys 안이어도 그것만 제자리에 두고 나머지는 보관 폴더로 / 맥: 같은 잠금 참가·위임 · 인텔 맥 핀 대조 시험
 # 0.3.41: cysr 1.1.9 핀(발행 2026-10-17 · 릴리스 SHA256SUMS.txt 403a8be0…) · 코드 변경 0 — 핀 값과 판번만
+# 0.3.43(2026-10-30): 핀 그대로(cysr 1.1.10) — 도움 사례 진단 갈래(J-INST-01 · J-DL-08 · J-NET-04 · J-APP-02) · 로그인 대기 입력 수집 = 사용 여부만 + 첫 화면 고지 1구절
 # 0.3.42: cysr 1.1.10 핀(발행 2026-10-23 · 값 = 발행할 자산 실물 실측 · 릴리스 SHA256SUMS.txt 대조는 발행 뒤 tests/win-pin-release.sh) · 코드 변경 0 — 핀 값과 판번만
 $CysVersion     = '1.1.10'
 $CysDownloadDir = "https://github.com/oogisoogi/cys-ro/releases/download/v${CysVersion}/"
@@ -646,6 +647,7 @@ $HelpWays = @{
     'J-NET-03'   = @('회사·학교 망은 바깥 서버를 막아 둔 경우가 있습니다.', '휴대폰 핫스팟 같은 다른 인터넷으로 연결하신 뒤 다시 실행해 주십시오.')
     'J-RM-01'    = @('재설치 명령을 한 번 더 실행해 주십시오.', '열려 있는 cysr 은 재설치가 스스로 닫습니다.')
     'J-PATH-01'  = @('컴퓨터를 한 번 다시 시작하신 뒤 새 창에서 다시 실행해 주십시오.')
+    'J-INST-01'  = @('열려 있는 설치 창을 모두 닫고 컴퓨터를 한 번 다시 시작하신 뒤,', '새 창에서 다시 실행해 주십시오.')
     'J-PS32-01'  = @('시작 메뉴에서 (x86) 이 붙지 않은 「Windows PowerShell」을 찾아 여신 뒤,', '아래 「다시 하시는 법」대로 다시 실행해 주십시오.')
     'J-LOGIN-01' = @('브라우저가 뜨지 않았거나 다른 브라우저에 로그인돼 있으면,', '화면에 보이는 https:// 로 시작하는 로그인 주소를 복사해', '로그인된 브라우저 주소창에 붙여넣어 주십시오.')
     'J-LOGIN-02' = @('브라우저 창을 모두 닫으신 뒤 다시 실행해 주십시오.', '승인은 한 번만 누르시고 코드를 복사하면 설치가 이어집니다.', '안 이어지면 설치 창을 한 번 클릭한 뒤 Ctrl+V 로 붙여넣어 주십시오.')
@@ -659,6 +661,9 @@ $HelpWays = @{
     'J-DL-03'    = @('컴퓨터를 한 번 다시 시작하신 뒤 새 창에서 다시 실행해 주십시오.')
     'J-DL-04'    = @('휴대폰 핫스팟 같은 다른 인터넷으로 연결하신 뒤 다시 실행해 주십시오.')
     'J-DL-07'    = @('클로드를 내려받는 서버에 닿지 못했습니다.', '휴대폰 핫스팟 같은 다른 인터넷으로 연결하신 뒤 다시 실행해 주십시오.', '회사·학교 망이면 그 망이 막아 둔 것일 수 있습니다.')
+    'J-DL-08'    = @('인터넷이 잘 되는 곳(공유기 가까이 · 다른 와이파이 · 휴대폰 핫스팟)으로', '옮기신 뒤 다시 실행해 주십시오. 끝난 단계는 건너뜁니다.')
+    'J-NET-04'   = @('휴대폰 핫스팟 같은 다른 인터넷으로 연결하신 뒤 다시 실행해 주십시오.', '회사·학교 컴퓨터라면 전산 담당자께', 'claude.ai 접속이 막혀 있는지 여쭈어 보셔도 됩니다.')
+    'J-APP-02'   = @('컴퓨터를 한 번 다시 시작하신 뒤 다시 실행해 주십시오.')
     # 1.1.8 U5: 새 판 바꾸기 기다림 — 두 번째에도 같으면 더 기다리기(01) · 다시 켜기(02) · 03 은 기다려도 안 풀려 곧바로 담당자($HelpDirectCodes)
     'J-UPD-01'   = @('10분쯤 뒤에 다시 실행해 주십시오.')
     'J-UPD-02'   = @('컴퓨터를 한 번 다시 시작하신 뒤 다시 실행해 주십시오.')
@@ -1090,13 +1095,32 @@ function Get-CysVersionLine {
 #   명령  = 이 창에서 부를 수 있다
 # 설치 목록만 보고 「있다」고 판정하면 안 된다. 지난 설치가 끝까지 못 간 컴퓨터에서 실제로 어긋난다.
 # 받는 자리 점검(1-7)의 답을 사람 말로 — 「안 쟀다」와 「못 닿았다」를 가른다.
+$script:InstallUrlProbe = 'unknown'   # 1-7 에서 claude.ai(설치기 주소)가 답했나: ok · fail · trust(안전 연결 실패) · unknown
 function Get-DlProbeWords {
-    switch ($script:DlProbe) {
-        'ok'   { return '설치 시작 전에는 닿았습니다(그 사이에 끊겼을 수 있습니다).' }
-        'bad'  { return '답은 왔지만 판번이 아니었습니다 — 회사·학교 망의 안내 화면일 수 있습니다.' }
-        'fail' { return '닿지 못했습니다 — 이 자리가 막혀 있습니다.' }
-        default { return '재지 못했습니다.' }
+    $dl = switch ($script:DlProbe) {
+        'ok'   { '설치 시작 전에는 닿았습니다(그 사이에 끊겼을 수 있습니다).' }
+        'bad'  { '답은 왔지만 판번이 아니었습니다 — 회사·학교 망의 안내 화면일 수 있습니다.' }
+        'fail' { '닿지 못했습니다 — 이 자리가 막혀 있습니다.' }
+        default { '재지 못했습니다.' }
     }
+    # installer-0343(도움 XQ9GKXWJ · MSN5EB74): 받는 자리(downloads.claude.ai)는 닿았는데 claude.ai 가 시작 전부터 실패한 기기에
+    #   「설치 시작 전에는 닿았습니다」만 적어, 실제로 실패한 주소는 시작 전에도 실패였다는 사실이 가려졌다 ⇒ 실패한 주소를 먼저 말한다.
+    if ($script:InstallUrlProbe -eq 'trust') { return ('claude.ai 에는 설치 시작 전에도 안전한 연결을 맺지 못했습니다 · downloads.claude.ai 는 ' + $dl) }
+    if ($script:InstallUrlProbe -eq 'fail')  { return ('claude.ai 에는 설치 시작 전에도 닿지 못했습니다 · downloads.claude.ai 는 ' + $dl) }
+    return $dl
+}
+# 예외와 그 안쪽 예외들의 글자를 한 줄로(5.1 = WebException.Status TrustFailure · 7 = 안쪽 AuthenticationException).
+function Get-ErrorChainText($ex) {
+    $parts = @()
+    for ($e = $ex; $e; $e = $e.InnerException) {
+        $parts += ([string]$e.GetType().Name + ' ' + [string]$e.Message)
+        try { if ($e.Status) { $parts += [string]$e.Status } } catch { }
+    }
+    return ($parts -join ' | ')
+}
+# 안전 연결(인증서 신뢰)이 안 맺어졌다는 말인가 — 윈 한국어 5.1 실측 문구(도움 XQ9GKXWJ)와 영어·7 판의 같은 뜻.
+function Test-TlsTrustWords([string]$text) {
+    return ($text -match '트러스트 관계|trust relationship|TrustFailure|AuthenticationException|remote certificate is invalid|원격 인증서')
 }
 $script:ClaudeInstallLog = ''
 # 자식 설치기가 남긴 글자의 꼬리를 화면과 환경 보고 양쪽에 붙인다(20줄) — 없으면 없다고 적는다.
@@ -1117,6 +1141,50 @@ function Show-ClaudeInstallLogTail {
     Say '     설치기가 마지막에 한 말입니다:'
     foreach ($ln in $tail) { if (([string]$ln).Trim()) { Say ('       ' + (Redact ([string]$ln))) } }
     Add-ReportLines (@('', '## [2/10] 클로드 설치기가 남긴 글자(마지막 20줄)') + @($tail | ForEach-Object { '- ' + (Redact ([string]$_)) }))
+}
+# 공식 설치기가 스스로 실패를 말했는가(help-cases-1029 · 도움 KUDTUSU9 10-22 08:32 · J-PATH-01 오진).
+#   그 기기는 설치기 기록 끝에 「× Installation failed」·「EBUSY: resource busy or locked」·「[claude-install error] Installation failed (exit code 1)」을
+#   남겼고 파일도 없었는데, 종료 코드를 못 읽어 「깔렸는데 명령을 못 찾는다(새 창·재시작 처방)」로 떨어졌다 — 깔린 적이 없었다.
+#   ⇒ 종료 코드가 아니라 **설치기가 한 말**로 가른다. 돌려주는 것 = '' 실패 표지 없음 · 'busy' 다른 프로그램이 임시 폴더를 쥐고 있었다 · 'failed' 그 밖.
+function Get-ClaudeInstallFailKind {
+    $tail = (@(Get-ClaudeInstallLogTail 60) | ForEach-Object { [string]$_ }) -join "`n"
+    if ($tail -notmatch 'Installation failed') { return '' }
+    if ($tail -match 'EBUSY|EPERM|resource busy or locked|being used by another process') { return 'busy' }
+    return 'failed'
+}
+# installer-0343(도움 XQ9GKXWJ · MSN5EB74 09-30 · J-DL-07 부분 오진): 공식 설치기가 「SSL/TLS 보안 채널에 대한 트러스트 관계를 설정할 수 없습니다」로
+#   끝났고 1-7 에서도 claude.ai 만 실패였다(github·downloads 는 정상 ⇒ 시계 문제가 아닐 가능성이 크다). 「서버에 못 닿음」이 아니라
+#   **claude.ai 한 곳과 안전한 연결이 안 맺어진 것** — 회사·학교·기관 망이나 보안 프로그램이 그 주소를 막을 때의 모양이다.
+#   판정 = 설치기가 남긴 글자(끝 60줄) 또는 1-7 의 claude.ai 실패가 안전 연결 실패였는가.
+function Test-ClaudeTlsTrustFail {
+    if ($script:InstallUrlProbe -eq 'trust') { return $true }
+    return (Test-TlsTrustWords ((@(Get-ClaudeInstallLogTail 60) | ForEach-Object { [string]$_ }) -join "`n"))
+}
+function Write-ClaudeTlsTrustFailed([string]$facts) {
+    Write-Log ('J-NET-04 by: tls-trust probe=' + $script:InstallUrlProbe)
+    Say '[2/10] 이 인터넷에서 claude.ai 와 안전한 연결을 맺지 못해 클로드 설치기를 받지 못했습니다(클로드 파일도 생기지 않았습니다).'
+    Write-JCode 'J-NET-04' 'claude.ai 와 안전한 연결을 맺지 못했습니다'
+    Say '     회사·학교·기관 인터넷이나 보안 프로그램이 이 주소를 막아 둘 때 흔히 이렇게 됩니다.'
+    Set-NextStepRerun '휴대폰 핫스팟 같은 다른 인터넷으로 연결하신 뒤, 아래 「다시 하시는 법」대로 다시 실행해 주십시오. 회사·학교 컴퓨터라면 전산 담당자께 claude.ai 접속이 막혀 있는지 여쭈어 보셔도 됩니다.'
+    if ($facts) { Say $facts }
+    Say ('     처음 점검 결과: ' + (Get-DlProbeWords))
+    Show-ClaudeInstallLogTail
+    $script:ShowRerun = $true
+}
+# 공식 설치기 실패(J-INST-01) — 종료 코드를 읽은 갈래와 못 읽은 갈래가 같은 말을 하게 한 자리에서 한다.
+function Write-ClaudeInstallFailed([string]$kind, [string]$facts) {
+    Write-Log ('J-INST-01 by: vendor-said-failed kind=' + $kind)
+    Say '[2/10] 클로드 공식 설치기가 설치를 끝내지 못했다고 알려 왔습니다(클로드 파일도 생기지 않았습니다).'
+    Write-JCode 'J-INST-01' '클로드 공식 설치기가 설치를 끝내지 못했습니다'
+    if ($kind -eq 'busy') {
+        Say '     설치기가 쓰려던 임시 폴더를 다른 프로그램이 잠깐 쥐고 있었습니다 — 백신 검사나, 앞서 열어 둔 다른 설치 창일 때가 많습니다.'
+        Set-NextStepRerun '열려 있는 다른 PowerShell 창을 모두 닫고 1분쯤 기다리신 뒤, 아래 「다시 하시는 법」대로 다시 실행해 주십시오. 두 번째도 같으면 컴퓨터를 한 번 다시 시작하신 뒤 다시 실행해 주십시오.'
+    } else {
+        Set-NextStepRerun '아래 「다시 하시는 법」대로 한 번 더 실행해 주십시오. 두 번째도 같으면 이 화면을 사진으로 남겨 보내 주십시오.'
+    }
+    if ($facts) { Say $facts }
+    Show-ClaudeInstallLogTail
+    $script:ShowRerun = $true
 }
 # 설치 목록 값 → 경로. Tauri 설치기는 InstallLocation·DisplayIcon·UninstallString 에 큰따옴표를 글자로 넣어 쓴다(모든 기기의 정상 값).
 #   ⇒ 따옴표를 벗기고 환경변수를 푼다 — 제거기 reset-clean.ps1 의 같은 값 읽기와 같은 규칙(0.3.38 · 윈 결함 묶음 ⓑ).
@@ -1556,7 +1624,9 @@ function Invoke-DetectStage1 {
 
     # 1-7 네트워크 — 연결 성립 여부만 본다
     $netEnum = 'ok'; $netVal = ''
+    $script:InstallUrlProbe = 'unknown'
     foreach ($u in @($ClaudeInstallUrl, $CysSiteUrl)) {
+        $uOk = $true
         try {
             $r = Invoke-WebRequest -Uri $u -Method Head -TimeoutSec 8 -UseBasicParsing -ErrorAction Stop
             $netVal += "$u=$($r.StatusCode) "
@@ -1567,9 +1637,14 @@ function Invoke-DetectStage1 {
             if ($code -and $code -ge 200 -and $code -lt 400) {
                 $netVal += "$u=$code "
             } else {
-                $netVal += "$u=실패 "; $netEnum = 'failed'
+                $uOk = $false
+                # installer-0343: 안전 연결(인증서 신뢰)이 안 맺어진 실패는 「못 닿음」과 다른 이름으로 남긴다 — [2/10] J-NET-04 가 읽는다.
+                $trust = Test-TlsTrustWords (Get-ErrorChainText $_.Exception)
+                $netVal += $(if ($trust) { "$u=실패(안전 연결) " } else { "$u=실패 " }); $netEnum = 'failed'
+                if ($u -eq $ClaudeInstallUrl -and $trust) { $script:InstallUrlProbe = 'trust' }
             }
         }
+        if ($u -eq $ClaudeInstallUrl -and $script:InstallUrlProbe -ne 'trust') { $script:InstallUrlProbe = $(if ($uOk) { 'ok' } else { 'fail' }) }
     }
     # 🔴받는 자리(downloads.claude.ai)는 **본문까지** 본다 — 여기만 판정 축이 다르다(0.3.28).
     #   까닭: 위 두 곳은 「나갈 수 있는가」를 재지만 이 자리는 「받아 올 수 있는가」를 잰다.
@@ -2340,12 +2415,28 @@ function Step-InstallClaude {
     }
     if ($held -and (-not $direct)) {
         # 조용히 다음 단계로 가지 않는다. 여기서 멈춰야 사람이 무엇을 누를지 알게 된다.
-        Write-JCode 'J-AV-01' '백신 창이 설치 파일을 붙들고 있는 것으로 보입니다'
+        # help-cases-1029(도움 KXA5QUM5 10-21): 백신 창은 한 번도 안 보였고 1분 멈춤 판정도 없었는데(받던 파일이 자라고 있었다)
+        #   「백신이 붙들고 있다」고 단정했다 — 그 기기는 진행 보고 전송도 시간 초과였다(느린 망 쪽 근거).
+        #   ⇒ 백신 근거(창 제목 · 1분 멈춤 판정)가 하나라도 있을 때만 백신을 앞에 세운다. 없으면 「느린 인터넷 또는 백신 — 가능성」으로 말한다.
+        $avNow = @(Get-AvWindowTitles)
+        $avEvidence = ([bool]$avShown) -or ($avNow.Count -gt 0) -or $avRetried -or $avStuck
+        Write-Log ('J-AV-01 by: av-evidence=' + $avEvidence + ' (window=' + ([bool]$avShown -or ($avNow.Count -gt 0)) + ' stall=' + ($avRetried -or $avStuck) + ' progress-fail-run=' + [int]$script:ProgressFailRun + ')')
+        Add-ReportLines @('', '## [2/10] 백신과 느린 인터넷 가르기', ('- 백신으로 보이는 창: ' + $(if ([bool]$avShown -or ($avNow.Count -gt 0)) { '보였다' } else { '한 번도 안 보였다' }) + ' · 1분 멈춤 판정: ' + $(if ($avRetried -or $avStuck) { '있었다' } else { '없었다' }) + ' · 진행 보고 연속 실패: ' + [int]$script:ProgressFailRun + '회'), ('- 판정: ' + $(if ($avEvidence) { '백신 쪽 근거 있음' } else { '백신 근거 없음 — 느린 인터넷 또는 백신(가능성 · 확정 아님)' })))
+        if ($avEvidence) { Write-JCode 'J-AV-01' '백신 창이 설치 파일을 붙들고 있는 것으로 보입니다' }
+        else { Write-JCode 'J-AV-01' '설치 파일을 시간 안에 다 받지 못했습니다(느린 인터넷 또는 백신 — 가능성)' }
         if ($prevHold -ge 1) {
             # 같은 자리 2회째부터 — 현장에서 통한 처방(공식 설치기를 도우미 밖에서 직접)을 설치기가 먼저 알린다
             Say '     클로드 공식 설치기를 이 도우미 밖에서 직접 돌려 보실 수도 있습니다 — 새 PowerShell 창에 아래 한 줄을 붙여넣고 Enter:'
             Say ('     & ([scriptblock]::Create((irm ' + $ClaudeInstallUrl + '))) ' + $ClaudeChannel)
             Say '     「Installation complete」 가 보이면 그 창을 닫고 아래 「다시 하시는 법」대로 다시 실행해 주십시오.'
+        }
+        if (-not $avEvidence) {
+            Say '     백신 창은 한 번도 보이지 않았습니다. 인터넷이 느려 시간 안에 다 받지 못했을 가능성이 있습니다(백신일 수도 있습니다).'
+            Say '     와이파이가 약하면 공유기 가까이에서, 또는 휴대폰 핫스팟 같은 다른 인터넷으로 연결하신 뒤 다시 실행해 보십시오.'
+            Say '     작업 표시줄이나 화면 오른쪽 아래에 백신 창이 보이면 그 창의 안내대로 진행을 허용해 주십시오.'
+            Set-NextStepRerun '인터넷 연결을 확인하시고(가능하면 다른 인터넷으로), 백신 확인 창이 보이면 허용하신 뒤 아래 「다시 하시는 법」대로 다시 실행해 주십시오.'
+            $script:ShowRerun = $true
+            return 4
         }
         Say-AntivirusHold '클로드 설치 파일 (이름이 claude 로 시작하는 파일)'
         Set-NextStepRerun '작업 표시줄이나 화면 오른쪽 아래에 백신 확인 창이 있으면 그 창의 안내대로 진행을 허용하신 뒤, 아래 「다시 하시는 법」대로 다시 실행해 주십시오.'
@@ -2370,6 +2461,10 @@ function Step-InstallClaude {
         # v0.3.32(운영자 판정 · 도움 KW67JGJG 범위 확대): 종료 코드를 읽은 기계도
         #   파일이 없고 1-7 망 점검에 실패 행이 있으면 같은 원인·같은 처방(J-DL-07 · 다른 인터넷)으로 보낸다 — 앞 판은 일반 「다시 실행」이었다.
         $rcExe = Join-Path $env:USERPROFILE '.local\bin\claude.exe'
+        if ((-not (Test-Path -LiteralPath $rcExe)) -and (Test-ClaudeTlsTrustFail)) {
+            Write-ClaudeTlsTrustFailed ("     설치기 종료 코드: $installRc · 클로드 파일: 없음")
+            return 4
+        }
         if ((-not (Test-Path -LiteralPath $rcExe)) -and $script:NetFailed) {
             Write-Log ('J-DL-07 by: net-failed rc=' + $installRc)
             Say "[2/10] 설치기가 오류로 끝났고(종료 코드 $installRc) 파일이 생기지 않았습니다. 처음 점검에서 인터넷 연결이 한 곳 이상 실패했습니다."
@@ -2378,6 +2473,11 @@ function Step-InstallClaude {
             Say ('     내려받는 자리 점검 결과: ' + (Get-DlProbeWords))
             Show-ClaudeInstallLogTail
             $script:ShowRerun = $true
+            return 4
+        }
+        $instFail = Get-ClaudeInstallFailKind
+        if ((-not (Test-Path -LiteralPath $rcExe)) -and $instFail) {
+            Write-ClaudeInstallFailed $instFail ("     설치기 종료 코드: $installRc · 클로드 파일: 없음")
             return 4
         }
         Say "[2/10] 실패 (종료 코드 $installRc). 아래 「다시 하시는 법」대로 다시 실행하시면 여기서부터 이어서 갑니다."
@@ -2444,6 +2544,10 @@ function Step-InstallClaude {
         #   걸린 시간을 못 읽은 기계(종료 코드도 못 읽음)는 위 「빨리 끝났다」 판정이 서지 않아 재시작 처방(J-PATH-01)으로 떨어졌다.
         #   ⇒ 파일이 없고 **1-7 망 점검에 실패 행이 있으면** 걸린 시간과 무관하게 같은 갈래(다른 인터넷으로)로 보낸다.
         $fastExit = (($null -ne $elapsedSec) -and ($elapsedSec -lt $ClaudeInstallFastExitSec))
+        if (($hasExe -eq '아니오') -and (Test-ClaudeTlsTrustFail)) {
+            Write-ClaudeTlsTrustFailed ("     파일 있음: $hasExe ($(Redact $exe)) · 사용자 PATH 등록: $inUser · 설치기 종료 코드: $rcShown · 설치기 걸린 시간: ${elapsedSec}초")
+            return 4
+        }
         if (($hasExe -eq '아니오') -and ($fastExit -or $script:NetFailed)) {
             Write-Log ('J-DL-07 by: ' + $(if ($fastExit) { 'fast-exit' } else { 'net-failed' }) + ' (elapsed=' + $elapsedSec + ' netFailed=' + $script:NetFailed + ')')
             if ($fastExit) { Say ('[2/10] 설치기가 시작한 지 ' + $ClaudeInstallFastExitSec + '초도 안 돼 끝났고 파일도 생기지 않았습니다.') }
@@ -2454,6 +2558,12 @@ function Step-InstallClaude {
             Say ('     내려받는 자리 점검 결과: ' + (Get-DlProbeWords))
             Show-ClaudeInstallLogTail
             $script:ShowRerun = $true
+            return 4
+        }
+        # help-cases-1029: 파일이 없고 설치기가 스스로 실패를 말했으면 PATH 문제가 아니다 — 깔린 적이 없다(위 Get-ClaudeInstallFailKind).
+        $instFail = Get-ClaudeInstallFailKind
+        if (($hasExe -eq '아니오') -and $instFail) {
+            Write-ClaudeInstallFailed $instFail ("     파일 있음: $hasExe ($(Redact $exe)) · 사용자 PATH 등록: $inUser · 설치기 종료 코드: $rcShown")
             return 4
         }
         Say '[2/10] 설치기는 끝났는데 claude 명령이 아직 안 잡힙니다.'
@@ -2668,6 +2778,77 @@ function Complete-LoginSuccess([string]$by, [string]$authText, [string]$where) {
     $script:LoggedIn = $true
     Say '[3/10] 로그인 확인했습니다.'
 }
+# ── 로그인 대기 중 「사람이 있었나 · 브라우저가 열렸나」 (help-cases-1029 · 도움 QSFYDUAH 10-22 · H3SRXDCT 10-26 · 같은 PC 2회) ──
+#   그 두 번은 20분 동안 코드 복사 0 · 설치 창 글자 0 · 질문 무응답이었다 — 「브라우저가 안 열렸다」와 「사람이 자리에 없었다」를
+#   우리 기록으로는 가를 수 없었다(포착 공백 = 우리 몫). ⇒ 두 신호를 잰다(읽기만 · 화면·창은 건드리지 않는다):
+#   ⑴ 사람 입력 = 운영체제가 아는 「마지막 키보드·마우스 입력」 시각(GetLastInputInfo · 이 컴퓨터 전체 · 무엇을 눌렀는지는 모른다)
+#   ⑵ 브라우저 = 로그인을 연 뒤 새로 뜬 브라우저 프로세스가 있는가 · 창 제목에 Claude 가 보이는가(제목만 읽는다)
+#   ⚠⑵의 「창 제목」은 맨 앞 탭 제목만 보인다 — 안 보였다고 「안 열렸다」로 단정하지 않는다(그래서 판정 말이 「흔적을 못 찾았다」다).
+$script:IdleBroken = $false
+$LoginBrowserNames = @('chrome', 'msedge', 'firefox', 'whale', 'brave', 'opera', 'iexplore')
+function Get-UserIdleMs {
+    # 돌려주는 것 = 마지막 사람 입력 뒤 지난 ms · 못 재면 -1(윈도우가 아님 · Add-Type 불가 · 함수 실패)
+    #   한 번 못 띄우면 다시 띄우지 않는다 — 2초마다 부르는 자리라 실패한 컴파일을 되풀이하면 대기가 무거워진다.
+    if ($script:IdleBroken) { return -1 }
+    try {
+        if (-not ('Jarvis.Idle' -as [type])) {
+            Add-Type -Namespace Jarvis -Name Idle -ErrorAction Stop -MemberDefinition @'
+[System.Runtime.InteropServices.StructLayout(System.Runtime.InteropServices.LayoutKind.Sequential)]
+public struct LASTINPUTINFO { public uint cbSize; public uint dwTime; }
+[System.Runtime.InteropServices.DllImport("user32.dll")]
+static extern bool GetLastInputInfo(ref LASTINPUTINFO p);
+public static long IdleMs() {
+    LASTINPUTINFO i = new LASTINPUTINFO();
+    i.cbSize = (uint)System.Runtime.InteropServices.Marshal.SizeOf(typeof(LASTINPUTINFO));
+    if (!GetLastInputInfo(ref i)) { return -1; }
+    return (long)unchecked((uint)System.Environment.TickCount - i.dwTime);
+}
+'@
+        }
+        return [long][Jarvis.Idle]::IdleMs()
+    } catch { $script:IdleBroken = $true; return -1 }
+}
+function Get-LoginBrowserProcs {
+    # 돌려주는 것 = @{ Id; Title } 목록 · 못 읽으면 빈 목록
+    try { return @(Get-Process -Name $LoginBrowserNames -ErrorAction SilentlyContinue | ForEach-Object { @{ Id = [int]$_.Id; Title = [string]$_.MainWindowTitle } }) } catch { return @() }
+}
+function New-LoginPresence {
+    $base = @{}
+    foreach ($b in @(Get-LoginBrowserProcs)) { $base[[string]$b.Id] = $true }
+    return @{ Sw = [System.Diagnostics.Stopwatch]::StartNew(); Base = $base; Measured = $false; Unmeasured = $false
+              InputCount = 0; LastInputSec = -1; NewBrowser = 0; ClaudeTitleSec = -1; NextBrowserSec = 0 }
+}
+function Update-LoginPresence($pr) {
+    # 로그인 대기 한 바퀴마다 부른다 — 사람 입력은 매번(싸다) · 브라우저는 6초마다
+    $now = [int]$pr.Sw.Elapsed.TotalSeconds
+    $idle = Get-UserIdleMs
+    if ($idle -lt 0) { $pr.Unmeasured = $true }
+    else {
+        $pr.Measured = $true
+        # 로그인을 연 뒤 5초가 지나서 생긴 입력만 센다 — 설치 시작 때 누른 Enter 를 「자리에 있었다」로 세지 않는다
+        $at = [int]($now - [math]::Floor($idle / 1000))
+        if (($at -ge 5) -and ($at -ne $pr.LastInputSec)) { $pr.InputCount++; $pr.LastInputSec = $at }
+    }
+    if ($now -ge $pr.NextBrowserSec) {
+        $pr.NextBrowserSec = $now + 6
+        foreach ($b in @(Get-LoginBrowserProcs)) {
+            if (-not $pr.Base.ContainsKey([string]$b.Id)) { $pr.Base[[string]$b.Id] = $true; $pr.NewBrowser++ }
+            if (($pr.ClaudeTitleSec -lt 0) -and ($b.Title -match '(?i)claude|anthropic')) { $pr.ClaudeTitleSec = $now }
+        }
+    }
+}
+function Resolve-LoginPresence($pr) {
+    # 돌려주는 것 = @{ Tag; Input; Browser } — Tag: away(사람 입력 없음) · no-browser(사람은 있었는데 브라우저 흔적 없음) · browser-seen · unmeasured
+    $bw = if ($pr.ClaudeTitleSec -ge 0) { ('Claude 제목 창 보임(' + $pr.ClaudeTitleSec + '초) · 새로 뜬 브라우저 ' + $pr.NewBrowser + '개') }
+          elseif ($pr.NewBrowser -gt 0) { ('새로 뜬 브라우저 ' + $pr.NewBrowser + '개 · Claude 제목 창은 못 봄') }
+          else { '새로 뜬 브라우저 0 · Claude 제목 창 못 봄' }
+    if (-not $pr.Measured) { return @{ Tag = 'unmeasured'; Input = '잴 수 없었다'; Browser = $bw } }
+    # 0.3.43(운영 결정 2026-10-30 「있었다/없었다만」): 보내는 보고·기록에는 키보드·마우스를 썼는지 여부만 — 횟수·시각은 판정에만 쓰고 싣지 않는다.
+    $in = if ($pr.InputCount -gt 0) { '있었다' } else { '없었다' }
+    if ($pr.InputCount -eq 0) { return @{ Tag = 'away'; Input = $in; Browser = $bw } }
+    if (($pr.ClaudeTitleSec -lt 0) -and ($pr.NewBrowser -eq 0)) { return @{ Tag = 'no-browser'; Input = $in; Browser = $bw } }
+    return @{ Tag = 'browser-seen'; Input = $in; Browser = $bw }
+}
 # 로그인 단계에서 본 것 — 기록 파일과 환경 보고(원격 해결이 보내는 본문)에 같은 줄을 남긴다. 코드·주소·계정 원문은 없다.
 function Add-LoginReport($info) {
     $lines = @(
@@ -2677,8 +2858,10 @@ function Add-LoginReport($info) {
         ('코드 넣기: ' + $info.Send),
         ('끝난 뒤 확인: ' + $info.Confirm),
         ('상한에서 받은 답: ' + $info.Answer),
-        ('질문 전 설치 창에 쌓인 글자 수: ' + $info.Keys)
+        ('질문 전 설치 창에 쌓인 글자 수: ' + $info.Keys),
+        ('기다리는 동안 키보드·마우스 사용(이 컴퓨터 전체): ' + $info.Input)
     )
+    # 0.3.43(운영 결정 2026-10-30 · 승인 범위 = 키보드·마우스 사용 여부뿐): 브라우저 줄·판정 꼬리표는 화면 처방 고르기에만 쓰고 보고·기록에 싣지 않는다.
     foreach ($l in $lines) { Write-Log ('login report: ' + $l) }
     Add-ReportLines (@('', '## [3/10] 로그인 단계에서 본 것') + @($lines | ForEach-Object { '- ' + $_ }))
 }
@@ -2802,7 +2985,7 @@ function Step-Login {
     # ★기다림은 `WaitForExit(ms)` 로 한다 — 커널 대기라 이 창의 입력을 건드리지 않는다(검토 지적 채택 2026-09-11 · 새 창에서도 그대로 둔다).
     # ★상한에 닿으면 그 창을 끝낸다 = 사람이 창을 닫은 것과 같은 결과 ⇒ 아래 확인과 J-LOGIN-01 회복 경로로 그대로 흘러간다.
     # ★$claudeExe(전체 경로)는 이 함수 첫머리에서 정했다 — 재판정·승인·확인이 같은 파일을 묻는다.
-    $info = @{ Win = '설치 창(코드는 설치기가 넣는다)'; Proc = '-'; Reopen = '안 했다'; Send = '-'; Confirm = '-'; Answer = '묻지 않음(상한에 닿지 않았다)'; Keys = '-' }
+    $info = @{ Win = '설치 창(코드는 설치기가 넣는다)'; Proc = '-'; Reopen = '안 했다'; Send = '-'; Confirm = '-'; Answer = '묻지 않음(상한에 닿지 않았다)'; Keys = '-'; Input = '-'; Browser = '-'; Presence = '-' }
     $c = @{ By = ''; Auth = ''; Fails = 0; Note = '-' }
     $oldTitle = $null
     try { $oldTitle = $Host.UI.RawUI.WindowTitle } catch { $oldTitle = $null }
@@ -2810,6 +2993,7 @@ function Step-Login {
         # ★승인 창이 상한 전에 스스로 끝났는데 로그인이 안 됐으면 = 코드가 받아들여지지 않은 것(J-LOGIN-02 · 2026-09-14 워크숍 4건)
         #   ⇒ 로그인 화면을 **한 번만** 더 연다(현장에서 통한 처방 「claude 를 다시 실행해 로그인」을 안에 둔 것). 두 번째도 같으면 J-LOGIN-01 로 간다.
         $reopened = $false
+        $pres = New-LoginPresence
         while ($true) {
             $credBefore = Get-LoginCredStamp
             $loginProc = $null
@@ -2850,6 +3034,7 @@ function Step-Login {
                 while (-not $loginProc.WaitForExit($LoginTickMs)) {
                     # 🔴상한은 **벽시계**로 잰다 — 쉰 초를 더해 가면 확인 명령에 든 시간이 빠져 「최대 20분」이 거짓이 된다(2026-09-15 표본 · 10분 표시가 실제 11분).
                     $w = [int]$sw.Elapsed.TotalSeconds
+                    Update-LoginPresence $pres
                     # 코드 넣기 — 복사된 내용에 「코드#state」 모양이 새로 나타나면 그 한 줄을 로그인 프로세스 입력에 넣는다(위 「코드 넣기」 머리 주석).
                     if ($clipSends -lt $LoginClipMaxSends) {
                         $clip = Get-LoginClipText
@@ -2990,6 +3175,17 @@ function Step-Login {
         # 🔴사람이 스스로 푸는 길(2026-09-15 윈도우 샌드박스 실증) — 새 PowerShell 창에서 claude 를 직접 실행하면 입력·로그인이 정상이었다.
         #   다시 실행하면 [3/10] 이 로그인을 다시 판정해 건너뛴다(Step-Login 첫머리 재판정).
         foreach ($ln in $LoginSelfFixLines) { Say $ln }
+        $pv = Resolve-LoginPresence $pres
+        $info.Input = $pv.Input; $info.Browser = $pv.Browser; $info.Presence = $pv.Tag
+        Write-Log ('login input: ' + $pv.Input)   # 0.3.43: 보내는 기록엔 사용 여부만(브라우저·판정 꼬리표 없음)
+        if ($pv.Tag -eq 'away') {
+            Say '     기다린 동안 이 컴퓨터의 키보드·마우스가 한 번도 움직이지 않았습니다 — 그 사이 자리를 비우셨던 것 같습니다.'
+            Say '     괜찮습니다. 다시 실행하시면 로그인 화면이 다시 열리니, 화면 앞에 계실 때 브라우저의 승인 단추를 눌러 주십시오.'
+        } elseif ($pv.Tag -eq 'no-browser') {
+            # 0.3.43: 브라우저에서 나온 판단이라 화면에만 찍는다(Say 는 보내는 기록에도 적는다).
+            Write-Host '     브라우저에 로그인 화면이 뜬 흔적을 찾지 못했습니다.'
+            Write-Host '     다시 실행하신 뒤에도 브라우저가 안 보이면, 설치 창에 보이는 https:// 주소를 복사해 브라우저 주소창에 붙여넣어 주십시오.'
+        }
         Add-LoginReport $info
         Write-JCode 'J-LOGIN-01' '로그인 승인이 시간 안에 끝나지 않았습니다'
         Set-NextStepRerun '아래 「다시 하시는 법」대로 다시 실행하시면 로그인 창이 다시 열립니다.'
@@ -3528,9 +3724,13 @@ function Step-DownloadCys {
             return 5
         }
     } catch { }
+    # installer-0343: 화면의 용량은 핀 값에서 잰다 — 손으로 적은 「약 132MB」가 판이 바뀐 뒤에도 남아 기다림 예측을 틀리게 했다.
+    $dlMB = [int][math]::Round($CysWinBytes / 1000000)   # 맥판과 같은 셈(10진 MB · bootstrap.sh $((CYS_MAC_BYTES / 1000000)))
+    $script:DlShort = @()    # 크기가 모자랐던 회차들(받은 바이트 · 걸린 초) — 두 번 다 모자라면 J-DL-08 근거
     for ($try = 1; $try -le 2; $try++) {
         if (Test-Path $dst) { Remove-Item $dst -Force -ErrorAction SilentlyContinue }
-        Say "[5/10] cysr 설치 파일을 받습니다 (약 132MB · 잠시 걸립니다)."
+        Say "[5/10] cysr 설치 파일을 받습니다 (약 ${dlMB}MB · 잠시 걸립니다)."
+        $dlStart = Get-Date
         $pref = $ProgressPreference
         try {
             $ProgressPreference = 'SilentlyContinue'
@@ -3590,6 +3790,9 @@ function Step-DownloadCys {
         }
         $got = (Get-Item $dst -ErrorAction SilentlyContinue).Length
         if ($got -ne $CysWinBytes) {
+            $dlSec = [int][math]::Max(1, ((Get-Date) - $dlStart).TotalSeconds)
+            $script:DlShort += ,@([long]$got, $dlSec)
+            Write-Log ('dl short try=' + $try + ' got=' + $got + ' want=' + $CysWinBytes + ' sec=' + $dlSec)
             Say "[5/10] 크기가 맞지 않습니다 (받은 것 $got · 기대 $CysWinBytes). 다시 받습니다."
             continue
         }
@@ -3611,6 +3814,22 @@ function Step-DownloadCys {
     # 두 번 다 실패했으면 반쯤 받은 파일을 남기지 않는다 — 다음 실행이 그것을 온전한 것으로 볼 수 있다.
     if (Test-Path $dst) { Remove-Item $dst -Force -ErrorAction SilentlyContinue }
     Say '[5/10] 설치 파일을 온전히 받지 못했습니다.'
+    # installer-0343(도움 MGHSX9GL 10-09 · J-UNK-00 오진): 두 번 다 「크기가 모자란 채」 끝났으면 받다 끊긴 것이다 —
+    #   그 기기는 초당 약 20KB 로 43분·57분을 꾸준히 받다가 50·70 MiB 에서 끊겼다. 코드 없이 끝나 「분류 못 함」이 됐다.
+    #   ⇒ 받은 양·걸린 시간·초당 속도를 사실로 적고 J-DL-08(느리거나 끊기는 인터넷)로 보낸다.
+    if (@($script:DlShort).Count -ge 2) {
+        $facts = @($script:DlShort | ForEach-Object {
+            $kbs = [int][math]::Round(($_[0] / 1000) / $_[1])
+            ('받은 것 약 ' + [int][math]::Round($_[0] / 1000000) + 'MB / ' + $dlMB + 'MB · 걸린 시간 ' + [int][math]::Floor($_[1] / 60) + '분 ' + ($_[1] % 60) + '초 · 초당 약 ' + $kbs + 'KB')
+        })
+        Write-Log ('J-DL-08 by: short-twice ' + ($facts -join ' | '))
+        foreach ($f in $facts) { Say ('     ' + $f) }
+        Add-ReportLines (@('', '## [5/10] 설치 파일 받기 — 두 번 다 끝까지 받지 못함') + @($facts | ForEach-Object { '- ' + $_ }))
+        Write-JCode 'J-DL-08' '설치 파일을 끝까지 받지 못했습니다(인터넷이 느리거나 중간에 끊김)'
+        Set-NextStepRerun '인터넷이 잘 되는 곳(공유기 가까이 · 다른 와이파이 · 휴대폰 핫스팟)에서 아래 「다시 하시는 법」대로 다시 실행해 주십시오. 화면 오른쪽 아래에 백신 창이 떠 있으면 그 창의 안내대로 진행을 허용해 주십시오.'
+        $script:ShowRerun = $true
+        return 5
+    }
     Say "     공식 페이지에서 직접 받으실 수 있습니다: $CysSiteUrl"
     Say "     받을 파일 이름 = $CysWinFile"
     return 5
@@ -3956,7 +4175,10 @@ function Step-PrepareAccount {
         # 함께 있어야 할 짝 파일이 실제로 있는지도 본다(다른 운영체제에서 이것이 없어 실패한 전례가 있다).
         $sideCar = Join-Path (Split-Path $cli -Parent) 'cysd.exe'
         Say "       짝 파일 있음 = $(Test-Path $sideCar) ($(Redact $sideCar))"
-        Say '     잠시 뒤 아래 「다시 하시는 법」대로 다시 실행해 주십시오. 그래도 같으면 위 세 줄을 알려 주십시오.'
+        # installer-0343(도움 3A45EF4G 외 4건 · J-UNK-00 오진): 이 갈래는 코드 없이 끝나 「분류 못 함」이 됐다 — 이름을 붙인다.
+        Write-Log ('J-APP-02 by: daemon-no-answer task=' + $script:AutoStartState + ' sidecar=' + (Test-Path $sideCar))
+        Write-JCode 'J-APP-02' '자비스 바탕 프로그램이 준비됐는데 답하지 않습니다'
+        Set-NextStepRerun '컴퓨터를 한 번 다시 시작하신 뒤, 아래 「다시 하시는 법」대로 다시 실행해 주십시오. 끝난 단계는 건너뛰고 이어서 갑니다. 그래도 같으면 위 세 줄을 알려 주십시오.'
         $script:ShowRerun = $true
         return 8
     }
@@ -5275,7 +5497,7 @@ function Step-Fleet {
 #   글자 칸은 `\z` 로 끝을 못박아 다시 만든다. 이름·글자·판본 비교는 대소문자를 가르는 -ceq·-cmatch·-ccontains 만 쓴다.
 # ⚠PowerShell 은 `'true' -eq $true` 를 참으로 본다 ⇒ 칸마다 **형(type)을 먼저** 본다.
 # ⚠이 절은 맥에서 PowerShell 없이 **정적 검사 + 맥판과의 대조**로만 증명했다 — 윈도우 실기가 필요한 축은 내부 문서.
-$InstallerVersion       = '0.3.42'   # 보고의 installer_version · $BootstrapVersion 은 화면 머리글 용도 그대로(보내지 않는다)
+$InstallerVersion       = '0.3.43'   # 보고의 installer_version · $BootstrapVersion 은 화면 머리글 용도 그대로(보내지 않는다)
 # 0.3.36: JARVIS_HELP_API_URL = CI·흉내가 도움 보고를 로컬로 돌리는 손잡이(맥 짝 · 사람이 쓰는 길이 아니다 · 없으면 종전 주소 — tests/help-url-lever.sh).
 $HelpApiUrl             = if ($env:JARVIS_HELP_API_URL) { [string]$env:JARVIS_HELP_API_URL } else { 'https://jarvis-install.godmeyou.kr' }
 # 🔴0.3.36(이종 검토): 시험용 함수 묶음은 도움 보고(/api/help)·닫기도 라이브로 못 보낸다(맥 HELP_API_URL 짝) — 가짜 서버는 읽은 뒤 덮어쓴다.
@@ -6380,7 +6602,7 @@ $TranscriptFile     = Join-Path $JarvisHome 'transcript.txt'
 $AttachMaxBytes     = 900 * 1024                          # 항목 하나의 상한(계약 2절)
 # 첫 화면 고지 = 서버 정본 문안(web-install 의 NOTICE_TEXT)과 글자까지 같다(계약 2절 「정본 1곳」 · 서버 응답의 notice 필드와도 같은 문장).
 # v0.3.18 — 고지 정본 1줄 교체(master 릴레이 2026-09-15 20:18 · 서버 NOTICE_TEXT 도 같은 글로 바꾼다 = 732 몫)
-$ProgressNotice = '설치가 잘 되는지 보려고 진행 단계와 기기 정보(모델, 메모리, 남은 공간)를 자동으로 보냅니다. 설치가 막히거나 이상이 보이거나 끝났을 때, 그리고 운영팀이 청할 때 설치 창·로그인 창·자비스 창·첫 자리 화면의 글자와 그림이 함께 보내집니다(다른 창은 찍지 않습니다). 글자에서는 로그인 코드·이메일·계정 이름을 가리지만, 그림은 가릴 수 없어 운영팀만 봅니다. 보관 30일 뒤 자동 삭제됩니다.'
+$ProgressNotice = '설치가 잘 되는지 보려고 진행 단계와 기기 정보(모델, 메모리, 남은 공간)를 자동으로 보냅니다. 로그인이 시간 안에 끝나지 않으면, 기다리시는 동안 키보드·마우스를 쓰셨는지 안 쓰셨는지만 함께 보냅니다(무엇을 누르셨는지는 보내지 않습니다). 설치가 막히거나 이상이 보이거나 끝났을 때, 그리고 운영팀이 청할 때 설치 창·로그인 창·자비스 창·첫 자리 화면의 글자와 그림이 함께 보내집니다(다른 창은 찍지 않습니다). 글자에서는 로그인 코드·이메일·계정 이름을 가리지만, 그림은 가릴 수 없어 운영팀만 봅니다. 보관 30일 뒤 자동 삭제됩니다.'
 $script:InstallId      = ''
 $script:ProgressWarned = $false     # 전송 실패 경고는 실행당 한 번만 기록한다(fail-open)
 $script:ProgressFailRun = 0         # 0.3.38: 실제로 보냈다가 실패한 진행 전송이 연달아 몇 번인가(닿으면 0 · 조기 return 은 세지 않는다)

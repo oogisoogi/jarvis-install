@@ -32,7 +32,19 @@ pass=0; fail=0
 ok()  { pass=$((pass+1)); printf '  ok   %s\n' "$1"; }
 bad() { fail=$((fail+1)); printf '  FAIL %s  ← %s\n' "$1" "$2"; }
 t() { if [ "$1" -eq 0 ]; then ok "$2"; else bad "$2" "$3"; fi; }
-run_ps() { perl -e 'alarm shift; exec @ARGV' 90 "$PW" -NoProfile -File "$@" </dev/null; }
+# 🔴OS 열기 격리(2026-10-22 · TICKET=cysr-1111-unarchiver-open) — 맥 pwsh 는 실행 비트 없는 파일을 `& $f` 로 부르면 `/usr/bin/open` 으로 넘긴다.
+#   흉내가 놓은 가짜 cys.exe 가 그렇게 열려 .exe 기본 앱(The Unarchiver)이 「풀 곳 허락」 창을 사람 화면에 띄웠다(19:45 · 21:0x · 22:0x 재발).
+#   ⇒ 맥은 sandbox-exec 로 /usr/bin/open 실행 자체를 막고(.NET 은 절대경로로 부른다) · 리눅스는 PATH 앞 가짜 open·xdg-open 이 부른 사실만 적는다.
+#   막는 것은 화면을 지키는 것이고, 새는 곳을 잡는 것은 맨 끝 「[격리]」 축이다(막힌 시도는 오류 글로 기록에 남는다).
+NOOPEN_BIN="$BASE/noopen-bin"; mkdir -p "$NOOPEN_BIN"
+for n in open xdg-open; do
+  printf '#!/bin/sh\nprintf "%%s %%s\\n" "$(basename "$0")" "$*" >> "%s/os-open.log"\nexit 0\n' "$BASE" > "$NOOPEN_BIN/$n"
+  chmod +x "$NOOPEN_BIN/$n"
+done
+export PATH="$NOOPEN_BIN:$PATH"
+NOOPEN=()
+command -v sandbox-exec >/dev/null 2>&1 && NOOPEN=(sandbox-exec -p '(version 1)(allow default)(deny process-exec (literal "/usr/bin/open"))')
+run_ps() { perl -e 'alarm shift; exec @ARGV' 90 ${NOOPEN[@]+"${NOOPEN[@]}"} "$PW" -NoProfile -File "$@" </dev/null; }
 has() { grep -qE -- "$2" "$1"; }
 
 echo "== v0.3.18 ⑨ [8/10] 자가진단 판정 =="
@@ -213,6 +225,13 @@ for f in reset-clean.ps1 reinstall.ps1; do
   [ "$n" = "0" ]
   t $? "[③ 기호 이모지] $f 의 화면 줄에 ⚠ 가 없다" "화면 줄 ${n}곳에 ⚠ 가 있다"
 done
+
+echo "== 격리 — 흉내가 OS 열기를 부르지 않는다(TICKET=cysr-1111-unarchiver-open) =="
+leak="$(grep -rlaF -e "'/usr/bin/open'" -e "'xdg-open'" "$BASE" 2>/dev/null | sed "s#^$BASE/##" | tr '\n' ' ')"
+[ -z "$leak" ] && [ ! -s "$BASE/os-open.log" ]
+t $? "[격리] 흉내 전 갈래가 open·xdg-open 을 한 번도 부르지 않았다(사람 화면에 앱 창 0)" "새는 곳: ${leak}$(head -c 200 "$BASE/os-open.log" 2>/dev/null | tr '\n' '|')"
+grep -qE '^CLI self-update --preserve-installer --setup .*--json$' "$BASE/ver-fresh/cli.log" 2>/dev/null
+t $? "[격리] 설치 뒤 되돌림 자산 챙기기(& cys.exe self-update)가 흉내의 cys.exe 스텁에 닿는다" "$(head -c 200 "$BASE/ver-fresh/cli.log" 2>/dev/null | tr '\n' '|')"
 
 printf '\n통과 %s · 실패 %s\n' "$pass" "$fail"
 [ "$fail" -eq 0 ]

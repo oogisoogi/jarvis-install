@@ -46,6 +46,7 @@ CLAUDE_DOWNLOAD_PROBE_URL="https://downloads.claude.ai/claude-code-releases/stab
 # 「설치기가 시작하자마자 죽었다」의 경계(초) — 윈판 $ClaudeInstallFastExitSec 과 같은 값.
 CLAUDE_INSTALL_FAST_EXIT_SEC=3
 DL_PROBE="unknown"          # 1-7 의 받는 자리 점검 결과(ok·bad·fail·unknown · 윈판 $script:DlProbe)
+INSTALL_URL_PROBE="unknown" # 1-7 에서 claude.ai(설치기 주소)가 답했나: ok·fail·trust(안전 연결 실패)·unknown (윈판 $script:InstallUrlProbe)
 NET_FAILED=0                # 1-7 네트워크 점검에 실패 행이 있었나(v0.3.32 · 윈판 $script:NetFailed)
 CLAUDE_INSTALL_LOG=""       # [2/10] 자식 설치기의 글자를 적어 둔 파일(윈판 $script:ClaudeInstallLog)
 LOGIN_SWEEP=""              # [3/10] 로그인 승계 쓸기 결과 한 줄(윈판 $script:LoginSweep)
@@ -144,6 +145,7 @@ CYS_DISPLAY_NAME="cysr"
 # 0.3.39: cysr 1.1.7 과 함께 내는 판(핀은 1.1.7 절단 뒤) · 맥 바뀐 것 = 원격 해결이 부르는 cys 도 [7/10] 이 고른 CYS_CLI(절대 경로) 먼저
 # 0.3.40: cysr 1.1.8 핀(값은 0.3.39 뒤 편입분 그대로) · 바뀐 것 = 자동 새 판 바꾸기와의 잠금 참가·위임(진단 코드 J-UPD-01~03) · 지우개: 참가 자리가 ~/.cys 안이어도 그것만 제자리에 두고 나머지는 보관 폴더로 · 인텔 맥 핀을 릴리스와 대조하는 시험(tests/mac-pin-x64-release.sh)
 # 0.3.41: cysr 1.1.9 핀(발행 2026-10-17 · 릴리스 SHA256SUMS.txt 403a8be0…) · 코드 변경 0 — 핀 값과 판번만
+# 0.3.43(2026-10-30): 핀 그대로(cysr 1.1.10) — 도움 사례 진단 갈래(J-INST-01 · J-DL-08 · J-NET-04 · J-APP-02) · 로그인 대기 입력 수집 = 사용 여부만 + 첫 화면 고지 1구절
 # 0.3.42: cysr 1.1.10 핀(발행 2026-10-23 · 값 = 발행할 자산 실물 실측 · 릴리스 SHA256SUMS.txt 대조는 발행 뒤 tests/*-pin-release.sh) · 코드 변경 0 — 핀 값과 판번만
 CYS_FORK_VERSION="1.1.10"
 CYS_FORK_DIR="https://github.com/oogisoogi/cys-ro/releases/download/v${CYS_FORK_VERSION}/"
@@ -1099,6 +1101,64 @@ login_end_wait() {
   fi
 }
 
+# ── 로그인 대기 중 「사람이 있었나 · 브라우저가 떴나」 (help-cases-1029 맥 짝 · 윈판 Get-UserIdleMs·Get-LoginBrowserProcs·*-LoginPresence) ──
+#   ⑴ 사람 입력 = 운영체제가 아는 「마지막 키보드·마우스 입력 뒤 지난 시간」(ioreg IOHIDSystem HIDIdleTime · 읽기만 · 무엇을 눌렀는지는 모른다)
+#   ⑵ 브라우저 = 로그인을 연 뒤 새로 뜬 브라우저 프로세스 수 · 지금 떠 있는 브라우저 수(이름만 본다)
+#   ⚠맥 미지원 = 창·탭 제목(「Claude 제목 창」) — 화면 접근 권한 없이는 못 읽는다(묻는 창을 띄우지 않는다). 그리고 맥은 이미 떠 있는
+#     브라우저에 새 탭으로 열리는 일이 흔하다 ⇒ 브라우저가 떠 있었으면 「열렸는지 모른다」(browser-unknown)로 적고 단정하지 않는다.
+#   ⚠잰 간격 = 감시자 한 바퀴(LOGIN_SAY_INTERVAL · 60초) + 로그인이 끝난 순간 1번 — 그 사이 입력 여러 번은 1번으로 센다(윈판은 2초).
+#   상태는 파일 하나에 둔다 — 재는 쪽(login_waiter)이 배경 자식이라 변수가 본체로 돌아오지 않는다. 줄 = 잼여부 입력수 마지막초 새브라우저 떠있는브라우저
+LOGIN_PRESENCE_FILE=""
+LOGIN_BROWSER_NAMES='Google Chrome|Safari|firefox|Microsoft Edge|Whale|Brave Browser|Opera|Arc'
+user_idle_sec() {   # 마지막 사람 입력 뒤 지난 초 · 못 재면 -1
+  local ns
+  ns="$(ioreg -c IOHIDSystem -d 4 2>/dev/null | awk '/"HIDIdleTime"/ {print $NF; exit}')"
+  case "$ns" in ''|*[!0-9]*) printf '%s' -1 ;; *) printf '%s' $((ns / 1000000000)) ;; esac
+}
+login_browser_pids() {   # 떠 있는 브라우저 본체의 번호(도우미 프로세스는 뺀다 · 이름 끝까지 같아야 한다)
+  ps -axo pid=,comm= 2>/dev/null | awk -v re="^($LOGIN_BROWSER_NAMES)\$" '{p=$1; sub(/^ *[0-9]+ +/,""); n=$0; sub(/.*\//,"",n); if (n ~ re) print p}'
+}
+login_presence_start() {
+  LOGIN_PRESENCE_FILE="$JARVIS_HOME/.login-presence"
+  printf '0 0 -1 0 0\n' > "$LOGIN_PRESENCE_FILE" 2>/dev/null || LOGIN_PRESENCE_FILE=""
+  [ -n "$LOGIN_PRESENCE_FILE" ] && { login_browser_pids > "$LOGIN_PRESENCE_FILE.pids" 2>/dev/null || :; }
+  return 0
+}
+login_presence_tick() {   # <로그인을 연 뒤 지난 초>
+  local now="$1" m=0 c=0 last=-1 nb=0 run=0 idle at pid
+  [ -n "$LOGIN_PRESENCE_FILE" ] && [ -f "$LOGIN_PRESENCE_FILE" ] || return 0
+  read -r m c last nb run < "$LOGIN_PRESENCE_FILE" || return 0
+  idle="$(user_idle_sec)"
+  if [ "$idle" -ge 0 ] 2>/dev/null; then
+    m=1; at=$((now - idle))
+    # 로그인을 연 뒤 5초가 지나서 생긴 입력만 센다 — 설치 시작 때 누른 Enter 를 「자리에 있었다」로 세지 않는다(윈판과 같은 규칙)
+    if [ "$at" -ge 5 ] && [ "$at" -ne "$last" ]; then c=$((c + 1)); last=$at; fi
+  fi
+  run=0
+  for pid in $(login_browser_pids); do
+    run=$((run + 1))
+    grep -qx "$pid" "$LOGIN_PRESENCE_FILE.pids" 2>/dev/null || { printf '%s\n' "$pid" >> "$LOGIN_PRESENCE_FILE.pids"; nb=$((nb + 1)); }
+  done
+  printf '%s %s %s %s %s\n' "$m" "$c" "$last" "$nb" "$run" > "$LOGIN_PRESENCE_FILE" 2>/dev/null || :
+}
+login_presence_resolve() {   # <잰 초> → LOGIN_INFO_INPUT · LOGIN_INFO_BROWSER · LOGIN_INFO_PRESENCE(away · no-browser · browser-seen · browser-unknown · unmeasured)
+  local w="$1" m=0 c=0 last=-1 nb=0 run=0
+  [ -n "$LOGIN_PRESENCE_FILE" ] && [ -f "$LOGIN_PRESENCE_FILE" ] && read -r m c last nb run < "$LOGIN_PRESENCE_FILE"
+  if [ "$nb" -gt 0 ]; then LOGIN_INFO_BROWSER="새로 뜬 브라우저 ${nb}개 · 창 제목은 맥에서 못 본다"
+  elif [ "$run" -gt 0 ]; then LOGIN_INFO_BROWSER="새로 뜬 브라우저 0 · 이미 떠 있던 브라우저 ${run}개(새 탭·창 제목은 맥에서 못 본다)"
+  else LOGIN_INFO_BROWSER="떠 있는 브라우저 0"; fi
+  if [ "$m" != "1" ]; then LOGIN_INFO_INPUT="잴 수 없었다"; LOGIN_INFO_PRESENCE="unmeasured"
+  # 0.3.43(운영 결정 2026-10-30 「있었다/없었다만」): 보내는 보고·기록에는 키보드·마우스를 썼는지 여부만 — 횟수·시각은 판정에만 쓰고 싣지 않는다.
+  elif [ "$c" -eq 0 ]; then LOGIN_INFO_INPUT="없었다"; LOGIN_INFO_PRESENCE="away"
+  else
+    LOGIN_INFO_INPUT="있었다"
+    if [ "$nb" -gt 0 ]; then LOGIN_INFO_PRESENCE="browser-seen"
+    elif [ "$run" -eq 0 ]; then LOGIN_INFO_PRESENCE="no-browser"
+    else LOGIN_INFO_PRESENCE="browser-unknown"; fi
+  fi
+  [ -n "$LOGIN_PRESENCE_FILE" ] && rm -f "$LOGIN_PRESENCE_FILE" "$LOGIN_PRESENCE_FILE.pids"
+  return 0
+}
 login_waiter() {
   # $1 = 표식 파일(있는 동안만 돈다) · $2 = 승인 프로세스의 번호·시작시각을 적어 둔 파일
   local mark="$1" pidfile="$2" waited=0 sleep_pid=""
@@ -1114,6 +1174,7 @@ login_waiter() {
     sleep_pid=""
     [ -e "$mark" ] || return 0
     waited=$(( waited + LOGIN_SAY_INTERVAL ))
+    login_presence_tick "$waited"
     if [ "$waited" -ge "$LOGIN_WAIT_TIMEOUT" ]; then
       login_end_wait "$pidfile"
       return 0
@@ -1321,6 +1382,7 @@ help_way_lines() {   # help_way_lines <코드> — 두 번째 방법 줄들(정�
     J-NET-02)   printf '%s\n' '10분쯤 뒤에 다시 실행해 주십시오.' '휴대폰 핫스팟 같은 다른 인터넷으로 바꿔 보셔도 됩니다.' ;;
     J-NET-03)   printf '%s\n' '회사·학교 망은 바깥 서버를 막아 둔 경우가 있습니다.' '휴대폰 핫스팟 같은 다른 인터넷으로 연결하신 뒤 다시 실행해 주십시오.' ;;
     J-PATH-01)  printf '%s\n' '컴퓨터를 한 번 다시 시작하신 뒤 새 창에서 다시 실행해 주십시오.' ;;
+    J-INST-01)  printf '%s\n' '열려 있는 설치 창을 모두 닫고 컴퓨터를 한 번 다시 시작하신 뒤,' '새 창에서 다시 실행해 주십시오.' ;;
     J-LOGIN-01) printf '%s\n' '브라우저가 뜨지 않았거나 다른 브라우저에 로그인돼 있으면,' \
                   '화면에 보이는 https:// 로 시작하는 로그인 주소를 복사해' '로그인된 브라우저 주소창에 붙여넣어 주십시오.' ;;
     J-HOME-01)  printf '%s\n' '창을 닫고 새 창을 여신 뒤(남은 설정이 따라오지 않습니다)' '다시 실행해 주십시오.' ;;
@@ -1331,6 +1393,9 @@ help_way_lines() {   # help_way_lines <코드> — 두 번째 방법 줄들(정�
     J-DL-03)    printf '%s\n' '컴퓨터를 한 번 다시 시작하신 뒤 새 창에서 다시 실행해 주십시오.' ;;
     J-DL-04)    printf '%s\n' '휴대폰 핫스팟 같은 다른 인터넷으로 연결하신 뒤 다시 실행해 주십시오.' ;;
     J-DL-07)    printf '%s\n' '클로드를 내려받는 서버에 닿지 못했습니다.' '휴대폰 핫스팟 같은 다른 인터넷으로 연결하신 뒤 다시 실행해 주십시오.' '회사·학교 망이면 그 망이 막아 둔 것일 수 있습니다.' ;;
+    J-DL-08)    printf '%s\n' '인터넷이 잘 되는 곳(공유기 가까이 · 다른 와이파이 · 휴대폰 핫스팟)으로' '옮기신 뒤 다시 실행해 주십시오. 끝난 단계는 건너뜁니다.' ;;
+    J-NET-04)   printf '%s\n' '휴대폰 핫스팟 같은 다른 인터넷으로 연결하신 뒤 다시 실행해 주십시오.' '회사·학교 컴퓨터라면 전산 담당자께' 'claude.ai 접속이 막혀 있는지 여쭈어 보셔도 됩니다.' ;;
+    J-APP-02)   printf '%s\n' '컴퓨터를 한 번 다시 시작하신 뒤 다시 실행해 주십시오.' ;;
     # 1.1.8 U5: 새 판 바꾸기 기다림 — 두 번째에도 같으면 더 기다리기(01) · 다시 켜기(02) · 03 은 기다려도 안 풀려 곧바로 담당자(help_is_direct)
     J-UPD-01)   printf '%s\n' '10분쯤 뒤에 다시 실행해 주십시오.' ;;
     J-UPD-02)   printf '%s\n' '컴퓨터를 한 번 다시 시작하신 뒤 다시 실행해 주십시오.' ;;
@@ -1869,15 +1934,24 @@ detect_stage1() {
   row "1-8" "cysr 실행 링크" "$link_state" "$link_enum" "$link_note"
 
   # 1-7 네트워크 — 연결 성립 여부만 본다 (응답 내용을 판정에 쓰면 형식 변경에 약해진다)
-  local u code net_enum="ok" net_val=""
+  local u code net_enum="ok" net_val="" uerr="${TMPDIR:-/tmp}/netprobe-err.$$"
+  INSTALL_URL_PROBE="unknown"
   for u in "$CLAUDE_INSTALL_URL" "$CYS_SITE_URL"; do
-    code="$(curl -sS -o /dev/null -m 8 -w '%{http_code}' -I "$u" 2>/dev/null)"
+    code="$(curl -sS -o /dev/null -m 8 -w '%{http_code}' -I "$u" 2>"$uerr")"
+    # installer-0343: 안전 연결(인증서 신뢰)이 안 맺어진 실패는 「못 닿음」과 다른 이름으로 남긴다 — [2/10] J-NET-04 가 읽는다(윈판 같은 자리).
+    if [ "$u" = "$CLAUDE_INSTALL_URL" ]; then
+      case "${code:-000}" in
+        2*|3*) INSTALL_URL_PROBE="ok" ;;
+        *) if tls_trust_words < "$uerr"; then INSTALL_URL_PROBE="trust"; code="실패(안전 연결)"; else INSTALL_URL_PROBE="fail"; fi ;;
+      esac
+    fi
     net_val="$net_val$u=${code:-실패} "
     case "${code:-000}" in
       2*|3*) : ;;
       *) net_enum="failed" ;;
     esac
   done
+  rm -f "$uerr"
   # 🔴받는 자리는 **본문까지** 본다 — 담벼락·프록시는 200 에 안내 문서를 실어 보낸다(윈판 1-7 과 같은 규율).
   local dtxt dcode
   dcode="$(curl -sS -m 8 -o "${TMPDIR:-/tmp}/dlprobe.$$" -w '%{http_code}' "$CLAUDE_DOWNLOAD_PROBE_URL" 2>/dev/null)"
@@ -2196,12 +2270,21 @@ claude_install_interrupt() { # 이 단계에서 Ctrl-C·창 닫기 — 배경에
 
 # 받는 자리 점검(1-7)의 답을 사람 말로 (윈판 Get-DlProbeWords 동형) — 「안 쟀다」와 「못 닿았다」를 가른다.
 dl_probe_words() {
+  # installer-0343(윈 도움 XQ9GKXWJ · MSN5EB74): claude.ai 가 시작 전부터 실패였으면 그것을 먼저 말한다 — 받는 자리만 말하면 「닿았습니다」가 실제 실패를 가린다.
+  case "$INSTALL_URL_PROBE" in
+    trust) printf '%s' 'claude.ai 에는 설치 시작 전에도 안전한 연결을 맺지 못했습니다 · downloads.claude.ai 는 ' ;;
+    fail)  printf '%s' 'claude.ai 에는 설치 시작 전에도 닿지 못했습니다 · downloads.claude.ai 는 ' ;;
+  esac
   case "$DL_PROBE" in
     ok)   printf '%s' '설치 시작 전에는 닿았습니다(그 사이에 끊겼을 수 있습니다).' ;;
     bad)  printf '%s' '답은 왔지만 판번이 아니었습니다 — 회사·학교 망의 안내 화면일 수 있습니다.' ;;
     fail) printf '%s' '닿지 못했습니다 — 이 자리가 막혀 있습니다.' ;;
     *)    printf '%s' '재지 못했습니다.' ;;
   esac
+}
+# 안전 연결(인증서 신뢰)이 안 맺어졌다는 말인가(표준 입력을 읽는다) — 맥 curl 의 인증서 실패 문구 + 윈 실측 문구(같은 표 · 윈판 Test-TlsTrustWords).
+tls_trust_words() {
+  grep -qE 'SSL certificate problem|certificate verify failed|unable to get local issuer certificate|self.signed certificate|트러스트 관계|trust relationship|TrustFailure'
 }
 # 자식 설치기가 남긴 글자의 꼬리 (윈판 Get-ClaudeInstallLogTail 동형) — 없으면 아무것도 안 찍는다.
 claude_install_log_tail() { # <줄 수>
@@ -2223,6 +2306,50 @@ show_claude_install_log_tail() {
   { printf '\n## [2/10] 클로드 설치기가 남긴 글자(마지막 20줄)\n'
     printf '%s\n' "$tail_txt" | while IFS= read -r ln; do [ -n "$ln" ] && printf -- '- %s\n' "$(redact "$ln")"; done
   } >> "$REPORT_FILE" 2>/dev/null || true
+}
+# 공식 설치기가 스스로 실패를 말했는가 (help-cases-1029 맥 짝 · 윈판 Get-ClaudeInstallFailKind 동형).
+#   윈 기기(도움 KUDTUSU9)는 설치기 기록 끝의 「Installation failed」·「EBUSY」를 두고도 J-PATH-01(새 창 처방)로 떨어졌다 — 깔린 적이 없었다.
+#   맥 문구 근거: 「Installation failed」·EBUSY 는 두 OS 가 같이 쓰는 클로드 실행 파일의 install 이 한 말이다(윈 기록 실측 · 맥 실측 없음 — 신뢰도 중간).
+#   「Installation was killed」 는 맥 설치 스크립트(claude.ai/install.sh · 2026-10-29 받은 판 249~251줄)가 신호로 끝났을 때 직접 찍는 말이다.
+#   찍는 것 = '' 실패 표지 없음 · busy 다른 프로그램이 쥐고 있었다 · failed 그 밖.
+claude_install_fail_kind() {
+  local t
+  t="$(claude_install_log_tail 60)"
+  printf '%s' "$t" | grep -qE 'Installation failed|Installation was killed' || return 0
+  if printf '%s' "$t" | grep -qE 'EBUSY|EPERM|resource busy or locked|being used by another process'; then printf '%s' busy
+  else printf '%s' failed; fi
+}
+# installer-0343(윈 도움 XQ9GKXWJ · MSN5EB74 · J-DL-07 부분 오진의 맥 짝): claude.ai 한 곳과 안전한 연결이 안 맺어졌으면 「서버에 못 닿음」이 아니다.
+#   판정 = 1-7 의 claude.ai 실패가 안전 연결 실패였는가 · 또는 설치기가 남긴 글자(끝 60줄). 맥 실기 실측 없음(문구 = curl 의 인증서 실패 말 · 신뢰도 중간).
+claude_tls_trust_fail() {
+  [ "$INSTALL_URL_PROBE" = "trust" ] && return 0
+  claude_install_log_tail 60 | tls_trust_words
+}
+write_claude_tls_trust_failed() { # <사실 줄>
+  log "J-NET-04 by: tls-trust probe=$INSTALL_URL_PROBE"
+  say "[2/10] 이 인터넷에서 claude.ai 와 안전한 연결을 맺지 못해 클로드 설치기를 받지 못했습니다(클로드 파일도 생기지 않았습니다)."
+  jcode "J-NET-04" "claude.ai 와 안전한 연결을 맺지 못했습니다"
+  say "     회사·학교·기관 인터넷이나 보안 프로그램이 이 주소를 막아 둘 때 흔히 이렇게 됩니다."
+  next_rerun "휴대폰 핫스팟 같은 다른 인터넷으로 연결하신 뒤, 아래 「다시 하시는 법」대로 다시 실행해 주십시오. 회사·학교 컴퓨터라면 전산 담당자께 claude.ai 접속이 막혀 있는지 여쭈어 보셔도 됩니다."
+  [ -n "${1:-}" ] && say "$1"
+  say "     처음 점검 결과: $(dl_probe_words)"
+  show_claude_install_log_tail
+  SHOW_RERUN=1
+}
+# 공식 설치기 실패(J-INST-01) — 종료 코드를 읽은 갈래와 「명령이 안 잡힌다」 갈래가 같은 말을 하게 한 자리에서 한다(윈판 Write-ClaudeInstallFailed 동형).
+write_claude_install_failed() { # <kind> <사실 줄>
+  log "J-INST-01 by: vendor-said-failed kind=$1"
+  say "[2/10] 클로드 공식 설치기가 설치를 끝내지 못했다고 알려 왔습니다(클로드 파일도 생기지 않았습니다)."
+  jcode "J-INST-01" "클로드 공식 설치기가 설치를 끝내지 못했습니다"
+  if [ "$1" = "busy" ]; then
+    say "     설치기가 쓰려던 폴더를 다른 프로그램이 잠깐 쥐고 있었습니다 — 앞서 열어 둔 다른 설치 창일 때가 많습니다."
+    next_rerun "열려 있는 다른 터미널 창을 모두 닫고 1분쯤 기다리신 뒤, 아래 「다시 하시는 법」대로 다시 실행해 주십시오. 두 번째도 같으면 컴퓨터를 한 번 다시 시작하신 뒤 다시 실행해 주십시오."
+  else
+    next_rerun "아래 「다시 하시는 법」대로 한 번 더 실행해 주십시오. 두 번째도 같으면 이 화면을 사진으로 남겨 보내 주십시오."
+  fi
+  [ -n "${2:-}" ] && say "$2"
+  show_claude_install_log_tail
+  SHOW_RERUN=1
 }
 step_install_claude() {
   if [ "$S1_CLAUDE_OK" = "1" ]; then
@@ -2282,6 +2409,9 @@ step_install_claude() {
     say "[2/10] 설치기를 받지 못했습니다 (종료 코드 $rc)."
     if wait_for_connection "[2/10]" '( set -o pipefail; curl -fsSL --max-time 600 "$CLAUDE_INSTALL_URL" | bash -s "$CLAUDE_CHANNEL" )'; then
       rc=0
+    elif [ ! -x "$HOME/.local/bin/claude" ] && claude_tls_trust_fail; then
+      write_claude_tls_trust_failed "     설치기 종료 코드: $rc · 클로드 파일: 없음"
+      return 4
     elif [ ! -x "$HOME/.local/bin/claude" ] && [ "$NET_FAILED" = 1 ]; then
       # v0.3.32(운영자 판정 · 윈 종료 코드 갈래의 맥 짝): 기다림(일시 끊김 흡수)은 그대로 두고,
       #   끝내 안 붙었는데 파일도 없고 1-7 에도 실패 행이 있으면 처방을 「다른 인터넷으로」(J-DL-07 과 같은 처방)로 준다.
@@ -2289,6 +2419,10 @@ step_install_claude() {
       say "     내려받는 자리 점검 결과: $(dl_probe_words)"
       show_claude_install_log_tail
       next_rerun "휴대폰 핫스팟 같은 다른 인터넷으로 연결하신 뒤, 아래 「다시 하시는 법」대로 다시 실행해 주십시오."
+      return 4
+    elif [ ! -x "$HOME/.local/bin/claude" ] && [ -n "$(claude_install_fail_kind)" ]; then
+      # help-cases-1029: 설치기가 스스로 실패를 말했으면 「연결이 된 뒤」가 아니다(윈판 종료 코드 갈래의 J-INST-01 짝).
+      write_claude_install_failed "$(claude_install_fail_kind)" "     설치기 종료 코드: $rc · 클로드 파일: 없음"
       return 4
     else
       next_rerun "연결이 된 뒤 아래 「다시 하시는 법」대로 다시 실행해 주십시오. 끝난 단계는 건너뛰고 이어서 갑니다."
@@ -2308,6 +2442,10 @@ step_install_claude() {
     #   (윈판 J-DL-07 과 같은 갈래 · 맥에는 32비트 갈래가 없어 이것이 첫 갈래다.)
     # v0.3.32(도움 KW67JGJG 윈판 짝): 파일이 없고 1-7 망 점검에 실패 행이 있으면 걸린 시간과 무관하게 이 갈래.
     local fast_exit=0; [ "$w" -lt "$CLAUDE_INSTALL_FAST_EXIT_SEC" ] && fast_exit=1
+    if [ "$direct" != "1" ] && [ ! -x "$HOME/.local/bin/claude" ] && claude_tls_trust_fail; then
+      write_claude_tls_trust_failed "     클로드 파일: 없음 · 설치기 종료 코드: $rc · 설치기 걸린 시간: ${w}초"
+      return 4
+    fi
     if [ "$direct" != "1" ] && [ ! -x "$HOME/.local/bin/claude" ] && { [ "$fast_exit" = 1 ] || [ "$NET_FAILED" = 1 ]; }; then
       log "J-DL-07 by: $([ "$fast_exit" = 1 ] && echo fast-exit || echo net-failed) (elapsed=$w netFailed=$NET_FAILED)"
       if [ "$fast_exit" = 1 ]; then say "[2/10] 설치기가 시작한 지 ${CLAUDE_INSTALL_FAST_EXIT_SEC}초도 안 돼 끝났고 파일도 생기지 않았습니다."
@@ -2318,6 +2456,11 @@ step_install_claude() {
       say "     내려받는 자리 점검 결과: $(dl_probe_words)"
       show_claude_install_log_tail
       SHOW_RERUN=1
+      return 4
+    fi
+    # help-cases-1029: 파일이 없고 설치기가 스스로 실패를 말했으면 PATH 문제가 아니다 — 깔린 적이 없다(윈판 같은 자리).
+    if [ ! -x "$HOME/.local/bin/claude" ] && [ -n "$(claude_install_fail_kind)" ]; then
+      write_claude_install_failed "$(claude_install_fail_kind)" "     클로드 파일: 없음 · 설치기 종료 코드: $rc · 설치기 걸린 시간: ${w}초"
       return 4
     fi
     say "[2/10] 설치기는 끝났는데 claude 명령이 아직 안 잡힙니다."
@@ -2466,7 +2609,9 @@ login_fail_question() { # → LOGIN_INFO_ANSWER · LOGIN_INFO_KEYS
 add_login_report() { # 로그인 단계에서 본 것 — 기록 파일과 환경 보고 두 곳에 똑같이 남긴다
   local l
   set -- "로그인 창: $LOGIN_INFO_WIN" "승인 프로세스: $LOGIN_INFO_PROC" "다시 열기: $LOGIN_INFO_REOPEN" "코드 넣기: $LOGIN_INFO_SEND" \
-         "끝난 뒤 확인: $LOGIN_INFO_CONFIRM" "상한에서 받은 답: $LOGIN_INFO_ANSWER" "질문 전 설치 창에 쌓인 글자 수: $LOGIN_INFO_KEYS"
+         "끝난 뒤 확인: $LOGIN_INFO_CONFIRM" "상한에서 받은 답: $LOGIN_INFO_ANSWER" "질문 전 설치 창에 쌓인 글자 수: $LOGIN_INFO_KEYS" \
+         "기다리는 동안 키보드·마우스 사용(이 컴퓨터 전체): $LOGIN_INFO_INPUT"
+  # 0.3.43(운영 결정 2026-10-30 · 승인 범위 = 키보드·마우스 사용 여부뿐): 브라우저 줄·판정 꼬리표는 화면 처방 고르기에만 쓰고 보고·기록에 싣지 않는다.
   for l in "$@"; do log "login report: $l"; done
   add_report_lines "" "## [3/10] 로그인 단계에서 본 것" "$(printf -- '- %s\n' "$@")"
 }
@@ -2574,9 +2719,11 @@ step_login() {
   rm -f "$LOGIN_PID_FILE" "$LOGIN_CAPPED_MARK"
   LOGIN_INFO_WIN="설치 창 안 가짜 터미널(코드는 설치기가 넣는다)"; LOGIN_INFO_PROC="-"; LOGIN_INFO_REOPEN="안 했다(맥은 다시 열지 않는다)"
   LOGIN_INFO_SEND="-"; LOGIN_INFO_CONFIRM="-"; LOGIN_INFO_ANSWER="묻지 않음(상한에 닿지 않았다)"; LOGIN_INFO_KEYS="-"
+  LOGIN_INFO_INPUT="-"; LOGIN_INFO_BROWSER="-"; LOGIN_INFO_PRESENCE="-"
   local login_t0 login_rc=0 login_w feed
   login_t0="$(date +%s)"
   : > "$LOGIN_WAIT_MARK"
+  login_presence_start
   login_waiter "$LOGIN_WAIT_MARK" "$LOGIN_PID_FILE" &
   LOGIN_WATCHER=$!
   # ★승인은 **앞에 그대로** 두되, 자기 번호와 시작 시각을 적고 나서 벤더 명령으로 **바뀐다**(exec).
@@ -2604,6 +2751,8 @@ step_login() {
   wait "$LOGIN_WATCHER" 2>/dev/null || true
   LOGIN_WATCHER=""   # 0.3.36(F11): 거둔 번호를 비운다 — 끝맺음이 다시 죽이려다 다른 프로세스가 물려받은 번호를 치지 않게
   login_w=$(( $(date +%s) - login_t0 ))
+  login_presence_tick "$login_w"
+  login_presence_resolve "$login_w"
   feed="$(grep -o 'login feeder end: clipboard [0-9]* · terminal lines [0-9]*' "$LOG_FILE" 2>/dev/null | tail -1)"
   [ -n "$feed" ] && LOGIN_INFO_SEND="복사된 코드 $(printf '%s' "$feed" | sed -E 's/.*clipboard ([0-9]+).*/\1/')회 · 설치 창 입력 줄 $(printf '%s' "$feed" | sed -E 's/.*terminal lines ([0-9]+).*/\1/')회"
   if [ -f "$LOGIN_CAPPED_MARK" ]; then
@@ -2635,6 +2784,16 @@ step_login() {
   LOGIN_INFO_CONFIRM="로그인 안 됨 · 확인 ${tries}회(${LOGIN_POLL_TIMEOUT}초) · 그 가운데 실행 실패 ${fails}회"
   set_login_stage "fail"
   say "[3/10] $((LOGIN_POLL_TIMEOUT / 60))분 동안 로그인이 확인되지 않았습니다."
+  log "login input: $LOGIN_INFO_INPUT"   # 0.3.43: 보내는 기록엔 사용 여부만(브라우저·판정 꼬리표 없음)
+  case "$LOGIN_INFO_PRESENCE" in
+    away)
+      say "     기다린 동안 이 컴퓨터의 키보드·마우스가 한 번도 움직이지 않았습니다 — 그 사이 자리를 비우셨던 것 같습니다."
+      say "     괜찮습니다. 다시 실행하시면 로그인 화면이 다시 열리니, 화면 앞에 계실 때 브라우저의 승인 단추를 눌러 주십시오." ;;
+    no-browser)
+      # 0.3.43: 브라우저에서 나온 판단이라 화면에만 찍는다(say 는 보내는 기록에도 적는다).
+      printf '%s\n' "     브라우저가 하나도 떠 있지 않았습니다 — 로그인 화면이 열리지 않았을 수 있습니다." \
+        "     다시 실행하신 뒤에도 브라우저가 안 보이면, 설치 창에 보이는 https:// 주소를 복사해 브라우저 주소창에 붙여넣어 주십시오." ;;
+  esac
   add_login_report
   jcode "J-LOGIN-01" "로그인 승인이 시간 안에 끝나지 않았습니다"
   next_rerun "아래 「다시 하시는 법」대로 다시 실행하시면 로그인 창이 다시 열립니다."
@@ -3113,8 +3272,10 @@ step_download_cys() {
     next_rerun "공간을 3GB 이상 비우신 뒤 아래 「다시 하시는 법」대로 다시 실행해 주십시오."
     return 5
   fi
+  local dl_short="" dl_short_n=0 dl_t0   # installer-0343: 크기가 모자랐던 회차(받은 바이트:걸린 초) — 두 번 다면 J-DL-08(윈판 $script:DlShort)
   for try in 1 2; do
     rm -f "$dst"
+    dl_t0="$SECONDS"
     # 크기 핀이 숫자가 아닐 때(발행 전 자리표)는 크기를 말하지 않는다 — 산술에 글자를 넣으면 셸 오류가 화면에 섞인다(외부 검토 1차 지적 2026-09-16).
     if [ "$CYS_MAC_BYTES" -gt 0 ] 2>/dev/null; then
       say "[5/10] cysr 설치 파일을 받습니다 (약 $((CYS_MAC_BYTES / 1000000))MB · 잠시 걸립니다)."
@@ -3188,11 +3349,30 @@ step_download_cys() {
       rm -f "$dst"
       return 5
     fi
+    local dl_sec=$((SECONDS - dl_t0)); [ "$dl_sec" -ge 1 ] || dl_sec=1
+    dl_short="$dl_short $got:$dl_sec"; dl_short_n=$((dl_short_n + 1))
+    log "dl short try=$try got=$got want=$CYS_MAC_BYTES sec=$dl_sec"
     say "[5/10] 크기가 맞지 않습니다 (받은 것 $got · 기대 $CYS_MAC_BYTES). 다시 받습니다."
   done
   # 두 번 다 실패했으면 반쯤 받은 파일을 남기지 않는다 — 다음 실행이 그것을 온전한 것으로 볼 수 있다.
   rm -f "$dst"
   say "[5/10] 설치 파일을 온전히 받지 못했습니다."
+  # installer-0343(윈 도움 MGHSX9GL · J-UNK-00 오진의 맥 짝): 두 번 다 크기가 모자란 채 끝났으면 받다 끊긴 것 — 사실을 적고 J-DL-08.
+  #   ⚠맥 curl 은 흐름이 멎으면(--speed-limit) 실패로 끝나 위 기다림 갈래로 가므로, 이 갈래는 「끝까지 왔다고 말했는데 모자란」 때뿐이다.
+  if [ "$dl_short_n" -ge 2 ] && [ "$CYS_MAC_BYTES" -gt 0 ] 2>/dev/null; then
+    local e b sec facts=""
+    for e in $dl_short; do
+      b="${e%%:*}"; sec="${e##*:}"
+      facts="${facts}받은 것 약 $((b / 1000000))MB / $((CYS_MAC_BYTES / 1000000))MB · 걸린 시간 $((sec / 60))분 $((sec % 60))초 · 초당 약 $((b / 1000 / sec))KB
+"
+    done
+    log "J-DL-08 by: short-twice$dl_short"
+    printf '%s' "$facts" | while IFS= read -r e; do [ -n "$e" ] && say "     $e"; done
+    { printf '\n## [5/10] 설치 파일 받기 — 두 번 다 끝까지 받지 못함\n'; printf '%s' "$facts" | while IFS= read -r e; do [ -n "$e" ] && printf -- '- %s\n' "$e"; done; } >> "$REPORT_FILE" 2>/dev/null || true
+    jcode "J-DL-08" "설치 파일을 끝까지 받지 못했습니다(인터넷이 느리거나 중간에 끊김)"
+    next_rerun "인터넷이 잘 되는 곳(공유기 가까이 · 다른 와이파이 · 휴대폰 핫스팟)에서 아래 「다시 하시는 법」대로 다시 실행해 주십시오."
+    return 5
+  fi
   say "     공식 페이지에서 직접 받으실 수 있습니다: $CYS_MANUAL_URL"
   say "     받을 파일 이름 = $CYS_MAC_FILE"
   return 5
@@ -3933,7 +4113,10 @@ step_prepare_account() {
     invoke_logged 'daemon status' cys_txn_env "$cli" daemon status || true
     side="$(cys_app_dir)/Contents/MacOS/cysd"
     say "       짝 파일 있음 = $([ -x "$side" ] && echo True || echo False) ($(redact "$side"))"
-    say "     잠시 뒤 아래 「다시 하시는 법」대로 다시 실행해 주십시오. 그래도 같으면 위 세 줄을 알려 주십시오."; SHOW_RERUN=1
+    # installer-0343(윈 도움 3A45EF4G 외 · J-UNK-00 오진의 맥 짝): 코드 없이 끝나 「분류 못 함」이 됐다 — 이름을 붙인다.
+    log "J-APP-02 by: daemon-no-answer launchd=$AUTOSTART_STATE"
+    jcode "J-APP-02" "자비스 바탕 프로그램이 준비됐는데 답하지 않습니다"
+    next_rerun "컴퓨터를 한 번 다시 시작하신 뒤, 아래 「다시 하시는 법」대로 다시 실행해 주십시오. 끝난 단계는 건너뛰고 이어서 갑니다. 그래도 같으면 위 세 줄을 알려 주십시오."
     return 8
   fi
   # v0.3.30: 이 단계가 끝난 지금의 데몬 pid 와 대조해 [9/10] 의 rotate 를 부를지 정한다(rotate_plan 머리 주석).
@@ -5083,7 +5266,7 @@ raise_cys_app_window() {
 # ★언제 도는가 = 자비스를 깨우기 **전에** 진단 코드를 남기고 멈춘 끝. 자비스를 깨운 뒤에는 돌지 않는다
 #   (자비스가 이 창을 넘겨받으므로 두 쪽이 한 화면에 섞이지 않게).
 # ⚠JSON·재검사·스크럽은 macOS 기본 `osascript`(JavaScript)가 한다 — 깨끗한 맥에는 jq·python 이 없다.
-INSTALLER_VERSION="0.3.42"      # 보고의 installer_version · BOOTSTRAP_VERSION 은 화면 머리글 용도 그대로(보내지 않는다)
+INSTALLER_VERSION="0.3.43"      # 보고의 installer_version · BOOTSTRAP_VERSION 은 화면 머리글 용도 그대로(보내지 않는다)
 # 0.3.36: JARVIS_HELP_API_URL = CI·흉내가 도움 보고를 로컬로 돌리는 손잡이(JARVIS_PROGRESS_URL 과 같은 모양 · 사람이 쓰는 길이 아니다 ·
 #   없으면 종전 주소 그대로 — tests/help-url-lever.sh 가 잰다). CI(reinstall-matrix.yml)의 full 부분 설치가 라이브 도움 채널로 가던 길을 막는다.
 HELP_API_URL="${JARVIS_HELP_API_URL:-https://jarvis-install.godmeyou.kr}"
@@ -5094,7 +5277,11 @@ REMOTE_HELP_NOTICE_URL="jarvis-install.godmeyou.kr/help/notice"
 # [1/10] 고지 1줄 = /help/notice 정본(page.ts)이 인용하는 문장 그대로 + 끝에 자세한 안내 자리(계약 7-1절). ⛔문안 변경 금지.
 # 0.3.36: 첫 화면 진행 고지 = 확정 문구(윈 $ProgressNotice 첫 문장 · 서버 NOTICE_TEXT 첫 문장과 같은 글).
 #   맥은 이 한 줄만 — 창 그림은 맥 기본이 꺼짐이라 윈 문단의 그림 문장을 옮기지 않는다.
-PROGRESS_NOTICE="설치가 잘 되는지 보려고 진행 단계와 기기 정보(모델, 메모리, 남은 공간)를 자동으로 보냅니다."
+#   0.3.43: + 로그인 대기 입력 1구절(서버 NOTICE_TEXT 둘째 문장과 같은 글 · 운영 결정 2026-10-30 · tests/notice-before-send.sh 가 page.ts 와 대조).
+# 0.3.43(운영 결정 2026-10-30): 로그인이 시간 안에 안 끝났을 때(J-LOGIN-01) 보내는 수집 = 키보드·마우스를 썼는지 여부(있었다·없었다·잴 수 없었다)뿐 —
+#   누른 내용·횟수·시각·브라우저 정보는 싣지 않는다(login_presence_resolve · add_login_report). 이 수집을 알리는 고지 1구절은
+#   서버 정본(page.ts NOTICE_TEXT)과 함께 바꿔야 해서(계약 2절 · 정본 1곳) 이 판에서는 문구를 넣지 않았다 — 검토 뒤 세 곳을 한 번에.
+PROGRESS_NOTICE="설치가 잘 되는지 보려고 진행 단계와 기기 정보(모델, 메모리, 남은 공간)를 자동으로 보냅니다. 로그인이 시간 안에 끝나지 않으면, 기다리시는 동안 키보드·마우스를 쓰셨는지 안 쓰셨는지만 함께 보냅니다(무엇을 누르셨는지는 보내지 않습니다)."
 # 0.3.36: 창 글자 고지 반 줄 = 확정 문구(⛔글자 변경 금지 — tests/notice-before-send.sh ⓔ 가 글자를 잰다).
 #   맥은 막힘·이상(느림·오류 글·다시 시도)·끝에 설치 기록 끝부분(evidence_text_file)과 자비스 화면 끝(post_install_evidence)을 가려서 보낸다 — 그 고지다.
 CAPTURE_NOTICE="설치가 끝나거나 막히거나 이상이 보이면, 도와드리기 위해 이 창과 자비스 창의 글자를 운영팀에 보냅니다(개인정보는 가리고 30일 뒤 지웁니다)."

@@ -117,23 +117,30 @@ $CysWinSha256 = (Get-FileHash -Algorithm SHA256 -LiteralPath $tmpf).Hash.ToLower
 # 받기 가짜가 쓰는 바이트 — motw-badsha 는 크기는 같고 내용이 다른 파일을 받는다(지문 불일치)
 $script:EmuDownloadBytes = if ($Scenario -eq 'motw-badsha') { [System.Text.Encoding]::ASCII.GetBytes('EMU CYS INSTALLER V0318') } else { $script:EmuInstallerBytes }
 New-Item -ItemType Directory -Force -Path "$Sb/cysdir" | Out-Null
-$exeOld = [System.Text.Encoding]::ASCII.GetBytes('emu cys exe A')
-$exeNew = [System.Text.Encoding]::ASCII.GetBytes('emu cys exe B (pinned build)')
+# 🔴가짜 cys.exe = 실행 가능한 셸 스텁(2026-10-22 · TICKET=cysr-1111-unarchiver-open) — 실물 Save-CysRollbackAssets 의 `& $cli self-update …` 가
+#   실행 비트 없는 바이트 파일을 만나면 맥 pwsh 가 `/usr/bin/open` 으로 넘겨 .exe 기본 앱(The Unarchiver) 창이 사람 화면에 떴다.
+#   스텁은 부른 사실만 $Sb/cli.log 에 적고 `{}` · rc 0 으로 답한다(운영 bootstrap.ps1 은 그대로) · A·B 는 둘째 줄로 갈려 지문이 다르다.
+$exeOld = [System.Text.Encoding]::ASCII.GetBytes("#!/bin/sh`n# emu cys exe A`nprintf 'CLI %s\n' ""`$*"" >> ""`$(dirname ""`$0"")/../cli.log""`necho '{}'`n")
+$exeNew = [System.Text.Encoding]::ASCII.GetBytes("#!/bin/sh`n# emu cys exe B (pinned build)`nprintf 'CLI %s\n' ""`$*"" >> ""`$(dirname ""`$0"")/../cli.log""`necho '{}'`n")
+function Write-EmuExe([string]$Path, [byte[]]$Bytes) {
+    [System.IO.File]::WriteAllBytes($Path, $Bytes)
+    if (-not $IsWindows) { [System.IO.File]::SetUnixFileMode($Path, [System.IO.UnixFileMode]'UserRead, UserWrite, UserExecute, GroupRead, GroupExecute, OtherRead, OtherExecute') }
+}
 function Write-EmuStamp($setupSha, $exeBytes) {
     $f = "$Sb/emu-exe-for-stamp.bin"; [System.IO.File]::WriteAllBytes($f, $exeBytes)
     $es = (Get-FileHash -Algorithm SHA256 -LiteralPath $f).Hash.ToLower()
     Set-Content -LiteralPath "$Sb/cysdir/jarvis-cys-pin.json" -Value ('{"version":"' + $CysVersion + '","setup_sha256":"' + $setupSha + '","exe_sha256":"' + $es + '"}') -NoNewline
 }
 switch ($Scenario) {
-    'ver-same'     { Set-Content -LiteralPath "$Sb/cys-state.txt" -Value $CysVersion -NoNewline; [System.IO.File]::WriteAllBytes("$Sb/cysdir/cys.exe", $exeNew); Write-EmuStamp $CysWinSha256 $exeNew }
+    'ver-same'     { Set-Content -LiteralPath "$Sb/cys-state.txt" -Value $CysVersion -NoNewline; Write-EmuExe "$Sb/cysdir/cys.exe" $exeNew; Write-EmuStamp $CysWinSha256 $exeNew }
     # 같은 판번 · 표지의 핀 지문이 지금 핀과 다르다 = 같은 판번으로 다시 발행한 빌드
-    'ver-same-pin' { Set-Content -LiteralPath "$Sb/cys-state.txt" -Value $CysVersion -NoNewline; [System.IO.File]::WriteAllBytes("$Sb/cysdir/cys.exe", $exeOld); Write-EmuStamp ('a' * 64) $exeOld }
+    'ver-same-pin' { Set-Content -LiteralPath "$Sb/cys-state.txt" -Value $CysVersion -NoNewline; Write-EmuExe "$Sb/cysdir/cys.exe" $exeOld; Write-EmuStamp ('a' * 64) $exeOld }
     # 같은 판번 · 핀은 같은데 깔린 cys.exe 가 표지와 다르다(다른 경로로 같은 판번의 다른 파일이 깔렸다)
-    'ver-same-exe' { Set-Content -LiteralPath "$Sb/cys-state.txt" -Value $CysVersion -NoNewline; [System.IO.File]::WriteAllBytes("$Sb/cysdir/cys.exe", $exeOld); Write-EmuStamp $CysWinSha256 $exeNew }
-    'ver-same-refresh-fail' { Set-Content -LiteralPath "$Sb/cys-state.txt" -Value $CysVersion -NoNewline; [System.IO.File]::WriteAllBytes("$Sb/cysdir/cys.exe", $exeOld) }
-    'ver-old'      { Set-Content -LiteralPath "$Sb/cys-state.txt" -Value '0.14.30' -NoNewline; [System.IO.File]::WriteAllBytes("$Sb/cysdir/cys.exe", $exeOld) }
-    'ver-old-fail' { Set-Content -LiteralPath "$Sb/cys-state.txt" -Value '0.14.30' -NoNewline; [System.IO.File]::WriteAllBytes("$Sb/cysdir/cys.exe", $exeOld) }
-    'ver-unknown'  { Set-Content -LiteralPath "$Sb/cys-state.txt" -Value 'unknown' -NoNewline; [System.IO.File]::WriteAllBytes("$Sb/cysdir/cys.exe", $exeOld) }
+    'ver-same-exe' { Set-Content -LiteralPath "$Sb/cys-state.txt" -Value $CysVersion -NoNewline; Write-EmuExe "$Sb/cysdir/cys.exe" $exeOld; Write-EmuStamp $CysWinSha256 $exeNew }
+    'ver-same-refresh-fail' { Set-Content -LiteralPath "$Sb/cys-state.txt" -Value $CysVersion -NoNewline; Write-EmuExe "$Sb/cysdir/cys.exe" $exeOld }
+    'ver-old'      { Set-Content -LiteralPath "$Sb/cys-state.txt" -Value '0.14.30' -NoNewline; Write-EmuExe "$Sb/cysdir/cys.exe" $exeOld }
+    'ver-old-fail' { Set-Content -LiteralPath "$Sb/cys-state.txt" -Value '0.14.30' -NoNewline; Write-EmuExe "$Sb/cysdir/cys.exe" $exeOld }
+    'ver-unknown'  { Set-Content -LiteralPath "$Sb/cys-state.txt" -Value 'unknown' -NoNewline; Write-EmuExe "$Sb/cysdir/cys.exe" $exeOld }
     'ver-fresh'    { }
     'motw-badsha'  { }
     'wait-hb'      { }
@@ -184,7 +191,7 @@ function Start-Process {
     if (-not $fail) {
         Set-Content -LiteralPath "$Sb/cys-state.txt" -Value $CysVersion -NoNewline
         New-Item -ItemType Directory -Force -Path "$Sb/cysdir" | Out-Null
-        [System.IO.File]::WriteAllBytes("$Sb/cysdir/cys.exe", $exeNew)
+        Write-EmuExe "$Sb/cysdir/cys.exe" $exeNew
         foreach ($n in @('cysd.exe', 'cys-app.exe')) { Set-Content -LiteralPath "$Sb/cysdir/$n" -Value 'x' -NoNewline }
     }
     $o = [pscustomobject]@{ HasExited = $true; ExitCode = $(if ($fail) { 4 } else { 0 }) }

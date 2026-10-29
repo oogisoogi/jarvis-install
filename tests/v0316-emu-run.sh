@@ -44,7 +44,23 @@ ok()  { pass=$((pass+1)); printf '  ok   %s\n' "$1"; }
 bad() { fail=$((fail+1)); printf '  FAIL %s  ← %s\n' "$1" "$2"; }
 t() { if [ "$1" -eq 0 ]; then ok "$2"; else bad "$2" "$3"; fi; }
 # 멈춘 흉내가 시험 전체를 세우지 않게 상한을 건다(맥에는 timeout 명령이 없다)
-run_ps() { perl -e 'alarm shift; exec @ARGV' 150 "$PW" -NoProfile -File "$@"; }
+# 🔴OS 열기 격리(2026-10-22 · TICKET=cysr-1111-unarchiver-open · tests/v0318-emu-run.sh 와 같은 가드) — 맥은 sandbox-exec 로
+#   /usr/bin/open 실행을 막고 · PATH 앞 가짜 open·xdg-open 은 부른 사실만 적는다. 새는 곳을 잡는 것은 맨 끝 「[격리]」 축이다.
+NOOPEN_BIN="$BASE/noopen-bin"; mkdir -p "$NOOPEN_BIN"
+for n in open xdg-open; do
+  printf '#!/bin/sh\nprintf "%%s %%s\\n" "$(basename "$0")" "$*" >> "%s/os-open.log"\nexit 0\n' "$BASE" > "$NOOPEN_BIN/$n"
+  chmod +x "$NOOPEN_BIN/$n"
+done
+# 🔴진짜 claude 를 PATH 에서 뺀다 — login.ps1 의 가짜 claude 는 「claude 가 사라졌다」를 흉내 내려 자신을 지우거나(poll-exc) 치운다
+#   (reopen-then-poll-exc). 그 틈에 PATH 뒤의 진짜 claude(~/.local/bin)가 잡혀 `claude auth login` 이 브라우저 로그인 창을 열고
+#   고아로 남았다(2026-10-22 실측 · 정리는 $BASE 가 든 프로세스만 겨눠 진짜 claude 는 못 끈다). 가짜는 ps1 이 $Sb/bin 을 앞에 붙인다.
+NOCLAUDE_PATH=""
+IFS=: read -r -a _pdirs <<< "$PATH"
+for d in "${_pdirs[@]}"; do [ -n "$d" ] && [ ! -e "$d/claude" ] && NOCLAUDE_PATH="$NOCLAUDE_PATH${NOCLAUDE_PATH:+:}$d"; done
+export PATH="$NOOPEN_BIN:$NOCLAUDE_PATH"
+NOOPEN=()
+command -v sandbox-exec >/dev/null 2>&1 && NOOPEN=(sandbox-exec -p '(version 1)(allow default)(deny process-exec (literal "/usr/bin/open"))')
+run_ps() { perl -e 'alarm shift; exec @ARGV' 150 ${NOOPEN[@]+"${NOOPEN[@]}"} "$PW" -NoProfile -File "$@"; }
 has() { grep -qE -- "$2" "$1"; }
 cnt() { grep -cE -- "$2" "$1" 2>/dev/null; }
 left() { pgrep -f "$BASE/.*$1" 2>/dev/null | wc -l | tr -d ' '; }
@@ -151,6 +167,11 @@ if command -v cc >/dev/null 2>&1; then
 else
   printf '  skip [reset] 대기 프로그램을 지을 cc 가 없다\n'
 fi
+
+echo "== 격리 — 흉내가 OS 열기를 부르지 않는다(TICKET=cysr-1111-unarchiver-open) =="
+leak="$(grep -rlaF -e "'/usr/bin/open'" -e "'xdg-open'" "$BASE" 2>/dev/null | sed "s#^$BASE/##" | tr '\n' ' ')"
+[ -z "$leak" ] && [ ! -s "$BASE/os-open.log" ]
+t $? "[격리] 흉내 전 갈래가 open·xdg-open 을 한 번도 부르지 않았다(사람 화면에 브라우저·앱 창 0)" "새는 곳: ${leak}$(head -c 300 "$BASE/os-open.log" 2>/dev/null | tr '\n' '|')"
 
 printf '\n통과 %s · 실패 %s\n' "$pass" "$fail"
 [ "$fail" -eq 0 ]

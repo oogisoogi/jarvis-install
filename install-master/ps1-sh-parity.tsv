@@ -47,8 +47,14 @@ Test-ClaudeAuthCmd	claude_has_auth_cmd	sh	같은 일(claude --help 에 auth 하�
 Test-CysAgentFlag	cys_supports_agent_flag	sh	같은 일
 Get-CysVersionLine	cys_version_line	sh	같은 일
 Get-DlProbeWords	dl_probe_words	sh	1-7 받는 자리 점검(ok·bad·fail·unknown)을 사람 말 한 줄로.
+Get-ErrorChainText	-	na	installer-0343 — .NET 예외와 안쪽 예외(5.1 WebException.Status · 7 AuthenticationException)의 글자를 한 줄로 · 맥은 curl 의 표준 오류 글자를 그대로 읽는다(예외 사슬 없음)
+Test-TlsTrustWords	tls_trust_words	sh	installer-0343 — 안전 연결(인증서 신뢰) 실패 문구 판정 · 같은 표(윈 실측 「트러스트 관계」·TrustFailure + 맥 curl 「SSL certificate problem」 류) · 맥 실기 실측 없음(신뢰도 중간)
 Get-ClaudeInstallLogTail	claude_install_log_tail	sh	[2/10] 자식 설치기가 남긴 글자의 꼬리 N 줄(없으면 빈 것).
 Show-ClaudeInstallLogTail	show_claude_install_log_tail	sh	그 꼬리를 화면과 환경 보고 양쪽에 붙인다 · 한 줄도 없으면 「없습니다」로 적는다(부재를 침묵으로 두지 않는다).
+Get-ClaudeInstallFailKind	claude_install_fail_kind	sh	help-cases-1029-r2 맥 짝 — 같은 문구로 가른다(Installation failed · EBUSY 류) + 맥 설치 스크립트가 신호로 끝났을 때 찍는 「Installation was killed」 · 맥 실패 문구 실측 없음(binary install 문구는 윈 기록 기준 · 신뢰도 중간)
+Test-ClaudeTlsTrustFail	claude_tls_trust_fail	sh	installer-0343 맥 짝 — 1-7 claude.ai 실패가 안전 연결 실패였거나 설치기 기록 끝 60줄에 그 문구
+Write-ClaudeTlsTrustFailed	write_claude_tls_trust_failed	sh	installer-0343 맥 짝 — 같은 화면·코드(J-NET-04)·다음 할 일 · 자리 = 종료 코드 실패 갈래(J-DL-07 앞) · 명령 안 잡힘 갈래(J-DL-07 앞)
+Write-ClaudeInstallFailed	write_claude_install_failed	sh	help-cases-1029-r2 맥 짝 — 같은 화면·코드·다음 할 일 · busy 안내에서 「백신 검사」 대신 「다른 설치 창」만(맥) · 「PowerShell 창」→「터미널 창」
 Get-RegPathValue	-	na	윈 레지스트리 값(따옴표·환경 변수 풀기)으로 설치 자리 읽기 · 맥은 등록 목록이 없다(앱 번들 자리 고정)
 Get-CysExeVersion	-	na	윈 실행 파일 판 정보(VersionInfo) 읽기 · 맥은 cys --version 을 쓴다(PE 판 정보 없음)
 Test-CysDirHasBins	-	na	윈 설치 폴더에 실행 파일 3종(cys·cysd·cys-app .exe) 실재 판정(ⓑ 본체 판정 = 파일 · 09-30 노트북 옛 설치 자리 오판) · 맥 앱 번들은 설치기가 통째로 둔다
@@ -115,6 +121,11 @@ Read-LoginTypedLine	login_feeder	sh	설치 창에 친 줄 읽어 넘기기 — r
 Read-LoginFailKey	read_login_fail_key	sh	1·2·3·Enter 한 키를 상한(60초) 안에 받기 · 답 = 1|2|3|enter|timeout|no-input(터미널 아님) — read -s -n 1 -t 1 고리(맥 bash 3.2 는 소수 상한 불가)
 Invoke-LoginFailQuestion	login_fail_question	sh	상한(20분)에서 끝났을 때만 · 문구 네 줄·분류 표지(browser-not-opened·no-approval-screen·approved-code-rejected·unknown·no-answer·no-console-input)·기록 줄 ps1 글자 동일 · 상한 판정 = login_end_wait 가 남기는 .login-capped 표지
 Complete-LoginSuccess	step_login	sh	로그인 성공 처리 — 맥은 S1_LOGGED_IN=1 + 「로그인 확인했습니다」(구독 기록·표지는 없음)
+Get-UserIdleMs	user_idle_sec	sh	help-cases-1029-r2 맥 짝 — ioreg IOHIDSystem HIDIdleTime(나노초 → 초) · 못 재면 -1 · 이 맥 실측 = 값 읽힘(2026-10-29)
+Get-LoginBrowserProcs	login_browser_pids	sh	help-cases-1029-r2 맥 짝 — 브라우저 본체 프로세스 번호만(이름 끝까지 일치 · 도우미 제외) · ⚠창 제목은 맥 미지원(화면 접근 권한 없이 못 읽음)
+New-LoginPresence	login_presence_start	sh	help-cases-1029-r2 맥 짝 — 상태를 파일 하나에 둔다(재는 쪽 login_waiter 가 배경 자식이라 변수가 안 돌아옴)
+Update-LoginPresence	login_presence_tick	sh	help-cases-1029-r2 맥 짝 — 감시자 한 바퀴(60초)마다 + 로그인이 끝난 순간 1번(윈판은 2초 · 맥은 1분 안의 여러 입력을 1번으로 셈)
+Resolve-LoginPresence	login_presence_resolve	sh	help-cases-1029-r2 맥 짝 — away·no-browser·browser-seen·unmeasured + 맥만 browser-unknown(브라우저는 떠 있었으나 새 탭·제목을 못 봄 · 단정하지 않음) · no-browser 는 맥에서 「떠 있는 브라우저 0」일 때만
 Add-LoginReport	add_login_report	sh	일곱 줄(로그인 창·승인 프로세스·다시 열기·코드 넣기·끝난 뒤 확인·상한에서 받은 답·쌓인 글자 수)을 기록과 환경 보고에 · 로그인 실패 끝에서만(ps1 같음) · 코드 넣기 = login_feeder 끝 기록 줄에서 셈
 Get-LoginProfileCandidates	login_profile_candidates	sh	로그인을 물어볼 설정 폴더 후보 — 기본 프로필 · ~/.cys/claude · CLAUDE_CONFIG_DIR · **실재하는 것만**.
 Test-ProfileLoggedIn	profile_login_answer	sh	그 프로필로 auth status 한 번 — yes|no|unknown(윈은 error 도 있다 · 실행 자체가 던지는 자리가 윈에만 있다).

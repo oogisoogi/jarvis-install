@@ -43,7 +43,18 @@ pass=0; fail=0
 ok()  { pass=$((pass+1)); printf '  ok   %s\n' "$1"; }
 bad() { fail=$((fail+1)); printf '  FAIL %s  ← %s\n' "$1" "$2"; }
 t() { if [ "$1" -eq 0 ]; then ok "$2"; else bad "$2" "$3"; fi; }
-run_ps() { perl -e 'alarm shift; exec @ARGV' 60 "$PW" -NoProfile -File "$@" </dev/null; }
+# 🔴OS 열기 격리(2026-10-22 · TICKET=cysr-1111-unarchiver-open · tests/v0318-emu-run.sh 와 같은 가드) — 갈래가 가짜 open 을 앞에 두지 않으면
+#   실물 bootstrap.sh 의 `open -a "$app"` 이 진짜 /usr/bin/open 으로 나간다. 맥은 sandbox-exec 로 pwsh 의 /usr/bin/open 실행을 막고 ·
+#   PATH 뒤쪽 가짜 open·xdg-open 은 부른 사실만 적는다(갈래의 가짜는 $SB/bin 으로 그보다 앞). 새는 곳을 잡는 것은 맨 끝 「[격리]」 축이다.
+NOOPEN_BIN="$BASE/noopen-bin"; mkdir -p "$NOOPEN_BIN"
+for n in open xdg-open; do
+  printf '#!/bin/sh\nprintf "%%s %%s\\n" "$(basename "$0")" "$*" >> "%s/os-open.log"\nexit 0\n' "$BASE" > "$NOOPEN_BIN/$n"
+  chmod +x "$NOOPEN_BIN/$n"
+done
+export PATH="$NOOPEN_BIN:$PATH"
+NOOPEN=()
+command -v sandbox-exec >/dev/null 2>&1 && NOOPEN=(sandbox-exec -p '(version 1)(allow default)(deny process-exec (literal "/usr/bin/open"))')
+run_ps() { perl -e 'alarm shift; exec @ARGV' 60 ${NOOPEN[@]+"${NOOPEN[@]}"} "$PW" -NoProfile -File "$@" </dev/null; }
 has() { grep -qE -- "$2" "$1"; }
 # 윈 재시도 보충 한 줄의 정본을 **읽어서** 쓴다(c2 · 사본을 박으면 문구를 고칠 때마다
 #   이 축이 거짓 적색이 된다 — 09-16 우리말 장문이 ASCII 영문으로 바뀌면서 실제로 한 번 그랬다).
@@ -364,6 +375,8 @@ for s in $MAC_MASTER_SCEN; do
   printf '#!/bin/bash\necho "EMU-CLAUDE-INLINE"\nexit 0\n' > "$SB/bin/claude"; chmod +x "$SB/bin/claude"
   # c7 — 실 osascript·실 앱에 안 닿는다(샌드박스 안 빈 폴더 · CYS_KIND=fork). 부른 것만 기록.
   printf '#!/bin/bash\nprintf "%%s\\n" "$*" >> "%s/osascript-calls"\nexit 0\n' "$SB" > "$SB/bin/osascript"; chmod +x "$SB/bin/osascript"
+  # open 도 가짜(기록만 · 아래 맥 앱 창 갈래와 같은 줄) — 없으면 step_wake 의 `open -a "$SB/cys.app"` 이 진짜 /usr/bin/open 으로 나갔다(2026-10-22 · TICKET=cysr-1111-unarchiver-open)
+  printf '#!/bin/bash\necho "open $*" >> "%s/open-calls"\nexit 0\n' "$SB" > "$SB/bin/open"; chmod +x "$SB/bin/open"
   JH="$SB/home/install-jarvis"
   printf '%s' "$s" > "$SB/scenario"; printf '%s' "$JH" > "$SB/jarvis-home"
   cat > "$SB/run.sh" <<EOF
@@ -586,6 +599,11 @@ t $? "[맥 c1] 다시 실행된 wake.sh 가 선언 첫 줄을 그대로 claude �
 # 0.3.36: step_wake 가 **실제로 쓴** wake.sh 가 claude 에 두 환경값을 싣는다(함수 단독 시험이 못 보는 덮어쓰기 변이 차단 · 적대 검토 반례)
 [ "$(cat "$SB/claude-env" 2>/dev/null)" = "EFFORT=high SUGG=false" ]
 t $? "[맥 c1] step_wake 가 쓴 wake.sh 가 claude 에 EFFORT=high · 제안 글 끄기를 싣는다" "$(cat "$SB/claude-env" 2>/dev/null)"
+
+echo "== 격리 — 흉내가 OS 열기를 부르지 않는다(TICKET=cysr-1111-unarchiver-open) =="
+leak="$(grep -rlaF -e "'/usr/bin/open'" -e "'xdg-open'" "$BASE" 2>/dev/null | sed "s#^$BASE/##" | tr '\n' ' ')"
+[ -z "$leak" ] && [ ! -s "$BASE/os-open.log" ]
+t $? "[격리] 흉내 전 갈래가 진짜 open·xdg-open 을 한 번도 부르지 않았다(사람 화면에 앱 창 0)" "새는 곳: ${leak}$(head -c 300 "$BASE/os-open.log" 2>/dev/null | tr '\n' '|')"
 
 printf '\n통과 %s · 실패 %s\n' "$pass" "$fail"
 [ "$fail" -eq 0 ] || exit 1
