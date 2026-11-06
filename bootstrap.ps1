@@ -140,7 +140,8 @@ $CysDisplayName = 'cysr'
 # 0.3.41: cysr 1.1.9 핀(발행 2026-10-17 · 릴리스 SHA256SUMS.txt 403a8be0…) · 코드 변경 0 — 핀 값과 판번만
 # 0.3.43(2026-10-30): 핀 그대로(cysr 1.1.10) — 도움 사례 진단 갈래(J-INST-01 · J-DL-08 · J-NET-04 · J-APP-02) · 로그인 대기 입력 수집 = 사용 여부만 + 첫 화면 고지 1구절
 # 0.3.42: cysr 1.1.10 핀(발행 2026-10-23 · 값 = 발행할 자산 실물 실측 · 릴리스 SHA256SUMS.txt 대조는 발행 뒤 tests/win-pin-release.sh) · 코드 변경 0 — 핀 값과 판번만
-$CysVersion     = '1.1.10'
+# 0.3.44: cysr 1.1.14 핀(발행 2026-11-06 · 값 = 발행 자산 실물 실측 · 릴리스 SHA256SUMS.txt 대조 = tests/win-pin-release.sh) · 코드 변경 0 — 핀 값과 판번만
+$CysVersion     = '1.1.14'
 $CysDownloadDir = "https://github.com/oogisoogi/cys-ro/releases/download/v${CysVersion}/"
 # ✅아래 세 값 = v1.1.6 재절단 드래프트 릴리스(2026-09-26 · 릴리스 id 396787705 · 대상 커밋 76d2b5e9) 의 자산에서 **실측으로 채웠다**(첫 절단 값(a8ab563b · 140837194 · 릴리스 id 396500235)을 대신한다).
 #   출처 = 릴리스 SHA256SUMS.txt(그 파일 자신의 sha256 = ca54d259b460340f33541181b1711e0183e036dc6a1c3110771480c2496b4ff2 · 1157 B · 13행 · 재절단 드래프트 자산) · 크기·지문은 릴리스 API 자산 digest·SUMS 줄·인증 받기 실물 sha256 과 대조(3/3 일치).
@@ -152,8 +153,8 @@ $CysDownloadDir = "https://github.com/oogisoogi/cys-ro/releases/download/v${CysV
 #   `${CysVersion}` 를 그대로 두는 것이 정본이다 — 판을 올릴 때 이름이 함께 따라 오르고, 뮤턴트 M508 이 그 따라오름을 잰다.
 #   지금 값은 풀면 cysr_1.1.6_x64-setup.exe = 릴리스 자산 이름과 글자 그대로 같다.
 $CysWinFile     = "cysr_${CysVersion}_x64-setup.exe"
-$CysWinBytes    = 152501415
-$CysWinSha256   = '0a214cce9110cf42c7872b88c20ee5c18c077b4eecb083ee936f1866293021e5'   # 릴리스 v1.1.10 SHA256SUMS.txt 의 그 줄과 바이트 일치(tests/win-pin-release.sh 가 릴리스를 때려 다시 잰다)
+$CysWinBytes    = 153645094
+$CysWinSha256   = '67a2d1079d23cb69fb203ab1b20e79436edbbe5f605fbfc29a1699094a597b79'   # 릴리스 v1.1.14 SHA256SUMS.txt 의 그 줄과 바이트 일치(tests/win-pin-release.sh 가 릴리스를 때려 다시 잰다)
 $CysDownloadUrl = $CysDownloadDir + $CysWinFile
 
 $LoginPollInterval = 2     # 초 — 승인 프로세스가 끝난 뒤 로그인을 다시 확인하는 간격
@@ -5497,7 +5498,7 @@ function Step-Fleet {
 #   글자 칸은 `\z` 로 끝을 못박아 다시 만든다. 이름·글자·판본 비교는 대소문자를 가르는 -ceq·-cmatch·-ccontains 만 쓴다.
 # ⚠PowerShell 은 `'true' -eq $true` 를 참으로 본다 ⇒ 칸마다 **형(type)을 먼저** 본다.
 # ⚠이 절은 맥에서 PowerShell 없이 **정적 검사 + 맥판과의 대조**로만 증명했다 — 윈도우 실기가 필요한 축은 내부 문서.
-$InstallerVersion       = '0.3.43'   # 보고의 installer_version · $BootstrapVersion 은 화면 머리글 용도 그대로(보내지 않는다)
+$InstallerVersion       = '0.3.44'   # 보고의 installer_version · $BootstrapVersion 은 화면 머리글 용도 그대로(보내지 않는다)
 # 0.3.36: JARVIS_HELP_API_URL = CI·흉내가 도움 보고를 로컬로 돌리는 손잡이(맥 짝 · 사람이 쓰는 길이 아니다 · 없으면 종전 주소 — tests/help-url-lever.sh).
 $HelpApiUrl             = if ($env:JARVIS_HELP_API_URL) { [string]$env:JARVIS_HELP_API_URL } else { 'https://jarvis-install.godmeyou.kr' }
 # 🔴0.3.36(이종 검토): 시험용 함수 묶음은 도움 보고(/api/help)·닫기도 라이브로 못 보낸다(맥 HELP_API_URL 짝) — 가짜 서버는 읽은 뒤 덮어쓴다.
