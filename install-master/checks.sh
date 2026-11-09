@@ -2991,8 +2991,8 @@ for f in "$PS" "$RESET" "$REIN_PS"; do
   codegrep "$f" '1\) ⊞ 윈도우 키\(키보드 왼쪽 아래, Ctrl과 Alt 사이\)를 누르고 powershell' && no_code "$f" '시작 단추를 누르고'; rc=$?
   ck "[v0317] 다시 하시는 법 첫 줄은 윈도우 키(사이트와 같은 말) · $(basename "$f")" "$rc" "(${GREP_WHY})"
 done
-codegrep "$PS" "^\\\$InstallerVersion *= '0\.3\.44'" && codegrep "$SH" '^INSTALLER_VERSION="0\.3\.44"'
-ck "[v0322] 판본 0.3.44(두 설치기 · 한 릴리스 = 한 판번)" $? "보고의 판본이 갈린다"
+codegrep "$PS" "^\\\$InstallerVersion *= '0\.3\.45'" && codegrep "$SH" '^INSTALLER_VERSION="0\.3\.45"'
+ck "[v0322] 판본 0.3.45(두 설치기 · 한 릴리스 = 한 판번)" $? "보고의 판본이 갈린다"
 # 확인 명령 한 번에도 상한 — 없으면 벤더 도구가 멈추는 순간 20분 상한까지 함께 멈춘다(외부 검토 1차 지적 채택).
 awk '/^function Get-LoginStatusText/{f=1}
      f&&/Start-Process -FilePath \$exe -ArgumentList .auth.,.status. .*-RedirectStandardOutput/{s=1}
@@ -3116,6 +3116,11 @@ fi
 if [ -f "$DIR/../tests/d5-f11-f17-interrupt-close.sh" ]; then
   bash "$DIR/../tests/d5-f11-f17-interrupt-close.sh" --dir "$DIR" >/dev/null 2>&1
   ck "[F11·F17] Ctrl-C 뒤 고아 감시자 0 · 창 닫힘 뒤 기록 줄 전부 시각 · 다음 실행 = 끝맺음(J-AV-03 거짓 0)(행동 시험 · 맥)" $? "감시자가 남거나 거짓 J-AV-03(tests/d5-f11-f17-interrupt-close.sh)"
+fi
+# Q6LNC844(2026-11-09) — 윈 설치 창 그림이 형식을 만든다(TypeNotFound 가 끝맺음의 「마지막 오류」를 가리지 않는다) · 로그인 대기 중 Ctrl+C 가 설치를 끊지 않는다(가상 터미널 · 실물 Step-Login)
+if [ -f "$DIR/../tests/q6lnc844-run.sh" ]; then
+  bash "$DIR/../tests/q6lnc844-run.sh" --dir "$DIR" >/dev/null 2>&1
+  ck "[Q6LNC844] 설치 창 그림 형식 등록 · 로그인 대기 중 Ctrl+C = 버리고 기록 · 대기 뒤 되돌림(행동 시험 · pwsh)" $? "형식이 안 생기거나 Ctrl+C 가 설치를 끊는다(tests/q6lnc844-run.sh)"
 fi
 # F11 보강(0.3.36 적대 검토 지적) — 감시자를 끝낼 때 내 자식인지 먼저 본다(먼저 끝난 감시자의 번호를 물려받은 남을 치지 않는다 · 맥)
 if [ -f "$DIR/../tests/defect-0930-mac-rh.sh" ]; then

@@ -141,6 +141,7 @@ $CysDisplayName = 'cysr'
 # 0.3.43(2026-10-30): 핀 그대로(cysr 1.1.10) — 도움 사례 진단 갈래(J-INST-01 · J-DL-08 · J-NET-04 · J-APP-02) · 로그인 대기 입력 수집 = 사용 여부만 + 첫 화면 고지 1구절
 # 0.3.42: cysr 1.1.10 핀(발행 2026-10-23 · 값 = 발행할 자산 실물 실측 · 릴리스 SHA256SUMS.txt 대조는 발행 뒤 tests/win-pin-release.sh) · 코드 변경 0 — 핀 값과 판번만
 # 0.3.44: cysr 1.1.14 핀(발행 2026-11-06 · 값 = 발행 자산 실물 실측 · 릴리스 SHA256SUMS.txt 대조 = tests/win-pin-release.sh) · 코드 변경 0 — 핀 값과 판번만
+# 0.3.45(2026-11-09): 핀 그대로(cysr 1.1.14) — 윈 사례 Q6LNC844 수리(설치 창 그림 형식 등록 · 로그인 대기 중 Ctrl+C 를 글자로 · 그림 별도 프로세스 10초 상한 · WT_SESSION 판별)
 $CysVersion     = '1.1.14'
 $CysDownloadDir = "https://github.com/oogisoogi/cys-ro/releases/download/v${CysVersion}/"
 # ✅아래 세 값 = v1.1.6 재절단 드래프트 릴리스(2026-09-26 · 릴리스 id 396787705 · 대상 커밋 76d2b5e9) 의 자산에서 **실측으로 채웠다**(첫 절단 값(a8ab563b · 140837194 · 릴리스 id 396500235)을 대신한다).
@@ -2719,11 +2720,22 @@ function Send-LoginCode($proc, [string]$code) {
 # 설치 창에 쌓인 글자를 기다리지 않고 읽어, 한 줄이 끝났으면 돌려준다(아니면 $null). 글자는 화면에 * 로만 보이고 기록에 안 남는다.
 $script:LoginTypedBuf = ''
 $script:LoginTypedKeys = 0   # 설치 창에서 읽은 글자 수(보고용 · 글자 자체는 적지 않는다)
+$script:LoginCtrlC = 0       # (Q6LNC844) 로그인 대기 중 설치 창에서 누른 Ctrl+C 횟수 — 처음 한 번만 적고 알린다
 function Read-LoginTypedLine {
     try {
         while ([Console]::KeyAvailable) {
             $k = [Console]::ReadKey($true)
             $script:LoginTypedKeys++
+            # (Q6LNC844) 대기 동안 Ctrl+C 는 중단이 아니라 글자로 들어온다(Step-Login 의 TreatControlCAsInput) — 버리고, 처음 한 번만 적고 알린다.
+            if (($k.KeyChar -eq [char]3) -or (($k.Key -eq [ConsoleKey]::C) -and (($k.Modifiers -band [ConsoleModifiers]::Control) -ne 0))) {
+                $script:LoginCtrlC++
+                if ($script:LoginCtrlC -eq 1) {
+                    Write-Log 'login wait: Ctrl+C in installer window — ignored (설치는 이어간다)'
+                    [Console]::WriteLine()
+                    Say '     Ctrl+C 로는 설치가 멈추지 않습니다(로그인을 기다리는 동안). 주소를 복사하시려면 마우스로 끌어 선택한 뒤 마우스 오른쪽 단추를 누르십시오. 멈추시려면 이 창을 닫으십시오.'
+                }
+                continue
+            }
             if ($k.Key -eq [ConsoleKey]::Enter) {
                 $line = $script:LoginTypedBuf
                 $script:LoginTypedBuf = ''
@@ -2990,7 +3002,16 @@ function Step-Login {
     $c = @{ By = ''; Auth = ''; Fails = 0; Note = '-' }
     $oldTitle = $null
     try { $oldTitle = $Host.UI.RawUI.WindowTitle } catch { $oldTitle = $null }
+    # 🔴(Q6LNC844 · 2026-11-09) 로그인 대기 동안 Ctrl+C 를 중단 키가 아니라 글자로 받는다(끝나면 되돌린다 · 아래 finally).
+    #   이 대기는 사람에게 **이 창에서 주소를 복사하라**고 한다 — 윈도우에서 복사 키가 곧 Ctrl+C 라, 선택이 풀린 채 누르면
+    #   설치기와 로그인 프로세스가 함께 끊겨 「unexpected end」(J-UNK-00)로 끝났다(기록에 탈출 줄 없이 txn released 로 바로 넘어간 모양).
+    #   ⚠선택이 살아 있을 때의 Ctrl+C 복사는 콘솔이 먼저 가져간다(이 설정과 무관 — 윈 실기 확인 항목). 창 닫기는 종전대로 멈춘다.
+    #   ⚠맥판은 다르다 — 맥의 복사 키는 Cmd+C 라 Ctrl-C 는 중단으로 남긴다(F11).
+    #   ⚠바꾸기는 되돌리는 try **안**에서 한다(교차 검토 지적 채택 2026-11-09) — 바꾼 직후 try 에 들기 전에 끊기면 되돌림을 못 탄다.
+    #   ⚠대기 뒤 실패 질문(Read-LoginFailKey)도 이 범위 안이다 — 거기서 Ctrl+C 는 1·2·3·Enter 가 아니라 버려지고 1분 뒤 다음으로 간다.
+    $ctrlCSaved = $null
     try {
+        try { $ctrlCSaved = [Console]::TreatControlCAsInput; [Console]::TreatControlCAsInput = $true } catch { $ctrlCSaved = $null }
         # ★승인 창이 상한 전에 스스로 끝났는데 로그인이 안 됐으면 = 코드가 받아들여지지 않은 것(J-LOGIN-02 · 2026-09-14 워크숍 4건)
         #   ⇒ 로그인 화면을 **한 번만** 더 연다(현장에서 통한 처방 「claude 를 다시 실행해 로그인」을 안에 둔 것). 두 번째도 같으면 J-LOGIN-01 로 간다.
         $reopened = $false
@@ -3194,6 +3215,7 @@ function Step-Login {
         return
     } finally {
         if ($null -ne $oldTitle) { try { $Host.UI.RawUI.WindowTitle = $oldTitle } catch { } }
+        if ($null -ne $ctrlCSaved) { try { [Console]::TreatControlCAsInput = $ctrlCSaved } catch { } }
     }
 }
 
@@ -5498,7 +5520,7 @@ function Step-Fleet {
 #   글자 칸은 `\z` 로 끝을 못박아 다시 만든다. 이름·글자·판본 비교는 대소문자를 가르는 -ceq·-cmatch·-ccontains 만 쓴다.
 # ⚠PowerShell 은 `'true' -eq $true` 를 참으로 본다 ⇒ 칸마다 **형(type)을 먼저** 본다.
 # ⚠이 절은 맥에서 PowerShell 없이 **정적 검사 + 맥판과의 대조**로만 증명했다 — 윈도우 실기가 필요한 축은 내부 문서.
-$InstallerVersion       = '0.3.44'   # 보고의 installer_version · $BootstrapVersion 은 화면 머리글 용도 그대로(보내지 않는다)
+$InstallerVersion       = '0.3.45'   # 보고의 installer_version · $BootstrapVersion 은 화면 머리글 용도 그대로(보내지 않는다)
 # 0.3.36: JARVIS_HELP_API_URL = CI·흉내가 도움 보고를 로컬로 돌리는 손잡이(맥 짝 · 사람이 쓰는 길이 아니다 · 없으면 종전 주소 — tests/help-url-lever.sh).
 $HelpApiUrl             = if ($env:JARVIS_HELP_API_URL) { [string]$env:JARVIS_HELP_API_URL } else { 'https://jarvis-install.godmeyou.kr' }
 # 🔴0.3.36(이종 검토): 시험용 함수 묶음은 도움 보고(/api/help)·닫기도 라이브로 못 보낸다(맥 HELP_API_URL 짝) — 가짜 서버는 읽은 뒤 덮어쓴다.
@@ -6992,19 +7014,25 @@ function Test-StepSlow([string]$Step, [double]$Sec) {
 }
 
 # ── 창 하나를 그림으로 (윈도우 전용 · 못 찍으면 $null 이라 그림만 빠지고 설치는 이어간다) ──
-function Get-WindowJpeg($h) {
-    if ($null -eq $h -or $h -eq [IntPtr]::Zero) { return $null }
-    try {
-        Add-Type -AssemblyName System.Drawing -ErrorAction Stop
-        if (-not ([System.Management.Automation.PSTypeName]'Jarvis.Win').Type) {
-            Add-Type -Namespace Jarvis -Name Win -ErrorAction Stop -MemberDefinition @'
+# 🔴(Q6LNC844 · 2026-11-09) 형식 등록을 함수 하나로 뺐다 — 앞 판은 설치 창 그림이 형식을 만들려고 Get-WindowJpeg 를 손잡이 0 으로 불렀는데,
+#   그 함수 첫 줄이 손잡이 0 이면 등록 **전에** 돌아가 형식이 영영 안 생겼다 ⇒ 설치 창 그림이 늘 빠졌고, 그때 난 TypeNotFound 가
+#   끝맺음의 「마지막 오류」로 적혀 진짜 끝(Ctrl-C 등)을 가렸다(MYS9P74K 09-21 · 2JZN3EEJ 09-30 · Q6LNC844 11-09 세 건). 못 만들면 던진다.
+function Add-JarvisWinType {
+    if (([System.Management.Automation.PSTypeName]'Jarvis.Win').Type) { return }
+    Add-Type -Namespace Jarvis -Name Win -ErrorAction Stop -MemberDefinition @'
 [System.Runtime.InteropServices.DllImport("user32.dll")] public static extern bool PrintWindow(System.IntPtr hwnd, System.IntPtr hdc, uint flags);
 [System.Runtime.InteropServices.DllImport("user32.dll")] public static extern bool GetWindowRect(System.IntPtr hwnd, out RECT r);
 [System.Runtime.InteropServices.DllImport("user32.dll")] public static extern bool IsHungAppWindow(System.IntPtr hwnd);
 [System.Runtime.InteropServices.DllImport("kernel32.dll")] public static extern System.IntPtr GetConsoleWindow();
+[System.Runtime.InteropServices.DllImport("user32.dll")] public static extern bool IsWindowVisible(System.IntPtr hwnd);
 public struct RECT { public int Left; public int Top; public int Right; public int Bottom; }
 '@
-        }
+}
+function Get-WindowJpeg($h) {
+    if ($null -eq $h -or $h -eq [IntPtr]::Zero) { return $null }
+    try {
+        Add-Type -AssemblyName System.Drawing -ErrorAction Stop
+        Add-JarvisWinType
         # 🔴먹통 창은 건너뛴다 — PrintWindow 는 대상 창의 실타래에 **동기로** 부탁하고 기다린다.
         #   응답을 멈춘 창이면 그 기다림이 끝나지 않아 **설치기가 통째로 멈춘다**(외부 검토 1차 지적 채택 2026-09-16).
         #   ⚠이것으로 모든 멈춤이 사라지지는 않는다 — 부른 뒤에 먹통이 되는 창은 이 검사 뒤에 있다(잔여 · 윈 실기 몫).
@@ -7015,10 +7043,13 @@ public struct RECT { public int Left; public int Top; public int Right; public i
         if ($w -le 0 -or $ht -le 0) { return $null }
         $bmp = New-Object System.Drawing.Bitmap($w, $ht)
         $g = [System.Drawing.Graphics]::FromImage($bmp)
+        $printed = $false
         try {
             $hdc = $g.GetHdc()
-            try { [void][Jarvis.Win]::PrintWindow($h, $hdc, 2) } finally { $g.ReleaseHdc($hdc) }
+            try { $printed = [bool][Jarvis.Win]::PrintWindow($h, $hdc, 2) } finally { $g.ReleaseHdc($hdc) }
         } finally { $g.Dispose() }
+        # (Q6LNC844 · 교차 검토 2차) PrintWindow 가 실패를 돌려주면 빈 그림을 보내지 않는다.
+        if (-not $printed) { $bmp.Dispose(); Write-Log 'window capture skip (PrintWindow 실패)'; return $null }
         # 🔴한 장 1.5MB 를 넘으면 서버가 413 으로 돌려보낸다(자르지 않는다) ⇒ **우리가 품질을 낮춰 다시 인코딩한다**.
         #   가로도 함께 줄인다 — 품질만 낮추면 큰 화면에서 상한 안에 못 들어간다.
         foreach ($try in @(@(1280, 60), @(1280, 40), @(960, 40), @(800, 30))) {
@@ -7032,13 +7063,95 @@ public struct RECT { public int Left; public int Top; public int Right; public i
         return $null
     } catch { return $null }
 }
+# 🔴(Q6LNC844 ⓑ · 운영 결정 2026-11-09) 설치 창 그림은 **별도 프로세스 + 시간 상한**으로 찍는다.
+#   PrintWindow 는 대상 창의 실타래에 동기로 부탁하고 기다린다 — 먹통 검사(IsHungAppWindow)는 부르기 **전**만 본다.
+#   설치기가 그림 한 장 때문에 멈추면 사람은 화면을 읽지 않고 창을 닫는다 ⇒ 그림보다 설치기 생존이 먼저다.
+#   ⇒ 같은 찍기 함수(Get-WindowJpeg · 살아 있는 정의 그대로)를 자식 PowerShell 에서 돌리고, 상한에 닿으면 그 자식(번호로만)을 끄고 그림 없이 간다.
+#   상한 = 맥판과 같은 10초(perl alarm 10) · 상한이 덮는 것 = 자식이 뜬 뒤 찍기를 기다리는 시간(+ 끌 때 2초). 부모 쪽 형식 등록(첫 1회 컴파일)·자식 띄우기는 그 밖이다.
+#   자식은 창 없이 뜬다(CreateNoWindow) — 이 창의 콘솔에 붙지 않아 Ctrl+C·입력과 엮이지 않는다고 본다(윈 실기 확인 항목).
+#   ⚠-EncodedCommand 를 쓰지 않는다 — 백신이 그 모양을 악성 신호로 본다. 대본은 작업 폴더의 임시 파일(BOM 붙은 UTF-8 · 5.1 이 한글을 읽게)이고 끝나면 지운다.
+#   ⚠앱 창(app_window)·로그인 창은 종전대로 이 프로세스에서 찍는다 — 앱 창은 현장 122장 무멈춤 실적이 있어 바꾸지 않았다(REPORT 4절 ⓑ).
+$WindowCaptureCapSec = 10
+$script:CaptureChildPid = 0
+function Invoke-IsolatedWindowJpeg($h) {
+    $base = Join-Path $JarvisHome ('capture-' + [guid]::NewGuid().ToString('N').Substring(0, 8))
+    $ps1 = $base + '.ps1'; $out = $base + '.jpg'; $lg = $base + '.log'
+    $p = $null
+    try {
+        $src = @(
+            'param([long]$H, [string]$Out, [string]$Lg, [long]$Max)'
+            'function Write-Log($m) { try { [System.IO.File]::AppendAllText($Lg, [string]$m + [Environment]::NewLine) } catch { } }'
+            '$EvidenceImageMaxBytes = $Max'
+            ('function Add-JarvisWinType {' + ${function:Add-JarvisWinType} + '}')
+            ('function Resize-Bitmap {' + ${function:Resize-Bitmap} + '}')
+            ('function ConvertTo-Jpeg {' + ${function:ConvertTo-Jpeg} + '}')
+            ('function Get-WindowJpeg {' + ${function:Get-WindowJpeg} + '}')
+            'try {'
+            '    $b = Get-WindowJpeg ([IntPtr]$H)'
+            '    if ($b) { [System.IO.File]::WriteAllBytes($Out, [byte[]]$b) }'
+            '} catch { Write-Log (''child error: '' + $_.Exception.Message); exit 3 }'
+        ) -join "`n"
+        [System.IO.File]::WriteAllText($ps1, $src, (New-Object System.Text.UTF8Encoding $true))
+        $psi = New-Object System.Diagnostics.ProcessStartInfo
+        $psi.FileName = [System.Diagnostics.Process]::GetCurrentProcess().MainModule.FileName
+        $psi.Arguments = '-NoProfile -NonInteractive -ExecutionPolicy Bypass -File "' + $ps1 + '" -H ' + [long]$h + ' -Out "' + $out + '" -Lg "' + $lg + '" -Max ' + [long]$EvidenceImageMaxBytes
+        $psi.UseShellExecute = $false
+        $psi.CreateNoWindow = $true
+        $p = [System.Diagnostics.Process]::Start($psi)
+        $script:CaptureChildPid = $p.Id
+        if (-not $p.WaitForExit($WindowCaptureCapSec * 1000)) {
+            Write-Log ('window capture: ' + $WindowCaptureCapSec + 's cap — child pid ' + $p.Id + ' ' + (Stop-CaptureChild $p) + ' (그림 없이 계속)')
+            return $null
+        }
+        if (Test-Path -LiteralPath $lg) {
+            foreach ($ln in @(Get-Content -LiteralPath $lg -Encoding UTF8 -ErrorAction SilentlyContinue)) { if ($ln) { Write-Log ('window capture (격리): ' + $ln) } }
+        }
+        $ec = $null
+        try { $ec = $p.ExitCode } catch { $ec = $null }
+        # 자식이 아예 못 돈 끝(실행 정책·제한 언어 모드·백신 차단 등)을 「그냥 못 찍음」과 가르게 종료 코드를 남긴다(교차 검토 2차).
+        if (($null -ne $ec) -and ($ec -ne 0)) { Write-Log ('window capture (격리): child exit ' + $ec + ' (그림 없이 계속)') }
+        if (-not (Test-Path -LiteralPath $out)) {
+            # (윈 실기 2026-11-09) 자식이 정상 종료(0)인데 그림이 없던 끝은 사유 줄이 없었다 — 「못 찍음」을 한 줄 남긴다.
+            if (($null -eq $ec) -or ($ec -eq 0)) { Write-Log 'window capture (격리): 그림 없음(창 크기·손잡이 확인 실패 등 · 그림 없이 계속)' }
+            return $null
+        }
+        return [System.IO.File]::ReadAllBytes($out)
+    } catch {
+        try { Write-Log ('window capture (격리) 실패 — 그림 없이 계속: ' + $_.Exception.Message) } catch { }
+        return $null
+    } finally {
+        # 🔴(교차 검토 2차 major) 어느 길로 나가든 살아 있는 자식은 여기서 끈다 — 대기 중 예외로 빠져나온 길도 포함.
+        if ($p) {
+            $live = $false
+            try { $live = -not $p.HasExited } catch { $live = $false }
+            if ($live) { try { Write-Log ('window capture: child pid ' + $p.Id + ' ' + (Stop-CaptureChild $p) + ' (정리)') } catch { } }
+            try { $p.Dispose() } catch { }
+        }
+        Remove-Item -LiteralPath $ps1, $out, $lg -Force -ErrorAction SilentlyContinue
+    }
+}
+function Stop-CaptureChild($p) {
+    # 그 자식 하나만(번호 · 이름 매칭 없음) 끄고 2초 기다린 뒤 실제로 끝났는지 본다 — 돌려주는 말 = 'killed' 또는 'termination unconfirmed'.
+    #   ⚠자식이 띄운 손자(5.1 Add-Type 의 csc.exe)는 함께 끄지 않는다 — 컴파일러는 스스로 끝난다(남는 위험은 REPORT 5절).
+    try { $p.Kill() } catch { }
+    $done = $false
+    try { $done = $p.WaitForExit(2000) } catch { $done = $false }
+    if (-not $done) { try { $done = $p.HasExited } catch { $done = $false } }
+    if ($done) { return 'killed' }
+    return 'termination unconfirmed'
+}
 function Get-InstallerWindowJpeg {
     # 설치 창 = 우리 콘솔 창 하나. ⛔전체 화면이 아니다 — 쓰시는 분의 다른 창은 담기지 않는다.
     try {
-        if (-not ([System.Management.Automation.PSTypeName]'Jarvis.Win').Type) { [void](Get-WindowJpeg ([IntPtr]::Zero)) }
+        Add-JarvisWinType
         $h = [Jarvis.Win]::GetConsoleWindow()
         if ($h -eq [IntPtr]::Zero) { return $null }   # 콘솔이 없다(입력 리디렉트·흉내) — 그림 없이 간다
-        return (Get-WindowJpeg $h)
+        # (윈 실기 2026-11-09 · Windows 11 26200) Windows Terminal 안에서도 GetConsoleWindow 가 「보이는」 대리 창을 준다 ⇒ 보임 검사만으로는 못 가른다.
+        #   WT 는 자기 안에서 돈 프로세스에 WT_SESSION 을 넣는다 → 이것을 먼저 본다(다른 탭이 담기지 않게 · 지원하지 않음 명시).
+        if ($env:WT_SESSION) { Write-Log 'window capture skip (Windows Terminal — WT_SESSION)'; return $null }
+        # (교차 검토 2차) Windows Terminal(ConPTY)의 콘솔 창은 숨은 대리 창이라 찍어도 보이는 설치 창이 아니다 — 자식을 띄우지 않고 그림 없이 간다.
+        if (-not [Jarvis.Win]::IsWindowVisible($h)) { Write-Log 'window capture skip (보이지 않는 콘솔 창 — Windows Terminal 등)'; return $null }
+        return (Invoke-IsolatedWindowJpeg $h)   # 별도 프로세스 + 10초 상한(위 머리 주석)
     } catch { return $null }
 }
 function Get-LoginWindowJpegLive {

@@ -148,6 +148,7 @@ CYS_DISPLAY_NAME="cysr"
 # 0.3.43(2026-10-30): 핀 그대로(cysr 1.1.10) — 도움 사례 진단 갈래(J-INST-01 · J-DL-08 · J-NET-04 · J-APP-02) · 로그인 대기 입력 수집 = 사용 여부만 + 첫 화면 고지 1구절
 # 0.3.42: cysr 1.1.10 핀(발행 2026-10-23 · 값 = 발행할 자산 실물 실측 · 릴리스 SHA256SUMS.txt 대조는 발행 뒤 tests/*-pin-release.sh) · 코드 변경 0 — 핀 값과 판번만
 # 0.3.44: cysr 1.1.14 핀(발행 2026-11-06 · 값 = 발행 자산 실물 실측 · 릴리스 SHA256SUMS.txt 대조 = tests/*-pin-release.sh) · 코드 변경 0 — 핀 값과 판번만
+# 0.3.45(2026-11-09): 핀 그대로(cysr 1.1.14) — 윈 사례 Q6LNC844 수리(설치 창 그림 형식 등록 · 로그인 대기 중 Ctrl+C 를 글자로 · 그림 별도 프로세스 10초 상한 · WT_SESSION 판별) · 맥 코드 변경 0
 CYS_FORK_VERSION="1.1.14"
 CYS_FORK_DIR="https://github.com/oogisoogi/cys-ro/releases/download/v${CYS_FORK_VERSION}/"
 # 1.0.1 부터 zip 최상위 = cysr.app(안의 실행 파일 = Contents/MacOS/cys · cys-app · cysd · CFBundleName cysr · 로컬 빌드 실측 2026-09-16).
@@ -5267,7 +5268,7 @@ raise_cys_app_window() {
 # ★언제 도는가 = 자비스를 깨우기 **전에** 진단 코드를 남기고 멈춘 끝. 자비스를 깨운 뒤에는 돌지 않는다
 #   (자비스가 이 창을 넘겨받으므로 두 쪽이 한 화면에 섞이지 않게).
 # ⚠JSON·재검사·스크럽은 macOS 기본 `osascript`(JavaScript)가 한다 — 깨끗한 맥에는 jq·python 이 없다.
-INSTALLER_VERSION="0.3.44"      # 보고의 installer_version · BOOTSTRAP_VERSION 은 화면 머리글 용도 그대로(보내지 않는다)
+INSTALLER_VERSION="0.3.45"      # 보고의 installer_version · BOOTSTRAP_VERSION 은 화면 머리글 용도 그대로(보내지 않는다)
 # 0.3.36: JARVIS_HELP_API_URL = CI·흉내가 도움 보고를 로컬로 돌리는 손잡이(JARVIS_PROGRESS_URL 과 같은 모양 · 사람이 쓰는 길이 아니다 ·
 #   없으면 종전 주소 그대로 — tests/help-url-lever.sh 가 잰다). CI(reinstall-matrix.yml)의 full 부분 설치가 라이브 도움 채널로 가던 길을 막는다.
 HELP_API_URL="${JARVIS_HELP_API_URL:-https://jarvis-install.godmeyou.kr}"

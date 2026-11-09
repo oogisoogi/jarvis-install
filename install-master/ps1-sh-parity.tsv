@@ -249,7 +249,10 @@ Get-LoginWindowJpeg	-	na	로그인 프로세스의 별도 창 캡처 — 맥 로
 Get-EvidenceBaseUrl	progress_url	sh	같은 일 · JARVIS_PROGRESS_URL 레버 동일
 Update-StepBaselines	step_baselines_update	sh	같은 일 · ?os=mac · 표지 not-fetched/ok:n/http:코드/empty/error/skip:* · 부르는 자리 = [1/10] start 뒤(ps1 5646)
 Test-StepSlow	step_is_slow,step_baseline_sec	sh	같은 판정(기준선 2배 초과 · 칸 없으면 거짓) · 부르는 자리 = 5~8/10 고리(ps1 5696)
+Add-JarvisWinType	-	na	Win32 창 함수(PrintWindow·GetConsoleWindow) 형식 등록 — 맥은 screencapture 라 등록할 형식이 없다(Q6LNC844 2026-11-09 · 설치 창 그림이 형식을 못 만들던 결함을 고치며 뺀 함수)
 Get-WindowJpeg	evidence_kind_jpeg	sh	창 하나 JPEG = screencapture -l <창 번호> · perl alarm 10초 · ⚠화면 기록 권한 없으면 파일 없음 = 건너뜀 기록(권한을 요청하지 않는다)
+Invoke-IsolatedWindowJpeg	-	na	설치 창 그림을 별도 프로세스 + 10초 상한으로 찍는다(Q6LNC844 ⓑ) — 맥은 screencapture 를 perl alarm 10초로 감싸 같은 상한을 이미 건다(evidence_kind_jpeg 안 · 따로 뺀 함수 없음)
+Stop-CaptureChild	-	na	격리 촬영 자식 하나를 번호로 끄고 2초 안에 끝났는지 본다(Q6LNC844 ⓑ) — 맥은 perl alarm 이 screencapture 를 스스로 끝낸다
 Get-InstallerWindowJpeg	evidence_window_id	sh	설치 창 번호 = 레버 JARVIS_CAPTURE_WINDOW_ID 또는 조상 프로세스의 창이 정확히 1개일 때만(CoreGraphics 창 목록)
 Get-LoginWindowJpegLive	-	na	살아 있는 로그인 창 캡처 — 맥 로그인은 설치 창 안에서 돌아 별도 창이 없음
 Get-AppWindowJpeg	evidence_window_id	sh	앱 창 번호 = 레버 또는 cys_app_dir 번들 경로와 일치하는 프로그램의 창만(ps1 「우리가 깐 자리에서 도는 것만」)
