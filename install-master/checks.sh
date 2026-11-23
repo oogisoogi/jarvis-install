@@ -911,7 +911,7 @@ echo "== 단계 2 — cys 설치 대행 [5]~[9] =="
 # (installer-0321-pin) 1.0.1 발행(2026-09-16) 실측값이 채워졌다 — 아래 두 축은 이제 **초록이어야 한다**(자리표가 남으면 붉다).
 #   ⚠이 축은 **형식만** 본다(64자리인가·숫자인가). 한 글자 틀린 값도 여기서는 통과하므로, 값이 릴리스와 같은지는 tests/win-pin-release.sh 가 릴리스를 때려서 진다.
 codegrep "$PS" 'CysWinBytes    = [0-9]+$'; ck "[5] 설치 파일 크기 핀(= cysr v1.0.1 setup.exe · 숫자)" $? "받다 끊긴 파일을 정상으로 본다(자리표가 남았다)"
-codegrep "$PS" "CysVersion     = '1\\.1\\.16'"; ck "[5] 윈 판본 핀 정확값(= cysr v1.1.16)" $? "이름표만 새 판본이고 실제로 받는 판본은 옛것이다"
+codegrep "$PS" "CysVersion     = '1\\.1\\.18'"; ck "[5] 윈 판본 핀 정확값(= cysr v1.1.18)" $? "이름표만 새 판본이고 실제로 받는 판본은 옛것이다"
 codegrep "$PS" "CysWinSha256   = '[0-9a-f]{64}'"; ck "[5] 윈 설치 파일 sha256 핀(= 릴리스 SHA256SUMS 줄 · 64자리)" $? "지문이 없으면 모든 설치가 지문 불일치로 멈춘다(자리표가 남았다)"
 no_code "$PS" 'TBD-1\.0\.1' && no_code "$SH" 'TBD-1\.0\.1'
 ck "[v0320] 핀 자리표(TBD-1.0.1)가 두 설치기에 남지 않았다" $? "발행값이 아직 안 채워졌다 — 이대로 배포하면 cys 받기가 반드시 실패한다"
@@ -942,7 +942,7 @@ codegrep "$PS" 'ref -match .surface:'; ck "[9] 세션이 실제로 열렸는지 
 # 판정 앞에 항상 참인 갈래를 끼우면 확인이 무력해진다 — 그런 갈래는 이 스크립트에 있을 이유가 없다.
 no_code "$PS" 'if \(\$(true|false)\)'; ck "[판정] 항상 참/거짓인 갈래가 없다" $? "판정을 우회하는 갈래가 들어왔다"
 no_code "$SH" 'if (true|false); then'; ck "[판정] sh 도 같음" $? "같음"
-codegrep "$PS" 'dangerously-skip-permissions \$fallbackPrompt'; ck "[9] 열리지 않으면 이 창에서 띄운다" $? "폴백이 없어 길이 끊긴다"
+codegrep "$PS" 'dangerously-skip-permissions (@rcArgs )?\$fallbackPrompt'; ck "[9] 열리지 않으면 이 창에서 띄운다" $? "폴백이 없어 길이 끊긴다"
 awk '/function Step-DownloadCys/{a=NR} /function Step-Wake/{b=NR} END{exit !(a&&b&&a<b)}' "$PS"; ck "[5~9] 단계 순서가 코드에 있다" $? "-"
 
 echo "== 백신 차단 대응 (2026-09-05 실측 · 우회하지 않고 알아보게 한다) =="
@@ -2529,7 +2529,7 @@ ck "[핀] 설치기(맥) 코드의 판본 문자열이 전부 핀 판본이다" 
 
 # ── ⓕ-2 맥 저희 판 전환 (2026-09-15) ────────────────────────────────
 #   애플 실리콘 맥은 우리 릴리스 zip 을 받아 풀어 넣는다. 인텔·자산 없음만 원작자 판으로 간다.
-codegrep "$SH" 'CYS_FORK_VERSION="1\.1\.16"'; ck "[전환] 맥 저희 판 판본 핀(= cysr v1.1.16)" $? "판본 핀이 없다"
+codegrep "$SH" 'CYS_FORK_VERSION="1\.1\.18"'; ck "[전환] 맥 저희 판 판본 핀(= cysr v1.1.18)" $? "판본 핀이 없다"
 codegrep "$SH" 'CYS_FORK_DIR="https://github\.com/oogisoogi/cys-ro/releases/download/v'; ck "[전환] 저희 판은 판본이 박힌 우리 릴리스 자리에서 받는다" $? "다른 자리를 가리킨다"
 # (installer-0321-pin) 1.0.1 발행(2026-09-16) 실측값이 채워졌다 — 아래 세 축은 이제 **초록이어야 한다**(자리표가 남으면 붉다 · 이 축도 형식만 본다).
 codegrep "$SH" 'CYS_FORK_BYTES="?[0-9]+"?$'; ck "[전환] 저희 판 크기 핀(숫자)" $? "크기가 안 맞아 매번 멈춘다(자리표가 남았다)"
@@ -2991,8 +2991,8 @@ for f in "$PS" "$RESET" "$REIN_PS"; do
   codegrep "$f" '1\) ⊞ 윈도우 키\(키보드 왼쪽 아래, Ctrl과 Alt 사이\)를 누르고 powershell' && no_code "$f" '시작 단추를 누르고'; rc=$?
   ck "[v0317] 다시 하시는 법 첫 줄은 윈도우 키(사이트와 같은 말) · $(basename "$f")" "$rc" "(${GREP_WHY})"
 done
-codegrep "$PS" "^\\\$InstallerVersion *= '0\.3\.46'" && codegrep "$SH" '^INSTALLER_VERSION="0\.3\.46"'
-ck "[v0322] 판본 0.3.46(두 설치기 · 한 릴리스 = 한 판번)" $? "보고의 판본이 갈린다"
+codegrep "$PS" "^\\\$InstallerVersion *= '0\.3\.48'" && codegrep "$SH" '^INSTALLER_VERSION="0\.3\.48"'
+ck "[v0322] 판본 0.3.48(두 설치기 · 한 릴리스 = 한 판번)" $? "보고의 판본이 갈린다"
 # 확인 명령 한 번에도 상한 — 없으면 벤더 도구가 멈추는 순간 20분 상한까지 함께 멈춘다(외부 검토 1차 지적 채택).
 awk '/^function Get-LoginStatusText/{f=1}
      f&&/Start-Process -FilePath \$exe -ArgumentList .auth.,.status. .*-RedirectStandardOutput/{s=1}
@@ -3144,6 +3144,13 @@ fi
 if [ -f "$DIR/../tests/wake-env-run.sh" ]; then
   bash "$DIR/../tests/wake-env-run.sh" --dir "$DIR" >/dev/null 2>&1
   ck "[wake 환경값] 본부 자비스 wake.sh·wake.ps1 이 claude 에 EFFORT=high · 제안 글 끄기를 넣는다(키가 있으면 그대로) · 첫 프롬프트 글자 그대로(만든 파일을 실제로 돌림 · 두 OS)" $? "본부 자비스만 회색 제안 글·기본 생각 깊이로 뜬다(tests/wake-env-run.sh)"
+fi
+# 본부 자비스 RC 기동 켬(0.3.47 · 운영자 결정 11-23 · 본부 자비스만) — 설치 직후 master 만 --settings(remoteControlAtStartup true)
+if [ -f "$DIR/../tests/wake-rc-run.sh" ]; then
+  bash "$DIR/../tests/wake-rc-run.sh" --dir "$DIR" >/dev/null 2>&1
+  ck "[wake RC] 본부 자비스 wake.sh·wake.ps1·창 폴백이 RC 설정 파일(~/.cys/seat-settings/master-wake.json)을 쓰고 --settings 로 넘긴다(없으면 종전 인자 · 사용자 settings.json 무변 · 실제로 돌림 · 두 OS)" $? "설치·갱신 직후 본부 자비스 RC 가 꺼진 채 뜬다(tests/wake-rc-run.sh)"
+else
+  ck "[wake RC] tests/wake-rc-run.sh 가 있다" 1 "시험 파일 없음"
 fi
 # 시험용 함수 묶음(JARVIS_LIB_ONLY=1)은 진행 전송을 라이브로 못 보낸다(0.3.36 · 시험 시간대 라이브 도착 2건 뒤 · 두 OS)
 if [ -f "$DIR/../tests/lib-only-no-live.sh" ]; then

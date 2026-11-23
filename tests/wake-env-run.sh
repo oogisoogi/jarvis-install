@@ -103,7 +103,8 @@ def before(lines, pat, n):
     if k is None: return None
     # 1.1.8 U5: 띄우기 직전의 자동 갱신 잠금 놓기 줄(놓기 · 못 놓았을 때 안내 1줄)은 환경값과 무관하다 — 그 줄은 건너뛰고 본다
     #   (두 값이 띄우기 앞에 있다는 뜻은 그대로 · 놓기 줄의 자리는 U5 잠금 시험이 따로 잰다)
-    lock = re.compile(r'^(txn_release\b|\[ "\$TXN_STUCK" = 1 \] && say |Unlock-CysTxn\b|if \(\$script:CysTxnLock\) \{ Say )')
+    #   0.3.47: RC 설정 파일 인자 줄(있을 때만 --settings)도 환경값과 무관하다 — 건너뛴다(그 줄의 자리·뜻은 tests/wake-rc-run.sh 가 잰다)
+    lock = re.compile(r'^(txn_release\b|\[ "\$TXN_STUCK" = 1 \] && say |Unlock-CysTxn\b|if \(\$script:CysTxnLock\) \{ Say |if master_wake_settings_ok "\$HOME/\$MASTER_WAKE_SETTINGS_REL"; then set -- |\$rcSettings = Join-Path |\$rcArgs = @\(\); if )')
     got = [l.strip() for l in lines[:k] if l.strip() and not lock.search(l.strip())][-n:]
     return got
 bs = [l.split("#", 1)[0] for l in body(sh, "\nstep_wake() {", "\n}\n")]
@@ -149,7 +150,7 @@ $q = $env:PROMPT -replace "'"'"'", "'"''"'"
   win_run() { # win_run <이름> [KEY=VAL …]
     local n="$1"; shift
     rm -f "$BASE/$n.env" "$BASE/$n.args"
-    env -u CLAUDE_CODE_EFFORT_LEVEL -u CLAUDE_CODE_ENABLE_PROMPT_SUGGESTION PATH="$WH/bin:$PATH" WE_OUT="$BASE/$n" "$@" \
+    env -u CLAUDE_CODE_EFFORT_LEVEL -u CLAUDE_CODE_ENABLE_PROMPT_SUGGESTION PATH="$WH/bin:$PATH" USERPROFILE="$WH" WE_OUT="$BASE/$n" "$@" \
       perl -e 'alarm 60; exec @ARGV or exit 126' "$PW" -NoProfile -File "$WP" </dev/null >/dev/null 2>&1
   }
   win_run w-absent

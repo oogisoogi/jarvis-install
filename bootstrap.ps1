@@ -143,7 +143,9 @@ $CysDisplayName = 'cysr'
 # 0.3.44: cysr 1.1.14 핀(발행 2026-11-06 · 값 = 발행 자산 실물 실측 · 릴리스 SHA256SUMS.txt 대조 = tests/win-pin-release.sh) · 코드 변경 0 — 핀 값과 판번만
 # 0.3.45(2026-11-09): 핀 그대로(cysr 1.1.14) — 윈 사례 Q6LNC844 수리(설치 창 그림 형식 등록 · 로그인 대기 중 Ctrl+C 를 글자로 · 그림 별도 프로세스 10초 상한 · WT_SESSION 판별)
 # 0.3.46(2026-11-22): cysr 1.1.16 핀(발행 2026-11-22 · 값 = 발행 자산 실물 실측 · 릴리스 SHA256SUMS.txt 대조 = tests/win-pin-release.sh) · 코드 변경 0 — 핀 값과 판번만
-$CysVersion     = '1.1.16'
+# 0.3.47(2026-11-23): 설치·갱신 직후 본부 자비스(master)만 RC 켬(write_master_wake_settings · Write-MasterWakeSettings) · cysr 1.1.17 핀(값 = 태그 런 release 45072298565 의 발행 자산 · 릴리스 공개 전이라 SHA256SUMS.txt 대조는 공개 뒤 tests/win-pin-release.sh)
+# 0.3.48(2026-11-23): cysr 1.1.18 핀(발행 2026-11-23 · 값 = 공개 릴리스 v1.1.18 SHA256SUMS.txt(그 파일 자신의 sha256 = 6748296dce301ff2eb42b694d01608bc5498e14e9bd0349da9476ee652e7cbab · 1162 B · 13행) 줄과 바이트 일치) · 코드 변경 0 — 핀 값과 판번만
+$CysVersion     = '1.1.18'
 $CysDownloadDir = "https://github.com/oogisoogi/cys-ro/releases/download/v${CysVersion}/"
 # ✅아래 세 값 = v1.1.6 재절단 드래프트 릴리스(2026-09-26 · 릴리스 id 396787705 · 대상 커밋 76d2b5e9) 의 자산에서 **실측으로 채웠다**(첫 절단 값(a8ab563b · 140837194 · 릴리스 id 396500235)을 대신한다).
 #   출처 = 릴리스 SHA256SUMS.txt(그 파일 자신의 sha256 = ca54d259b460340f33541181b1711e0183e036dc6a1c3110771480c2496b4ff2 · 1157 B · 13행 · 재절단 드래프트 자산) · 크기·지문은 릴리스 API 자산 digest·SUMS 줄·인증 받기 실물 sha256 과 대조(3/3 일치).
@@ -155,8 +157,8 @@ $CysDownloadDir = "https://github.com/oogisoogi/cys-ro/releases/download/v${CysV
 #   `${CysVersion}` 를 그대로 두는 것이 정본이다 — 판을 올릴 때 이름이 함께 따라 오르고, 뮤턴트 M508 이 그 따라오름을 잰다.
 #   지금 값은 풀면 cysr_1.1.6_x64-setup.exe = 릴리스 자산 이름과 글자 그대로 같다.
 $CysWinFile     = "cysr_${CysVersion}_x64-setup.exe"
-$CysWinBytes    = 159005177
-$CysWinSha256   = '44c13c3587a3cc89ba772336ce511045d118e3ba7bb380466cb8e95d56f1cc82'   # 릴리스 v1.1.16 SHA256SUMS.txt 의 그 줄과 바이트 일치(tests/win-pin-release.sh 가 릴리스를 때려 다시 잰다)
+$CysWinBytes    = 159062302
+$CysWinSha256   = '86f9e57afb92b30ec4c235c681148f476c2300a577565a63ac9b8c534f184093'   # 릴리스 v1.1.18 SHA256SUMS.txt 의 그 줄과 바이트 일치(tests/win-pin-release.sh 가 릴리스를 때려 다시 잰다)
 $CysDownloadUrl = $CysDownloadDir + $CysWinFile
 
 $LoginPollInterval = 2     # 초 — 승인 프로세스가 끝난 뒤 로그인을 다시 확인하는 간격
@@ -4628,13 +4630,56 @@ function Start-CysAppWindow {
 function Get-WakeBody([string]$wakeQuoted) {
     # claude 가 .cmd 래퍼로 풀리면 cmd.exe 가 인자 속 줄바꿈에서 명령을 끊는다 ⇒ 실행 파일(.exe)을 먼저 고르고, 없으면 종전대로 이름으로 부른다.
     #   (제안된 「claude.ps1 로 고정」은 기각 — 공식 설치본에는 .ps1 이 없어 정상 경로가 깨진다.)
+    # 0.3.47: 아래 줄에 넣을 RC 설정 파일 상대 경로(작은따옴표 두 번 쓰기) — 큰따옴표 문자열 안의 $( "…" ) 겹따옴표를 피한다(ps-balance 축이 한 줄 따옴표 균형을 잰다).
+    $rcRelQuoted = $MasterWakeSettingsRel -replace "'", "''"
     return (@(
         "if (-not (Test-Path Env:CLAUDE_CODE_EFFORT_LEVEL)) { `$env:CLAUDE_CODE_EFFORT_LEVEL = 'high' }",
         "if (-not (Test-Path Env:CLAUDE_CODE_ENABLE_PROMPT_SUGGESTION)) { `$env:CLAUDE_CODE_ENABLE_PROMPT_SUGGESTION = 'false' }",
         "`$c = @(Get-Command claude -CommandType Application -ErrorAction SilentlyContinue | Where-Object { `$_.Extension -eq '.exe' })[0]",
         "`$exe = if (`$c) { `$c.Source } else { 'claude' }",
-        "& `$exe --dangerously-skip-permissions '$wakeQuoted'"
+        # 0.3.47: RC 설정 파일(Write-MasterWakeSettings)의 내용이 **우리가 쓴 그 글자 그대로일 때만** --settings — 경로는 wake.ps1 이 돌 때 USERPROFILE 로 푼다(배열로 넘겨 공백 경로도 인자 하나).
+        #   존재만 보지 않는 까닭(이종 검토 1차): 이번 쓰기가 실패해 남은 옛 파일이 깨졌거나 못 읽는 파일이면 그것을 claude 설정 입력으로 넘기게 된다.
+        #   글자 비교(-ceq)가 아니라 바이트 대조(base64)인 까닭(이종 검토 2차): -ceq 는 NUL 차이를 무시해 NUL 이 섞인 깨진 파일도 같다고 본다 · 못 읽으면 catch = 인자 없이.
+        "`$rcSettings = Join-Path `$env:USERPROFILE '$rcRelQuoted'",
+        "`$rcArgs = @(); try { if ((Test-Path -LiteralPath `$rcSettings -PathType Leaf) -and [Convert]::ToBase64String([System.IO.File]::ReadAllBytes(`$rcSettings)) -ceq '$MasterWakeSettingsB64') { `$rcArgs = @('--settings', `$rcSettings) } } catch { `$rcArgs = @() }",
+        "& `$exe --dangerously-skip-permissions @rcArgs '$wakeQuoted'"
     ) -join "`r`n")
+}
+# ── 본부 자비스 RC 기동 설정(0.3.47 · 맥판 write_master_wake_settings 짝) ──
+# 운영자 결정(11-23): RC 는 기본으로 켜져 있어야 한다 — 단, 본부 자비스(master)만.
+#   설치기가 여는 master 좌석은 cys new-surface --cmd(wake.ps1) 라서 cys 가 자기가 claude 를 띄우는 기동(복원 포함)에만 붙이는 좌석 설정(--settings · RC 켬)이
+#   닿지 않았다 ⇒ 설치·갱신 직후 master RC 꺼짐 · 다음 복원부터 켜짐(맥 VM 실측 · 같은 모양).
+#   ⇒ 이 파일을 우리가 쓰고 wake.ps1·창 폴백의 claude 에 --settings 로 넘긴다. 명령줄 --settings 는 사용자 settings.json(seed 가 false 를 둔다)보다 위다.
+#   ⛔사용자 settings.json 은 건드리지 않는다 · cso·worker 는 cys 가 띄우므로 이 길을 지나지 않는다.
+#   쓰기 = 같은 폴더 임시 파일 → 바꿔 놓기(원자) · 폴더 없으면 만든다 · BOM 없는 UTF-8(JSON) · 이미 있으면 같은 내용으로 덮는다(재설치).
+#   ⚠그 자리가 폴더면 실패로 보고, 옮긴 뒤 그 자리의 내용까지 대조한다 · 쓰는 쪽(wake.ps1 · 창 폴백)은 존재가 아니라 내용이 이 글자 그대로인가로 --settings 를 정한다(이종 검토 지적).
+#   ⚠File.Replace 의 백업 칸에 $null 을 주면 PowerShell 이 빈 글자로 바꿔 넘겨 실패한다(맥 pwsh 실측) ⇒ [NullString]::Value.
+$MasterWakeSettingsRel = '.cys\seat-settings\master-wake.json'
+$MasterWakeSettingsJson = '{"remoteControlAtStartup": true}'
+# 파일 바이트 정본 = 「JSON + LF」 UTF-8(BOM 없음)의 base64 — 쓰는 쪽(wake.ps1 · 창 폴백 · 쓰기 뒤 대조)이 이 값과 바이트로 대조한다(NUL·BOM·CRLF 도 다름 · Test-MasterWakeSettings).
+$MasterWakeSettingsB64 = [Convert]::ToBase64String((New-Object System.Text.UTF8Encoding($false)).GetBytes($MasterWakeSettingsJson + "`n"))
+function Test-MasterWakeSettings([string]$p) {   # → $true = 일반 파일이고 바이트가 「JSON + LF」 그대로(못 읽음 = $false)
+    try {
+        return ((Test-Path -LiteralPath $p -PathType Leaf) -and [Convert]::ToBase64String([System.IO.File]::ReadAllBytes($p)) -ceq $MasterWakeSettingsB64)
+    } catch { return $false }
+}
+function Write-MasterWakeSettings {   # → $true = 썼다 · $false = 못 썼다(wake 는 --settings 없이 종전대로 뜬다)
+    $f = Join-Path $env:USERPROFILE $MasterWakeSettingsRel
+    $tmp = $null
+    try {
+        $d = Split-Path -Parent $f
+        [void][System.IO.Directory]::CreateDirectory($d)
+        $tmp = Join-Path $d ('.master-wake.' + [guid]::NewGuid().ToString('N') + '.tmp')
+        [System.IO.File]::WriteAllText($tmp, $MasterWakeSettingsJson + "`n", (New-Object System.Text.UTF8Encoding($false)))
+        if (Test-Path -LiteralPath $f -PathType Container) { throw "자리가 폴더다: $f" }
+        if (Test-Path -LiteralPath $f -PathType Leaf) { [System.IO.File]::Replace($tmp, $f, [NullString]::Value) } else { [System.IO.File]::Move($tmp, $f) }
+        if (-not (Test-MasterWakeSettings $f)) { throw "옮긴 뒤 내용이 다르다: $f" }
+        return $true
+    } catch {
+        Write-Log ('wake rc settings: write failed (wake without --settings): ' + $_.Exception.Message)
+        if ($tmp) { Remove-Item -LiteralPath $tmp -Force -ErrorAction SilentlyContinue }
+        return $false
+    }
 }
 
 function Step-Wake {
@@ -4664,6 +4709,8 @@ function Step-Wake {
     }
     Say '[9/10] 자비스를 깨웁니다.'
     Say "     (지금까지 사람 손이 필요했던 횟수: $($script:HumanHands)번)"
+    # 0.3.47: 본부 자비스 RC 기동 설정 — 아래 두 길(cys 안 wake.ps1 · 이 창 폴백) 모두 이 파일을 본다(Write-MasterWakeSettings 머리 주석).
+    if (Write-MasterWakeSettings) { Write-Log ('wake rc settings: ' + (Redact (Join-Path $env:USERPROFILE $MasterWakeSettingsRel))) }
     $cli = if ($script:CysCli) { $script:CysCli } else { 'cys' }
     # 0.3.38(윈 결함 묶음 ⓓ): 창(GUI)을 여는 실행 파일이 없으면 **자리를 열지 않는다** — 창 없는 기기에 master 자리를 열면
     #   「cys 창의 master 자리에 입력해 주십시오」라는 수행할 수 없는 부탁으로 끝난다(09-30 노트북 · 10/10 rc=10 · 822초).
@@ -4871,7 +4918,10 @@ function Step-Wake {
         # 1.1.8 U5: 이 창은 이제 자비스 것이다 — 자비스가 도는 내내 잠금을 쥐거나 토큰 env 를 물려주지 않게 띄우기 직전에 놓는다
         Unlock-CysTxn
         if ($script:CysTxnLock) { Say '     (자비스의 새 판 바꾸기 자리를 아직 정리하지 못해, 이 창의 자비스를 닫을 때까지 자동 새 판 바꾸기는 기다립니다.)' }   # 3판(N5): 묘비 실패 = 쥔 채
-        & $fallbackExe --dangerously-skip-permissions $fallbackPrompt
+        # 0.3.47: 이 창의 자비스도 본부 master 다 — wake.ps1 과 같이 RC 설정 파일의 내용이 우리 글자 그대로일 때만 --settings(Write-MasterWakeSettings 머리 주석).
+        $rcSettings = Join-Path $env:USERPROFILE $MasterWakeSettingsRel
+        $rcArgs = @(); if (Test-MasterWakeSettings $rcSettings) { $rcArgs = @('--settings', $rcSettings) }
+        & $fallbackExe --dangerously-skip-permissions @rcArgs $fallbackPrompt
         if ($global:LASTEXITCODE -eq 0) { $script:ReachedWake = $true }
     } catch {
         Say "[9/10] 자비스를 띄우지 못했습니다: $($_.Exception.Message)"
@@ -5521,7 +5571,7 @@ function Step-Fleet {
 #   글자 칸은 `\z` 로 끝을 못박아 다시 만든다. 이름·글자·판본 비교는 대소문자를 가르는 -ceq·-cmatch·-ccontains 만 쓴다.
 # ⚠PowerShell 은 `'true' -eq $true` 를 참으로 본다 ⇒ 칸마다 **형(type)을 먼저** 본다.
 # ⚠이 절은 맥에서 PowerShell 없이 **정적 검사 + 맥판과의 대조**로만 증명했다 — 윈도우 실기가 필요한 축은 내부 문서.
-$InstallerVersion       = '0.3.46'   # 보고의 installer_version · $BootstrapVersion 은 화면 머리글 용도 그대로(보내지 않는다)
+$InstallerVersion       = '0.3.48'   # 보고의 installer_version · $BootstrapVersion 은 화면 머리글 용도 그대로(보내지 않는다)
 # 0.3.36: JARVIS_HELP_API_URL = CI·흉내가 도움 보고를 로컬로 돌리는 손잡이(맥 짝 · 사람이 쓰는 길이 아니다 · 없으면 종전 주소 — tests/help-url-lever.sh).
 $HelpApiUrl             = if ($env:JARVIS_HELP_API_URL) { [string]$env:JARVIS_HELP_API_URL } else { 'https://jarvis-install.godmeyou.kr' }
 # 🔴0.3.36(이종 검토): 시험용 함수 묶음은 도움 보고(/api/help)·닫기도 라이브로 못 보낸다(맥 HELP_API_URL 짝) — 가짜 서버는 읽은 뒤 덮어쓴다.

@@ -150,12 +150,14 @@ CYS_DISPLAY_NAME="cysr"
 # 0.3.44: cysr 1.1.14 핀(발행 2026-11-06 · 값 = 발행 자산 실물 실측 · 릴리스 SHA256SUMS.txt 대조 = tests/*-pin-release.sh) · 코드 변경 0 — 핀 값과 판번만
 # 0.3.45(2026-11-09): 핀 그대로(cysr 1.1.14) — 윈 사례 Q6LNC844 수리(설치 창 그림 형식 등록 · 로그인 대기 중 Ctrl+C 를 글자로 · 그림 별도 프로세스 10초 상한 · WT_SESSION 판별) · 맥 코드 변경 0
 # 0.3.46(2026-11-22): cysr 1.1.16 핀(발행 2026-11-22 · 값 = 발행 자산 실물 실측 · 릴리스 SHA256SUMS.txt 대조 = tests/*-pin-release.sh) · 코드 변경 0 — 핀 값과 판번만
-CYS_FORK_VERSION="1.1.16"
+# 0.3.47(2026-11-23): 설치·갱신 직후 본부 자비스(master)만 RC 켬(write_master_wake_settings · Write-MasterWakeSettings) · cysr 1.1.17 핀(값 = 태그 런 release 45072298565 의 발행 자산 · 릴리스 공개 전이라 SHA256SUMS.txt 대조는 공개 뒤 tests/*-pin-release.sh)
+# 0.3.48(2026-11-23): cysr 1.1.18 핀(발행 2026-11-23 · 값 = 공개 릴리스 v1.1.18 SHA256SUMS.txt(그 파일 자신의 sha256 = 6748296dce301ff2eb42b694d01608bc5498e14e9bd0349da9476ee652e7cbab · 1162 B · 13행) 줄과 바이트 일치) · 코드 변경 0 — 핀 값과 판번만
+CYS_FORK_VERSION="1.1.18"
 CYS_FORK_DIR="https://github.com/oogisoogi/cys-ro/releases/download/v${CYS_FORK_VERSION}/"
 # 1.0.1 부터 zip 최상위 = cysr.app(안의 실행 파일 = Contents/MacOS/cys · cys-app · cysd · CFBundleName cysr · 로컬 빌드 실측 2026-09-16).
 CYS_FORK_FILE="cysr-macos-arm64-v${CYS_FORK_VERSION}.zip"
-# ✅아래 크기·지문·CDHash = **v1.1.16 발행 zip** 의 값이다(2026-11-22 발행 자산 실측 · 1.1.14 값(150a4f34 · 218750276)을 대신한다).
-#   출처 = 릴리스 v1.1.16 의 SHA256SUMS.txt(그 파일 자신의 sha256 = 695812842dc4cf18181761c02be09fa02f508f4215b87c64e578e02a4d6667b7 · 1162 B · 13행) — 지문·파일 이름은 그 줄과 바이트 일치,
+# ✅아래 크기·지문·CDHash = **v1.1.18 발행 zip** 의 값이다(2026-11-23 공개 · 태그 런 release 45133180346 · 1.1.16 값(0ca89183 · 225831620)을 대신한다).
+#   출처 = 릴리스 v1.1.18 의 SHA256SUMS.txt(그 파일 자신의 sha256 = 6748296dce301ff2eb42b694d01608bc5498e14e9bd0349da9476ee652e7cbab · 1162 B · 13행 · tests/mac-pin-release.sh 로 대조) · (이전 기록 · 1.1.16) 릴리스 v1.1.16 의 SHA256SUMS.txt(그 파일 자신의 sha256 = 695812842dc4cf18181761c02be09fa02f508f4215b87c64e578e02a4d6667b7 · 1162 B · 13행) — 지문·파일 이름은 그 줄과 바이트 일치,
 #         크기는 릴리스 zip 의 크기, CDHash 는 발행 zip 을 풀어(ditto -x -k) codesign -dvvv 로 잰 값. 세 값 모두 tests/mac-pin-release.sh 가 릴리스를 때려 다시 잰다.
 #   (이전 기록 · 1.1.6) **v1.1.6 재절단 드래프트(릴리스 id 396787705 · 대상 커밋 76d2b5e9)** 의 zip 에서 실측(2026-09-26 · 1.1.5 값(71e285ea · 207818466)을 대신했다).
 #   (이전 기록 · 1.1.6 출처) 릴리스 v1.1.6 의 SHA256SUMS.txt(그 파일 자신의 sha256 = ca54d259b460340f33541181b1711e0183e036dc6a1c3110771480c2496b4ff2 · 1157 B · 13행 · 재절단 드래프트 자산)와
@@ -165,16 +167,16 @@ CYS_FORK_FILE="cysr-macos-arm64-v${CYS_FORK_VERSION}.zip"
 #         발행 자산 zip 실물(arm64·x64 · gh release download) — 크기·sha256 은 파일에서 셌고(릴리스 API digest·SUMS 줄과 3/3 일치), CDHash 는 풀어서(ditto -x -k) codesign -dvvv 로 쟀다(지시값 6/6 일치).
 #   ⚠태그가 옮겨지면 이 값도 함께 바뀐다(v1.1.0 라운드에만 네 번 옮겨졌다) — 값을 문서에 복제하지 말고 발행 자산에서 다시 재라.
 #   CDHash 는 **발행된 그 zip** 을 풀어(ditto -x -k) `codesign -dvvv` 로 쟀다(서명 = cys-local · zip 최상위 = cysr.app 하나).
-CYS_FORK_BYTES="225831620"
-CYS_FORK_SHA256="0ca8918395e42501a991a7eaac9d5dbdd417753ece0bf63512ca830ab0b3e802"
+CYS_FORK_BYTES="225884827"
+CYS_FORK_SHA256="9266c9498973c9ff35e82ebc8111f757cdb5fb8e764c2b4da839f3ea953f0c07"
 # 설치된 프로그램이 「바로 이 판」인가를 가르는 값. 판본 숫자는 원작자 판도 같은 숫자를 쓸 수 있어서
 #   숫자만 보면 **원작자 판을 우리 판으로 읽고 건너뛴다**(어제 원작자 판을 깐 맥이 그대로 남는다).
-CYS_FORK_CDHASH="1e5a0b2a8ed3f644c7432daa9776bbe59f519159"
+CYS_FORK_CDHASH="47e72b60f91ae0c30de2c4a907b834490363da19"
 
 # ★★인텔(x86_64) 맥 핀 — v1.1 부터 우리 판이 인텔 맥도 덮는다 (2026-09-20).
 #   까닭: v1.0.2 까지 우리 맥 자산은 arm64 하나뿐이라 **인텔 맥만 원작자 판으로 갈라졌다**. 같은 날 같은 방에서
 #     두 참가자가 서로 다른 cys 를 쓰는 일이 실제로 있었다(2026-09-15 전환 주석의 그 사유) — 그 갈림을 여기서 닫는다.
-#   ✅아래 값은 **v1.1.16 발행 x64 zip** 의 값이다(2026-11-22 발행 자산 실측 · 지문·파일 이름 = 릴리스 SHA256SUMS.txt 의 그 줄 · 크기 = 릴리스 zip 크기 — tests/mac-pin-x64-release.sh 가 릴리스를 때려 다시 잰다).
+#   ✅아래 값은 **v1.1.18 발행 x64 zip** 의 값이다(2026-11-23 공개 · 태그 런 release 45133180346 · 지문·파일 이름 = 릴리스 SHA256SUMS.txt 의 그 줄 · 크기 = 릴리스 zip 크기 — tests/mac-pin-x64-release.sh 가 릴리스를 때려 다시 잰다).
 #     CDHash 는 발행 zip 을 풀어 codesign -dvvv 로 잰 값이다(그 시험은 모양만 본다 — zip 약 230MB 를 받아야 해서 · 값을 바꿀 때는 풀어서 다시 잰다).
 #     (이전 기록) v1.1.6 재절단 x64 드래프트 zip 에서 실측(2026-09-26 · 릴리스 id 396787705 · 대상 커밋 76d2b5e9 · 1.1.5 값(45b629ff · 215440455)을 대신했다).
 #     (이전 기록) v1.1.5 x64 발행 zip 에서 실측(2026-09-24 · 11차 재핀 · 11차 절단 태그 커밋 526325bf · Mach-O thin x86_64 · 서명 cys-local).
@@ -182,9 +184,9 @@ CYS_FORK_CDHASH="1e5a0b2a8ed3f644c7432daa9776bbe59f519159"
 #   ⛔자리표가 남아 있는 동안 인텔 맥은 **원작자 판으로 돌아가지 않고 멈춘다**(cys_fork_x64_pin_ready · step_download_cys 머리).
 #     조용히 원작자 판을 깔면 이 바꿈이 없애려던 그 갈림이 그대로 되살아난다 — 말없이 다른 판을 까느니 멈춰서 말하는 쪽을 고른다.
 CYS_FORK_X64_FILE="cysr-macos-x64-v${CYS_FORK_VERSION}.zip"
-CYS_FORK_X64_BYTES="233921850"
-CYS_FORK_X64_SHA256="9efe1ec7517fe05203f02d0e9a5d99d9eca73a4fc217374eeaf9401399c9f16c"
-CYS_FORK_X64_CDHASH="8e5f483b8996beea10ede691855a8a5e8e439a34"
+CYS_FORK_X64_BYTES="233980456"
+CYS_FORK_X64_SHA256="2e4efb502750bfa9a033d938cd7dfe7ef0db0b4216d80b1378d6588b656f2cdd"
+CYS_FORK_X64_CDHASH="637f60857c76d37554449eb357d43137bcae2c28"
 # 저희 판이 놓이는 자리 = /Applications/cysr.app · 옛 이름 자리 = /Applications/cys.app(0.14.x·1.0.0 이 깔린 자리 · 원작자 판도 이 이름).
 CYS_FORK_APP="/Applications/cysr.app"
 CYS_OLD_APP="/Applications/cys.app"
@@ -5021,9 +5023,39 @@ write_wake_file() { # write_wake_file <파일> <첫 프롬프트> — rc 0 = 썼
   local q
   # 경로에 작은따옴표가 있으면(사용자 이름 등) 문자열이 거기서 닫혀 wake.sh 가 안 돈다 ⇒ '\'' 로 글자로 남긴다(ps1 Step-Wake 의 $wakeQuoted 와 같은 방어).
   q="$(printf '%s' "$2" | sed "s/'/'\\\\''/g")"
-  printf '#!/bin/bash\n%s\nCLAUDE="$HOME/.local/bin/claude"\n[ -x "$CLAUDE" ] || CLAUDE=claude\nexec "$CLAUDE" --dangerously-skip-permissions %s\n' "$WAKE_CLAUDE_ENV" "'$q'" > "$1" 2>/dev/null || return 1
+  # 0.3.47: RC 설정 파일(write_master_wake_settings)이 **일반 파일이고 바이트가 우리가 쓴 그대로일 때만** --settings 를 붙인다 — 경로는 wake.sh 가 돌 때 $HOME 으로 푼다(따옴표 방어가 필요 없다).
+  #   존재만 보지 않는 까닭(이종 검토 1차): 이번 쓰기가 실패해 남은 옛 파일이 깨졌거나 못 읽는 파일이면 그것을 claude 설정 입력으로 넘기게 된다 ⇒ 다르면 종전 인자 그대로.
+  #   글자 비교($(cat))가 아니라 cmp 바이트 대조인 까닭(이종 검토 2차): 명령 치환은 NUL 을 지워 NUL 이 섞인 깨진 파일도 같다고 본다 · -f 를 먼저 보는 까닭 = FIFO 를 열면 쓰는 쪽이 없어 무기한 멈춘다.
+  printf '#!/bin/bash\n%s\nCLAUDE="$HOME/.local/bin/claude"\n[ -x "$CLAUDE" ] || CLAUDE=claude\nRC_SETTINGS="$HOME/%s"\nif [ -f "$RC_SETTINGS" ] && printf \x27%%s\\n\x27 %s | /usr/bin/cmp -s - "$RC_SETTINGS" 2>/dev/null; then set -- --settings "$RC_SETTINGS"; else set --; fi\nexec "$CLAUDE" --dangerously-skip-permissions "$@" %s\n' "$WAKE_CLAUDE_ENV" "$MASTER_WAKE_SETTINGS_REL" "'$MASTER_WAKE_SETTINGS_JSON'" "'$q'" > "$1" 2>/dev/null || return 1
   chmod +x "$1" 2>/dev/null
   return 0
+}
+# ── 본부 자비스 RC 기동 설정(0.3.47 · 윈판 Write-MasterWakeSettings 짝) ──
+# 운영자 결정(11-23): RC 는 기본으로 켜져 있어야 한다 — 단, 본부 자비스(master)만.
+#   설치기가 여는 master 좌석은 `cys new-surface --cmd "bash wake.sh"` 라서 cys 가 자기가 claude 를 띄우는 기동(복원 포함)에만 붙이는 좌석 설정(--settings · RC 켬)이
+#   닿지 않았다 ⇒ 설치·갱신 직후 master RC 꺼짐 · 다음 복원(launch 경로)부터 켜짐(맥 VM 실측).
+#   ⇒ 이 파일을 우리가 쓰고 wake.sh·창 폴백의 claude 에 --settings 로 넘긴다. 명령줄 --settings 는 사용자 settings.json(위 seed 가 false 를 둔다)보다 위다.
+#   ⛔사용자 settings.json 은 건드리지 않는다 · cso·worker 는 cys 가 띄우므로 이 길을 지나지 않는다(그쪽 끄기 두 키는 cys 가 싣는다).
+#   쓰기 = 같은 폴더 임시 파일 → mv(원자) · 폴더 없으면 만든다 · 이미 있으면 같은 내용으로 덮는다(재설치).
+#   ⚠그 자리가 폴더(또는 폴더를 가리키는 링크)면 mv 가 임시 파일을 그 **안으로** 옮기고 성공한다(이종 검토 지적) ⇒ 폴더면 실패로 보고, 옮긴 뒤 그 자리의 내용까지 대조한다.
+#   ⚠쓰는 쪽(wake.sh · 창 폴백)은 존재가 아니라 **일반 파일 + 바이트가 이것 그대로인가**(master_wake_settings_ok)로 --settings 를 정한다 — 이번 쓰기가 실패해 남은 옛 파일·깨진 파일·FIFO 는 넘기지 않는다.
+MASTER_WAKE_SETTINGS_REL='.cys/seat-settings/master-wake.json'
+MASTER_WAKE_SETTINGS_JSON='{"remoteControlAtStartup": true}'
+master_wake_settings_ok() { # <파일> → rc 0 = 일반 파일이고 바이트가 「JSON + 줄바꿈」 그대로(cmp · NUL 도 다름으로 본다 · FIFO 는 열지 않는다)
+  [ -f "$1" ] && printf '%s\n' "$MASTER_WAKE_SETTINGS_JSON" | /usr/bin/cmp -s - "$1" 2>/dev/null
+}
+write_master_wake_settings() { # → rc 0 = 썼다 · 1 = 못 썼다(wake 는 --settings 없이 종전대로 뜬다)
+  local f="$HOME/$MASTER_WAKE_SETTINGS_REL" d tmp
+  d="$(dirname "$f")"
+  mkdir -p "$d" 2>/dev/null || return 1
+  [ -d "$f" ] && return 1
+  tmp="$(mktemp "$d/.master-wake.XXXXXX" 2>/dev/null)" || return 1
+  if printf '%s\n' "$MASTER_WAKE_SETTINGS_JSON" > "$tmp" 2>/dev/null && chmod 644 "$tmp" 2>/dev/null && mv -f "$tmp" "$f" 2>/dev/null \
+     && master_wake_settings_ok "$f"; then
+    return 0
+  fi
+  rm -f "$tmp" 2>/dev/null
+  return 1
 }
 
 step_wake() {
@@ -5051,6 +5083,9 @@ ${first_prompt}"
   fi
   say "[9/10] 자비스를 깨웁니다."
   say "     (지금까지 사람 손이 필요했던 횟수: ${HUMAN_HANDS}번)"
+  # 0.3.47: 본부 자비스 RC 기동 설정 — 아래 두 길(cys 안 wake.sh · 이 창 폴백) 모두 이 파일을 본다(write_master_wake_settings 머리 주석).
+  if write_master_wake_settings; then log "wake rc settings: $(redact "$HOME/$MASTER_WAKE_SETTINGS_REL")"
+  else log "wake rc settings: write failed (wake without --settings)"; fi
   cli="${CYS_CLI:-cys}"
   if command -v "$cli" >/dev/null 2>&1 || [ -x "$cli" ]; then
     # 창 이름도 같은 이유로 ASCII 다.
@@ -5208,7 +5243,9 @@ ${first_prompt}"
   #   토큰 env 가 자비스에게 물려가 그 안의 rotate·팩 명령이 rc 26 이 된다 ⇒ 넘기기 직전에 놓는다.
   txn_release
   [ "$TXN_STUCK" = 1 ] && say "     (자비스의 새 판 바꾸기 자리를 아직 정리하지 못해, 이 창의 자비스를 닫을 때까지 자동 새 판 바꾸기는 기다립니다.)"   # 3판(N5)
-  exec "$claude_bin" --dangerously-skip-permissions "$wake_prompt"
+  # 0.3.47: 이 창의 자비스도 본부 master 다 — wake.sh 와 같이 RC 설정 파일의 내용이 우리 글자 그대로일 때만 --settings(write_master_wake_settings 머리 주석).
+  if master_wake_settings_ok "$HOME/$MASTER_WAKE_SETTINGS_REL"; then set -- --settings "$HOME/$MASTER_WAKE_SETTINGS_REL"; else set --; fi
+  exec "$claude_bin" --dangerously-skip-permissions "$@" "$wake_prompt"
 }
 
 # cys 앱 창을 연다 — 첫 설치의 확인 창(격리 속성)은 [6/10] 이 이미 지웠다.
@@ -5269,7 +5306,7 @@ raise_cys_app_window() {
 # ★언제 도는가 = 자비스를 깨우기 **전에** 진단 코드를 남기고 멈춘 끝. 자비스를 깨운 뒤에는 돌지 않는다
 #   (자비스가 이 창을 넘겨받으므로 두 쪽이 한 화면에 섞이지 않게).
 # ⚠JSON·재검사·스크럽은 macOS 기본 `osascript`(JavaScript)가 한다 — 깨끗한 맥에는 jq·python 이 없다.
-INSTALLER_VERSION="0.3.46"      # 보고의 installer_version · BOOTSTRAP_VERSION 은 화면 머리글 용도 그대로(보내지 않는다)
+INSTALLER_VERSION="0.3.48"      # 보고의 installer_version · BOOTSTRAP_VERSION 은 화면 머리글 용도 그대로(보내지 않는다)
 # 0.3.36: JARVIS_HELP_API_URL = CI·흉내가 도움 보고를 로컬로 돌리는 손잡이(JARVIS_PROGRESS_URL 과 같은 모양 · 사람이 쓰는 길이 아니다 ·
 #   없으면 종전 주소 그대로 — tests/help-url-lever.sh 가 잰다). CI(reinstall-matrix.yml)의 full 부분 설치가 라이브 도움 채널로 가던 길을 막는다.
 HELP_API_URL="${JARVIS_HELP_API_URL:-https://jarvis-install.godmeyou.kr}"
