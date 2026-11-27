@@ -1,0 +1,1526 @@
+{
+ "version": 3,
+ "ticket": "scrub-redesign-1116",
+ "about": "참조 모델 model/scrub-v3.js 가 낸 답 — 옛 45 벡터(바뀐 것은 was 에 옛 답) + 판정문 재현. 가짜 이름·가짜 토큰만.",
+ "vectors": [
+  {
+   "id": "S1a-space-name-unix-home",
+   "input": "/Users/Hong Gildong/project",
+   "names": [
+    "Hong Gildong"
+   ],
+   "expected": "~/project",
+   "marks": [
+    [
+     0,
+     1,
+     4
+    ]
+   ]
+  },
+  {
+   "id": "S1b-home-line-harvested",
+   "input": "HOME=/Users/Hong Gildong",
+   "names": [
+    "/Users/Hong Gildong",
+    "Hong Gildong"
+   ],
+   "expected": "HOME=~",
+   "marks": [
+    [
+     5,
+     6,
+     4
+    ]
+   ]
+  },
+  {
+   "id": "S2-nul-name-order",
+   "input": "USER=ab\u0000\u0000\u0000\nUSER=abcd\nabcd",
+   "names": [
+    "ab\u0000\u0000\u0000",
+    "abcd"
+   ],
+   "expected": "USER=~user\nUSER=~user\n~user",
+   "marks": [
+    [
+     5,
+     10,
+     5
+    ],
+    [
+     16,
+     21,
+     5
+    ],
+    [
+     22,
+     27,
+     5
+    ]
+   ]
+  },
+  {
+   "id": "S3a-bearer-name-first",
+   "input": "Bearer abcDEF1234567890",
+   "names": [
+    "Bearer"
+   ],
+   "expected": "Bearer <토큰 지움>",
+   "marks": [
+    [
+     0,
+     14,
+     1
+    ]
+   ]
+  },
+  {
+   "id": "S3b-bearer-name-again",
+   "input": "Bearer <토큰 지움>",
+   "names": [
+    "Bearer"
+   ],
+   "expected": "~user <토큰 지움>",
+   "marks": [
+    [
+     0,
+     5,
+     5
+    ]
+   ],
+   "was": "Bearer <토큰 지움>"
+  },
+  {
+   "id": "I1b-win-nested-home",
+   "input": "USERPROFILE=C:\\Users\\team\\SECRET_TEAM\\hong",
+   "names": [
+    "C:\\Users\\team\\SECRET_TEAM\\hong",
+    "hong"
+   ],
+   "expected": "USERPROFILE=~",
+   "marks": [
+    [
+     12,
+     13,
+     3
+    ]
+   ]
+  },
+  {
+   "id": "I1c-mac-nested-home",
+   "input": "HOME=/Users/team/SECRET_TEAM/hong",
+   "names": [
+    "/Users/team/SECRET_TEAM/hong",
+    "hong"
+   ],
+   "expected": "HOME=~",
+   "marks": [
+    [
+     5,
+     6,
+     4
+    ]
+   ]
+  },
+  {
+   "id": "I1d-feff-in-name",
+   "input": "/Users/Hong﻿Gildong/x",
+   "names": [
+    "Hong﻿Gildong"
+   ],
+   "expected": "~/x",
+   "marks": [
+    [
+     0,
+     1,
+     4
+    ]
+   ]
+  },
+  {
+   "id": "P1-name-sk",
+   "input": "key=sk-abcdefgh12345678 saved",
+   "names": [
+    "sk"
+   ],
+   "expected": "key=<키 지움> saved",
+   "marks": [
+    [
+     4,
+     10,
+     2
+    ]
+   ]
+  },
+  {
+   "id": "P2-name-bearer",
+   "input": "Authorization: Bearer abcDEF1234567890",
+   "names": [
+    "Bearer"
+   ],
+   "expected": "Authorization: Bearer <토큰 지움>",
+   "marks": [
+    [
+     15,
+     29,
+     1
+    ]
+   ]
+  },
+  {
+   "id": "P3-name-inside-token",
+   "input": "Authorization: Bearer abcDEF1234567890 · key=sk-ant-api03-Zz09",
+   "names": [
+    "DE",
+    "an"
+   ],
+   "expected": "Authorization: Bearer <토큰 지움> · key=<키 지움>",
+   "marks": [
+    [
+     15,
+     29,
+     1
+    ],
+    [
+     36,
+     42,
+     2
+    ]
+   ]
+  },
+  {
+   "id": "P4-name-users",
+   "input": "C:\\Users\\hong\\x · /Users/hong/y",
+   "names": [
+    "Users"
+   ],
+   "expected": "~\\x · ~/y",
+   "marks": [
+    [
+     0,
+     1,
+     3
+    ],
+    [
+     6,
+     7,
+     4
+    ]
+   ]
+  },
+  {
+   "id": "P5-mixed-marker-words",
+   "input": "mail a.b@example.com key sk-abcdefgh12345678 Authorization: Bearer tok12345678 path C:\\Users\\hong\\x who a.b+(c) and axb+(c) hello",
+   "names": [
+    "키 지움",
+    "토큰",
+    "지움",
+    "이메일",
+    "Users",
+    "user",
+    "a.b+(c)",
+    "hello"
+   ],
+   "expected": "mail <이메일 지움> key <키 지움> Authorization: Bearer <토큰 지움> path ~\\x who ~user and axb+(c) ~user",
+   "marks": [
+    [
+     5,
+     13,
+     0
+    ],
+    [
+     18,
+     24,
+     2
+    ],
+    [
+     40,
+     54,
+     1
+    ],
+    [
+     60,
+     61,
+     3
+    ],
+    [
+     68,
+     73,
+     5
+    ],
+    [
+     86,
+     91,
+     5
+    ]
+   ]
+  },
+  {
+   "id": "B1-space-name-win-home",
+   "input": "USERPROFILE=C:\\Users\\Hong Gildong\n[4/10] Hong Gildong 님",
+   "names": [
+    "C:\\Users\\Hong Gildong",
+    "Hong Gildong"
+   ],
+   "expected": "USERPROFILE=~\n[4/10] ~user 님",
+   "marks": [
+    [
+     12,
+     13,
+     3
+    ],
+    [
+     21,
+     26,
+     5
+    ]
+   ]
+  },
+  {
+   "id": "B2-prefix-names",
+   "input": "hong hongtester hong",
+   "names": [
+    "hong",
+    "hongtester"
+   ],
+   "expected": "~user ~user ~user",
+   "marks": [
+    [
+     0,
+     5,
+     5
+    ],
+    [
+     6,
+     11,
+     5
+    ],
+    [
+     12,
+     17,
+     5
+    ]
+   ]
+  },
+  {
+   "id": "B3-nul-inside-name",
+   "input": "USER=hong 님 hongtester x",
+   "names": [
+    "hong\u0000tester",
+    "ho\u0000ng"
+   ],
+   "expected": "USER=~user 님 ~user x",
+   "marks": [
+    [
+     5,
+     10,
+     5
+    ],
+    [
+     13,
+     18,
+     5
+    ]
+   ]
+  },
+  {
+   "id": "B4-k1-marker-chars",
+   "input": "a@b.com sk-abcdefgh12345678 M0 1 M1 지움 10",
+   "names": [
+    "M0",
+    "1",
+    "M1",
+    "지움",
+    "토큰",
+    "user",
+    "~user",
+    "10"
+   ],
+   "expected": "<이메일 지움> <키 지움> ~user ~user ~user ~user ~user",
+   "marks": [
+    [
+     0,
+     8,
+     0
+    ],
+    [
+     9,
+     15,
+     2
+    ],
+    [
+     16,
+     21,
+     5
+    ],
+    [
+     22,
+     27,
+     5
+    ],
+    [
+     28,
+     33,
+     5
+    ],
+    [
+     34,
+     39,
+     5
+    ],
+    [
+     40,
+     45,
+     5
+    ]
+   ]
+  },
+  {
+   "id": "B5-korean-name",
+   "input": "작성자 홍 길동 입니다 · 홍 길동님",
+   "names": [
+    "홍 길동"
+   ],
+   "expected": "작성자 ~user 입니다 · ~user님",
+   "marks": [
+    [
+     4,
+     9,
+     5
+    ],
+    [
+     16,
+     21,
+     5
+    ]
+   ]
+  },
+  {
+   "id": "B6-win-korean-home",
+   "input": "path C:\\Users\\홍 길동\\Documents\\a.txt · \"C:\\\\Users\\\\홍 길동\\\\x\"",
+   "names": [
+    "홍 길동"
+   ],
+   "expected": "path ~\\Documents\\a.txt · \"~\\\\x\"",
+   "marks": [
+    [
+     5,
+     6,
+     3
+    ],
+    [
+     26,
+     27,
+     3
+    ]
+   ]
+  },
+  {
+   "id": "B7-regex-special-name",
+   "input": "x.y+z(1) Bearer a.b+c/d=e1234 key=sk-abcdefgh12345 a+b axb $& \\d",
+   "names": [
+    "x.y+z(1)",
+    "a.b",
+    "+",
+    "fgh1",
+    "$&",
+    "\\d"
+   ],
+   "expected": "~user Bearer <토큰 지움> key=<키 지움> a~userb axb ~user ~user",
+   "marks": [
+    [
+     0,
+     5,
+     5
+    ],
+    [
+     6,
+     20,
+     1
+    ],
+    [
+     25,
+     31,
+     2
+    ],
+    [
+     33,
+     38,
+     5
+    ],
+    [
+     44,
+     49,
+     5
+    ],
+    [
+     50,
+     55,
+     5
+    ]
+   ]
+  },
+  {
+   "id": "B8-no-names",
+   "input": "mail a.b@example.com /Users/hong/x C:\\Users\\hong\\y",
+   "names": [],
+   "expected": "mail <이메일 지움> ~/x ~\\y",
+   "marks": [
+    [
+     5,
+     13,
+     0
+    ],
+    [
+     14,
+     15,
+     4
+    ],
+    [
+     18,
+     19,
+     3
+    ]
+   ]
+  },
+  {
+   "id": "B9-empty-names",
+   "input": "hello world",
+   "names": [
+    "",
+    "\u0000",
+    "\u0000\u0000"
+   ],
+   "expected": "hello world",
+   "marks": []
+  },
+  {
+   "id": "B10-already-scrubbed",
+   "input": "mail <이메일 지움> key <키 지움> Authorization: Bearer <토큰 지움> path ~\\x who ~user HOME=~",
+   "names": [
+    "Bearer",
+    "토큰",
+    "지움",
+    "이메일",
+    "user",
+    "키 지움",
+    "~user"
+   ],
+   "expected": "mail <~user ~user> key <~user> Authorization: ~user <~user ~user> path ~\\x who ~user HOME=~",
+   "marks": [
+    [
+     6,
+     11,
+     5
+    ],
+    [
+     12,
+     17,
+     5
+    ],
+    [
+     24,
+     29,
+     5
+    ],
+    [
+     46,
+     51,
+     5
+    ],
+    [
+     53,
+     58,
+     5
+    ],
+    [
+     59,
+     64,
+     5
+    ],
+    [
+     79,
+     84,
+     5
+    ]
+   ],
+   "was": "mail <이메일 지움> key <키 지움> Authorization: Bearer <토큰 지움> path ~\\x who ~user HOME=~"
+  },
+  {
+   "id": "B11-overlapping-names",
+   "input": "ab cd ef",
+   "names": [
+    "ab cd",
+    "cd ef"
+   ],
+   "expected": "~user",
+   "marks": [
+    [
+     0,
+     5,
+     5
+    ]
+   ],
+   "was": "~user ef"
+  },
+  {
+   "id": "B12-touching-names",
+   "input": "HongHong",
+   "names": [
+    "Hong"
+   ],
+   "expected": "~user",
+   "marks": [
+    [
+     0,
+     5,
+     5
+    ]
+   ],
+   "was": "~user~user"
+  },
+  {
+   "id": "B13-formation-across-marker",
+   "input": "Hong x",
+   "names": [
+    "Hong",
+    "r x"
+   ],
+   "expected": "~user x",
+   "marks": [
+    [
+     0,
+     5,
+     5
+    ]
+   ]
+  },
+  {
+   "id": "B14-users-users",
+   "input": "/Users/Users/x",
+   "names": [
+    "Users"
+   ],
+   "expected": "~/x",
+   "marks": [
+    [
+     0,
+     1,
+     4
+    ]
+   ]
+  },
+  {
+   "id": "B15-email-in-home",
+   "input": "/Users/a@b.com/x",
+   "names": [],
+   "expected": "<이메일 지움>/x",
+   "marks": [
+    [
+     0,
+     8,
+     0
+    ]
+   ]
+  },
+  {
+   "id": "B16-bearer-then-path",
+   "input": "Bearer /Users/hong/x",
+   "names": [
+    "hong"
+   ],
+   "expected": "Bearer <토큰 지움>",
+   "marks": [
+    [
+     0,
+     14,
+     1
+    ]
+   ]
+  },
+  {
+   "id": "B17-email-is-name",
+   "input": "HongGildong@example.com HongGildong",
+   "names": [
+    "HongGildong"
+   ],
+   "expected": "<이메일 지움> ~user",
+   "marks": [
+    [
+     0,
+     8,
+     0
+    ],
+    [
+     9,
+     14,
+     5
+    ]
+   ]
+  },
+  {
+   "id": "B18-planted-marker",
+   "input": "a\u0000M0\u0000b \u0000M7\u0000 Bearer abcDEF1234567890",
+   "names": [
+    "zz"
+   ],
+   "expected": "aM0b M7 Bearer <토큰 지움>",
+   "marks": [
+    [
+     8,
+     22,
+     1
+    ]
+   ]
+  },
+  {
+   "id": "B19-plain",
+   "input": "[5/10] 받은 파일 확인 · J-AV-02 · Windows 11 · PowerShell 5.1 · %TEMP% 비어 있음",
+   "names": [
+    "hong"
+   ],
+   "expected": "[5/10] 받은 파일 확인 · J-AV-02 · Windows 11 · PowerShell 5.1 · %TEMP% 비어 있음",
+   "marks": []
+  },
+  {
+   "id": "B20-name-crlf-lines",
+   "input": "USER=hongtester\r\nlog: /Users/hongtester/.local/bin\r\nhongtester done",
+   "names": [
+    "hongtester"
+   ],
+   "expected": "USER=~user\r\nlog: ~/.local/bin\r\n~user done",
+   "marks": [
+    [
+     5,
+     10,
+     5
+    ],
+    [
+     17,
+     18,
+     4
+    ],
+    [
+     31,
+     36,
+     5
+    ]
+   ]
+  },
+  {
+   "id": "B21-name-across-two-markers",
+   "input": "~user~user ok",
+   "names": [
+    "r~u"
+   ],
+   "expected": "~use~userser ok",
+   "marks": [
+    [
+     4,
+     9,
+     5
+    ]
+   ],
+   "was": "~user~user ok"
+  },
+  {
+   "id": "B22-email-over-marker",
+   "input": "~user@example.com",
+   "names": [],
+   "expected": "~<이메일 지움>",
+   "marks": [
+    [
+     1,
+     9,
+     0
+    ]
+   ],
+   "was": "<이메일 지움>"
+  },
+  {
+   "id": "B23-korean-before-anchor",
+   "input": "확인C:\\Users\\hong\\x · 값sk-abcdefgh12345678 · 토큰Bearer abcDEF1234567890",
+   "names": [],
+   "expected": "확인~\\x · 값<키 지움> · 토큰Bearer <토큰 지움>",
+   "marks": [
+    [
+     2,
+     3,
+     3
+    ],
+    [
+     9,
+     15,
+     2
+    ],
+    [
+     20,
+     34,
+     1
+    ]
+   ]
+  },
+  {
+   "id": "B24-ignorable-char-name",
+   "input": "x ~﻿user y",
+   "names": [
+    "~﻿user"
+   ],
+   "expected": "x ~user y",
+   "marks": [
+    [
+     2,
+     7,
+     5
+    ]
+   ]
+  },
+  {
+   "id": "C1-chain-name-after-marker",
+   "input": "rxxxxxx",
+   "names": [
+    "rx"
+   ],
+   "expected": "~userxxxxx",
+   "marks": [
+    [
+     0,
+     5,
+     5
+    ]
+   ]
+  },
+  {
+   "id": "C2-tilde-run-tilde-name",
+   "input": "~~~~~~~~~~~~~~~~~~~~",
+   "names": [
+    "~~~~~~~~"
+   ],
+   "expected": "~user",
+   "marks": [
+    [
+     0,
+     5,
+     5
+    ]
+   ],
+   "was": "~user~user~~~~"
+  },
+  {
+   "id": "C3-name-glued-to-input-marker",
+   "input": "cd ~userkim/x",
+   "names": [
+    "userkim"
+   ],
+   "expected": "cd ~~user/x",
+   "marks": [
+    [
+     4,
+     9,
+     5
+    ]
+   ],
+   "was": "cd ~userkim/x"
+  },
+  {
+   "id": "C4-name-with-tilde",
+   "input": "path HONGGI~1 done · TEMP=C:\\Users\\HONGGI~1\\AppData",
+   "names": [
+    "HONGGI~1"
+   ],
+   "expected": "path ~user done · TEMP=~\\AppData",
+   "marks": [
+    [
+     5,
+     10,
+     5
+    ],
+    [
+     23,
+     24,
+     3
+    ]
+   ]
+  },
+  {
+   "id": "C5-chain-installer-r3",
+   "input": "rssssss",
+   "names": [
+    "rs"
+   ],
+   "expected": "~usersssss",
+   "marks": [
+    [
+     0,
+     5,
+     5
+    ]
+   ]
+  },
+  {
+   "id": "C6-chain-long",
+   "input": "USER=rs\nrssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssss",
+   "names": [
+    "rs"
+   ],
+   "expected": "USER=~user\n~usersssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssss",
+   "marks": [
+    [
+     5,
+     10,
+     5
+    ],
+    [
+     11,
+     16,
+     5
+    ]
+   ]
+  },
+  {
+   "id": "C7-shorter-name-before-marker",
+   "input": "hong~user x",
+   "names": [
+    "hong~u",
+    "hong"
+   ],
+   "expected": "~userser x",
+   "marks": [
+    [
+     0,
+     5,
+     5
+    ]
+   ],
+   "was": "~user~user x"
+  },
+  {
+   "id": "C8-second-pass-needed",
+   "input": "mail 홍서연@example.com",
+   "names": [
+    "홍서연"
+   ],
+   "expected": "mail <이메일 지움>",
+   "marks": [
+    [
+     5,
+     13,
+     0
+    ]
+   ]
+  },
+  {
+   "id": "R-설치기 1R #2 Bearer",
+   "input": "Authorization: Bearer abcDEF1234567890",
+   "names": [
+    "Bearer"
+   ],
+   "expected": "Authorization: Bearer <토큰 지움>",
+   "marks": [
+    [
+     15,
+     29,
+     1
+    ]
+   ]
+  },
+  {
+   "id": "R-설치기 1R #2 sk",
+   "input": "key=sk-abcdefgh12345678 saved",
+   "names": [
+    "sk"
+   ],
+   "expected": "key=<키 지움> saved",
+   "marks": [
+    [
+     4,
+     10,
+     2
+    ]
+   ]
+  },
+  {
+   "id": "R-설치기 2R ① 빈칸 이름",
+   "input": "/Users/Hong Gildong/x",
+   "names": [
+    "Hong Gildong"
+   ],
+   "expected": "~/x",
+   "marks": [
+    [
+     0,
+     1,
+     4
+    ]
+   ]
+  },
+  {
+   "id": "R-설치기 2R ② 윈 중첩",
+   "input": "USERPROFILE=C:\\Users\\team\\SECRET_TEAM\\hong",
+   "names": [
+    "C:\\Users\\team\\SECRET_TEAM\\hong",
+    "hong"
+   ],
+   "expected": "USERPROFILE=~",
+   "marks": [
+    [
+     12,
+     13,
+     3
+    ]
+   ]
+  },
+  {
+   "id": "R-설치기 2R ② 맥 중첩",
+   "input": "HOME=/Users/team/SECRET_TEAM/hong",
+   "names": [
+    "/Users/team/SECRET_TEAM/hong",
+    "hong"
+   ],
+   "expected": "HOME=~",
+   "marks": [
+    [
+     5,
+     6,
+     4
+    ]
+   ]
+  },
+  {
+   "id": "R-설치기 2R U+FEFF 이름",
+   "input": "/Users/Hong﻿Gildong/x",
+   "names": [
+    "Hong﻿Gildong"
+   ],
+   "expected": "~/x",
+   "marks": [
+    [
+     0,
+     1,
+     4
+    ]
+   ]
+  },
+  {
+   "id": "R-설치기 2R U+FEFF 이름 없음",
+   "input": "/Users/Hong﻿Gildong/x",
+   "names": [],
+   "expected": "~/x",
+   "marks": [
+    [
+     0,
+     1,
+     4
+    ]
+   ]
+  },
+  {
+   "id": "R-설치기 3R #1 연쇄 rs",
+   "input": "rssssss",
+   "names": [
+    "rs"
+   ],
+   "expected": "~usersssss",
+   "marks": [
+    [
+     0,
+     5,
+     5
+    ]
+   ]
+  },
+  {
+   "id": "R-서버 1R #1",
+   "input": "/Users/Hong Gildong/project",
+   "names": [
+    "Hong Gildong"
+   ],
+   "expected": "~/project",
+   "marks": [
+    [
+     0,
+     1,
+     4
+    ]
+   ]
+  },
+  {
+   "id": "R-서버 1R #1 수확",
+   "input": "HOME=/Users/Hong Gildong",
+   "names": [
+    "/Users/Hong Gildong",
+    "Hong Gildong"
+   ],
+   "expected": "HOME=~",
+   "marks": [
+    [
+     5,
+     6,
+     4
+    ]
+   ]
+  },
+  {
+   "id": "R-서버 1R #2 NUL 순서",
+   "input": "USER=ab\u0000\u0000\u0000\nUSER=abcd\nabcd",
+   "names": [
+    "ab\u0000\u0000\u0000",
+    "abcd"
+   ],
+   "expected": "USER=~user\nUSER=~user\n~user",
+   "marks": [
+    [
+     5,
+     10,
+     5
+    ],
+    [
+     16,
+     21,
+     5
+    ],
+    [
+     22,
+     27,
+     5
+    ]
+   ]
+  },
+  {
+   "id": "R-서버 1R #3 Bearer 첫 호출",
+   "input": "Bearer abcDEF1234567890",
+   "names": [
+    "Bearer"
+   ],
+   "expected": "Bearer <토큰 지움>",
+   "marks": [
+    [
+     0,
+     14,
+     1
+    ]
+   ]
+  },
+  {
+   "id": "R-서버 1R #3 다시 가림(멱등 아님 = 설계)",
+   "input": "Bearer <토큰 지움>",
+   "names": [
+    "Bearer"
+   ],
+   "expected": "~user <토큰 지움>",
+   "marks": [
+    [
+     0,
+     5,
+     5
+    ]
+   ]
+  },
+  {
+   "id": "R-서버 2R #2 연쇄 rx",
+   "input": "rxxxxxx",
+   "names": [
+    "rx"
+   ],
+   "expected": "~userxxxxx",
+   "marks": [
+    [
+     0,
+     5,
+     5
+    ]
+   ]
+  },
+  {
+   "id": "R-서버 3R #1 xuserkim",
+   "input": "xuserkim",
+   "names": [
+    "userkim",
+    "xuser"
+   ],
+   "expected": "~user",
+   "marks": [
+    [
+     0,
+     5,
+     5
+    ]
+   ]
+  },
+  {
+   "id": "R-서버 3R #1 Hong Gil Dong",
+   "input": "Hong Gil Dong",
+   "names": [
+    "Hong Gil",
+    "Gil Dong"
+   ],
+   "expected": "~user",
+   "marks": [
+    [
+     0,
+     5,
+     5
+    ]
+   ]
+  },
+  {
+   "id": "R-서버 3R #1 홍길동",
+   "input": "담당 홍길동 입니다",
+   "names": [
+    "홍길",
+    "길동"
+   ],
+   "expected": "담당 ~user 입니다",
+   "marks": [
+    [
+     3,
+     8,
+     5
+    ]
+   ]
+  },
+  {
+   "id": "R-서버 3R #4 중첩 /Users/×8",
+   "input": "ab/Users//Users//Users//Users//Users//Users//Users//Users/x",
+   "names": [
+    "b/Users//Users//Users//Users//Users//Users//Users//Users/x",
+    "ab"
+   ],
+   "expected": "~",
+   "marks": [
+    [
+     0,
+     1,
+     4
+    ]
+   ]
+  },
+  {
+   "id": "R-서버 3R ⓐ cd ~userkim",
+   "input": "cd ~userkim/x",
+   "names": [
+    "userkim"
+   ],
+   "expected": "cd ~~user/x",
+   "marks": [
+    [
+     4,
+     9,
+     5
+    ]
+   ]
+  },
+  {
+   "id": "R-서버 3R ⓐ hong~userkim",
+   "input": "USER=hong~userkim\nhong~userkim",
+   "names": [
+    "hong~userkim"
+   ],
+   "expected": "USER=~user\n~user",
+   "marks": [
+    [
+     5,
+     10,
+     5
+    ],
+    [
+     11,
+     16,
+     5
+    ]
+   ]
+  },
+  {
+   "id": "R-이력 ① 이름 Users",
+   "input": "C:\\Users\\hong\\x · /Users/hong/y",
+   "names": [
+    "Users"
+   ],
+   "expected": "~\\x · ~/y",
+   "marks": [
+    [
+     0,
+     1,
+     3
+    ],
+    [
+     6,
+     7,
+     4
+    ]
+   ]
+  },
+  {
+   "id": "R-이력 ① 토큰 속 두 글자",
+   "input": "Authorization: Bearer abcDEF1234567890 · key=sk-ant-api03-Zz09",
+   "names": [
+    "DE",
+    "an"
+   ],
+   "expected": "Authorization: Bearer <토큰 지움> · key=<키 지움>",
+   "marks": [
+    [
+     15,
+     29,
+     1
+    ],
+    [
+     36,
+     42,
+     2
+    ]
+   ]
+  },
+  {
+   "id": "R-중첩 윈+맥",
+   "input": "C:\\Users\\/Users//Users//Users/x",
+   "names": [],
+   "expected": "~",
+   "marks": [
+    [
+     0,
+     1,
+     3
+    ]
+   ]
+  },
+  {
+   "id": "X-lone-high",
+   "input": "\ud800",
+   "names": [],
+   "expected": "�",
+   "marks": []
+  },
+  {
+   "id": "X-lone-high-2",
+   "input": "\ud801",
+   "names": [],
+   "expected": "�",
+   "marks": []
+  },
+  {
+   "id": "X-replacement",
+   "input": "�",
+   "names": [],
+   "expected": "�",
+   "marks": []
+  },
+  {
+   "id": "X-pair-kept",
+   "input": "a😀b",
+   "names": [
+    "\ud83d"
+   ],
+   "expected": "a😀b",
+   "marks": []
+  },
+  {
+   "id": "X-lone-in-text",
+   "input": "a\ud83dq \ude00 ok",
+   "names": [
+    "q"
+   ],
+   "expected": "a�~user � ok",
+   "marks": [
+    [
+     2,
+     7,
+     5
+    ]
+   ]
+  },
+  {
+   "id": "X-codex-q5-first",
+   "input": "a@b.co@ddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd.co",
+   "names": [
+    ">"
+   ],
+   "expected": "<이메일 지움>@ddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd.co",
+   "marks": [
+    [
+     0,
+     8,
+     0
+    ]
+   ]
+  },
+  {
+   "id": "X-codex-q5-again",
+   "input": "<이메일 지움>@ddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd.co",
+   "names": [
+    ">"
+   ],
+   "expected": "<이메일 지움<이메일 지움>",
+   "marks": [
+    [
+     7,
+     15,
+     0
+    ]
+   ]
+  },
+  {
+   "id": "X-codex-q7-long-home",
+   "input": "HOME=/Volumes/team/d/d/d/d/d/d/d/d/d/d/d/d/d/d/d/d/d/d/d/d/d/d/d/d/d/d/d/d/d/d/d/d/d/d/d/d/d/d/d/d/d/d/d/d/d/d/d/d/d/d/d/d/d/d/d/d/d/d/d/d/d/d/d/d/d/d/d/d/d/d/d/d/d/d/d/d/d/d/d/d/d/d/d/d/d/d/d/d/d/d/d/d/d/d/d/d/d/d/d/d/d/d/d/d/d/d/d/d/d/d/d/d/d/d/d/d/d/d/d/d/d/d/d/d/d/quartz",
+   "names": [
+    "/Volumes/team/d/d/d/d/d/d/d/d/d/d/d/d/d/d/d/d/d/d/d/d/d/d/d/d/d/d/d/d/d/d/d/d/d/d/d/d/d/d/d/d/d/d/d/d/d/d/d/d/d/d/d/d/d/d/d/d/d/d/d/d/d/d/d/d/d/d/d/d/d/d/d/d/d/d/d/d/d/d/d/d/d/d/d/d/d/d/d/d/d/d/d/d/d/d/d/d/d/d/d/d/d/d/d/d/d/d/d/d/d/d/d/d/d/d/d/d/d/d/d/d/d/d/d/d/d/quartz",
+    "quartz"
+   ],
+   "expected": "HOME=~user",
+   "marks": [
+    [
+     5,
+     10,
+     5
+    ]
+   ]
+  },
+  {
+   "id": "X-codex-q3-rescan-lines",
+   "input": "C:\\Users\\/Users/x\nC:\\Users\\/Users/x\nC:\\Users\\/Users/x\n",
+   "names": [],
+   "expected": "~\n~\n~\n",
+   "marks": [
+    [
+     0,
+     1,
+     3
+    ],
+    [
+     2,
+     3,
+     3
+    ],
+    [
+     4,
+     5,
+     3
+    ]
+   ]
+  },
+  {
+   "id": "X-codex-q2-deepest",
+   "input": "C:\\Users\\/Users/<",
+   "names": [
+    "<"
+   ],
+   "expected": "~",
+   "marks": [
+    [
+     0,
+     1,
+     3
+    ]
+   ]
+  },
+  {
+   "id": "X-long-name",
+   "input": "abc zzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzz",
+   "names": [
+    "zzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzz"
+   ],
+   "expected": "abc ~user",
+   "marks": [
+    [
+     4,
+     9,
+     5
+    ]
+   ]
+  },
+  {
+   "id": "X-codex2-tidy-name-nul",
+   "input": "😀",
+   "names": [
+    "\ud83d\u0000\ude00"
+   ],
+   "expected": "~user",
+   "marks": [
+    [
+     0,
+     5,
+     5
+    ]
+   ]
+  },
+  {
+   "id": "X-codex2-tidy-text-nul",
+   "input": "\ud83d\u0000\ude00",
+   "names": [
+    "😀"
+   ],
+   "expected": "~user",
+   "marks": [
+    [
+     0,
+     5,
+     5
+    ]
+   ]
+  },
+  {
+   "id": "X-codex2-tidy-both",
+   "input": "a\ud83d\u0000\u0000\ude00b \ude00\u0000\ud83d",
+   "names": [
+    "\ud83d\u0000\ude00",
+    "\u0000"
+   ],
+   "expected": "a~userb ��",
+   "marks": [
+    [
+     1,
+     6,
+     5
+    ]
+   ]
+  },
+  {
+   "id": "X-codex2-appendix-e",
+   "input": "Q Q Q Z",
+   "names": [
+    "Q",
+    "Q Q Q Z"
+   ],
+   "expected": "~user",
+   "marks": [
+    [
+     0,
+     5,
+     5
+    ]
+   ]
+  },
+  {
+   "id": "X-codex2-appendix-e-2",
+   "input": "ab ab abc ab ab ab abd",
+   "names": [
+    "ab",
+    "ab ab ab abd"
+   ],
+   "expected": "~user ~user ~userc ~user",
+   "marks": [
+    [
+     0,
+     5,
+     5
+    ],
+    [
+     6,
+     11,
+     5
+    ],
+    [
+     12,
+     17,
+     5
+    ],
+    [
+     19,
+     24,
+     5
+    ]
+   ]
+  }
+ ]
+}

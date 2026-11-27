@@ -152,12 +152,15 @@ CYS_DISPLAY_NAME="cysr"
 # 0.3.46(2026-11-22): cysr 1.1.16 핀(발행 2026-11-22 · 값 = 발행 자산 실물 실측 · 릴리스 SHA256SUMS.txt 대조 = tests/*-pin-release.sh) · 코드 변경 0 — 핀 값과 판번만
 # 0.3.47(2026-11-23): 설치·갱신 직후 본부 자비스(master)만 RC 켬(write_master_wake_settings · Write-MasterWakeSettings) · cysr 1.1.17 핀(값 = 태그 런 release 45072298565 의 발행 자산 · 릴리스 공개 전이라 SHA256SUMS.txt 대조는 공개 뒤 tests/*-pin-release.sh)
 # 0.3.49(2026-11-25): cysr 1.1.19 핀(발행 2026-11-25 · 값 = 공개 릴리스 v1.1.19 SHA256SUMS.txt(그 파일 자신의 sha256 = c41c6ff3f51203f4b877df4dee795fc5721610c69e30e9fce30f19d9d3086125 · 1162 B · 13행) 줄과 바이트 일치) · 코드 변경 0 — 핀 값과 판번만
-CYS_FORK_VERSION="1.1.19"
+# 0.3.50(2026-11-26 · 후보): 가림 v3 이식 + 미발행 r13 고침 편입(r13/scrub-v3-port 에서 「0.3.46(2026-11-15)」로 적혔던 판 — 공개된 적 없음 · 라이브 0.3.46(11-22)과 다른 판): 11-15 적대 검토 확정 지적 수리 중 맥 몫(글자 첨부 지우기 · 폴링 출처 헤더) · 가림 v3 · 사람이 멈춘 대기 끝 = info 표식
+#   0.3.50 에 함께 든 것: 윈 [3/10] 90초 첫 점검·「다시 실행하지 마십시오」·대기 하트비트 표지(50267f8) · 윈 관리자 창 설치에서도 [9/10] 앱 창을 일반 권한으로(1d078f1) · [9/10] 데몬 자동 복원이 끝나기를 기다린 뒤 master 자리(맥 76a1231 · 윈 3cc4031)
+#   핀 = cysr 1.1.20(발행 2026-11-26 · 값 = 공개 릴리스 v1.1.20 SHA256SUMS.txt(그 파일 자신의 sha256 = 2659189a094d8b42a90b359c421acbe6bd5fb2a9dfd0f4f3072ca3419739ba06) 줄과 바이트 일치 · 같은 값 = 묶음 2a pin1120.py)
+CYS_FORK_VERSION="1.1.20"
 CYS_FORK_DIR="https://github.com/oogisoogi/cys-ro/releases/download/v${CYS_FORK_VERSION}/"
 # 1.0.1 부터 zip 최상위 = cysr.app(안의 실행 파일 = Contents/MacOS/cys · cys-app · cysd · CFBundleName cysr · 로컬 빌드 실측 2026-09-16).
 CYS_FORK_FILE="cysr-macos-arm64-v${CYS_FORK_VERSION}.zip"
-# ✅아래 크기·지문·CDHash = **v1.1.19 발행 zip** 의 값이다(2026-11-25 공개 · 태그 런 release 45519664276 · 1.1.16 값(0ca89183 · 225831620)을 대신한다).
-#   출처 = 릴리스 v1.1.19 의 SHA256SUMS.txt(그 파일 자신의 sha256 = c41c6ff3f51203f4b877df4dee795fc5721610c69e30e9fce30f19d9d3086125 · 1162 B · 13행 · tests/mac-pin-release.sh 로 대조) · (이전 기록 · 1.1.16) 릴리스 v1.1.16 의 SHA256SUMS.txt(그 파일 자신의 sha256 = 695812842dc4cf18181761c02be09fa02f508f4215b87c64e578e02a4d6667b7 · 1162 B · 13행) — 지문·파일 이름은 그 줄과 바이트 일치,
+# ✅아래 크기·지문·CDHash = **v1.1.20 발행 zip** 의 값이다(2026-11-26 공개 · 태그 런 release 45761253887 · 1.1.16 값(0ca89183 · 225831620)을 대신한다).
+#   출처 = 릴리스 v1.1.20 의 SHA256SUMS.txt(그 파일 자신의 sha256 = 2659189a094d8b42a90b359c421acbe6bd5fb2a9dfd0f4f3072ca3419739ba06 · 1162 B · 13행 · tests/mac-pin-release.sh 로 대조) · (이전 기록 · 1.1.16) 릴리스 v1.1.16 의 SHA256SUMS.txt(그 파일 자신의 sha256 = 695812842dc4cf18181761c02be09fa02f508f4215b87c64e578e02a4d6667b7 · 1162 B · 13행) — 지문·파일 이름은 그 줄과 바이트 일치,
 #         크기는 릴리스 zip 의 크기, CDHash 는 발행 zip 을 풀어(ditto -x -k) codesign -dvvv 로 잰 값. 세 값 모두 tests/mac-pin-release.sh 가 릴리스를 때려 다시 잰다.
 #   (이전 기록 · 1.1.6) **v1.1.6 재절단 드래프트(릴리스 id 396787705 · 대상 커밋 76d2b5e9)** 의 zip 에서 실측(2026-09-26 · 1.1.5 값(71e285ea · 207818466)을 대신했다).
 #   (이전 기록 · 1.1.6 출처) 릴리스 v1.1.6 의 SHA256SUMS.txt(그 파일 자신의 sha256 = ca54d259b460340f33541181b1711e0183e036dc6a1c3110771480c2496b4ff2 · 1157 B · 13행 · 재절단 드래프트 자산)와
@@ -167,16 +170,16 @@ CYS_FORK_FILE="cysr-macos-arm64-v${CYS_FORK_VERSION}.zip"
 #         발행 자산 zip 실물(arm64·x64 · gh release download) — 크기·sha256 은 파일에서 셌고(릴리스 API digest·SUMS 줄과 3/3 일치), CDHash 는 풀어서(ditto -x -k) codesign -dvvv 로 쟀다(지시값 6/6 일치).
 #   ⚠태그가 옮겨지면 이 값도 함께 바뀐다(v1.1.0 라운드에만 네 번 옮겨졌다) — 값을 문서에 복제하지 말고 발행 자산에서 다시 재라.
 #   CDHash 는 **발행된 그 zip** 을 풀어(ditto -x -k) `codesign -dvvv` 로 쟀다(서명 = cys-local · zip 최상위 = cysr.app 하나).
-CYS_FORK_BYTES="225895202"
-CYS_FORK_SHA256="a2d9864e39ac24d50ba05dec39020cdacbd45324ca18f3f08161d1423b5efc06"
+CYS_FORK_BYTES="225901947"
+CYS_FORK_SHA256="19d20dd6de77a7a8d7905f93d2b524cc52e85a388e821f6a99b91dee28eb751b"
 # 설치된 프로그램이 「바로 이 판」인가를 가르는 값. 판본 숫자는 원작자 판도 같은 숫자를 쓸 수 있어서
 #   숫자만 보면 **원작자 판을 우리 판으로 읽고 건너뛴다**(어제 원작자 판을 깐 맥이 그대로 남는다).
-CYS_FORK_CDHASH="bbc629d17dc4f103be8dcab97c17d7691e26d693"
+CYS_FORK_CDHASH="1bc49a9ea41d5e5dd3c4c62436d5dcc3168653af"
 
 # ★★인텔(x86_64) 맥 핀 — v1.1 부터 우리 판이 인텔 맥도 덮는다 (2026-09-20).
 #   까닭: v1.0.2 까지 우리 맥 자산은 arm64 하나뿐이라 **인텔 맥만 원작자 판으로 갈라졌다**. 같은 날 같은 방에서
 #     두 참가자가 서로 다른 cys 를 쓰는 일이 실제로 있었다(2026-09-15 전환 주석의 그 사유) — 그 갈림을 여기서 닫는다.
-#   ✅아래 값은 **v1.1.19 발행 x64 zip** 의 값이다(2026-11-25 공개 · 태그 런 release 45519664276 · 지문·파일 이름 = 릴리스 SHA256SUMS.txt 의 그 줄 · 크기 = 릴리스 zip 크기 — tests/mac-pin-x64-release.sh 가 릴리스를 때려 다시 잰다).
+#   ✅아래 값은 **v1.1.20 발행 x64 zip** 의 값이다(2026-11-26 공개 · 태그 런 release 45761253887 · 지문·파일 이름 = 릴리스 SHA256SUMS.txt 의 그 줄 · 크기 = 릴리스 zip 크기 — tests/mac-pin-x64-release.sh 가 릴리스를 때려 다시 잰다).
 #     CDHash 는 발행 zip 을 풀어 codesign -dvvv 로 잰 값이다(그 시험은 모양만 본다 — zip 약 230MB 를 받아야 해서 · 값을 바꿀 때는 풀어서 다시 잰다).
 #     (이전 기록) v1.1.6 재절단 x64 드래프트 zip 에서 실측(2026-09-26 · 릴리스 id 396787705 · 대상 커밋 76d2b5e9 · 1.1.5 값(45b629ff · 215440455)을 대신했다).
 #     (이전 기록) v1.1.5 x64 발행 zip 에서 실측(2026-09-24 · 11차 재핀 · 11차 절단 태그 커밋 526325bf · Mach-O thin x86_64 · 서명 cys-local).
@@ -184,9 +187,9 @@ CYS_FORK_CDHASH="bbc629d17dc4f103be8dcab97c17d7691e26d693"
 #   ⛔자리표가 남아 있는 동안 인텔 맥은 **원작자 판으로 돌아가지 않고 멈춘다**(cys_fork_x64_pin_ready · step_download_cys 머리).
 #     조용히 원작자 판을 깔면 이 바꿈이 없애려던 그 갈림이 그대로 되살아난다 — 말없이 다른 판을 까느니 멈춰서 말하는 쪽을 고른다.
 CYS_FORK_X64_FILE="cysr-macos-x64-v${CYS_FORK_VERSION}.zip"
-CYS_FORK_X64_BYTES="233985770"
-CYS_FORK_X64_SHA256="62e7bc10c287b1fdef1f5cdb41e881a2ddcf5d2685d5405adcb734934fd1a8a9"
-CYS_FORK_X64_CDHASH="dccfe5d48fdc4cf1a5d39f6ab11a46363cb63a68"
+CYS_FORK_X64_BYTES="233992265"
+CYS_FORK_X64_SHA256="1f097d2ec0ac13e94b19ea9895e1de534826619b3d0e4a5f4101d3b6017d545f"
+CYS_FORK_X64_CDHASH="6183f7fec10c8fa617ad0216f393d63d0b1b93a3"
 # 저희 판이 놓이는 자리 = /Applications/cysr.app · 옛 이름 자리 = /Applications/cys.app(0.14.x·1.0.0 이 깔린 자리 · 원작자 판도 이 이름).
 CYS_FORK_APP="/Applications/cysr.app"
 CYS_OLD_APP="/Applications/cys.app"
@@ -829,12 +832,35 @@ help_attach() { # help_attach <kind> <파일 이름> <파일> — 윈판 Send-At
   return 1
 }
 
+help_scrubbed_tail() { # help_scrubbed_tail <원본> <상한 바이트> <만들 파일> — 보낼 글자 첨부를 만든다 · rc 0 = 만들었다 · rc 1 = 보낼 것이 없다(없는 파일 · 빈 파일 · 머리표뿐)
+  # 🔴「파일 전체를 엄격히 읽기 → 전체 가림 → 끝에서 자름」(「둘로 가름」 설계 · JS attachmentFromFile).
+  #   앞 판의 「끝 2×상한을 떼고 첫 줄 버림 → iconv -c → 가림」 은 걷었다 — 가림 앞에서 줄이면 잘린 Bearer 문맥의 토큰이 남는다(설계 뮤턴트 M32) ·
+  #   틀린 바이트를 버리고 읽으면 깨진 이름 조각이 남는다. 읽기는 엄격한 UTF-8 하나(UTF-16·CP949·틀린 바이트·NUL·크기 초과 = 닫힌 실패).
+  #   닫힌 실패면 <전부 지움> 한 낱말을 보낸다(파일이 있었다는 사실만 · 원문 0) — JS 가 죽어도 같다(원문을 대신 보내지 않는다).
+  [ -f "$1" ] || return 1
+  local r
+  rm -f "$3"
+  r="$(RH_IN_FILE="$1" RH_OUT_FILE="$3" RH_MAX="$2" RH_NAMES_FILE="$RH_TMP/names" \
+    RH_EXTRA_NAMES="$(id -un 2>/dev/null)
+$(id -F 2>/dev/null)
+$(basename "$HOME")" remote_help_js scrubfile 2>/dev/null)"
+  case "$r" in
+    SKIP) rm -f "$3"; return 1 ;;
+    "SENT -") ;;
+    "SENT "[a-z]*) log "attach scrub: 통째 가림(${r#SENT }): $(basename "$1")" ;;
+    *) printf '%s' '<전부 지움>' > "$3" 2>/dev/null || { rm -f "$3"; return 1; }
+       log "attach scrub: 통째 가림(error · 가림 프로그램이 답하지 않음): $(basename "$1")" ;;
+  esac
+  [ -s "$3" ]
+}
+
 help_fail_attachments() { # 윈판 Send-FailAttachments — 보고가 열린 직후 부른다 · 계약 3절 순서 · 각각 fail-open
   [ -n "$RH_ID" ] && [ -n "$RH_TMP" ] || return 0
   {
     local d="$RH_TMP/attach"
     mkdir -p "$d" 2>/dev/null
-    file_tail_capped "$LOG_FILE" "$ATTACH_MAX_BYTES" "$d/bootstrap.log" && help_attach log_full bootstrap.log "$d/bootstrap.log"
+    # 🔴글자 첨부는 지운 뒤에 보낸다(review-fix-jarvis-1115 · 앞 판 = 원래 바이트 그대로 · 고지 「보내기 전에 지웁니다」와 어긋남)
+    help_scrubbed_tail "$LOG_FILE" "$ATTACH_MAX_BYTES" "$d/bootstrap.log" && help_attach log_full bootstrap.log "$d/bootstrap.log"
     # 맥에는 트랜스크립트가 없다 — 설치 창 글자는 곧 기록 파일이라(say 가 화면과 기록에 같은 줄을 쓴다) log_full 과 같은 내용이 된다.
     log "attach skip (맥에는 트랜스크립트가 없다 · 설치 창 글자 = log_full): console_text"
     # 🔴전체 화면이 아니라 설치 창 하나다(윈판 v0.3.20 과 같은 규율) · 칸 이름 screen_png 는 서버 계약 그대로 · 파일 이름만 사실대로.
@@ -842,8 +868,9 @@ help_fail_attachments() { # 윈판 Send-FailAttachments — 보고가 열린 직
       help_attach screen_png installer-window.jpg "$d/installer-window.jpg"
     fi
     log "attach: login window capture 없음(맥의 로그인은 설치 창 안에서 진행된다 — 따로 찍을 창이 없다)"
-    proc_tree_file "$d/proc-tree.txt" && help_attach proc_tree proc-tree.txt "$d/proc-tree.txt"
-    file_tail_capped "$REPORT_FILE" "$ATTACH_MAX_BYTES" "$d/env-report.md" && help_attach env_full env-report.md "$d/env-report.md"
+    # 프로세스 목록도 같은 길로(ps comm= 은 실행 파일 전체 경로 — 집 폴더 이름이 든다 · 가린 뒤에만 보낸다)
+    proc_tree_file "$d/proc-tree.raw" && help_scrubbed_tail "$d/proc-tree.raw" "$ATTACH_MAX_BYTES" "$d/proc-tree.txt" && help_attach proc_tree proc-tree.txt "$d/proc-tree.txt"
+    help_scrubbed_tail "$REPORT_FILE" "$ATTACH_MAX_BYTES" "$d/env-report.md" && help_attach env_full env-report.md "$d/env-report.md"
     rm -rf "$d"
   } >/dev/null 2>&1
   return 0
@@ -1548,6 +1575,10 @@ help_last_report_save() {   # help_last_report_save <보고 번호>
 #   감지만·미리보기), 사람이 새 종료 자리를 만들 때마다 이 줄을 기억해서 붙여야 한다면
 #   언젠가 빠진다. 트랩은 **기억이 아니라 구조**다.
 CLOSING_DONE=0
+# ★user-reports-fix-1119: [10/10] 동료 대기를 사람이 멈춘 끝(Ctrl-C · 창 닫기)을 「원인 모를 실패(J-UNK-00)」와 가른다.
+#   OWNER_INTERRUPTED = fleet_on_interrupt 가 세움 · FLEET_WAITING = step_fleet 가 도는 동안만 1 · FLEET_STEP_T0 = [10/10] 시작 시각(초)
+#   실례(사용자 보고 11-19 맥): master-verified 뒤 5분 39초에 멈춘 실행이 J-UNK-00 으로 셈에 들어가 진짜 실패와 섞였다.
+OWNER_INTERRUPTED=0; FLEET_WAITING=0; FLEET_STEP_T0=""
 kill_own_child() { # kill_own_child <번호> [신호=TERM] — 그 번호가 지금 이 셸의 자식일 때만 신호를 보낸다(rc 0) · 아니면 손대지 않는다(rc 1)
   # 0.3.36(적대 검토 지적): 감시자가 시간 상한으로 먼저 끝나면 그 번호를 다른 프로세스가 물려받을 수 있다 — 소유 확인 없이 죽이면 남을 친다.
   local p="${1:-}" sig="${2:-TERM}"
@@ -1579,7 +1610,19 @@ closing_note() {
   fi
   # 🔴0.3.35(dbg-D5 F10 ①): 진단 코드 없이 0 이 아닌 코드로 끝난 실패는 진행 이벤트가 한 건도 안 나갔다(운영이 셀 수 없음).
   #   ⇒ 그 끝에 한해 「어느 단계 · J-UNK-00」 실패 이벤트를 보낸다. 화면·안내는 바꾸지 않는다(윈 끝맺음의 J-UNK-00 채우기와 같은 자리).
-  if [ "${end_rc:-0}" -ne 0 ] && [ -z "$J_CODE" ]; then
+  #   ★user-reports-fix-1119: 단 [10/10] 동료 대기를 **사람이 멈춘** 끝은 실패가 아니다 — 진행 info 표식으로만 남기고 J-UNK-00 을 붙이지 않는다.
+  #     ⓐ Ctrl-C = fleet_on_interrupt 가 awaken:owner-interrupt 를 이미 보냈다(OWNER_INTERRUPTED=1)
+  #     ⓑ 창 닫기 = 위 window_gone 판정 + 대기 중(FLEET_WAITING=1) → 여기서 awaken:owner-window-closed 를 보낸다
+  #        (실측: 실제 가상 터미널을 닫으면 EXIT 트랩이 rc=1 로 돈다 — 그 전엔 이 끝이 J-UNK-00 이었다)
+  #     그 밖(대기 밖 · 창이 살아 있는 rc≠0)은 종전 그대로 J-UNK-00 이다.
+  #     ⚠창 닫기 갈래는 끝 코드를 보지 않는다 — 실측: 창을 닫은 끝의 rc 는 끊긴 명령 바로 앞 명령의 결과라(0 일 수도 1 일 수도) 판정 축이 못 된다.
+  #       대기 중(FLEET_WAITING=1)에 창이 사라졌다는 것만으로 충분하다(정상으로 돌아온 [10/10] 은 FLEET_WAITING 을 0 으로 내린다).
+  if [ "${OWNER_INTERRUPTED:-0}" = 1 ]; then
+    log "owner interrupt at 10/10: rc=$end_rc → progress info awaken:owner-interrupt (no J-UNK-00)"
+  elif [ "$window_gone" = 1 ] && [ "${FLEET_WAITING:-0}" = 1 ] && [ -z "$J_CODE" ]; then
+    log "window closed during 10/10 wait: rc=$end_rc → progress info awaken:owner-window-closed (no J-UNK-00)"
+    progress_send '10/10' 'info' "$(fleet_step_elapsed)" 'awaken:owner-window-closed' ''
+  elif [ "${end_rc:-0}" -ne 0 ] && [ -z "$J_CODE" ]; then
     log "unexpected end: rc=$end_rc no jcode → progress fail J-UNK-00"
     progress_send "$(current_step)" fail "" "J-UNK-00"
   fi
@@ -4229,6 +4272,59 @@ set_fleet_baseline() {
   log "fleet baseline surfaces:$FLEET_BASELINE"
   return 0
 }
+# 🔴🔴**데몬이 지난 자리를 되살리는 동안 master 자리를 열지 않는다**(0.3.50 · 맥 VM rc3 실기 11-25).
+#   [8/10] 이 데몬을 새로 띄우면 데몬은 지난 자리를 **명부 순서대로 하나씩** 되살린다(cysd 콜드부트 자동 복원 ·
+#   자리마다 각성 확인을 기다려 한 자리에 10초 남짓). 앞 판은 그 도중에 기준선을 찍고 master 자리를 열었다 ⇒
+#   rc3 링 기록: 06:50:08 worker 37 되살림(phoenix pid 67269) → 06:50:10 설치기가 새 master 38 엶(pid 67794) →
+#   06:50:18 phoenix 의 master 되살리기가 `role.claim_denied … privileged role held by live surface` ⇒
+#   **옛 master 대화(--resume)가 사라지고 설치기의 새 대화가 그 자리를 차지했다**(worker·cso 는 --resume 그대로).
+#   rc2 는 기준선 때 이미 master 34 가 살아 있어 claim_denied → 이어 받기 갈래로 갔다(같은 코드 · 시각만 다름).
+#   ⇒ 데몬이 알려 주는 복원 단계(`cys status --json` 의 daemon.auto_restore · cysr 1.1.16~)가 running·retry_wait·held 인 동안
+#     기다린다. 편성과 `cys rotate`(wait_auto_restore_settled)가 이미 같은 칸으로 같은 일을 한다 — 설치기만 빠져 있었다.
+#   끝나는 조건(먼저 오는 것): ⓐ 단계가 그 셋이 아님(done·off · 칸 없는 옛 cys · 못 읽음 = 기다리지 않음 = 종전 그대로)
+#     ⓑ 살아 있는 master 자리가 보임(되살아났다 — 이어 여는 자리는 claim_denied → 이어 받기 갈래)
+#     ⓒ 상한 RESTORE_SETTLE_CAP_SEC(= cys rotate 의 복원 대기 기본값 120s · rotate_restore_wait) — 닿으면 종전대로 연다(설치가 멈추지 않게 · fail-open).
+RESTORE_SETTLE_CAP_SEC=120
+RESTORE_SETTLE_POLL_SEC=1
+auto_restore_phase_of() { # <cli> → running|retry_wait|held|done|off · 칸 없음(옛 cys) = 빈 출력 · 조회 실패(상한·rc≠0) = 「?」(`cys status --json` 은 다듬은 JSON · 칸 이름은 한 번만 나온다)
+  #   실패한 조회의 출력은 읽지 않는다(윈 Invoke-CysCapped 가 rc≠0 출력을 버리는 것과 짝 · 독립 검증 N3)
+  local out
+  out="$(cys_capped 5 "${1:-cys}" status --json)" || { printf '?'; return 0; }
+  printf '%s\n' "$out" | sed -n 's/.*"auto_restore"[[:space:]]*:[[:space:]]*"\([a-z_]*\)".*/\1/p' | head -1
+}
+wait_auto_restore_settled() { # <cli> → rc 0 = 끝남(ⓐ·ⓑ) · rc 1 = 상한(ⓒ) · 화면 줄은 실제로 기다릴 때만 한 줄
+  local cli="${1:-cys}" ph m t0="$SECONDS" polls=0 said=0 fails=0
+  while :; do
+    ph="$(auto_restore_phase_of "$cli")"
+    # 조회 실패 한 번으로 끝내지 않는다 — 복원 중 데몬이 바빠 5초 상한에 한 번 걸리면 rc3 경합이 되살아난다(독립 검증 N3) ⇒ **연속 3번**일 때만 끝
+    if [ "$ph" = '?' ]; then
+      fails=$((fails + 1))
+      if [ "$fails" -ge 3 ]; then log "auto-restore wait: settled phase=unreadable fails=$fails polls=$polls waited=$((SECONDS - t0))s"; return 0; fi
+      if [ $((SECONDS - t0)) -ge "$RESTORE_SETTLE_CAP_SEC" ]; then log "auto-restore wait: cap ${RESTORE_SETTLE_CAP_SEC}s phase=unreadable polls=$polls -> open seat anyway"; return 1; fi
+      polls=$((polls + 1)); sleep "$RESTORE_SETTLE_POLL_SEC"; continue
+    fi
+    fails=0
+    case "$ph" in
+      running|retry_wait|held) ;;
+      *) log "auto-restore wait: settled phase=${ph:-unknown} polls=$polls waited=$((SECONDS - t0))s"; return 0 ;;
+    esac
+    m="$(master_seat_ref "$cli")"   # 살아 있는 master 판정은 한 곳(claim_denied 갈래의 끝 증거와 같은 함수)
+    if [ -n "$m" ]; then
+      log "auto-restore wait: master restored ($m) phase=$ph polls=$polls waited=$((SECONDS - t0))s"
+      return 0
+    fi
+    if [ $((SECONDS - t0)) -ge "$RESTORE_SETTLE_CAP_SEC" ]; then
+      log "auto-restore wait: cap ${RESTORE_SETTLE_CAP_SEC}s phase=$ph polls=$polls -> open seat anyway"
+      return 1
+    fi
+    if [ "$said" = 0 ]; then
+      say "     cysr 이 지난 자비스 창들을 되살리는 중입니다 — 끝나기를 기다립니다(최대 $((RESTORE_SETTLE_CAP_SEC / 60))분)."
+      said=1
+    fi
+    polls=$((polls + 1))
+    sleep "$RESTORE_SETTLE_POLL_SEC"
+  done
+}
 live_roles() {
   local out r live="" line sid
   out="$(CYS_NO_AUTOSTART=1 "$1" list 2>&1)"
@@ -4558,6 +4654,10 @@ fleet_on_interrupt() {
   trap - INT
   printf '\n%s\n' '   설치 창의 기다림을 멈췄습니다 — 자비스 창(cysr)은 그대로 둡니다. 거기서 이어서 이야기하시면 됩니다.'
   log "fleet: interrupted by owner (Ctrl-C) — seats left running"
+  # ★user-reports-fix-1119: 사람이 멈춘 끝을 운영이 가를 수 있게 info 표식 + [10/10] 시작 뒤 지난 초. 표지를 **보내기 전에** 세운다
+  #   (보내는 사이 Ctrl-C 를 한 번 더 누르면 트랩 없이 끝나도 끝맺음이 J-UNK-00 을 붙이지 않게).
+  OWNER_INTERRUPTED=1
+  progress_send '10/10' 'info' "$(fleet_step_elapsed)" 'awaken:owner-interrupt' ''
   NEXT_STEP='cysr 창의 master 자리에서 이어서 이야기하십시오. 이 설치 창은 닫으셔도 됩니다.'
   SHOW_RERUN=0
   exit 130
@@ -4576,11 +4676,19 @@ note_daemon_group() { # 데몬이 이 창과 같은 프로세스 묶음(Ctrl-C �
 }
 # 🔴[10/10] 의 시작·끝 전송을 여기 한 곳에 모은다(윈판 Invoke-StepFleet 동형 · installer-0328).
 #   까닭: step_fleet 는 되돌아가는 길이 여럿이라 각각에 끝 전송을 붙이면 반드시 하나를 빠뜨린다.
+fleet_step_elapsed() { # → [10/10] 시작 뒤 지난 초(시작 시각을 모르면 빈 글 = 진행 이벤트의 elapsed 칸을 비운다)
+  local now
+  case "${FLEET_STEP_T0:-}" in ''|*[!0-9]*) return 0 ;; esac
+  now="$(date +%s 2>/dev/null)" || return 0
+  printf '%s' "$(( now - FLEET_STEP_T0 ))"
+}
 invoke_step_fleet() { # <surface ref>
   local rc t0
   progress_send '10/10' 'start' '' '' ''
   t0="$(date +%s)"
+  FLEET_STEP_T0="$t0"; FLEET_WAITING=1   # user-reports-fix-1119 — 사람 중단 분류의 범위 = step_fleet 가 도는 동안만
   step_fleet "${1:-}"; rc=$?
+  FLEET_WAITING=0
   progress_send '10/10' 'end' "$(( $(date +%s) - t0 ))" "rc=$rc" ''
   return $rc
 }
@@ -4616,6 +4724,11 @@ step_fleet() {
     [ "$(printf '%s' "$live" | wc -w | tr -d ' ')" -ge 3 ] && break
     sleep "$FLEET_POLL_SEC"   # 먼저 보고 나서 기다린다 — 이미 섰으면 한 번도 기다리지 않는다
     i=$((i + 1))
+    # 0.3.50: 이 7분 고리도 1분마다(2초 × 30) 한 줄 — 말없이 멈춘 화면이 사람의 Ctrl-C·창 닫기를 불렀다(사용자 진행 기록 11-19·11-26 · 정상 실행의 열에 하나가 5분을 넘긴다).
+    #   뒤 6분 고리와 같은 꼴 · 마지막 바퀴(곧 다음 안내가 나오는 자리)에는 찍지 않는다.
+    if [ $((i % 30)) -eq 0 ] && [ "$i" -lt "$FLEET_AWAKE_TRIES" ]; then
+      say "   동료 자리를 기다리는 중입니다 ($((i * FLEET_POLL_SEC / 60))분 지남 · 최대 $((FLEET_AWAKE_TRIES * FLEET_POLL_SEC / 60))분 · 사람이 하실 일은 없습니다)."
+    fi
   done
   # ★성공의 근거 = 자식 좌석. 우리가 연 master 자리는 근거가 못 된다(declaration_seen 머리 주석).
   if declaration_seen "$live"; then
@@ -5104,6 +5217,8 @@ ${first_prompt}"
     # ★지난 설치가 남긴 표지를 먼저 치운다 — 남아 있으면 이번 마스터 자리가 아무 일도 안 해도 「시작했다」로 읽힌다(ps1 Clear-MasterMark).
     clear_master_mark
     archive_old_round
+    # ★데몬의 자동 복원이 끝나기(또는 지난 master 자리가 되살아나기)를 기다린 **뒤에** 기준선을 찍고 자리를 연다(wait_auto_restore_settled 머리 주석 · 맥 rc3 실기).
+    wait_auto_restore_settled "$cli"
     # ★자리를 열기 **전에** 기준선을 찍는다(2차 검토 N2). 이 줄이 자리 여는 줄보다 뒤에 오면
     #   우리가 만든 master 자리까지 기준선에 들어가 영영 안 세어진다.
     set_fleet_baseline "$cli"
@@ -5306,7 +5421,7 @@ raise_cys_app_window() {
 # ★언제 도는가 = 자비스를 깨우기 **전에** 진단 코드를 남기고 멈춘 끝. 자비스를 깨운 뒤에는 돌지 않는다
 #   (자비스가 이 창을 넘겨받으므로 두 쪽이 한 화면에 섞이지 않게).
 # ⚠JSON·재검사·스크럽은 macOS 기본 `osascript`(JavaScript)가 한다 — 깨끗한 맥에는 jq·python 이 없다.
-INSTALLER_VERSION="0.3.49"      # 보고의 installer_version · BOOTSTRAP_VERSION 은 화면 머리글 용도 그대로(보내지 않는다)
+INSTALLER_VERSION="0.3.50"      # 보고의 installer_version · BOOTSTRAP_VERSION 은 화면 머리글 용도 그대로(보내지 않는다)
 # 0.3.36: JARVIS_HELP_API_URL = CI·흉내가 도움 보고를 로컬로 돌리는 손잡이(JARVIS_PROGRESS_URL 과 같은 모양 · 사람이 쓰는 길이 아니다 ·
 #   없으면 종전 주소 그대로 — tests/help-url-lever.sh 가 잰다). CI(reinstall-matrix.yml)의 full 부분 설치가 라이브 도움 채널로 가던 길을 막는다.
 HELP_API_URL="${JARVIS_HELP_API_URL:-https://jarvis-install.godmeyou.kr}"
@@ -5625,55 +5740,473 @@ function utf8Bytes(text) {
   return bytes;
 }
 
-function tailBytes(text, max) {
-  var chars = Array.from(text);
-  var bytes = utf8Bytes(text);
-  var start = 0;
-  while (bytes > max && start < chars.length) { bytes -= utf8Bytes(chars[start]); start += 1; }
-  return chars.slice(start).join("");
+// ── 가림 v3 — 「둘로 가름」 설계를 옮김(정본 = 참조 모델 split/model · 공용 벡터 tests/scrub-v3/model/) ──
+//   서버 src/scrub.ts · 윈 Invoke-RemoteHelpScrub 와 결과 글이 코드 단위까지 같아야 한다(관문 = tests/scrub-v3-mac.mjs).
+//   한 문장: 「가릴 자리」를 정리한 원문의 글자 위치 집합으로 계산한다 — 이름은 원문에서 한 번(자동기계 · 겹침 포함) · 결과 글에서 이름을 다시 찾지 않는다 ·
+//   구조 규칙은 원문에서 찾은 뒤 결과 글에 다시 걸리는 것이 없을 때까지만 넓힌다(상한 8) · 한도·상한을 넘으면 던지지 않고 칸 통째 가림(<전부 지움>).
+//   ⚠뒤보기 문법을 쓰지 않는다 — 옛 macOS 의 JavaScriptCore 에 없다(모델 structStreamsPortable 꼴: 낱말 경계 = \b · /Users/ 사슬 = 손 반복).
+var MARK = { EMAIL: "<이메일 지움>", BEARER: "Bearer <토큰 지움>", KEY: "<키 지움>", HOME: "~", NAME: "~user", FULL: "<전부 지움>" };
+var RANK = { EMAIL: 0, BEARER: 1, KEY: 2, WINHOME: 3, UNIXHOME: 4, NAME: 5, FULL: 6 };
+var MARK_OF_RANK = [MARK.EMAIL, MARK.BEARER, MARK.KEY, MARK.HOME, MARK.HOME, MARK.NAME, MARK.FULL];
+var SCRUB_NAMES_MAX = 256;          // 서로 다른 이름 수
+var SCRUB_NAME_UNITS_MAX = 262144;  // 이름 글자 합(코드 단위)
+var SCRUB_RESCANS_MAX = 8;          // 구조 재확인에서 「바뀐」 횟수 상한
+var FIELD_UNITS_MAX = 4194304;      // 칸 하나가 받는 글의 크기 상한(코드 단위) — 가리기 전에 판정한다 · 파일은 읽기 전에 바이트 수로
+var SCRUB_BUDGET_MS = 20000;        // 칸마다 벽시계 예산(설계 권고 20초) — 결과 글과 무관 · 넘으면 그 칸 통째 가림(budget)
+
+// 0단계 정리 — 순서가 명세다: NUL 제거 → **그 결과에** 짝 잃은 서러게이트를 U+FFFD 로(글과 이름에 같은 순서 · 손 반복 · toWellFormed 를 쓰지 않는다).
+function scrubTidy(input) {
+  var text = String(input);
+  if (text.indexOf("\u0000") >= 0) text = text.split("\u0000").join("");
+  var i, unit, clean = true;
+  for (i = 0; i < text.length; i += 1) { unit = text.charCodeAt(i); if (unit >= 0xd800 && unit <= 0xdfff) { clean = false; break; } }
+  if (clean) return text;
+  var out = [];
+  for (i = 0; i < text.length; i += 1) {
+    unit = text.charCodeAt(i);
+    if (unit >= 0xd800 && unit <= 0xdbff) {
+      var next = i + 1 < text.length ? text.charCodeAt(i + 1) : 0;
+      if (next >= 0xdc00 && next <= 0xdfff) { out.push(text.charAt(i), text.charAt(i + 1)); i += 1; } else out.push("�");
+    } else if (unit >= 0xdc00 && unit <= 0xdfff) out.push("�");
+    else out.push(text.charAt(i));
+  }
+  return out.join("");
 }
 
-function headBytes(text, max) {
-  var chars = Array.from(text);
-  var bytes = utf8Bytes(text);
-  var end = chars.length;
-  while (bytes > max && end > 0) { end -= 1; bytes -= utf8Bytes(chars[end]); }
-  return chars.slice(0, end).join("");
+// 구조 규칙(엔진 중립 문법 · 글자 모둠은 코드 값으로) — 모델 RULE_SOURCES 의 앞 넷에서 「앞 글자가 낱말 글자가 아님」 을 \b 로 바꾼 꼴(뒤따르는 글자가 낱말 글자라 같은 뜻)
+var SCRUB_WS_WIDE = "\\t\\n\\v\\f\\r \\u0085\\u00a0\\u1680\\u180e\\u2000-\\u200a\\u2028\\u2029\\u202f\\u205f\\u3000\\ufeff";
+var SCRUB_RULES = [
+  ["[A-Za-z0-9._%+-]{1,64}@[A-Za-z0-9-]{1,63}(?:\\.[A-Za-z0-9-]{1,63})*\\.[A-Za-z]{2,63}", RANK.EMAIL],
+  ["\\b[Bb][Ee][Aa][Rr][Ee][Rr][" + SCRUB_WS_WIDE + "]+[A-Za-z0-9._~+/=-]+", RANK.BEARER],
+  ["\\bsk-[A-Za-z0-9_-]{8,}", RANK.KEY],
+  ["\\b[A-Za-z]:(?:\\\\{1,2}|/)[Uu][Ss][Ee][Rr][Ss](?:\\\\{1,2}|/)[^\\\\/\\r\\n\"'<>|:*?]+", RANK.WINHOME]
+].map(function (rule) { return [new RegExp(rule[0], "g"), rule[1]]; });
+// 다섯째 규칙(모델 RULE_SOURCES 끝 줄 · 뒤보기 + (?:/Users/)+ + 멈춤 글자 밖) = 손 반복(겹겹이 든 /Users/ 를 한 덩이로 · 이름 없이 끝난 사슬은 구간이 아니다)
+var SCRUB_UNIX_STOP = { 47: 1, 9: 1, 10: 1, 11: 1, 12: 1, 13: 1, 32: 1, 34: 1, 39: 1, 60: 1, 62: 1 };
+
+/** 규칙마다의 일치 구간 — 목록 하나는 왼쪽부터·겹치지 않게(= 시작 자리 순). tick = 예산 확인 자리(규칙 하나가 끝날 때마다). */
+function scrubStructStreams(text, tick) {
+  var streams = SCRUB_RULES.map(function (rule) {
+    var re = rule[0];
+    var spans = [];
+    re.lastIndex = 0;
+    for (var m = re.exec(text); m !== null; m = re.exec(text)) spans.push([m.index, m.index + m[0].length, rule[1]]);
+    if (tick) tick();
+    return spans;
+  });
+  var unix = [];
+  var anchor = "/Users/";
+  for (var at = text.indexOf(anchor); at >= 0; ) {
+    var chainEnd = at;
+    while (text.startsWith(anchor, chainEnd)) chainEnd += anchor.length;
+    var end = chainEnd;
+    while (end < text.length && SCRUB_UNIX_STOP[text.charCodeAt(end)] !== 1) end += 1;
+    if (end > chainEnd) unix.push([at, end, RANK.UNIXHOME]);
+    at = text.indexOf(anchor, end > chainEnd ? end : chainEnd);
+  }
+  if (tick) tick();
+  streams.push(unix);
+  return streams;
 }
 
-// ── 1차 스크럽 — 서버 src/scrub.ts 와 같은 규칙(계약 5절) · 서버가 한 번 더 지운다 ──
-var SCRUB_PATTERNS = [
-  [/[A-Za-z0-9._%+-]{1,64}@[A-Za-z0-9-]{1,63}(?:\.[A-Za-z0-9-]{1,63})*\.[A-Za-z]{2,63}/g, "<이메일 지움>"],
-  [/\bBearer\s+[A-Za-z0-9._~+/=-]+/gi, "Bearer <토큰 지움>"],
-  [/\bsk-[A-Za-z0-9_-]{8,}/g, "<키 지움>"],
-  [/\b[A-Za-z]:(?:\\{1,2}|\/)Users(?:\\{1,2}|\/)[^\\/\r\n"'<>|:*?]+/gi, "~"],
-  [/\/Users\/[^/\s"'<>]+/g, "~"]
-];
-var NAME_LINES = /\b(?:USERNAME|USERPROFILE|LOGNAME|USER|HOME)\b[ \t]*[=:][ \t]*([^\r\n]+)|\bwhoami\b[ \t]*[:=>][ \t]*([^\r\n]+)|(?:^|\n)[ \t]*([A-Za-z][A-Za-z0-9.-]{1,63}\\[A-Za-z0-9._-]{2,63})[ \t]*(?:\r?\n|$)/gi;
+// 이름 — Aho–Corasick: 모든 이름의 모든 자리(겹침 포함)의 합집합을 선형으로
+function scrubAutomaton(names) {
+  var go = new Map(); // 열쇠 = 상태 × 65536 + 코드 단위
+  var fail = [0];
+  var longest = [0]; // 이 상태의 글자열을 접미사로 하는 이름 중 가장 긴 것의 길이
+  var kids = [[]];
+  names.forEach(function (name) {
+    var state = 0;
+    for (var i = 0; i < name.length; i += 1) {
+      var unit = name.charCodeAt(i);
+      var to = go.get(state * 65536 + unit);
+      if (to === undefined) {
+        to = fail.length;
+        fail.push(0);
+        longest.push(0);
+        kids.push([]);
+        go.set(state * 65536 + unit, to);
+        kids[state].push(unit);
+      }
+      state = to;
+    }
+    if (name.length > longest[state]) longest[state] = name.length;
+  });
+  var queue = kids[0].map(function (unit) { return go.get(unit); });
+  for (var head = 0; head < queue.length; head += 1) {
+    var state = queue[head];
+    for (var k = 0; k < kids[state].length; k += 1) {
+      var unit = kids[state][k];
+      var to = go.get(state * 65536 + unit);
+      var f = fail[state];
+      while (f !== 0 && !go.has(f * 65536 + unit)) f = fail[f];
+      var via = go.get(f * 65536 + unit);
+      fail[to] = via !== undefined && via !== to ? via : 0;
+      if (longest[fail[to]] > longest[to]) longest[to] = longest[fail[to]];
+      queue.push(to);
+    }
+  }
+  return { go: go, fail: fail, longest: longest };
+}
 
-// known = 이 컴퓨터가 스스로 아는 로그인 이름(표시 없이 나와도 지운다 — 서버는 표시된 이름만 안다).
-function harvestNames(input, known) {
+/** 이름이 덮는 원문 구간들 — ⚠부록 E: 새 구간이 앞 구간에 닿으면 꺼내 합친다(스택 합치기 · 시작 자리가 늘 차례대로). tick = 65,536 글자마다. */
+function scrubNameSpans(text, names, tick) {
+  if (names.length === 0) return [];
+  var auto = scrubAutomaton(names);
+  var go = auto.go, fail = auto.fail, longest = auto.longest;
+  var spans = [];
+  var state = 0;
+  for (var i = 0; i < text.length; i += 1) {
+    if (tick && (i & 65535) === 65535) tick();
+    var unit = text.charCodeAt(i);
+    while (state !== 0 && !go.has(state * 65536 + unit)) state = fail[state];
+    var to = go.get(state * 65536 + unit);
+    state = to === undefined ? 0 : to;
+    var len = longest[state];
+    if (len === 0) continue;
+    var start = i + 1 - len;
+    while (spans.length > 0 && spans[spans.length - 1][1] >= start) {
+      var prev = spans.pop();
+      if (prev[0] < start) start = prev[0];
+    }
+    spans.push([start, i + 1, RANK.NAME]);
+  }
+  return spans;
+}
+
+/** 시작 자리 순 목록 여러 개를 한 번 훑어 덩이로 — 정렬 없음 · 겹치거나 맞닿으면 한 덩이 · 덩이의 순위 = 가장 작은 순위. */
+function scrubMerge(streams, counter) {
+  var heads = streams.map(function () { return 0; });
+  var runs = [];
+  var start = -1, end = -1, rank = 0;
+  for (;;) {
+    var pick = -1;
+    for (var k = 0; k < streams.length; k += 1) {
+      if (heads[k] < streams[k].length && (pick < 0 || streams[k][heads[k]][0] < streams[pick][heads[pick]][0])) pick = k;
+    }
+    if (pick < 0) break;
+    var span = streams[pick][heads[pick]];
+    heads[pick] += 1;
+    counter.work += 1;
+    if (start >= 0 && span[0] <= end) {
+      if (span[1] > end) end = span[1];
+      if (span[2] < rank) rank = span[2];
+    } else {
+      if (start >= 0) runs.push([start, end, rank]);
+      start = span[0];
+      end = span[1];
+      rank = span[2];
+    }
+  }
+  if (start >= 0) runs.push([start, end, rank]);
+  return runs;
+}
+
+/** 덩이마다 표식 하나로 바꾼 글 + 표식 자리(가린 글 좌표). */
+function scrubRender(text, runs) {
+  var pieces = [];
+  var length = 0;
+  var cursor = 0;
+  var marks = [];
+  runs.forEach(function (run) {
+    pieces.push(text.slice(cursor, run[0]));
+    length += run[0] - cursor;
+    var mark = MARK_OF_RANK[run[2]];
+    marks.push([length, length + mark.length, run[2]]);
+    pieces.push(mark);
+    length += mark.length;
+    cursor = run[1];
+  });
+  pieces.push(text.slice(cursor));
+  return { text: pieces.join(""), marks: marks };
+}
+
+/** 가린 글의 구간들(한 규칙의 목록 = 왼쪽부터)을 원문 구간으로 — 표식에 닿은 쪽은 그 덩이 끝까지 · 손가락 둘은 앞으로만(선형). */
+function scrubToOriginal(found, runs, marks, counter) {
+  var out = [];
+  var a = -1, b = -1;
+  function locate(pos, from) {
+    var k = from;
+    while (k + 1 < marks.length && marks[k + 1][0] <= pos) { k += 1; counter.work += 1; }
+    return k;
+  }
+  found.forEach(function (span) {
+    var from = span[0], to = span[1];
+    counter.work += 1;
+    a = locate(from, a);
+    b = locate(to - 1, b > a ? b : a);
+    var start = a < 0 ? from : from < marks[a][1] ? runs[a][0] : runs[a][1] + (from - marks[a][1]);
+    var last = to - 1;
+    var end = b < 0 ? last + 1 : last < marks[b][1] ? runs[b][1] : runs[b][1] + (last - marks[b][1]) + 1;
+    out.push([start, end, span[2]]);
+  });
+  return out;
+}
+
+function scrubFullMask(text, reason, rescans, work) {
+  if (text.length === 0) return { text: "", marks: [], runs: [], full: false, reason: null, rescans: 0, work: 0 };
+  return { text: MARK.FULL, marks: [[0, MARK.FULL.length, RANK.FULL]], runs: [[0, text.length, RANK.FULL]], full: true, reason: reason, rescans: rescans || 0, work: work || 0 };
+}
+
+/**
+ * 가림 — 던지지 않는다. → { text, marks, runs, full, reason, rescans, work }
+ *   tick = 예산 확인 함수(넘었거나 시계가 고장이면 까닭(scrubReason)을 실어 던진다 · 결과 글과 무관) — 정리 뒤 · 이름 훑기 65,536 글자마다 · 규칙마다 · 재확인 한 바퀴마다
+ */
+function scrubV3(input, names, tick) {
+  var text = scrubTidy(input);
+  var counter = { work: 0 };
+  var rescans = 0;
+  try {
+    if (tick) tick();
+    var seen = new Set();
+    (names || []).forEach(function (raw) { var name = scrubTidy(raw); if (name.length > 0) seen.add(name); });
+    var list = Array.from(seen);
+    if (text.length === 0) return scrubFullMask(text);
+    var units = 0;
+    list.forEach(function (name) { units += name.length; });
+    if (list.length > SCRUB_NAMES_MAX || units > SCRUB_NAME_UNITS_MAX) return scrubFullMask(text, "names");
+    var runs = scrubMerge([scrubNameSpans(text, list, tick)].concat(scrubStructStreams(text, tick)), counter);
+    for (; ; rescans += 1) {
+      var rendered = scrubRender(text, runs);
+      if (tick) tick();
+      var found = scrubStructStreams(rendered.text, tick);
+      if (found.every(function (stream) { return stream.length === 0; })) return { text: rendered.text, marks: rendered.marks, runs: runs, full: false, reason: null, rescans: rescans, work: counter.work };
+      if (rescans === SCRUB_RESCANS_MAX) return scrubFullMask(text, "rescans", rescans, counter.work);
+      var widened = found.map(function (stream) { return scrubToOriginal(stream, runs, rendered.marks, counter); });
+      runs = scrubMerge([runs].concat(widened), counter);
+    }
+  } catch (error) {
+    return scrubFullMask(text, error && typeof error.scrubReason === "string" ? error.scrubReason : "error", rescans, counter.work);
+  }
+}
+
+// ── 이름 수확 — harvest(글, 알려진 이름) → { names, overflow } (모델 harvest.js) ──
+//   알려진 이름(배열 또는 앞에서 만든 묶음 { names, overflow })은 **원본 그대로** 합친다 — 손질(2자 이상 · 따옴표 제거 · 마지막 경로 조각)은 「더 얻는 이름」 만 만든다
+//   (한 글자 계정 q · 따옴표 든 계정 acct'77 을 잃지 않는다 · 설계 검토 발견 1). 원본에서 버리는 것 = 정리 뒤 빈 글자열 · 빈칸뿐인 글자열 · 글자열 아닌 것.
+//   합친 뒤 MAX_NAMES 를 넘는 새 이름이 나오면 overflow(그 묶음으로 가리는 칸은 통째 가림 · 상한에서 조용히 멈추지 않는다).
+//   셋째 가지(DOMAIN\계정 줄)의 줄 끝은 앞보기로만 본다(개행을 먹으면 연속한 다음 줄이 빠진다 · 3R 발견 4).
+function scrubCaseless(word) { return word.split("").map(function (ch) { return /[A-Za-z]/.test(ch) ? "[" + ch.toUpperCase() + ch.toLowerCase() + "]" : ch; }).join(""); }
+var NAME_LINES = new RegExp(
+  "\\b(?:" + ["USERNAME", "USERPROFILE", "LOGNAME", "USER", "HOME"].map(scrubCaseless).join("|") + ")[ \\t]*[=:][ \\t]*([^\\r\\n]+)"
+  + "|\\b" + scrubCaseless("whoami") + "[ \\t]*[:=>][ \\t]*([^\\r\\n]+)"
+  + "|(?:^|\\n)[ \\t]*([A-Za-z][A-Za-z0-9.-]{1,63}\\\\[A-Za-z0-9._-]{2,63})[ \\t]*(?=\\r?\\n|$)",
+  "g");
+var SCRUB_WS_SET = new Set([9, 10, 11, 12, 13, 32, 0x85, 0xa0, 0x1680, 0x180e, 0x2028, 0x2029, 0x202f, 0x205f, 0x3000, 0xfeff]);
+for (var wsUnit = 0x2000; wsUnit <= 0x200a; wsUnit += 1) SCRUB_WS_SET.add(wsUnit);
+
+function trimWide(value) {
+  var a = 0, b = value.length;
+  while (a < b && SCRUB_WS_SET.has(value.charCodeAt(a))) a += 1;
+  while (b > a && SCRUB_WS_SET.has(value.charCodeAt(b - 1))) b -= 1;
+  return value.slice(a, b);
+}
+function isBlankName(value) { for (var i = 0; i < value.length; i += 1) if (!SCRUB_WS_SET.has(value.charCodeAt(i))) return false; return true; }
+
+function harvest(input, known) {
+  var knownList = Array.isArray(known) ? known : (known && Array.isArray(known.names) ? known.names : []);
   var names = [];
-  function add(raw) {
-    if (names.length >= MAX_NAMES) return;
-    var value = String(raw).trim().replace(/["']/g, "");
-    if (value.length >= 2 && names.indexOf(value) < 0) names.push(value);
-    var segment = (value.split(/[\\/]/).pop() || "").trim();
-    if (segment.length >= 2 && names.length < MAX_NAMES && names.indexOf(segment) < 0) names.push(segment);
+  var seen = new Set();
+  var overflow = !Array.isArray(known) && known !== null && known !== undefined && known.overflow === true;
+  function put(value) {
+    if (seen.has(value)) return;
+    if (names.length >= MAX_NAMES) { overflow = true; return; }
+    seen.add(value);
+    names.push(value);
   }
-  known.forEach(add);
-  var matches = Array.from(input.matchAll(NAME_LINES));
-  for (var i = 0; i < matches.length && names.length < MAX_NAMES; i += 1) add(matches[i][1] || matches[i][2] || matches[i][3] || "");
-  return names.sort(function (a, b) { return b.length - a.length; });
+  function push(value) { if (value.length >= 2) put(value); }
+  function add(raw) {
+    var whole = trimWide(scrubTidy(raw));
+    var value = whole.split("\"").join("").split("'").join("");
+    push(whole); // 따옴표를 떼기 전의 값과 그 마지막 경로 조각
+    var cutWhole = Math.max(whole.lastIndexOf("\\"), whole.lastIndexOf("/"));
+    push(trimWide(whole.slice(cutWhole + 1)));
+    push(value);
+    var cut = Math.max(value.lastIndexOf("\\"), value.lastIndexOf("/"));
+    push(trimWide(value.slice(cut + 1)));
+  }
+  knownList.forEach(function (name) { // ① 알려진 이름 원본
+    if (typeof name !== "string") return;
+    var raw = scrubTidy(name);
+    if (raw.length > 0 && !isBlankName(raw)) put(raw);
+  });
+  knownList.forEach(function (name) { if (typeof name === "string" && name) add(name); }); // ② 알려진 이름에서 손질로 더 얻는 것
+  var text = scrubTidy(input); // ③ 글의 표시 줄(상한에 닿아도 계속 훑는다 — 멈추는 것은 넘침이 확인된 때뿐)
+  NAME_LINES.lastIndex = 0;
+  for (var m = NAME_LINES.exec(text); m !== null && !overflow; m = NAME_LINES.exec(text)) {
+    add(m[1] !== undefined ? m[1] : m[2] !== undefined ? m[2] : m[3]);
+    if (m[0].length === 0) NAME_LINES.lastIndex += 1;
+  }
+  names.sort(function (a, b) { return b.length - a.length; });
+  return { names: names, overflow: overflow };
 }
 
-function scrubWith(input, names) {
-  var text = input;
-  if (names.length > 0) {
-    var alternation = new RegExp(names.map(function (name) { return name.replace(/[.*+?^${}()|[\]\\]/g, "\\$&"); }).join("|"), "g");
-    text = text.replace(alternation, "~user");
+/** 받은 이름(배열 또는 묶음)을 던지지 않고 푼다. */
+function openNames(known) {
+  if (Array.isArray(known)) return { names: known, overflow: false };
+  if (known !== null && typeof known === "object" && Array.isArray(known.names)) return { names: known.names, overflow: known.overflow === true };
+  return { names: [], overflow: false };
+}
+
+// ── 칸 하나의 처리 — scrubField(글, 이름 묶음, opts) (모델 pipeline.js) ──
+//   빈 글 → 빈 글(유일한 예외) · ⓪ 문지기(시계보다 먼저): 넘친 묶음 → harvest · 크기 상한 초과 → size · 그 뒤 시계를 처음 읽음(고장 → clock)
+//   ① 받은 글 **전체**를 가린다(가림 앞에서는 한 글자도 줄이지 않는다) ② 그 뒤에 UTF-8 바이트 상한으로 자른다(글자를 가르지 않는다) · 예산은 도중에 확인.
+//   통째 표식은 자르지 않는다(15바이트 · 명시된 예외). → { text, full, reason, truncated, runs }
+function scrubUtf8Size(point) { return point < 0x80 ? 1 : point < 0x800 ? 2 : point < 0x10000 ? 3 : 4; }
+function tailBytes(text, max) {   // 끝에서부터 max 바이트(UTF-8) 이하 · 서러게이트 짝을 가르지 않는다 · 선형
+  var size = 0;
+  var at = text.length;
+  while (at > 0) {
+    var low = text.charCodeAt(at - 1);
+    var pair = low >= 0xdc00 && low <= 0xdfff && at >= 2 && text.charCodeAt(at - 2) >= 0xd800 && text.charCodeAt(at - 2) <= 0xdbff;
+    var bytes = pair ? 4 : scrubUtf8Size(low >= 0xd800 && low <= 0xdfff ? 0xfffd : low);
+    if (size + bytes > max) break;
+    size += bytes;
+    at -= pair ? 2 : 1;
   }
-  return SCRUB_PATTERNS.reduce(function (acc, pattern) { return acc.replace(pattern[0], pattern[1]); }, text);
+  return text.slice(at);
+}
+function headBytes(text, max) {   // 앞에서부터 max 바이트(UTF-8) 이하
+  var size = 0;
+  var at = 0;
+  while (at < text.length) {
+    var point = text.codePointAt(at);
+    var bytes = scrubUtf8Size(point >= 0xd800 && point <= 0xdfff ? 0xfffd : point);
+    if (size + bytes > max) break;
+    size += bytes;
+    at += point > 0xffff ? 2 : 1;
+  }
+  return text.slice(0, at);
+}
+function scrubStop(reason) { var error = new Error("scrub stop: " + reason); error.scrubReason = reason; return error; }
+/** 예산 계기 — 시계 값을 믿지 않는다: 읽을 때마다 유한한 수인가 · 앞 값보다 작지 않은가(아니면 clock) · (지금 − 처음) > 예산이면 budget. */
+function scrubBudget(opts) {
+  if (opts.budgetMs === undefined) return { check: undefined };
+  if (typeof opts.budgetMs !== "number" || !isFinite(opts.budgetMs) || opts.budgetMs < 0) throw scrubStop("clock");
+  var last = null;
+  function read() {
+    var now;
+    try { now = opts.clock(); } catch (error) { throw scrubStop("clock"); }
+    if (typeof now !== "number" || !isFinite(now) || (last !== null && now < last)) throw scrubStop("clock");
+    last = now;
+    return now;
+  }
+  var started = read();
+  return { check: function () { if (read() - started > opts.budgetMs) throw scrubStop("budget"); } };
+}
+function scrubClockMs() { return Number($.NSProcessInfo.processInfo.systemUptime) * 1000; }   // 거꾸로 가지 않는 시계(부팅 뒤 초)
+function scrubField(text, names, opts) {
+  opts = opts || {};
+  var source = "";
+  function full(reason) { return { text: source.length === 0 ? "" : MARK.FULL, full: source.length > 0, reason: source.length === 0 ? null : reason, truncated: false, runs: source.length === 0 ? [] : null }; }
+  try {
+    source = String(text);
+    if (source.length === 0) return full(null);
+    var nameList = Array.isArray(names) ? names : (names && names.names) || [];
+    var overflow = !Array.isArray(names) && names !== null && names !== undefined && names.overflow === true;
+    if (overflow) return full("harvest");
+    var unitsMax = opts.unitsMax === undefined ? FIELD_UNITS_MAX : opts.unitsMax;
+    if (source.length > unitsMax) return full("size");
+    var budget = scrubBudget(opts);
+    var result = scrubV3(source, nameList, budget.check);
+    if (result.full) return full(result.reason);
+    if (opts.maxBytes === undefined) { if (budget.check) budget.check(); return { text: result.text, full: false, reason: null, truncated: false, runs: result.runs }; }
+    var kept = opts.keep === "head" ? headBytes(result.text, opts.maxBytes) : tailBytes(result.text, opts.maxBytes);
+    if (budget.check) budget.check();
+    return { text: kept, full: false, reason: null, truncated: kept.length < result.text.length, runs: result.runs };
+  } catch (error) {
+    return full(error && typeof error.scrubReason === "string" ? error.scrubReason : "error");
+  }
+}
+/** 설치기가 쓰는 칸 처리(예산 = SCRUB_BUDGET_MS · 거꾸로 가지 않는 시계). */
+function scrubFieldBudgeted(text, names, maxBytes, keep) {
+  return scrubField(text, names, { maxBytes: maxBytes, keep: keep, budgetMs: SCRUB_BUDGET_MS, clock: scrubClockMs });
+}
+
+// ── 글자 첨부 — 파일 하나(모델 attach-strict.js installerAttachment · 추정 없음) ──
+//   ⓪ 빈 파일 = 보내지 않음 · 파일 바이트 수 > 크기 상한 = 읽지 않고 통째 가림(size)
+//   ① 엄격한 UTF-8 로 파일 **전체**를 읽는다(손 디코더 utf8StrictDecode = 유니코드 표 3-7 · 틀린 바이트가 하나라도 있으면 null)
+//      → 못 읽으면 통째 가림(decode · UTF-16 은 머리표가 있어도 읽지 않는다) · 읽은 글에 NUL 이 있으면 통째 가림(nul)
+//      ⚠NSString(NSUTF8StringEncoding)을 쓰지 않는다 — 엄격하지 않다(macOS 26.6 실측: 41 A9 → "A\ufffd" 로 읽고 nil 을 내지 않는다 · tests/scrub-v3-mac.mjs 관문 4m).
+//   ② 맨 앞 U+FEFF 를 전부 뗌 → 비면 보내지 않음 → 이름 묶음(알려진 이름 원본 + 이 글에서 수확) → 전체를 가린다 → 끝에서 maxBytes 로 자른다
+//   → null(보내지 않음) 또는 { text, full, reason, names, overflow, runs } — text 의 UTF-8 이 보내는 바이트(닫힌 실패 = <전부 지움> 한 낱말)
+function stripLeadingBoms(text) { var at = 0; while (at < text.length && text.charCodeAt(at) === 0xfeff) at += 1; return at === 0 ? text : text.slice(at); }
+function fileByteSize(path) {
+  var attrs = $.NSFileManager.defaultManager.attributesOfItemAtPathError(path, null);
+  if (attrs.isNil()) return null;
+  var size = Number(attrs.fileSize);
+  return Number.isSafeInteger(size) && size >= 0 ? size : null;
+}
+// 파일 바이트(NSData → base64 → 손으로 풂 — JXA 에는 바이트를 바로 넘기는 다리가 없다) · 못 읽으면 null
+var B64_VALUE = (function () { var table = []; var alphabet = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/"; for (var i = 0; i < 128; i += 1) table.push(-1); for (var k = 0; k < 64; k += 1) table[alphabet.charCodeAt(k)] = k; table[61] = 0; return table; })();
+function base64Bytes(b64, n) {
+  var bytes = new Uint8Array(n);
+  var j = 0;
+  if (b64.length % 4 !== 0) return null;
+  for (var i = 0; i < b64.length; i += 4) {
+    var a = B64_VALUE[b64.charCodeAt(i)], b = B64_VALUE[b64.charCodeAt(i + 1)], c = B64_VALUE[b64.charCodeAt(i + 2)], d = B64_VALUE[b64.charCodeAt(i + 3)];
+    if (!(a >= 0 && b >= 0 && c >= 0 && d >= 0)) return null;
+    var v = (a << 18) | (b << 12) | (c << 6) | d;
+    if (j < n) bytes[j++] = (v >> 16) & 255;
+    if (j < n) bytes[j++] = (v >> 8) & 255;
+    if (j < n) bytes[j++] = v & 255;
+  }
+  return j === n ? bytes : null;
+}
+function fileBytes(path) {
+  var data = $.NSData.dataWithContentsOfFile(path);
+  if (data.isNil()) return null;
+  return base64Bytes(ObjC.unwrap(data.base64EncodedStringWithOptions(0)), Number(data.length));
+}
+/** 엄격한 UTF-8(유니코드 표 3-7 · TextDecoder('utf-8',{fatal:true}) 와 같은 판정) → 글(머리표를 떼지 않는다 — 부르는 쪽이 맨 앞 U+FEFF 를 전부 뗀다) 또는 null. */
+function utf8StrictDecode(bytes) {
+  var n = bytes.length;
+  var units = [];
+  var chunks = [];
+  var i = 0;
+  function cont(k, lo, hi) { return k < n && bytes[k] >= lo && bytes[k] <= hi; }
+  while (i < n) {
+    var b = bytes[i], point;
+    if (b <= 0x7f) { point = b; i += 1; }
+    else if (b >= 0xc2 && b <= 0xdf) { if (!cont(i + 1, 0x80, 0xbf)) return null; point = ((b & 0x1f) << 6) | (bytes[i + 1] & 0x3f); i += 2; }
+    else if (b >= 0xe0 && b <= 0xef) {
+      var lo = b === 0xe0 ? 0xa0 : 0x80, hi = b === 0xed ? 0x9f : 0xbf;
+      if (!cont(i + 1, lo, hi) || !cont(i + 2, 0x80, 0xbf)) return null;
+      point = ((b & 0x0f) << 12) | ((bytes[i + 1] & 0x3f) << 6) | (bytes[i + 2] & 0x3f); i += 3;
+    } else if (b >= 0xf0 && b <= 0xf4) {
+      var lo4 = b === 0xf0 ? 0x90 : 0x80, hi4 = b === 0xf4 ? 0x8f : 0xbf;
+      if (!cont(i + 1, lo4, hi4) || !cont(i + 2, 0x80, 0xbf) || !cont(i + 3, 0x80, 0xbf)) return null;
+      point = ((b & 0x07) << 18) | ((bytes[i + 1] & 0x3f) << 12) | ((bytes[i + 2] & 0x3f) << 6) | (bytes[i + 3] & 0x3f); i += 4;
+    } else return null;
+    if (point > 0xffff) { point -= 0x10000; units.push(0xd800 + (point >> 10), 0xdc00 + (point & 0x3ff)); } else units.push(point);
+    if (units.length >= 8192) { chunks.push(String.fromCharCode.apply(null, units)); units = []; }
+  }
+  if (units.length > 0) chunks.push(String.fromCharCode.apply(null, units));
+  return chunks.join("");
+}
+function readStrictUtf8File(path) { var bytes = fileBytes(path); return bytes === null ? null : utf8StrictDecode(bytes); }
+function attachmentFromFile(path, known, maxBytes, opts) {
+  opts = opts || {};
+  var given = openNames(known);
+  function send(text, reason, set, runs) { return { text: text, full: reason !== null, reason: reason, names: set ? set.names : given.names.slice(), overflow: set ? set.overflow : given.overflow, runs: runs === undefined ? null : runs }; }
+  try {
+    var unitsMax = opts.unitsMax === undefined ? FIELD_UNITS_MAX : opts.unitsMax;
+    var size = fileByteSize(path);
+    if (size === null) return send(MARK.FULL, "decode");
+    if (size === 0) return null;
+    if (size > unitsMax) return send(MARK.FULL, "size");   // 읽기 전에 — 파일 크기만 보고(UTF-8 은 바이트 수 ≥ 코드 단위 수)
+    var text = readStrictUtf8File(path);
+    if (text === null) return send(MARK.FULL, "decode");
+    if (text.indexOf("\u0000") >= 0) return send(MARK.FULL, "nul");
+    text = stripLeadingBoms(text);
+    if (text.length === 0) return null;   // 머리표뿐인 파일 = 빈 파일과 같다
+    var found = harvest(text, given);
+    var fieldOpts = { maxBytes: maxBytes, keep: "tail", unitsMax: unitsMax, budgetMs: SCRUB_BUDGET_MS, clock: scrubClockMs };
+    if (opts.budgetMs !== undefined) { fieldOpts.budgetMs = opts.budgetMs; fieldOpts.clock = opts.clock; }
+    var result = scrubField(text, found, fieldOpts);
+    return send(result.text, result.full ? result.reason : null, found, result.runs);
+  } catch (error) {
+    return send(MARK.FULL, "error");
+  }
 }
 
 // ── 재검사 — 번들 표·같은 문법(계약 9-1절 · 서버 코드를 가져오지 않은 독립 구현) ──
@@ -5755,24 +6288,30 @@ function modeReport() {
   if (!/^[0-9]{1,2}\/[0-9]{1,2}$/.test(step)) throw new Error("step");
   if (!/^[0-9A-Za-z][0-9A-Za-z.+_-]{0,31}$/.test(version)) throw new Error("installer_version");
   var envReport = readText(env("RH_ENV_FILE")) || "";
-  var lines = (readText(env("RH_LOG_FILE")) || "").split("\n");
-  if (lines.length > 0 && lines[lines.length - 1] === "") lines.pop();
-  var log = lines.slice(-LOG_TAIL_LINES).join("\n");
-  var names = harvestNames(envReport + "\n" + log, env("RH_EXTRA_NAMES").split("\n"));
+  var log = readText(env("RH_LOG_FILE")) || "";   // 기록 **전체**(끝 200줄은 가린 뒤에 자른다 — 가림 앞에서 줄이지 않는다)
+  // 이름 묶음 = 이 컴퓨터가 아는 이름 원본 + 환경 보고·기록 전체에서 수확(넘치면 두 칸 모두 통째 가림)
+  var names = harvest(envReport + "\n" + log, env("RH_EXTRA_NAMES").split("\n"));
+  var logField = scrubFieldBudgeted(log, names);
+  var logTail = logField.text;
+  if (!logField.full) {
+    var lines = logTail.split("\n");
+    if (lines.length > 0 && lines[lines.length - 1] === "") lines.pop();
+    logTail = tailBytes(lines.slice(-LOG_TAIL_LINES).join("\n"), LOG_TAIL_MAX_BYTES);
+  }
   var body = {
     code: code,
     step: step,
     os: "mac",
     installer_version: version,
-    env_report: headBytes(scrubWith(envReport, names), ENV_REPORT_MAX_BYTES),
-    log_tail: tailBytes(scrubWith(log, names), LOG_TAIL_MAX_BYTES),
+    env_report: scrubFieldBudgeted(envReport, names, ENV_REPORT_MAX_BYTES, "head").text,
+    log_tail: logTail,
     notice_shown: true
   };
   // 직렬화한 본문이 상한을 넘으면 기록 끝(log_tail) → 환경 보고(env_report) 순으로, 남길 수 있는 가장 긴 길이를 찾아 줄인다
   fitReport(body, "log_tail", tailBytes);
   fitReport(body, "env_report", headBytes);
   writeText(env("RH_REPORT_OUT"), JSON.stringify(body));
-  writeText(env("RH_NAMES_OUT"), names.join("\n"));
+  writeNameSet(env("RH_NAMES_OUT"), names);   // 묶음째(넘침 보존) — 명령 결과·글자 첨부가 이어받는다
   return "OK";
 }
 
@@ -5854,8 +6393,9 @@ function modeAck(argv) {
     if (rc !== null && !Number.isSafeInteger(rc)) throw new Error("rc");
     var output = readText(env("RH_OUTPUT_FILE")) || "";
     if (timedOut) output += "\ntimeout:" + argv[5] + "s";
-    var names = (readText(env("RH_NAMES_FILE")) || "").split("\n").filter(function (name) { return name.length >= 2; });
-    body = { seq: seq, status: "ran", rc: rc, output_tail: tailBytes(scrubWith(output, names), OUTPUT_MAX_BYTES) };
+    // 이름 = 보고를 열 때 만든 묶음(원본 그대로 · 넘침 보존) + 이 결과 글에서 수확
+    var names = harvest(output, readNameSet(env("RH_NAMES_FILE")));
+    body = { seq: seq, status: "ran", rc: rc, output_tail: scrubFieldBudgeted(output, names, OUTPUT_MAX_BYTES, "tail").text };
   } else {
     throw new Error("status");
   }
@@ -5863,9 +6403,37 @@ function modeAck(argv) {
   return "OK";
 }
 
+// 이름 묶음 파일 = JSON { names, overflow }(보고를 열 때 만들고 · 첨부마다 합친 묶음으로 갈아 쓴다).
+//   없거나 못 읽거나 꼴이 틀리면 「넘침」 으로 읽는다 — 이름을 모르는 채 가리지 않는다(그 칸은 통째 가림).
+function readNameSet(path) {
+  var raw = readText(path);
+  var parsed = null;
+  try { parsed = raw === null ? null : JSON.parse(raw); } catch (error) { parsed = null; }
+  if (parsed !== null && typeof parsed === "object" && Array.isArray(parsed.names) && typeof parsed.overflow === "boolean"
+      && parsed.names.every(function (name) { return typeof name === "string"; })) return { names: parsed.names, overflow: parsed.overflow };
+  return { names: [], overflow: true };
+}
+function writeNameSet(path, set) { writeText(path, JSON.stringify({ names: set.names, overflow: set.overflow === true })); }
+
+// 글자 첨부(기록·환경 보고·프로세스 목록)를 보내기 전에 지운다 — 「파일 전체를 엄격히 읽기 → 전체 가림 → 끝에서 자름」(attachmentFromFile).
+// 이름 = 보고를 열 때 만든 묶음(RH_NAMES_FILE) + 이 컴퓨터가 아는 이름 원본(RH_EXTRA_NAMES) + 이 파일에서 수확 — 합친 묶음을 다시 적는다(다음 칸이 이어받는다).
+// 표준 출력: SKIP(보낼 것 없음 = 빈 파일·머리표뿐) · SENT -(가린 글) · SENT <까닭>(닫힌 실패 — 보내는 것은 <전부 지움> 한 낱말). 던지면 부르는 쪽이 <전부 지움> 을 쓴다.
+function modeScrubFile() {
+  var max = Number(env("RH_MAX"));
+  if (!Number.isSafeInteger(max) || max <= 0) throw new Error("max");
+  var stored = readNameSet(env("RH_NAMES_FILE"));
+  var known = { names: stored.names.concat(env("RH_EXTRA_NAMES").split("\n")), overflow: stored.overflow };
+  var sent = attachmentFromFile(env("RH_IN_FILE"), known, max);
+  if (sent === null) return "SKIP";
+  writeText(env("RH_OUT_FILE"), sent.text);
+  writeNameSet(env("RH_NAMES_FILE"), sent);
+  return "SENT " + (sent.reason === null ? "-" : sent.reason);
+}
+
 function run(argv) {
   switch (argv[0]) {
     case "report": return modeReport();
+    case "scrubfile": return modeScrubFile();
     case "id": return modeId();
     case "poll": return modePoll();
     case "answer": return modeAnswer();
@@ -5888,6 +6456,11 @@ remote_help_http() {   # remote_help_http <METHOD> <경로> [본문 파일] → 
   case "$2" in
     */ack|*/close|*/attach) [ -s "$RH_TMP/client-header" ] && extra+=(-H "@$RH_TMP/client-header") ;;   # 첨부도 보고를 연 설치기만(계약 1절 · 윈판 Invoke-RemoteHelpHttp)
   esac
+  # 폴링(GET /api/help/<번호>)도 같은 헤더 — 서버는 이 헤더가 맞는 폴링에만 운영팀 촬영 요청을 싣는다(계약 5절 ② ·
+  #   review-fix-jarvis-1115 c1-input-2: 앞 판은 붙이지 않아 원격 해결 대기 중인 맥에 촬영 요청이 닿지 않고 30분 뒤 사라졌다).
+  if [ "$1" = "GET" ] && [ -n "${RH_ID:-}" ] && [ "$2" = "/api/help/$RH_ID" ] && [ -s "$RH_TMP/client-header" ]; then
+    extra+=(-H "@$RH_TMP/client-header")
+  fi
   RH_HTTP="$(curl -sS -m "${RH_HTTP_MAX:-20}" -X "$1" ${extra[@]+"${extra[@]}"} -o "$RH_TMP/resp" -w '%{http_code}' \
     "$HELP_API_URL$2" </dev/null 2>/dev/null)"
   case "$RH_HTTP" in [1-5][0-9][0-9]) ;; *) RH_HTTP="000" ;; esac
@@ -5939,7 +6512,8 @@ remote_help_report() {   # rc 0 = 보고 번호를 받았다
   : > "$RH_TMP/env"
   : > "$RH_TMP/log"
   [ -f "$REPORT_FILE" ] && iconv -f UTF-8 -t UTF-8 -c < "$REPORT_FILE" > "$RH_TMP/env" 2>/dev/null
-  [ -f "$LOG_FILE" ] && tail -n 200 "$LOG_FILE" 2>/dev/null | iconv -f UTF-8 -t UTF-8 -c > "$RH_TMP/log" 2>/dev/null
+  # 기록은 전체를 넘긴다 — 끝 200줄은 JS 가 가린 뒤에 자른다(가림 앞에서 줄이지 않는다) · 본문 칸의 읽기는 앞 판처럼 느슨하다(틀린 바이트를 버림)
+  [ -f "$LOG_FILE" ] && iconv -f UTF-8 -t UTF-8 -c < "$LOG_FILE" > "$RH_TMP/log" 2>/dev/null
   # 멈춘 단계 = 이 실행이 기록 파일에 마지막으로 찍은 [n/10](이 실행은 [1/10] 을 찍었으므로 앞 실행의 것이 아니다)
   step="$(grep -oE '\[[0-9]{1,2}/[0-9]{1,2}\]' "$LOG_FILE" 2>/dev/null | tail -1 | tr -d '[]')"
   [ -n "$step" ] || step="0/10"

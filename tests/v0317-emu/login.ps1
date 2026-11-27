@@ -19,6 +19,7 @@ case "$1 $2" in
      case "$S" in
        slow-approve) /bin/sleep 3; cred; touch "$SB/logged"; exit 0 ;;
        instant-return) exit 1 ;;
+       reopen-hang) [ "$n" -ge 2 ] && exec -a "$SB/emu-sleep" /bin/sleep 3079; exit 1 ;;
        hang|hang-ask) exec -a "$SB/emu-sleep" /bin/sleep 3071 ;;
        file-only) ( /bin/sleep 1; cred; touch "$SB/logged" ) >/dev/null 2>&1 & exec -a "$SB/emu-sleep" /bin/sleep 3072 ;;
        no-status) ( /bin/sleep 1; cred ) >/dev/null 2>&1 & exec -a "$SB/emu-sleep" /bin/sleep 3073 ;;
@@ -72,6 +73,9 @@ $LoginPollInterval = 1; $LoginConfirmTries = 3; $LoginSayInterval = 5; $LoginWai
 $LoginCheckpointSec = 3; $LoginStatusEverySec = 2; $LoginAskWaitSec = 2; $LoginStatusWaitMs = 1500
 if ($Scenario -eq 'hang-ask') { function Read-LoginFailKey([int]$waitSec) { return '2' } }
 $LoginTickMs = 300
+# 0.3.50(TICKET=login-stall-whm7-1126): 첫 점검·대기 하트비트를 짧게 — 하트비트는 진짜 전송 대신 흉내 파일에만 적는다(실서버 무접촉 · JARVIS_NO_PROGRESS 와 같은 뜻)
+$LoginEarlyCheckSec = 1; $LoginProgressEverySec = 1
+function Send-Progress($step, $ev, $elapsed, $detail, $envInfo, $extra) { Add-Content -LiteralPath "$Sb/progress" -Value ([string]$step + '|' + [string]$ev + '|' + [string]$elapsed + '|' + [string]$detail) }
 # 복사된 내용은 이 기계의 진짜 클립보드를 절대 읽지 않는다 — 흉내 파일(가짜 claude 가 「사람의 복사」를 흉내 내 쓴다)만 읽는다.
 function Get-LoginClipText { if (Test-Path -LiteralPath "$Sb/clip") { return [System.IO.File]::ReadAllText("$Sb/clip") } return $null }
 if ($Scenario -eq 'clip-stale') { Set-Content -Path "$Sb/clip" -Value 'AAAAbbbbCCCCdddd_-_OLDCODE#SSSSttttUUUUvvvv_-_OLDSTATE' -NoNewline }

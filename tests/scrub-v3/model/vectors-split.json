@@ -1,0 +1,1404 @@
+{
+ "note": "TICKET=scrub-split-design-1116 · 참조 모델(split/model)이 낸 답(codex split 1R 반영). 가림 함수 자체의 84건은 vectors-v3.json. 글자 대조는 코드 단위로. known = 이름 배열(= 넘침 아님) 또는 묶음 { names, overflow }. expected.names 는 순서 무관(집합으로 대조). 설치기 답이 null = 보내지 않음(빈 파일 · 머리표뿐인 파일).",
+ "constants": {
+  "HARVEST_MAX_NAMES": 64,
+  "FIELD_UNITS_MAX": 4194304,
+  "ATTACH_MAX_BYTES": 921600,
+  "FULL_MARK": "<전부 지움>"
+ },
+ "harvest": [
+  {
+   "id": "H-codex3-f4-lf",
+   "input": "ZZ\\acct01\nZZ\\acct02\n",
+   "known": [],
+   "names": [
+    "ZZ\\acct01",
+    "ZZ\\acct02",
+    "acct01",
+    "acct02"
+   ],
+   "overflow": false
+  },
+  {
+   "id": "H-codex3-f4-crlf",
+   "input": "ZZ\\acct01\r\nZZ\\acct02\r\n",
+   "known": [],
+   "names": [
+    "ZZ\\acct01",
+    "ZZ\\acct02",
+    "acct01",
+    "acct02"
+   ],
+   "overflow": false
+  },
+  {
+   "id": "H-codex3-f4-three",
+   "input": "ZZ\\acct01\n  ZZ\\acct02  \nZZ\\acct03",
+   "known": [],
+   "names": [
+    "ZZ\\acct01",
+    "ZZ\\acct02",
+    "ZZ\\acct03",
+    "acct01",
+    "acct02",
+    "acct03"
+   ],
+   "overflow": false
+  },
+  {
+   "id": "H-codex3-f3-overflow",
+   "input": "USER=acct000\nUSER=acct001\nUSER=acct002\nUSER=acct003\nUSER=acct004\nUSER=acct005\nUSER=acct006\nUSER=acct007\nUSER=acct008\nUSER=acct009\nUSER=acct010\nUSER=acct011\nUSER=acct012\nUSER=acct013\nUSER=acct014\nUSER=acct015\nUSER=acct016\nUSER=acct017\nUSER=acct018\nUSER=acct019\nUSER=acct020\nUSER=acct021\nUSER=acct022\nUSER=acct023\nUSER=acct024\nUSER=acct025\nUSER=acct026\nUSER=acct027\nUSER=acct028\nUSER=acct029\nUSER=acct030\nUSER=acct031\nUSER=acct032\nUSER=acct033\nUSER=acct034\nUSER=acct035\nUSER=acct036\nUSER=acct037\nUSER=acct038\nUSER=acct039\nUSER=acct040\nUSER=acct041\nUSER=acct042\nUSER=acct043\nUSER=acct044\nUSER=acct045\nUSER=acct046\nUSER=acct047\nUSER=acct048\nUSER=acct049\nUSER=acct050\nUSER=acct051\nUSER=acct052\nUSER=acct053\nUSER=acct054\nUSER=acct055\nUSER=acct056\nUSER=acct057\nUSER=acct058\nUSER=acct059\nUSER=acct060\nUSER=acct061\nUSER=acct062\nUSER=acct063\nUSER=acct064\nacct064",
+   "known": [],
+   "names": [
+    "acct000",
+    "acct001",
+    "acct002",
+    "acct003",
+    "acct004",
+    "acct005",
+    "acct006",
+    "acct007",
+    "acct008",
+    "acct009",
+    "acct010",
+    "acct011",
+    "acct012",
+    "acct013",
+    "acct014",
+    "acct015",
+    "acct016",
+    "acct017",
+    "acct018",
+    "acct019",
+    "acct020",
+    "acct021",
+    "acct022",
+    "acct023",
+    "acct024",
+    "acct025",
+    "acct026",
+    "acct027",
+    "acct028",
+    "acct029",
+    "acct030",
+    "acct031",
+    "acct032",
+    "acct033",
+    "acct034",
+    "acct035",
+    "acct036",
+    "acct037",
+    "acct038",
+    "acct039",
+    "acct040",
+    "acct041",
+    "acct042",
+    "acct043",
+    "acct044",
+    "acct045",
+    "acct046",
+    "acct047",
+    "acct048",
+    "acct049",
+    "acct050",
+    "acct051",
+    "acct052",
+    "acct053",
+    "acct054",
+    "acct055",
+    "acct056",
+    "acct057",
+    "acct058",
+    "acct059",
+    "acct060",
+    "acct061",
+    "acct062",
+    "acct063"
+   ],
+   "overflow": true
+  },
+  {
+   "id": "H-codex3-f3-edge64",
+   "input": "USER=acct000\nUSER=acct001\nUSER=acct002\nUSER=acct003\nUSER=acct004\nUSER=acct005\nUSER=acct006\nUSER=acct007\nUSER=acct008\nUSER=acct009\nUSER=acct010\nUSER=acct011\nUSER=acct012\nUSER=acct013\nUSER=acct014\nUSER=acct015\nUSER=acct016\nUSER=acct017\nUSER=acct018\nUSER=acct019\nUSER=acct020\nUSER=acct021\nUSER=acct022\nUSER=acct023\nUSER=acct024\nUSER=acct025\nUSER=acct026\nUSER=acct027\nUSER=acct028\nUSER=acct029\nUSER=acct030\nUSER=acct031\nUSER=acct032\nUSER=acct033\nUSER=acct034\nUSER=acct035\nUSER=acct036\nUSER=acct037\nUSER=acct038\nUSER=acct039\nUSER=acct040\nUSER=acct041\nUSER=acct042\nUSER=acct043\nUSER=acct044\nUSER=acct045\nUSER=acct046\nUSER=acct047\nUSER=acct048\nUSER=acct049\nUSER=acct050\nUSER=acct051\nUSER=acct052\nUSER=acct053\nUSER=acct054\nUSER=acct055\nUSER=acct056\nUSER=acct057\nUSER=acct058\nUSER=acct059\nUSER=acct060\nUSER=acct061\nUSER=acct062\nUSER=acct063\nacct063\nUSER=acct000",
+   "known": [],
+   "names": [
+    "acct000",
+    "acct001",
+    "acct002",
+    "acct003",
+    "acct004",
+    "acct005",
+    "acct006",
+    "acct007",
+    "acct008",
+    "acct009",
+    "acct010",
+    "acct011",
+    "acct012",
+    "acct013",
+    "acct014",
+    "acct015",
+    "acct016",
+    "acct017",
+    "acct018",
+    "acct019",
+    "acct020",
+    "acct021",
+    "acct022",
+    "acct023",
+    "acct024",
+    "acct025",
+    "acct026",
+    "acct027",
+    "acct028",
+    "acct029",
+    "acct030",
+    "acct031",
+    "acct032",
+    "acct033",
+    "acct034",
+    "acct035",
+    "acct036",
+    "acct037",
+    "acct038",
+    "acct039",
+    "acct040",
+    "acct041",
+    "acct042",
+    "acct043",
+    "acct044",
+    "acct045",
+    "acct046",
+    "acct047",
+    "acct048",
+    "acct049",
+    "acct050",
+    "acct051",
+    "acct052",
+    "acct053",
+    "acct054",
+    "acct055",
+    "acct056",
+    "acct057",
+    "acct058",
+    "acct059",
+    "acct060",
+    "acct061",
+    "acct062",
+    "acct063"
+   ],
+   "overflow": false
+  },
+  {
+   "id": "H-codex3-f3-paths33",
+   "input": "HOME=/home/dir0/acct000\nHOME=/home/dir1/acct001\nHOME=/home/dir2/acct002\nHOME=/home/dir3/acct003\nHOME=/home/dir4/acct004\nHOME=/home/dir5/acct005\nHOME=/home/dir6/acct006\nHOME=/home/dir7/acct007\nHOME=/home/dir8/acct008\nHOME=/home/dir9/acct009\nHOME=/home/dir10/acct010\nHOME=/home/dir11/acct011\nHOME=/home/dir12/acct012\nHOME=/home/dir13/acct013\nHOME=/home/dir14/acct014\nHOME=/home/dir15/acct015\nHOME=/home/dir16/acct016\nHOME=/home/dir17/acct017\nHOME=/home/dir18/acct018\nHOME=/home/dir19/acct019\nHOME=/home/dir20/acct020\nHOME=/home/dir21/acct021\nHOME=/home/dir22/acct022\nHOME=/home/dir23/acct023\nHOME=/home/dir24/acct024\nHOME=/home/dir25/acct025\nHOME=/home/dir26/acct026\nHOME=/home/dir27/acct027\nHOME=/home/dir28/acct028\nHOME=/home/dir29/acct029\nHOME=/home/dir30/acct030\nHOME=/home/dir31/acct031\nHOME=/home/dir32/acct032",
+   "known": [],
+   "names": [
+    "/home/dir10/acct010",
+    "/home/dir11/acct011",
+    "/home/dir12/acct012",
+    "/home/dir13/acct013",
+    "/home/dir14/acct014",
+    "/home/dir15/acct015",
+    "/home/dir16/acct016",
+    "/home/dir17/acct017",
+    "/home/dir18/acct018",
+    "/home/dir19/acct019",
+    "/home/dir20/acct020",
+    "/home/dir21/acct021",
+    "/home/dir22/acct022",
+    "/home/dir23/acct023",
+    "/home/dir24/acct024",
+    "/home/dir25/acct025",
+    "/home/dir26/acct026",
+    "/home/dir27/acct027",
+    "/home/dir28/acct028",
+    "/home/dir29/acct029",
+    "/home/dir30/acct030",
+    "/home/dir31/acct031",
+    "/home/dir0/acct000",
+    "/home/dir1/acct001",
+    "/home/dir2/acct002",
+    "/home/dir3/acct003",
+    "/home/dir4/acct004",
+    "/home/dir5/acct005",
+    "/home/dir6/acct006",
+    "/home/dir7/acct007",
+    "/home/dir8/acct008",
+    "/home/dir9/acct009",
+    "acct000",
+    "acct001",
+    "acct002",
+    "acct003",
+    "acct004",
+    "acct005",
+    "acct006",
+    "acct007",
+    "acct008",
+    "acct009",
+    "acct010",
+    "acct011",
+    "acct012",
+    "acct013",
+    "acct014",
+    "acct015",
+    "acct016",
+    "acct017",
+    "acct018",
+    "acct019",
+    "acct020",
+    "acct021",
+    "acct022",
+    "acct023",
+    "acct024",
+    "acct025",
+    "acct026",
+    "acct027",
+    "acct028",
+    "acct029",
+    "acct030",
+    "acct031"
+   ],
+   "overflow": true
+  },
+  {
+   "id": "H-tidy-surrogate-nul",
+   "input": "USER=\ud83d\u0000\ude00",
+   "known": [],
+   "names": [
+    "😀"
+   ],
+   "overflow": false
+  },
+  {
+   "id": "H-tidy-short-after-quotes",
+   "input": "USER=\"x\"",
+   "known": [],
+   "names": [
+    "\"x\""
+   ],
+   "overflow": false
+  },
+  {
+   "id": "H-tidy-spaces-in-quotes",
+   "input": "USER=\"  acct77  \"",
+   "known": [],
+   "names": [
+    "\"  acct77  \"",
+    "  acct77  ",
+    "acct77"
+   ],
+   "overflow": false
+  },
+  {
+   "id": "H-last-segment-retrim",
+   "input": "USERPROFILE=C:\\Users\\ acct77 ",
+   "known": [],
+   "names": [
+    "C:\\Users\\ acct77",
+    "acct77"
+   ],
+   "overflow": false
+  },
+  {
+   "id": "H-known-first",
+   "input": "whoami: DESK-1\\hong",
+   "known": [
+    "kim.dev",
+    "C:\\Users\\kim.dev"
+   ],
+   "names": [
+    "C:\\Users\\kim.dev",
+    "DESK-1\\hong",
+    "kim.dev",
+    "hong"
+   ],
+   "overflow": false
+  },
+  {
+   "id": "H-label-inside-word",
+   "input": "xUSER=nope\nUSER = acct77",
+   "known": [],
+   "names": [
+    "acct77"
+   ],
+   "overflow": false
+  },
+  {
+   "id": "H-known-single-char",
+   "input": "USERNAME=q\nstatus q ok\n",
+   "known": [
+    "q"
+   ],
+   "names": [
+    "q"
+   ],
+   "overflow": false
+  },
+  {
+   "id": "H-known-quote",
+   "input": "USERNAME=acct'77\nstatus acct'77 ok\n",
+   "known": [
+    "acct'77"
+   ],
+   "names": [
+    "acct'77",
+    "acct77"
+   ],
+   "overflow": false
+  },
+  {
+   "id": "H-known-blank-only",
+   "input": "status ok",
+   "known": [
+    "",
+    " ",
+    "\t",
+    " ",
+    "　 ",
+    "\u0000"
+   ],
+   "names": [],
+   "overflow": false
+  },
+  {
+   "id": "H-known-padded",
+   "input": "status ok",
+   "known": [
+    "  hong  ",
+    "DESK-1\\kim.dev"
+   ],
+   "names": [
+    "DESK-1\\kim.dev",
+    "  hong  ",
+    "kim.dev",
+    "hong"
+   ],
+   "overflow": false
+  },
+  {
+   "id": "H-label-quote",
+   "input": "Username: DESK-1\\O'Brien\nwelcome O'Brien\n",
+   "known": [],
+   "names": [
+    "DESK-1\\O'Brien",
+    "DESK-1\\OBrien",
+    "O'Brien",
+    "OBrien"
+   ],
+   "overflow": false
+  },
+  {
+   "id": "H-known-set-overflow",
+   "input": "USER=acct77",
+   "known": {
+    "names": [
+     "a1"
+    ],
+    "overflow": true
+   },
+   "names": [
+    "a1"
+   ],
+   "overflow": true
+  },
+  {
+   "id": "H-known-set-fine",
+   "input": "USER=acct77",
+   "known": {
+    "names": [
+     "a1"
+    ],
+    "overflow": false
+   },
+   "names": [
+    "acct77",
+    "a1"
+   ],
+   "overflow": false
+  }
+ ],
+ "field": [
+  {
+   "id": "F-overflow",
+   "text": "USER=acct000\nUSER=acct001\nUSER=acct002\nUSER=acct003\nUSER=acct004\nUSER=acct005\nUSER=acct006\nUSER=acct007\nUSER=acct008\nUSER=acct009\nUSER=acct010\nUSER=acct011\nUSER=acct012\nUSER=acct013\nUSER=acct014\nUSER=acct015\nUSER=acct016\nUSER=acct017\nUSER=acct018\nUSER=acct019\nUSER=acct020\nUSER=acct021\nUSER=acct022\nUSER=acct023\nUSER=acct024\nUSER=acct025\nUSER=acct026\nUSER=acct027\nUSER=acct028\nUSER=acct029\nUSER=acct030\nUSER=acct031\nUSER=acct032\nUSER=acct033\nUSER=acct034\nUSER=acct035\nUSER=acct036\nUSER=acct037\nUSER=acct038\nUSER=acct039\nUSER=acct040\nUSER=acct041\nUSER=acct042\nUSER=acct043\nUSER=acct044\nUSER=acct045\nUSER=acct046\nUSER=acct047\nUSER=acct048\nUSER=acct049\nUSER=acct050\nUSER=acct051\nUSER=acct052\nUSER=acct053\nUSER=acct054\nUSER=acct055\nUSER=acct056\nUSER=acct057\nUSER=acct058\nUSER=acct059\nUSER=acct060\nUSER=acct061\nUSER=acct062\nUSER=acct063\nUSER=acct064\nacct064",
+   "names": "(이 글에서 수확)",
+   "opts": {},
+   "expected": {
+    "text": "<전부 지움>",
+    "full": true,
+    "reason": "harvest",
+    "truncated": false
+   }
+  },
+  {
+   "id": "F-edge64",
+   "text": "USER=acct000\nUSER=acct001\nUSER=acct002\nUSER=acct003\nUSER=acct004\nUSER=acct005\nUSER=acct006\nUSER=acct007\nUSER=acct008\nUSER=acct009\nUSER=acct010\nUSER=acct011\nUSER=acct012\nUSER=acct013\nUSER=acct014\nUSER=acct015\nUSER=acct016\nUSER=acct017\nUSER=acct018\nUSER=acct019\nUSER=acct020\nUSER=acct021\nUSER=acct022\nUSER=acct023\nUSER=acct024\nUSER=acct025\nUSER=acct026\nUSER=acct027\nUSER=acct028\nUSER=acct029\nUSER=acct030\nUSER=acct031\nUSER=acct032\nUSER=acct033\nUSER=acct034\nUSER=acct035\nUSER=acct036\nUSER=acct037\nUSER=acct038\nUSER=acct039\nUSER=acct040\nUSER=acct041\nUSER=acct042\nUSER=acct043\nUSER=acct044\nUSER=acct045\nUSER=acct046\nUSER=acct047\nUSER=acct048\nUSER=acct049\nUSER=acct050\nUSER=acct051\nUSER=acct052\nUSER=acct053\nUSER=acct054\nUSER=acct055\nUSER=acct056\nUSER=acct057\nUSER=acct058\nUSER=acct059\nUSER=acct060\nUSER=acct061\nUSER=acct062\nUSER=acct063\nacct063\nUSER=acct000",
+   "names": "(이 글에서 수확)",
+   "opts": {},
+   "expected": {
+    "text": "USER=~user\nUSER=~user\nUSER=~user\nUSER=~user\nUSER=~user\nUSER=~user\nUSER=~user\nUSER=~user\nUSER=~user\nUSER=~user\nUSER=~user\nUSER=~user\nUSER=~user\nUSER=~user\nUSER=~user\nUSER=~user\nUSER=~user\nUSER=~user\nUSER=~user\nUSER=~user\nUSER=~user\nUSER=~user\nUSER=~user\nUSER=~user\nUSER=~user\nUSER=~user\nUSER=~user\nUSER=~user\nUSER=~user\nUSER=~user\nUSER=~user\nUSER=~user\nUSER=~user\nUSER=~user\nUSER=~user\nUSER=~user\nUSER=~user\nUSER=~user\nUSER=~user\nUSER=~user\nUSER=~user\nUSER=~user\nUSER=~user\nUSER=~user\nUSER=~user\nUSER=~user\nUSER=~user\nUSER=~user\nUSER=~user\nUSER=~user\nUSER=~user\nUSER=~user\nUSER=~user\nUSER=~user\nUSER=~user\nUSER=~user\nUSER=~user\nUSER=~user\nUSER=~user\nUSER=~user\nUSER=~user\nUSER=~user\nUSER=~user\nUSER=~user\n~user\nUSER=~user",
+    "full": false,
+    "reason": null,
+    "truncated": false
+   }
+  },
+  {
+   "id": "F-f4",
+   "text": "ZZ\\acct01\nZZ\\acct02\n",
+   "names": "(이 글에서 수확)",
+   "opts": {},
+   "expected": {
+    "text": "~user\n~user\n",
+    "full": false,
+    "reason": null,
+    "truncated": false
+   }
+  },
+  {
+   "id": "F-cut-tail",
+   "text": "USER=acct77\nlog line acct77 가나다\nlog line acct77 가나다\nlog line acct77 가나다\nlog line acct77 가나다\nlog line acct77 가나다\nlog line acct77 가나다\nlog line acct77 가나다\nlog line acct77 가나다\n",
+   "names": "(이 글에서 수확)",
+   "opts": {
+    "maxBytes": 64,
+    "keep": "tail"
+   },
+   "expected": {
+    "text": "ser 가나다\nlog line ~user 가나다\nlog line ~user 가나다\n",
+    "full": false,
+    "reason": null,
+    "truncated": true
+   }
+  },
+  {
+   "id": "F-cut-head",
+   "text": "USER=acct77\nlog line acct77 가나다\nlog line acct77 가나다\nlog line acct77 가나다\nlog line acct77 가나다\nlog line acct77 가나다\nlog line acct77 가나다\nlog line acct77 가나다\nlog line acct77 가나다\n",
+   "names": "(이 글에서 수확)",
+   "opts": {
+    "maxBytes": 64,
+    "keep": "head"
+   },
+   "expected": {
+    "text": "USER=~user\nlog line ~user 가나다\nlog line ~user 가나다\nlog",
+    "full": false,
+    "reason": null,
+    "truncated": true
+   }
+  },
+  {
+   "id": "F-cut-zero",
+   "text": "status ok",
+   "names": [],
+   "opts": {
+    "maxBytes": 0
+   },
+   "expected": {
+    "text": "",
+    "full": false,
+    "reason": null,
+    "truncated": true
+   }
+  },
+  {
+   "id": "F-size-over",
+   "text": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+   "names": [],
+   "opts": {
+    "unitsMax": 64
+   },
+   "expected": {
+    "text": "<전부 지움>",
+    "full": true,
+    "reason": "size",
+    "truncated": false
+   }
+  },
+  {
+   "id": "F-size-edge",
+   "text": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+   "names": [],
+   "opts": {
+    "unitsMax": 64
+   },
+   "expected": {
+    "text": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+    "full": false,
+    "reason": null,
+    "truncated": false
+   }
+  },
+  {
+   "id": "F-clock-nan",
+   "text": "status ok",
+   "names": [],
+   "opts": {
+    "budgetMs": 20,
+    "clockValues": [
+     "NaN"
+    ]
+   },
+   "expected": {
+    "text": "<전부 지움>",
+    "full": true,
+    "reason": "clock",
+    "truncated": false
+   }
+  },
+  {
+   "id": "F-clock-backwards",
+   "text": "status ok",
+   "names": [],
+   "opts": {
+    "budgetMs": 20,
+    "clockValues": [
+     100,
+     0
+    ]
+   },
+   "expected": {
+    "text": "<전부 지움>",
+    "full": true,
+    "reason": "clock",
+    "truncated": false
+   }
+  },
+  {
+   "id": "F-budget-third-read",
+   "text": "status ok",
+   "names": [],
+   "opts": {
+    "budgetMs": 20,
+    "clockValues": [
+     0,
+     0,
+     1000
+    ]
+   },
+   "expected": {
+    "text": "<전부 지움>",
+    "full": true,
+    "reason": "budget",
+    "truncated": false
+   }
+  },
+  {
+   "id": "F-budget-fine",
+   "text": "status ok",
+   "names": [],
+   "opts": {
+    "budgetMs": 20,
+    "clockValues": [
+     0
+    ]
+   },
+   "expected": {
+    "text": "status ok",
+    "full": false,
+    "reason": null,
+    "truncated": false
+   }
+  },
+  {
+   "id": "F-empty",
+   "text": "",
+   "names": [],
+   "opts": {
+    "budgetMs": 20,
+    "clockValues": [
+     "NaN"
+    ]
+   },
+   "expected": {
+    "text": "",
+    "full": false,
+    "reason": null,
+    "truncated": false
+   }
+  },
+  {
+   "id": "F-order-empty-first",
+   "text": "",
+   "names": {
+    "names": [],
+    "overflow": true
+   },
+   "opts": {
+    "unitsMax": 0,
+    "budgetMs": 20,
+    "clockValues": [
+     "NaN"
+    ]
+   },
+   "expected": {
+    "text": "",
+    "full": false,
+    "reason": null,
+    "truncated": false
+   }
+  },
+  {
+   "id": "F-order-harvest-first",
+   "text": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+   "names": {
+    "names": [],
+    "overflow": true
+   },
+   "opts": {
+    "unitsMax": 64,
+    "budgetMs": 20,
+    "clockValues": [
+     "NaN"
+    ]
+   },
+   "expected": {
+    "text": "<전부 지움>",
+    "full": true,
+    "reason": "harvest",
+    "truncated": false
+   }
+  },
+  {
+   "id": "F-order-size-before-clock",
+   "text": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+   "names": [],
+   "opts": {
+    "unitsMax": 64,
+    "budgetMs": 20,
+    "clockValues": [
+     "NaN"
+    ]
+   },
+   "expected": {
+    "text": "<전부 지움>",
+    "full": true,
+    "reason": "size",
+    "truncated": false
+   }
+  },
+  {
+   "id": "F-order-clock-last",
+   "text": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+   "names": [],
+   "opts": {
+    "unitsMax": 64,
+    "budgetMs": 20,
+    "clockValues": [
+     "NaN"
+    ]
+   },
+   "expected": {
+    "text": "<전부 지움>",
+    "full": true,
+    "reason": "clock",
+    "truncated": false
+   }
+  },
+  {
+   "id": "F-known-single-char",
+   "text": "USERNAME=q\nstatus q ok\n",
+   "names": "(이 글에서 수확 · 알려진 이름 \"q\")",
+   "opts": {},
+   "expected": {
+    "text": "USERNAME=~user\nstatus ~user ok\n",
+    "full": false,
+    "reason": null,
+    "truncated": false
+   }
+  }
+ ],
+ "server_attachment": [
+  {
+   "id": "S-codex3-f2",
+   "bytes_hex": "fffe55534552203d6163637437370a",
+   "known": [
+    "单剅㴠"
+   ],
+   "expected": {
+    "path": "full",
+    "reason": "not_utf8",
+    "text": "<전부 지움>",
+    "names": [
+     "单剅㴠"
+    ],
+    "overflow": false
+   }
+  },
+  {
+   "id": "S-codex3-f5",
+   "bytes_hex": "acb9ccb8",
+   "known": [
+    "리료"
+   ],
+   "expected": {
+    "path": "full",
+    "reason": "not_utf8",
+    "text": "<전부 지움>",
+    "names": [
+     "리료"
+    ],
+    "overflow": false
+   }
+  },
+  {
+   "id": "S-codex3-f7-utf8",
+   "bytes_hex": "726161707020ec84a4ecb99820ec9984eba38c",
+   "known": [
+    "ra"
+   ],
+   "expected": {
+    "path": "text",
+    "reason": null,
+    "text": "~userapp 설치 완료",
+    "names": [
+     "ra"
+    ],
+    "overflow": false
+   }
+  },
+  {
+   "id": "S-codex3-f7-utf16le",
+   "bytes_hex": "72006100610070007000200024c158ce200044c6ccb8",
+   "known": [
+    "ra"
+   ],
+   "expected": {
+    "path": "full",
+    "reason": "nul",
+    "text": "<전부 지움>",
+    "names": [
+     "ra"
+    ],
+    "overflow": false
+   }
+  },
+  {
+   "id": "S-codex3-f7-cp949",
+   "bytes_hex": "726161707020bcb3c4a120bfcfb7e1",
+   "known": [
+    "ra"
+   ],
+   "expected": {
+    "path": "full",
+    "reason": "not_utf8",
+    "text": "<전부 지움>",
+    "names": [
+     "ra"
+    ],
+    "overflow": false
+   }
+  },
+  {
+   "id": "S-codex3-f4",
+   "bytes_hex": "5a5a5c6163637430310a5a5a5c6163637430320a",
+   "known": [],
+   "expected": {
+    "path": "text",
+    "reason": null,
+    "text": "~user\n~user\n",
+    "names": [
+     "ZZ\\acct01",
+     "ZZ\\acct02",
+     "acct01",
+     "acct02"
+    ],
+    "overflow": false
+   }
+  },
+  {
+   "id": "S-codex3-f3",
+   "bytes_hex": "555345523d616363743030300a555345523d616363743030310a555345523d616363743030320a555345523d616363743030330a555345523d616363743030340a555345523d616363743030350a555345523d616363743030360a555345523d616363743030370a555345523d616363743030380a555345523d616363743030390a555345523d616363743031300a555345523d616363743031310a555345523d616363743031320a555345523d616363743031330a555345523d616363743031340a555345523d616363743031350a555345523d616363743031360a555345523d616363743031370a555345523d616363743031380a555345523d616363743031390a555345523d616363743032300a555345523d616363743032310a555345523d616363743032320a555345523d616363743032330a555345523d616363743032340a555345523d616363743032350a555345523d616363743032360a555345523d616363743032370a555345523d616363743032380a555345523d616363743032390a555345523d616363743033300a555345523d616363743033310a555345523d616363743033320a555345523d616363743033330a555345523d616363743033340a555345523d616363743033350a555345523d616363743033360a555345523d616363743033370a555345523d616363743033380a555345523d616363743033390a555345523d616363743034300a555345523d616363743034310a555345523d616363743034320a555345523d616363743034330a555345523d616363743034340a555345523d616363743034350a555345523d616363743034360a555345523d616363743034370a555345523d616363743034380a555345523d616363743034390a555345523d616363743035300a555345523d616363743035310a555345523d616363743035320a555345523d616363743035330a555345523d616363743035340a555345523d616363743035350a555345523d616363743035360a555345523d616363743035370a555345523d616363743035380a555345523d616363743035390a555345523d616363743036300a555345523d616363743036310a555345523d616363743036320a555345523d616363743036330a555345523d616363743036340a61636374303634",
+   "known": [],
+   "expected": {
+    "path": "full",
+    "reason": "harvest",
+    "text": "<전부 지움>",
+    "names": [
+     "acct000",
+     "acct001",
+     "acct002",
+     "acct003",
+     "acct004",
+     "acct005",
+     "acct006",
+     "acct007",
+     "acct008",
+     "acct009",
+     "acct010",
+     "acct011",
+     "acct012",
+     "acct013",
+     "acct014",
+     "acct015",
+     "acct016",
+     "acct017",
+     "acct018",
+     "acct019",
+     "acct020",
+     "acct021",
+     "acct022",
+     "acct023",
+     "acct024",
+     "acct025",
+     "acct026",
+     "acct027",
+     "acct028",
+     "acct029",
+     "acct030",
+     "acct031",
+     "acct032",
+     "acct033",
+     "acct034",
+     "acct035",
+     "acct036",
+     "acct037",
+     "acct038",
+     "acct039",
+     "acct040",
+     "acct041",
+     "acct042",
+     "acct043",
+     "acct044",
+     "acct045",
+     "acct046",
+     "acct047",
+     "acct048",
+     "acct049",
+     "acct050",
+     "acct051",
+     "acct052",
+     "acct053",
+     "acct054",
+     "acct055",
+     "acct056",
+     "acct057",
+     "acct058",
+     "acct059",
+     "acct060",
+     "acct061",
+     "acct062",
+     "acct063"
+    ],
+    "overflow": true
+   }
+  },
+  {
+   "id": "S-bom-once",
+   "bytes_hex": "efbbbf555345524e414d453d6163637437370d0a616363743737206f6b0d0a",
+   "known": [],
+   "expected": {
+    "path": "text",
+    "reason": null,
+    "text": "USERNAME=~user\r\n~user ok\r\n",
+    "names": [
+     "acct77"
+    ],
+    "overflow": false
+   }
+  },
+  {
+   "id": "S-bom-twice",
+   "bytes_hex": "efbbbfefbbbf5a5a5c6163637430310a616363743031206f6b0a",
+   "known": [],
+   "expected": {
+    "path": "text",
+    "reason": null,
+    "text": "~user\n~user ok\n",
+    "names": [
+     "ZZ\\acct01",
+     "acct01"
+    ],
+    "overflow": false
+   }
+  },
+  {
+   "id": "S-nul-inside",
+   "bytes_hex": "555345523d6163637437372000616363743737",
+   "known": [],
+   "expected": {
+    "path": "full",
+    "reason": "nul",
+    "text": "<전부 지움>",
+    "names": [],
+    "overflow": false
+   }
+  },
+  {
+   "id": "S-truncated-head",
+   "bytes_hex": "b080eb8298eb8ba420616363743737",
+   "known": [
+    "acct77"
+   ],
+   "expected": {
+    "path": "full",
+    "reason": "not_utf8",
+    "text": "<전부 지움>",
+    "names": [
+     "acct77"
+    ],
+    "overflow": false
+   }
+  },
+  {
+   "id": "S-truncated-tail",
+   "bytes_hex": "61636374373720eab080eb8298eb8b",
+   "known": [
+    "acct77"
+   ],
+   "expected": {
+    "path": "full",
+    "reason": "not_utf8",
+    "text": "<전부 지움>",
+    "names": [
+     "acct77"
+    ],
+    "overflow": false
+   }
+  },
+  {
+   "id": "S-overlong",
+   "bytes_hex": "41c08042",
+   "known": [],
+   "expected": {
+    "path": "full",
+    "reason": "not_utf8",
+    "text": "<전부 지움>",
+    "names": [],
+    "overflow": false
+   }
+  },
+  {
+   "id": "S-surrogate-encoded",
+   "bytes_hex": "41eda08042",
+   "known": [],
+   "expected": {
+    "path": "full",
+    "reason": "not_utf8",
+    "text": "<전부 지움>",
+    "names": [],
+    "overflow": false
+   }
+  },
+  {
+   "id": "S-full-mark-from-installer",
+   "bytes_hex": "3ceca084ebb68020eca780ec9b803e",
+   "known": [
+    "acct77"
+   ],
+   "expected": {
+    "path": "text",
+    "reason": null,
+    "text": "<전부 지움>",
+    "names": [
+     "acct77"
+    ],
+    "overflow": false
+   }
+  },
+  {
+   "id": "S-already-scrubbed",
+   "bytes_hex": "555345524e414d453d7e757365720d0a433a5c55736572735c7e5c7820426561726572203ced86a0ed81b020eca780ec9b803e0d0a",
+   "known": [
+    "acct77"
+   ],
+   "expected": {
+    "path": "text",
+    "reason": null,
+    "text": "USERNAME=~user\r\n~\\x Bearer <토큰 지움>\r\n",
+    "names": [
+     "acct77",
+     "~user"
+    ],
+    "overflow": false
+   }
+  },
+  {
+   "id": "S-split1-f1-single-char",
+   "bytes_hex": "555345524e414d453d710a7374617475732071206f6b0a",
+   "known": [
+    "q"
+   ],
+   "expected": {
+    "path": "text",
+    "reason": null,
+    "text": "USERNAME=~user\nstatus ~user ok\n",
+    "names": [
+     "q"
+    ],
+    "overflow": false
+   }
+  },
+  {
+   "id": "S-split1-f1-quote",
+   "bytes_hex": "555345524e414d453d616363742737370a7374617475732061636374273737206f6b0a",
+   "known": [
+    "acct'77"
+   ],
+   "expected": {
+    "path": "text",
+    "reason": null,
+    "text": "USERNAME=~user\nstatus ~user ok\n",
+    "names": [
+     "acct'77",
+     "acct77"
+    ],
+    "overflow": false
+   }
+  },
+  {
+   "id": "S-split1-label-quote",
+   "bytes_hex": "557365726e616d653a204445534b2d315c4f27427269656e0a77656c636f6d65204f27427269656e0a",
+   "known": [],
+   "expected": {
+    "path": "text",
+    "reason": null,
+    "text": "Username: ~user\nwelcome ~user\n",
+    "names": [
+     "DESK-1\\O'Brien",
+     "DESK-1\\OBrien",
+     "O'Brien",
+     "OBrien"
+    ],
+    "overflow": false
+   }
+  },
+  {
+   "id": "S-split1-f2-prior-overflow",
+   "bytes_hex": "61636374303634",
+   "known": {
+    "names": [
+     "acct000"
+    ],
+    "overflow": true
+   },
+   "expected": {
+    "path": "full",
+    "reason": "harvest",
+    "text": "<전부 지움>",
+    "names": [
+     "acct000"
+    ],
+    "overflow": true
+   }
+  },
+  {
+   "id": "S-split1-f2-array-means-no-overflow",
+   "bytes_hex": "61636374303634",
+   "known": [
+    "acct000"
+   ],
+   "expected": {
+    "path": "text",
+    "reason": null,
+    "text": "acct064",
+    "names": [
+     "acct000"
+    ],
+    "overflow": false
+   }
+  },
+  {
+   "id": "S-utf16le-bom-no-ascii",
+   "bytes_hex": "fffec2acc3ad",
+   "known": [],
+   "expected": {
+    "path": "full",
+    "reason": "not_utf8",
+    "text": "<전부 지움>",
+    "names": [],
+    "overflow": false
+   }
+  }
+ ],
+ "installer_attachment": [
+  {
+   "id": "I-utf8-crlf",
+   "file_hex": "555345524e414d453d6163637437370d0aec84a4ecb99820eab8b0eba19d206163637437370d0a",
+   "known": [
+    "acct77"
+   ],
+   "max_bytes": 921600,
+   "expected": {
+    "full": false,
+    "reason": null,
+    "sent_text": "USERNAME=~user\r\n설치 기록 ~user\r\n",
+    "sent_hex": "555345524e414d453d7e757365720d0aec84a4ecb99820eab8b0eba19d207e757365720d0a",
+    "names": [
+     "acct77"
+    ],
+    "overflow": false
+   }
+  },
+  {
+   "id": "I-utf8-bom",
+   "file_hex": "efbbbf555345524e414d453d6163637437370d0aec84a4ecb998206163637437370d0a",
+   "known": [
+    "acct77"
+   ],
+   "max_bytes": 921600,
+   "expected": {
+    "full": false,
+    "reason": null,
+    "sent_text": "USERNAME=~user\r\n설치 ~user\r\n",
+    "sent_hex": "555345524e414d453d7e757365720d0aec84a4ecb998207e757365720d0a",
+    "names": [
+     "acct77"
+    ],
+    "overflow": false
+   }
+  },
+  {
+   "id": "I-utf16le-bom",
+   "file_hex": "fffe55005300450052004e0041004d0045003d006100630063007400370037000d000a0024c158ce20006100630063007400370037000d000a00",
+   "known": [
+    "acct77"
+   ],
+   "max_bytes": 921600,
+   "expected": {
+    "full": true,
+    "reason": "decode",
+    "sent_text": "<전부 지움>",
+    "sent_hex": "3ceca084ebb68020eca780ec9b803e",
+    "names": [
+     "acct77"
+    ],
+    "overflow": false
+   }
+  },
+  {
+   "id": "I-utf16be-bom",
+   "file_hex": "feff0055005300450052004e0041004d0045003d006100630063007400370037000d000ac124ce580020006100630063007400370037000d000a",
+   "known": [
+    "acct77"
+   ],
+   "max_bytes": 921600,
+   "expected": {
+    "full": true,
+    "reason": "decode",
+    "sent_text": "<전부 지움>",
+    "sent_hex": "3ceca084ebb68020eca780ec9b803e",
+    "names": [
+     "acct77"
+    ],
+    "overflow": false
+   }
+  },
+  {
+   "id": "I-utf16le-nobom",
+   "file_hex": "55005300450052004e0041004d0045003d006100630063007400370037000d000a0024c158ce20006100630063007400370037000d000a00",
+   "known": [
+    "acct77"
+   ],
+   "max_bytes": 921600,
+   "expected": {
+    "full": true,
+    "reason": "decode",
+    "sent_text": "<전부 지움>",
+    "sent_hex": "3ceca084ebb68020eca780ec9b803e",
+    "names": [
+     "acct77"
+    ],
+    "overflow": false
+   }
+  },
+  {
+   "id": "I-utf16le-bom-odd",
+   "file_hex": "fffe6100620041",
+   "known": [],
+   "max_bytes": 921600,
+   "expected": {
+    "full": true,
+    "reason": "decode",
+    "sent_text": "<전부 지움>",
+    "sent_hex": "3ceca084ebb68020eca780ec9b803e",
+    "names": [],
+    "overflow": false
+   }
+  },
+  {
+   "id": "I-utf16le-bom-lone-surrogate",
+   "file_hex": "fffe6100620000d84100",
+   "known": [],
+   "max_bytes": 921600,
+   "expected": {
+    "full": true,
+    "reason": "decode",
+    "sent_text": "<전부 지움>",
+    "sent_hex": "3ceca084ebb68020eca780ec9b803e",
+    "names": [],
+    "overflow": false
+   }
+  },
+  {
+   "id": "I-cp949",
+   "file_hex": "555345524e414d453d61636374373720bcb3c4a120bfcfb7e1",
+   "known": [
+    "acct77"
+   ],
+   "max_bytes": 921600,
+   "expected": {
+    "full": true,
+    "reason": "decode",
+    "sent_text": "<전부 지움>",
+    "sent_hex": "3ceca084ebb68020eca780ec9b803e",
+    "names": [
+     "acct77"
+    ],
+    "overflow": false
+   }
+  },
+  {
+   "id": "I-mixed-cp949-then-utf8",
+   "file_hex": "bcb3c4a120b1e2b7cf0d0aec84a4ecb998206163637437370d0a",
+   "known": [
+    "acct77"
+   ],
+   "max_bytes": 921600,
+   "expected": {
+    "full": true,
+    "reason": "decode",
+    "sent_text": "<전부 지움>",
+    "sent_hex": "3ceca084ebb68020eca780ec9b803e",
+    "names": [
+     "acct77"
+    ],
+    "overflow": false
+   }
+  },
+  {
+   "id": "I-nul",
+   "file_hex": "61636374373720007461696c",
+   "known": [
+    "acct77"
+   ],
+   "max_bytes": 921600,
+   "expected": {
+    "full": true,
+    "reason": "nul",
+    "sent_text": "<전부 지움>",
+    "sent_hex": "3ceca084ebb68020eca780ec9b803e",
+    "names": [
+     "acct77"
+    ],
+    "overflow": false
+   }
+  },
+  {
+   "id": "I-cut-tail-on-char-boundary",
+   "file_hex": "555345524e414d453d6163637437370aeab080eb8298eb8ba42061636374373720eca4840aeab080eb8298eb8ba42061636374373720eca4840aeab080eb8298eb8ba42061636374373720eca4840aeab080eb8298eb8ba42061636374373720eca4840aeab080eb8298eb8ba42061636374373720eca4840aeab080eb8298eb8ba42061636374373720eca4840aeab080eb8298eb8ba42061636374373720eca4840aeab080eb8298eb8ba42061636374373720eca4840aeab080eb8298eb8ba42061636374373720eca4840aeab080eb8298eb8ba42061636374373720eca4840aeab080eb8298eb8ba42061636374373720eca4840aeab080eb8298eb8ba42061636374373720eca4840a",
+   "known": [
+    "acct77"
+   ],
+   "max_bytes": 100,
+   "expected": {
+    "full": false,
+    "reason": null,
+    "sent_text": "가나다 ~user 줄\n가나다 ~user 줄\n가나다 ~user 줄\n가나다 ~user 줄\n가나다 ~user 줄\n",
+    "sent_hex": "eab080eb8298eb8ba4207e7573657220eca4840aeab080eb8298eb8ba4207e7573657220eca4840aeab080eb8298eb8ba4207e7573657220eca4840aeab080eb8298eb8ba4207e7573657220eca4840aeab080eb8298eb8ba4207e7573657220eca4840a",
+    "names": [
+     "acct77"
+    ],
+    "overflow": false
+   }
+  },
+  {
+   "id": "I-bearer-across-window",
+   "file_hex": "686561640a4265617265720a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a6162636465666768696a303132333435363738394142434445464748494a0a7461696c206c696e650a7461696c206c696e650a7461696c206c696e650a7461696c206c696e650a",
+   "known": [],
+   "max_bytes": 96,
+   "expected": {
+    "full": false,
+    "reason": null,
+    "sent_text": "head\nBearer <토큰 지움>\ntail line\ntail line\ntail line\ntail line\n",
+    "sent_hex": "686561640a426561726572203ced86a0ed81b020eca780ec9b803e0a7461696c206c696e650a7461696c206c696e650a7461696c206c696e650a7461696c206c696e650a",
+    "names": [],
+    "overflow": false
+   }
+  },
+  {
+   "id": "I-bom-only",
+   "file_hex": "efbbbf",
+   "known": [],
+   "max_bytes": 921600,
+   "expected": null
+  },
+  {
+   "id": "I-empty",
+   "file_hex": "",
+   "known": [],
+   "max_bytes": 921600,
+   "expected": null
+  },
+  {
+   "id": "I-split1-f1-single-char",
+   "file_hex": "555345524e414d453d710a7374617475732071206f6b0a",
+   "known": [
+    "q"
+   ],
+   "max_bytes": 921600,
+   "expected": {
+    "full": false,
+    "reason": null,
+    "sent_text": "USERNAME=~user\nstatus ~user ok\n",
+    "sent_hex": "555345524e414d453d7e757365720a737461747573207e75736572206f6b0a",
+    "names": [
+     "q"
+    ],
+    "overflow": false
+   }
+  },
+  {
+   "id": "I-split1-f1-quote",
+   "file_hex": "555345524e414d453d616363742737370a7374617475732061636374273737206f6b0a",
+   "known": [
+    "acct'77"
+   ],
+   "max_bytes": 921600,
+   "expected": {
+    "full": false,
+    "reason": null,
+    "sent_text": "USERNAME=~user\nstatus ~user ok\n",
+    "sent_hex": "555345524e414d453d7e757365720a737461747573207e75736572206f6b0a",
+    "names": [
+     "acct'77",
+     "acct77"
+    ],
+    "overflow": false
+   }
+  },
+  {
+   "id": "I-split1-f2-prior-overflow",
+   "file_hex": "61636374303634",
+   "known": {
+    "names": [
+     "acct000"
+    ],
+    "overflow": true
+   },
+   "max_bytes": 921600,
+   "expected": {
+    "full": true,
+    "reason": "harvest",
+    "sent_text": "<전부 지움>",
+    "sent_hex": "3ceca084ebb68020eca780ec9b803e",
+    "names": [
+     "acct000"
+    ],
+    "overflow": true
+   }
+  },
+  {
+   "id": "I-two-bytes-not-bom",
+   "file_hex": "ff80",
+   "known": [],
+   "max_bytes": 921600,
+   "expected": {
+    "full": true,
+    "reason": "decode",
+    "sent_text": "<전부 지움>",
+    "sent_hex": "3ceca084ebb68020eca780ec9b803e",
+    "names": [],
+    "overflow": false
+   }
+  }
+ ]
+}

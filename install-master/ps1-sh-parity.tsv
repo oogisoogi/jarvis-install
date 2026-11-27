@@ -8,6 +8,8 @@
 # (표 밖 짝) 도움 보고 주소 손잡이(0.3.36 · master#bdb927f2 A안): 맥 HELP_API_URL="${JARVIS_HELP_API_URL:-https://jarvis-install.godmeyou.kr}" ↔ 윈 $HelpApiUrl = $env:JARVIS_HELP_API_URL 이 있으면 그 값 · 없으면 같은 서버(변수라 이 함수 표 밖 · 두 OS 같은 뜻 = tests/help-url-lever.sh · LIB_ONLY 로 읽은 셸은 손잡이가 없을 때만 로컬)
 # ⚠「# todo」 줄 = 아직 이식하지 않은 함수(표에 행이 없으므로 checks 대조 축은 붉다 — 거짓 초록을 만들지 않으려고 상태를 지어내지 않았다)
 #   괄호 안 = 맡은 작업 제안(T1 = 설치 단계 · T2 = 전송·증거·캡처)
+Test-WinTooOld	-	na	윈도우 10 미만(빌드 10240 미만) 판정 — 맥 설치기에는 윈도우 판 갈래가 없다. cysr-1115-smalls ③(2026-11-11)
+Get-WinTooOldLines	-	na	윈도우 10 미만에서 멈출 때의 안내 문구 — 위와 같은 이유로 sh 대응 없음. cysr-1115-smalls ③(2026-11-11)
 Test-Ps32OnWin64	-	na	64bit OS 위 32bit PowerShell(x86) 프로세스 판정 — bash 에는 이 구분이 없다(macOS 는 프로세스 비트수 갈래가 없음). c8(2026-09-17 2d6f25b)
 Build-Ps32RelaunchArgs	-	na	32bit 프로세스를 64bit PowerShell(sysnative)로 재실행할 인자 조립 — 위와 같은 이유로 sh 대응 없음. c8(2026-09-17 2d6f25b) · 0.3.35: -File 경로를 큰따옴표로 감싸 넘긴다(공백 든 사용자 폴더에서 쪼개지던 것 · dbg-D5 F7)
 Write-Log	log	sh	같은 일(기록 파일에 시각+줄 덧붙임)
@@ -17,6 +19,9 @@ Get-CysAutoStartState	cys_autostart_state	sh	5값(yes·off·other·no·unknown) 
 Get-AutoStartWords	cys_autostart_words	sh	5값 → 사람 말 한 자리 · 문구는 ps1 동형(작업 스케줄러 cysd → LaunchAgent com.cysjavis.cysd · 로그온 → 로그인) · 부르는 자리 = [8/10] 세 곳 + 보고서 「직접 열어 켰습니다」
 Invoke-CysProbe	cys_capped	sh	데몬을 깨우지 않는 조회 — bash 는 `CYS_NO_AUTOSTART=1 명령` 접두 인라인으로 같은 일, 함수로는 cys_capped(상한 포함)
 Write-TextNoBom	-	na	PowerShell 5.1 의 UTF-8 BOM 끼워넣기 회피 전용 — bash printf/리다이렉트는 BOM 을 안 붙임
+New-TextFileExclusive	-	na	임시 파일을 새로 만들기만(CreateNew · 그 이름에 링크 등이 이미 있으면 실패 · 검증 F9) — 맥은 .claude.json 을 plutil 로 고쳐 이 자리가 없다
+Invoke-FileSwap	-	na	바꿔 끼우기 한 번(File.Replace · 원래 파일이 없으면 Move) — 시험이 이것만 바꿔 실패 갈래(오류 1176·1177)를 만든다(검증 F2) · 맥은 .claude.json 을 plutil 로 고쳐 이 자리가 없다
+Write-TextNoBomAtomic	-	na	남의 설정 파일(.claude.json·settings.json·되돌리기·trust-seed.tsv)을 옆에 다 쓴 뒤 바꿔 끼우기(review-fix-jarvis-1115 · c0-input-3) — 맥은 .claude.json 을 plutil -replace/-insert 로 고치고 기록은 >> 로 덧붙여 이 함수 자리가 없다(plutil 의 쓰기 방식은 이번 수리 범위 밖)
 Human	human	sh	같은 일(사람 손 계수 + 한 줄)
 Show-PrevRunNote	show_prev_run_note	sh	지난 실행 마지막 줄·상태(closed·wait·answer·ended) 판정·J-AV-03(J_CODE 와 분리 · 보고서 「지난 실행 진단 코드」)·120자 자르기 ps1 동형 · 맥 closing_note 가 「다음에 할 일:」을 기록에도 적게 함 · 윈판의 「백신이 PowerShell 을 종료」 추정 줄은 맥에서 「창을 닫았거나 Ctrl-C」로 갈음
 Write-JCode	jcode	sh	진단 코드 화면·기록 같은 일 · 실패 진행 전송(progress_send fail)·실패 증거(evidence_once fail) 포함(T2 9abadd2 · ps1 425·426)
@@ -83,6 +88,7 @@ Invoke-DetectStage2	detect_stage2	sh	같은 일(2-1·2-2·2-4·2-5·2-8·2-9)
 Write-Report	write_report	sh	환경 보고 같은 일 · 단 윈판의 사람 손 계수 2줄·지나온 단계 목록·데몬 직접 켬 안내는 맥 보고서에 없음
 Seed-LocalBinPath	seed_local_bin_path	sh	~/.local/bin 을 PATH 에 멱등으로 — 맥은 셸 프로필 파일에 한 줄
 Get-UserPathValue	-	na	사용자 환경변수(레지스트리 HKCU Environment) Path 읽기 — 맥 PATH 는 셸 프로필 파일이 정함
+Get-UserPathKind	-	na	사용자 PATH 레지스트리 값 종류(REG_EXPAND_SZ 유지) 규칙(review-fix-jarvis-1115 · c0-data-2) — 맥에는 레지스트리 값 종류가 없다
 Set-UserPathValue	-	na	사용자 환경변수 Path 쓰기 — 맥에는 영구 사용자 환경변수 저장소가 없고 셸 프로필이 담당
 Seed-CysPath	seed_cys_path	sh	cys 자리를 새 터미널 PATH 에 멱등으로(프로필 전부 훑고 없을 때만 셸이 읽는 자리에 한 줄 · 이 프로세스 PATH 에도) · 윈판 사용자 환경변수 Path ↔ 맥 셸 프로필 · 부르는 자리 = [7/10] 이 앱 안 경로로만 답했을 때(이미 PATH 연결이 답하면 가리지 않음)
 Get-ProcTree	get_proc_tree	sh	우리가 띄운 프로세스의 자식·손자(깊이 6) 목록 = ps -axo pid,ppid,start,comm + awk 너비 우선 · 못 읽으면 빈 글(설치를 막지 않는다)
@@ -125,6 +131,7 @@ Get-UserIdleMs	user_idle_sec	sh	help-cases-1029-r2 맥 짝 — ioreg IOHIDSystem
 Get-LoginBrowserProcs	login_browser_pids	sh	help-cases-1029-r2 맥 짝 — 브라우저 본체 프로세스 번호만(이름 끝까지 일치 · 도우미 제외) · ⚠창 제목은 맥 미지원(화면 접근 권한 없이 못 읽음)
 New-LoginPresence	login_presence_start	sh	help-cases-1029-r2 맥 짝 — 상태를 파일 하나에 둔다(재는 쪽 login_waiter 가 배경 자식이라 변수가 안 돌아옴)
 Update-LoginPresence	login_presence_tick	sh	help-cases-1029-r2 맥 짝 — 감시자 한 바퀴(60초)마다 + 로그인이 끝난 순간 1번(윈판은 2초 · 맥은 1분 안의 여러 입력을 1번으로 셈)
+Get-LoginWaitDetail	-	na	0.3.50(TICKET=login-stall-whm7-1126) 윈 3/10 wait 하트비트 detail(sweep·code·reopen) — 맥 login_waiter 는 다시 열기(J-LOGIN-02) 갈래가 없고 하트비트 detail 은 빈칸 그대로 · 맥 짝(sweep·code 만)은 후속 판 후보(이번 범위 = 윈 정체 기기 대응)
 Resolve-LoginPresence	login_presence_resolve	sh	help-cases-1029-r2 맥 짝 — away·no-browser·browser-seen·unmeasured + 맥만 browser-unknown(브라우저는 떠 있었으나 새 탭·제목을 못 봄 · 단정하지 않음) · no-browser 는 맥에서 「떠 있는 브라우저 0」일 때만
 Add-LoginReport	add_login_report	sh	일곱 줄(로그인 창·승인 프로세스·다시 열기·코드 넣기·끝난 뒤 확인·상한에서 받은 답·쌓인 글자 수)을 기록과 환경 보고에 · 로그인 실패 끝에서만(ps1 같음) · 코드 넣기 = login_feeder 끝 기록 줄에서 셈
 Get-LoginProfileCandidates	login_profile_candidates	sh	로그인을 물어볼 설정 폴더 후보 — 기본 프로필 · ~/.cys/claude · CLAUDE_CONFIG_DIR · **실재하는 것만**.
@@ -142,6 +149,7 @@ Copy-LoginToIsolated	copy_login_to_isolated	sh	같은 일 — 맥은 파일이 �
 Get-LoginCopyWords	login_copy_words	sh	판정 → 기록 한 줄 사람 말(값 없음) · 두 OS 글자까지 같다. (2026-09-21)
 Get-TrustRollbackWords	trust_rollback_words	sh	같은 일
 Undo-TrustSeed	seed_claude_prefs,trust_key_state	sh	넣은 홈 신뢰 키 되돌리고 되읽어 verified·kept·unknown — 맥은 plutil -remove 인라인 + trust_key_state
+Merge-TrustSeedLines	-	na	지난 실행 trust-seed.tsv 줄 + 이번 줄 합치기(review-fix-jarvis-1115 · c0-data-7) — 맥은 기록을 printf >> 로 덧붙여 지난 줄이 원래 남는다(seed_claude_prefs)
 Set-AllProfiles	seed_all_profiles,trust_set_rollback_state	sh	전 자리 사전 설정 + 기록 실패 시 되돌림 상태(나쁜 쪽 유지)
 Step-Prepare	step_prepare	sh	같은 일([4/10])
 Step-DownloadCys	step_download_cys,cys_http_code	sh	[5/10] 같은 일(크기·지문·공간·404/410) · 404/410 = 양쪽 즉시 실패(J-DL-05 · rc 5 · 같은 문구 · 원작자 판 폴백 없음 · 맥 폴백은 0.3.35 에서 제거 · dbg-D5 F1) · 407 = 양쪽 즉시 끝(J-NET-01 · rc 5 · 같은 문구 · 맥은 0.3.35 dbg-D5 F10 에서 신설 · 앞 판 맥은 30분 대기) · 단 윈판의 「같은 판·같은 내용이면 받지 않음」은 맥에 없음(맥은 받은 뒤 [6/10] 에서 건너뜀)
@@ -162,6 +170,18 @@ Get-CysAppExe	cys_app_dir	sh	창(GUI)을 여는 대상을 고른다 — 윈은 �
 Get-DesktopDir	-	na	윈 바탕화면 폴더(셸 폴더) · 사람 카드 창 여는 길(ⓓ) 재료 · 맥 짝 없음(윈 결함 묶음 범위)
 Get-ShortcutTarget	-	na	윈 바로가기(.lnk) 대상 읽기(WScript.Shell) · 맥에 .lnk 없음
 Get-CysWindowOpenHint	-	na	윈 사람 카드 「창이 안 보이면」 한 줄(바탕화면 cysr 바로가기와 대상이 실재할 때만 바탕화면 · 아니면 시작 메뉴 · ⓓ) · 맥 카드의 여는 길 한 줄은 이 작업 범위 밖(윈 결함 묶음 09-30 노트북) — 짝 필요 여부는 확인 요청에 올림
+Get-AppLaunchPlan	-	na	판단 표(관리자 여부 · 예약 작업 jarvis-cys-app RunLevel · 세션 안 탐색기) → plain|keep:device-admin|keep:no-shell|explorer. 관리자 창에서 돈 설치기가 앱 창을 일반 권한으로 내려 띄우기 위한 윈 전용 판단 — 맥에는 UAC 승격 토큰·UIPI 가 없고 설치기는 sudo 없이 사용자 권한으로 open 한다. 0.3.50(2026-11-26 installer-win-unelevate)
+Test-SelfElevated	-	na	이 설치기가 관리자 토큰인가(IsInRole Administrator) — 관리자 창에서 돈 설치기가 앱 창을 일반 권한으로 내려 띄우기 위한 윈 전용 판단 — 맥에는 UAC 승격 토큰·UIPI 가 없고 설치기는 sudo 없이 사용자 권한으로 open 한다. 0.3.50(2026-11-26 installer-win-unelevate)
+Get-AppTaskRunLevel	-	na	예약 작업 jarvis-cys-app 의 RunLevel 글자 — 맥 launchd 에는 RunLevel 이 없다. 관리자 창에서 돈 설치기가 앱 창을 일반 권한으로 내려 띄우기 위한 윈 전용 판단 — 맥에는 UAC 승격 토큰·UIPI 가 없고 설치기는 sudo 없이 사용자 권한으로 open 한다. 0.3.50(2026-11-26 installer-win-unelevate)
+Test-DesktopShellUp	-	na	이 로그온 세션에 바탕화면 탐색기가 있는가 — 관리자 창에서 돈 설치기가 앱 창을 일반 권한으로 내려 띄우기 위한 윈 전용 판단 — 맥에는 UAC 승격 토큰·UIPI 가 없고 설치기는 sudo 없이 사용자 권한으로 open 한다. 0.3.50(2026-11-26 installer-win-unelevate)
+Test-CysAppProcUp	-	na	이 세션·그 실행 파일 경로의 앱 프로세스가 있는가(Path 없으면 CIM) — 관리자 창에서 돈 설치기가 앱 창을 일반 권한으로 내려 띄우기 위한 윈 전용 판단 — 맥에는 UAC 승격 토큰·UIPI 가 없고 설치기는 sudo 없이 사용자 권한으로 open 한다. 0.3.50(2026-11-26 installer-win-unelevate)
+Get-ProcOwnerSid	-	na	프로세스 주인 SID(CIM GetOwnerSid · 못 읽으면 빈 값) — 관리자 창에서 돈 설치기가 앱 창을 일반 권한으로 내려 띄우기 위한 윈 전용 판단 — 맥에는 UAC 승격 토큰·UIPI 가 없고 설치기는 sudo 없이 사용자 권한으로 open 한다. 0.3.50(2026-11-26 installer-0350 독립 검증 R1·N2)
+Get-SelfUserSid	-	na	이 설치기 계정 SID — 관리자 창에서 돈 설치기가 앱 창을 일반 권한으로 내려 띄우기 위한 윈 전용 판단 — 맥에는 UAC 승격 토큰·UIPI 가 없고 설치기는 sudo 없이 사용자 권한으로 open 한다. 0.3.50(2026-11-26 installer-0350 독립 검증 R1·N2)
+Get-DesktopShellOwner	-	na	이 세션 바탕화면 탐색기의 주인이 이 설치기 계정인가(same|other|unknown) — 관리자 창에서 돈 설치기가 앱 창을 일반 권한으로 내려 띄우기 위한 윈 전용 판단 — 맥에는 UAC 승격 토큰·UIPI 가 없고 설치기는 sudo 없이 사용자 권한으로 open 한다. 0.3.50(2026-11-26 installer-0350 독립 검증 R1·N2)
+Get-ShellWaitElapsedMs	-	na	탐색기에 넘긴 뒤 10초 마감을 벽시계로 잼 — 관리자 창에서 돈 설치기가 앱 창을 일반 권한으로 내려 띄우기 위한 윈 전용 판단 — 맥에는 UAC 승격 토큰·UIPI 가 없고 설치기는 sudo 없이 사용자 권한으로 open 한다. 0.3.50(2026-11-26 installer-0350 독립 검증 R1·N2)
+Get-CysAppElevation	-	na	띄운 앱 프로세스의 토큰이 관리자인가(1|0|? · Add-Type 토큰 읽기 · 못 재면 ?) — 관리자 창에서 돈 설치기가 앱 창을 일반 권한으로 내려 띄우기 위한 윈 전용 판단 — 맥에는 UAC 승격 토큰·UIPI 가 없고 설치기는 sudo 없이 사용자 권한으로 open 한다. 0.3.50(2026-11-26 installer-0350 · 실기 A 대신 첫 실사용 설치를 진행 info 로 잰다)
+Send-AppLaunchInfo	-	na	진행 보고 9/10 info 「app-launch plan=<판정> elevated=<1|0|?>」 1건 — 관리자 창에서 돈 설치기가 앱 창을 일반 권한으로 내려 띄우기 위한 윈 전용 판단 — 맥에는 UAC 승격 토큰·UIPI 가 없고 설치기는 sudo 없이 사용자 권한으로 open 한다. 0.3.50(2026-11-26 installer-0350 · 실기 A 대신 첫 실사용 설치를 진행 info 로 잰다)
+Start-CysAppViaShell	-	na	explorer.exe 에 앱 실행을 넘기고 10초 안 출현을 잰다 — 관리자 창에서 돈 설치기가 앱 창을 일반 권한으로 내려 띄우기 위한 윈 전용 판단 — 맥에는 UAC 승격 토큰·UIPI 가 없고 설치기는 sudo 없이 사용자 권한으로 open 한다. 0.3.50(2026-11-26 installer-win-unelevate)
 Start-CysAppWindow	start_cys_app_window	sh	앱 창을 띄운다 · 이미 떠 있으면 재기동 않고 앞으로만(윈 WScript.Shell AppActivate ↔ 맥 raise_cys_app_window osascript activate) · 찍는 값 raised|started|빈 글.
 Get-WakeBody	write_wake_file	sh	본부 자비스를 띄우는 wake 파일 본문 — 두 OS 같음: claude 앞에 CLAUDE_CODE_EFFORT_LEVEL=high · CLAUDE_CODE_ENABLE_PROMPT_SUGGESTION=false 를 환경 키가 없을 때만 넣는다(cys 좌석 주입과 같은 값·같은 규칙 · 맥 `${키-기본}` ↔ 윈 Test-Path Env: · 지키는 것은 환경 키 값뿐 — 설정 파일·/effort 는 이 값에 진다 · 윈은 프로세스 범위만) · 첫 프롬프트 작은따옴표 방어 유지 · 윈은 본문만 돌려주고 파일 쓰기(BOM)는 Step-Wake 에, 맥은 파일 쓰기까지(chmod 포함) · 시험 tests/wake-env-run.sh(만든 파일을 실제로 돌린다) · 0.3.36
 Test-MasterWakeSettings	master_wake_settings_ok	sh	본부 자비스 RC 설정 파일이 넘겨도 되는 것인가 — 두 OS 같음: 일반 파일 + 바이트가 「{"remoteControlAtStartup": true} + LF」 그대로(맥 cmp · 윈 base64 · NUL·BOM·CRLF 도 다름 · 못 읽음 = 아님 · 맥은 FIFO 를 열지 않는다) · 쓰기 뒤 대조와 창 폴백이 쓴다(wake 파일 안의 같은 판정은 그 파일에 글자로 들어간다) · 이종 검토 2차 · 0.3.47
@@ -169,6 +189,8 @@ Write-MasterWakeSettings	write_master_wake_settings	sh	본부 자비스 RC 기�
 Step-Wake	step_wake,cys_open_master_seat	sh	[9/10] 같은 일 · 단 윈판은 선언(너는 마스터다)을 첫 지시에 싣고 표지를 지우며, 맥은 일부러 싣지 않음(맥 실기 근거 0) · [5/10]~[8/10] 막힘 뒤: 맥·윈 = 각성에 들어가지 않고 「설치가 끝나지 않았습니다」+진단 코드로 즉시 끝(맥 0.3.35 dbg-D5 F3 · 윈 짝 0.3.35 r2 결정 A · 윈 행동 시험 tests/d5-f3w · 윈 실기 아직 재지 않음) · 윈 Step-Wake 안의 막힌 단 갈래(이 창에서 띄움)는 도달 불가로 남음(지우지 않음 · 결정 C 와 같은 별건) · wake 파일 본문 = Get-WakeBody ↔ write_wake_file(0.3.36 · 환경값 두 개)
 Get-SurfaceIds	set_fleet_baseline	sh	cys list 에서 surface 번호 모으기 — 윈판에서도 부르는 자리 0 · 맥은 set_fleet_baseline 인라인
 Set-FleetBaseline	set_fleet_baseline	sh	같은 일(못 찍으면 판정 안 함)
+Get-AutoRestorePhase	auto_restore_phase_of	sh	0.3.50(cysr-mac-update-resume-1126) 같은 일 — cys status --json 의 daemon.auto_restore 를 읽음(조회 실패 = 「?」 · 칸 없음 = 빈 값 · 맥도 실패한 조회의 출력은 읽지 않음 — 독립 검증 N3 보정)
+Wait-AutoRestoreSettled	wait_auto_restore_settled	sh	0.3.50(cysr-mac-update-resume-1126) 같은 일 — [9/10] 기준선 앞에서 데몬 자동 복원(running·retry_wait·held)을 기다림 · 끝 = 단계 끝 · master 자리 보임 · 상한 120s(종전대로 엶) · 맥 VM rc3 옛 master 밀려남 고침
 Get-LiveRoles	live_roles	sh	같은 일(기준선 뒤 새 자리만)
 Test-DeclarationSeen	declaration_seen	sh	같은 일
 Set-FleetFinished	set_fleet_finished	sh	같은 일(NEXT_STEP 끝남 문구 · 다시 실행 안내 끔)
@@ -199,12 +221,29 @@ Write-MasterRequestCard	master_request_card	sh	같은 일(카드 글자 동일)
 Get-MasterStateNow	master_state_now	sh	같은 일((recheck) 기록)
 Write-MasterUnknownCard	master_unknown_card	sh	같은 일
 Set-FleetNeedsMaster	set_fleet_needs_master	sh	같은 일
-Invoke-StepFleet	invoke_step_fleet	sh	[10/10] 시작·끝 전송을 한 곳에 모은 감싸개(되돌아가는 길이 여럿이라 각 return 에 붙이면 하나를 빠뜨린다).
+Invoke-StepFleet	invoke_step_fleet,fleet_on_interrupt,fleet_step_elapsed	sh	[10/10] 시작·끝 전송을 한 곳에 모은 감싸개(되돌아가는 길이 여럿이라 각 return 에 붙이면 하나를 빠뜨린다) · 대기 중 사람 Ctrl+C = 진행 info awaken:owner-interrupt(+[10/10] 시작 뒤 초 · J-UNK-00 아님) — 윈 = finally 갈래(Ctrl+C 는 catch 를 안 거침 · 실측) · 맥 = fleet_on_interrupt · 창 닫기 awaken:owner-window-closed 는 맥만(윈은 창과 함께 프로세스가 끝나 finally 도 못 돔 = OS 상 짝 없음) (사용자 보고 11-19)
 Step-Fleet	step_fleet	sh	[10/10] 같은 일(기준선·자동 각성 대기 7분·역할 대기·자식 확인·master 각성 확인·끝 증거) · mac-parity-t1-core(2026-09-16)로 맥도 자동 각성·master 각성 확인 동형화(옛 「맥에 없음·처음부터 사람 카드」서술은 그 뒤로 낡음) · c9(2026-09-18)로 대기 4분→7분 동형 연장
 Read-RemoteHelpStream	remote_help_http	sh	응답 본문 읽기 — 맥은 curl -o 로 파일에 받음
 Invoke-RemoteHelpHttp	remote_help_http	sh	같은 일(20초 상한 · ack·close 출처 헤더 · 000=닿지 못함) · 단 윈판의 /attach 헤더는 맥에 없음
-Get-RemoteHelpNames	remote_help_js,remote_help_report	sh	지울 로그인 이름 모으기 — 맥은 JS harvestNames(osascript) + id -un·id -F·basename $HOME
+Initialize-RemoteHelpScrub	remote_help_js	sh	가림 규칙·수확 문법·서러게이트 정규식을 한 번만 만든다 (가림 v3 · scrub-v3-port-1116 · 맥 JXA 의 같은 단계)
+Get-RemoteHelpScrubStopReason	remote_help_js	sh	확인 자리(예산·시계)가 던진 까닭을 통째 가림의 까닭으로 (가림 v3 · scrub-v3-port-1116 · 맥 JXA 의 같은 단계)
+Get-RemoteHelpTidy	remote_help_js	sh	0단계 정리 — NUL 제거 → 그 결과에 짝 잃은 서러게이트를 U+FFFD 로 (가림 v3 · scrub-v3-port-1116 · 맥 JXA 의 같은 단계)
+Get-RemoteHelpStructStreams	remote_help_js	sh	구조 규칙 5개의 일치 목록(규칙마다 왼쪽부터) (가림 v3 · scrub-v3-port-1116 · 맥 JXA 의 같은 단계)
+Get-RemoteHelpNameStream	remote_help_js	sh	이름 구간 — Aho–Corasick + 스택 합치기 (가림 v3 · scrub-v3-port-1116 · 맥 JXA 의 같은 단계)
+Merge-RemoteHelpStreams	remote_help_js	sh	시작 자리 순 목록 여럿을 한 번 훑어 덩이로(정렬 없음) (가림 v3 · scrub-v3-port-1116 · 맥 JXA 의 같은 단계)
+Get-RemoteHelpRendered	remote_help_js	sh	덩이마다 표식 하나로 바꾼 글 + 표식 자리 (가림 v3 · scrub-v3-port-1116 · 맥 JXA 의 같은 단계)
+Get-RemoteHelpOriginalStream	remote_help_js	sh	가린 글의 재확인 일치를 원문 구간으로(앞으로만 가는 손가락) (가림 v3 · scrub-v3-port-1116 · 맥 JXA 의 같은 단계)
+New-RemoteHelpScrubFull	remote_help_js	sh	칸 통째 가림(<전부 지움>) 결과 (가림 v3 · scrub-v3-port-1116 · 맥 JXA 의 같은 단계)
 Invoke-RemoteHelpScrub	remote_help_js	sh	이메일·토큰·집 경로·이름 지우기 — JS scrubWith
+Get-RemoteHelpTrimWide	remote_help_js	sh	넓은 빈칸 목록으로 앞뒤 빈칸 떼기(수확) (가림 v3 · scrub-v3-port-1116 · 맥 JXA 의 같은 단계)
+ConvertTo-RemoteHelpNameSet	remote_help_js	sh	이름 인자 = 배열(넘침 아님) 또는 묶음 { names, overflow } (가림 v3 · scrub-v3-port-1116 · 맥 JXA 의 같은 단계)
+Get-RemoteHelpNames	remote_help_js,remote_help_report	sh	지울 로그인 이름 모으기 — 맥은 JS harvestNames(osascript) + id -un·id -F·basename $HOME
+Get-RemoteHelpCutTail	remote_help_js	sh	가린 뒤 끝에서 UTF-8 바이트 상한으로 자름(글자를 가르지 않음 · 선형) (가림 v3 · scrub-v3-port-1116 · 맥 JXA 의 같은 단계)
+Get-RemoteHelpCutHead	remote_help_js	sh	가린 뒤 앞에서 UTF-8 바이트 상한으로 자름 (가림 v3 · scrub-v3-port-1116 · 맥 JXA 의 같은 단계)
+Get-RemoteHelpScrubClock	remote_help_js	sh	칸 예산의 시계(ms) — 못 읽으면 까닭 clock (가림 v3 · scrub-v3-port-1116 · 맥 JXA 의 같은 단계)
+Test-RemoteHelpScrubNumber	remote_help_js	sh	시계·예산 값이 유한한 수인가 (가림 v3 · scrub-v3-port-1116 · 맥 JXA 의 같은 단계)
+Invoke-RemoteHelpScrubField	remote_help_js	sh	칸 하나의 처리 — 빈 글 → 넘침 → 크기 → 시계 → 전체 가림 → 자름(예산) (가림 v3 · scrub-v3-port-1116 · 맥 JXA 의 같은 단계)
+ConvertTo-RemoteHelpAttachment	help_scrubbed_tail	sh	글 첨부 — 크기 문지기 → 엄격한 UTF-8 하나 → NUL → 머리표 → 수확 → 칸 처리 · 닫힌 실패 = <전부 지움> (가림 v3 · scrub-v3-port-1116 · 맥 JXA 의 같은 단계)
 Get-RemoteHelpTailBytes	remote_help_js	sh	UTF-8 바이트 상한 끝부분 자르기 — JS tailBytes
 Get-RemoteHelpHeadBytes	remote_help_js	sh	UTF-8 바이트 상한 앞부분 자르기 — JS headBytes
 Test-RemoteHelpSeq	remote_help_js	sh	양의 안전 정수 번호 검사 — JS positiveSeq·loadExecuted
@@ -228,6 +267,7 @@ Show-RemoteHelpAnswer	remote_help_tick,remote_help_js	sh	처방 표시(제어 �
 Show-RemoteHelpEnded	remote_help_ended	sh	같은 일
 Invoke-RemoteHelpTick	remote_help_tick	sh	폴링 한 번 처리 같은 일 · 촬영 요청 받기·처리(capture_receive·capture_requested_run) 포함(T2 · ps1 4667·4668)
 Save-RemoteHelpToken	remote_help_report	sh	출처 토큰을 본인만 읽는 파일로 — 맥은 umask 077·chmod 600 인라인(윈판은 ACL)
+Get-RemoteHelpLogTail	remote_help_js	sh	보고 log_tail — 기록 전체를 가린 뒤 끝 200줄 → 128,000 바이트(맥 modeReport 의 같은 단계 · 검증 H1 · scrub-v3-port-1116)
 Send-RemoteHelpReport	remote_help_report	sh	같은 일(보고 꾸리기·3회 재시도·번호·토큰)
 Watch-RemoteHelp	remote_help_loop	sh	같은 일(2시간 상한·20초 폴링)
 Invoke-RemoteHelp	remote_help,remote_help_on_signal	sh	원격 해결 진입·창 닫힘 시 close 같은 일 · 단 윈판의 보고 직후 증거·첨부 전송은 맥에 없음
@@ -269,6 +309,8 @@ Send-CaptureEvidence	capture_evidence	sh	이유×단계 한 번 캡처 증거 ·
 Get-PostInstallText	post_install_evidence	sh	master 화면 끝 40줄+훅 오류 수 · 마스킹 뒤 서버 증거(post-install)
 Send-PostInstallEvidence	post_install_evidence	sh	[10/10] 끝 증거 한 번 · seat=master · hook_errors · app_window 그림(권한 있을 때)
 Get-FileBytesCapped	file_tail_capped	sh	같은 일(파일 끝 N바이트)
+Get-RemoteHelpAttachKnown	help_scrubbed_tail	sh	글 첨부의 이름 묶음 = 보고 때 묶음(넘침 보존) + 이 컴퓨터의 계정 이름 원본 (가림 v3 · scrub-v3-port-1116 · 맥 JXA 의 같은 단계)
+Get-ScrubbedTextBytes	help_scrubbed_tail	sh	글자 첨부(기록·환경 보고 · 윈만 설치 창 글자)를 보고 본문과 같은 규칙·이름으로 지운 뒤 끝 N바이트 · 못 지우면 보내지 않음(review-fix-jarvis-1115 · c0-ops-0)
 Get-ProcTreeBytes	proc_tree_file	sh	같은 일(ps -axo + awk 트리)
 Send-Attachment	help_attach	sh	같은 일 · remote_help_http 첨부에도 출처 머리글(ps1 4233)
 Send-FailAttachments	help_fail_attachments	sh	같은 순서 · console_text·login_window_png 는 맥에 없어 까닭 한 줄씩 기록

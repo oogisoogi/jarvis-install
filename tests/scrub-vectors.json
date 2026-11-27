@@ -1,0 +1,579 @@
+{
+ "version": 1,
+ "ticket": "scrub-span-fix-1116",
+ "about": "가림 함수 공용 시험 벡터 — 서버 web-install/src/scrub.ts scrubWith · 설치기 Invoke-RemoteHelpScrub · bootstrap.sh scrubWith 가 같은 입력에 같은 출력을 내야 한다. 가짜 이름·가짜 토큰만.",
+ "vectors": [
+  {
+   "id": "S1a-space-name-unix-home",
+   "input": "/Users/Hong Gildong/project",
+   "names": [
+    "Hong Gildong"
+   ],
+   "expected": "~/project",
+   "secrets": [
+    "Hong",
+    "Gildong"
+   ],
+   "note": "서버 #1 · 설치기 #1 ① — 구조 규칙이 이름 앞부분만 먹어도 나머지가 남지 않는다"
+  },
+  {
+   "id": "S1b-home-line-harvested",
+   "input": "HOME=/Users/Hong Gildong",
+   "names": [
+    "/Users/Hong Gildong",
+    "Hong Gildong"
+   ],
+   "expected": "HOME=~",
+   "secrets": [
+    "Hong",
+    "Gildong"
+   ],
+   "note": "서버 #1 둘째 재현(수확 이름 그대로)"
+  },
+  {
+   "id": "S2-nul-name-order",
+   "input": "USER=ab\u0000\u0000\u0000\nUSER=abcd\nabcd",
+   "names": [
+    "ab\u0000\u0000\u0000",
+    "abcd"
+   ],
+   "expected": "USER=~user\nUSER=~user\n~user",
+   "secrets": [
+    "ab",
+    "cd"
+   ],
+   "note": "서버 #2 — NUL 을 뺀 뒤의 길이로 다시 정렬"
+  },
+  {
+   "id": "S3a-bearer-name-first",
+   "input": "Bearer abcDEF1234567890",
+   "names": [
+    "Bearer"
+   ],
+   "expected": "Bearer <토큰 지움>",
+   "secrets": [
+    "abcDEF1234567890"
+   ],
+   "note": "서버 #3 첫 호출"
+  },
+  {
+   "id": "S3b-bearer-name-again",
+   "input": "Bearer <토큰 지움>",
+   "names": [
+    "Bearer"
+   ],
+   "expected": "Bearer <토큰 지움>",
+   "secrets": [],
+   "note": "서버 #3 — 가린 결과를 다시 가려도 같다(멱등)"
+  },
+  {
+   "id": "I1b-win-nested-home",
+   "input": "USERPROFILE=C:\\Users\\team\\SECRET_TEAM\\hong",
+   "names": [
+    "C:\\Users\\team\\SECRET_TEAM\\hong",
+    "hong"
+   ],
+   "expected": "USERPROFILE=~",
+   "secrets": [
+    "team",
+    "SECRET_TEAM",
+    "hong"
+   ],
+   "note": "설치기 #1 ② 윈"
+  },
+  {
+   "id": "I1c-mac-nested-home",
+   "input": "HOME=/Users/team/SECRET_TEAM/hong",
+   "names": [
+    "/Users/team/SECRET_TEAM/hong",
+    "hong"
+   ],
+   "expected": "HOME=~",
+   "secrets": [
+    "team",
+    "SECRET_TEAM",
+    "hong"
+   ],
+   "note": "설치기 #1 ② 맥"
+  },
+  {
+   "id": "I1d-feff-in-name",
+   "input": "/Users/Hong﻿Gildong/x",
+   "names": [
+    "Hong﻿Gildong"
+   ],
+   "expected": "~/x",
+   "secrets": [
+    "Hong",
+    "Gildong"
+   ],
+   "note": "설치기 #1 OS 대조 — .NET·JS 의 \\s 차이(U+FEFF)가 결과를 가르지 않는다"
+  },
+  {
+   "id": "P1-name-sk",
+   "input": "key=sk-abcdefgh12345678 saved",
+   "names": [
+    "sk"
+   ],
+   "expected": "key=<키 지움> saved",
+   "secrets": [
+    "abcdefgh12345678"
+   ],
+   "note": "교차 검증 1차 #2 · 서버 앞 판"
+  },
+  {
+   "id": "P2-name-bearer",
+   "input": "Authorization: Bearer abcDEF1234567890",
+   "names": [
+    "Bearer"
+   ],
+   "expected": "Authorization: Bearer <토큰 지움>",
+   "secrets": [
+    "abcDEF1234567890"
+   ],
+   "note": "교차 검증 1차 #2 · 서버 앞 판"
+  },
+  {
+   "id": "P3-name-inside-token",
+   "input": "Authorization: Bearer abcDEF1234567890 · key=sk-ant-api03-Zz09",
+   "names": [
+    "DE",
+    "an"
+   ],
+   "expected": "Authorization: Bearer <토큰 지움> · key=<키 지움>",
+   "secrets": [
+    "1234567890",
+    "api03"
+   ],
+   "note": "이름이 토큰 값 한가운데"
+  },
+  {
+   "id": "P4-name-users",
+   "input": "C:\\Users\\hong\\x · /Users/hong/y",
+   "names": [
+    "Users"
+   ],
+   "expected": "~\\x · ~/y",
+   "secrets": [
+    "hong"
+   ],
+   "note": "이름이 Users"
+  },
+  {
+   "id": "P5-mixed-marker-words",
+   "input": "mail a.b@example.com key sk-abcdefgh12345678 Authorization: Bearer tok12345678 path C:\\Users\\hong\\x who a.b+(c) and axb+(c) hello",
+   "names": [
+    "키 지움",
+    "토큰",
+    "지움",
+    "이메일",
+    "Users",
+    "user",
+    "a.b+(c)",
+    "hello"
+   ],
+   "expected": "mail <이메일 지움> key <키 지움> Authorization: Bearer <토큰 지움> path ~\\x who ~user and axb+(c) ~user",
+   "secrets": [
+    "abcdefgh12345678",
+    "tok12345678",
+    "hong",
+    "a.b@"
+   ],
+   "note": "설치기 W6b S3 그대로"
+  },
+  {
+   "id": "B1-space-name-win-home",
+   "input": "USERPROFILE=C:\\Users\\Hong Gildong\n[4/10] Hong Gildong 님",
+   "names": [
+    "C:\\Users\\Hong Gildong",
+    "Hong Gildong"
+   ],
+   "expected": "USERPROFILE=~\n[4/10] ~user 님",
+   "secrets": [
+    "Hong",
+    "Gildong"
+   ],
+   "note": "빈칸 이름 · 윈 집 폴더"
+  },
+  {
+   "id": "B2-prefix-names",
+   "input": "hong hongtester hong",
+   "names": [
+    "hong",
+    "hongtester"
+   ],
+   "expected": "~user ~user ~user",
+   "secrets": [
+    "hong",
+    "tester"
+   ],
+   "note": "이름이 다른 이름의 접두 · 짧은 것이 앞에 와도"
+  },
+  {
+   "id": "B3-nul-inside-name",
+   "input": "USER=hong 님 hongtester x",
+   "names": [
+    "hong\u0000tester",
+    "ho\u0000ng"
+   ],
+   "expected": "USER=~user 님 ~user x",
+   "secrets": [
+    "hong",
+    "tester"
+   ],
+   "note": "NUL 든 이름"
+  },
+  {
+   "id": "B4-k1-marker-chars",
+   "input": "a@b.com sk-abcdefgh12345678 M0 1 M1 지움 10",
+   "names": [
+    "M0",
+    "1",
+    "M1",
+    "지움",
+    "토큰",
+    "user",
+    "~user",
+    "10"
+   ],
+   "expected": "<이메일 지움> <키 지움> ~user ~user ~user ~user ~user",
+   "secrets": [
+    "abcdefgh12345678"
+   ],
+   "note": "K1 — 이름이 자리표·표식 글자와 겹친다"
+  },
+  {
+   "id": "B5-korean-name",
+   "input": "작성자 홍 길동 입니다 · 홍 길동님",
+   "names": [
+    "홍 길동"
+   ],
+   "expected": "작성자 ~user 입니다 · ~user님",
+   "secrets": [
+    "홍 길동"
+   ],
+   "note": "한글 이름"
+  },
+  {
+   "id": "B6-win-korean-home",
+   "input": "path C:\\Users\\홍 길동\\Documents\\a.txt · \"C:\\\\Users\\\\홍 길동\\\\x\"",
+   "names": [
+    "홍 길동"
+   ],
+   "expected": "path ~\\Documents\\a.txt · \"~\\\\x\"",
+   "secrets": [
+    "홍",
+    "길동"
+   ],
+   "note": "윈도 경로(한글·빈칸 · JSON 이중)"
+  },
+  {
+   "id": "B7-regex-special-name",
+   "input": "x.y+z(1) Bearer a.b+c/d=e1234 key=sk-abcdefgh12345 a+b axb $& \\d",
+   "names": [
+    "x.y+z(1)",
+    "a.b",
+    "+",
+    "fgh1",
+    "$&",
+    "\\d"
+   ],
+   "expected": "~user Bearer <토큰 지움> key=<키 지움> a~userb axb ~user ~user",
+   "secrets": [
+    "x.y+z(1)",
+    "e1234",
+    "fgh1"
+   ],
+   "note": "정규식 특수문자 이름"
+  },
+  {
+   "id": "B8-no-names",
+   "input": "mail a.b@example.com /Users/hong/x C:\\Users\\hong\\y",
+   "names": [],
+   "expected": "mail <이메일 지움> ~/x ~\\y",
+   "secrets": [
+    "hong",
+    "a.b@"
+   ],
+   "note": "이름 0개"
+  },
+  {
+   "id": "B9-empty-names",
+   "input": "hello world",
+   "names": [
+    "",
+    "\u0000",
+    "\u0000\u0000"
+   ],
+   "expected": "hello world",
+   "secrets": [],
+   "note": "빈 이름·NUL 만인 이름은 무시"
+  },
+  {
+   "id": "B10-already-scrubbed",
+   "input": "mail <이메일 지움> key <키 지움> Authorization: Bearer <토큰 지움> path ~\\x who ~user HOME=~",
+   "names": [
+    "Bearer",
+    "토큰",
+    "지움",
+    "이메일",
+    "user",
+    "키 지움",
+    "~user"
+   ],
+   "expected": "mail <이메일 지움> key <키 지움> Authorization: Bearer <토큰 지움> path ~\\x who ~user HOME=~",
+   "secrets": [],
+   "note": "이미 가려진 입력(멱등)"
+  },
+  {
+   "id": "B11-overlapping-names",
+   "input": "ab cd ef",
+   "names": [
+    "ab cd",
+    "cd ef"
+   ],
+   "expected": "~user ef",
+   "secrets": [
+    "ab",
+    "cd"
+   ],
+   "note": "두 이름이 서로 겹친다 — 겹쳐 찾지 않는다(왼쪽·긴 것 먼저 · 제곱 비용을 막는 값 · 앞 판들과 같음)"
+  },
+  {
+   "id": "B12-touching-names",
+   "input": "HongHong",
+   "names": [
+    "Hong"
+   ],
+   "expected": "~user~user",
+   "secrets": [
+    "Hong"
+   ],
+   "note": "맞닿은 같은 이름 = 따로 바뀐다(합치지 않는다)"
+  },
+  {
+   "id": "B13-formation-across-marker",
+   "input": "Hong x",
+   "names": [
+    "Hong",
+    "r x"
+   ],
+   "expected": "~user x",
+   "secrets": [
+    "Hong"
+   ],
+   "note": "바꾼 표식과 옆 글자가 이름 모양을 이뤄도 표식에 걸친 자리는 이름이 아니다(멱등 · 원문 이름 글자는 남지 않음)"
+  },
+  {
+   "id": "B14-users-users",
+   "input": "/Users/Users/x",
+   "names": [
+    "Users"
+   ],
+   "expected": "~/x",
+   "secrets": [],
+   "note": "이름 = Users · 집 폴더 이름도 Users"
+  },
+  {
+   "id": "B15-email-in-home",
+   "input": "/Users/a@b.com/x",
+   "names": [],
+   "expected": "<이메일 지움>/x",
+   "secrets": [
+    "a@b.com"
+   ],
+   "note": "겹침 우선순위 = 규칙 차례(이메일 먼저)"
+  },
+  {
+   "id": "B16-bearer-then-path",
+   "input": "Bearer /Users/hong/x",
+   "names": [
+    "hong"
+   ],
+   "expected": "Bearer <토큰 지움>",
+   "secrets": [
+    "hong"
+   ],
+   "note": "Bearer 값 안의 집 폴더"
+  },
+  {
+   "id": "B17-email-is-name",
+   "input": "HongGildong@example.com HongGildong",
+   "names": [
+    "HongGildong"
+   ],
+   "expected": "<이메일 지움> ~user",
+   "secrets": [
+    "HongGildong"
+   ],
+   "note": "이메일 앞부분 = 이름"
+  },
+  {
+   "id": "B18-planted-marker",
+   "input": "a\u0000M0\u0000b \u0000M7\u0000 Bearer abcDEF1234567890",
+   "names": [
+    "zz"
+   ],
+   "expected": "aM0b M7 Bearer <토큰 지움>",
+   "secrets": [
+    "abcDEF1234567890"
+   ],
+   "note": "보낸 이가 심은 NUL 자리표"
+  },
+  {
+   "id": "B19-plain",
+   "input": "[5/10] 받은 파일 확인 · J-AV-02 · Windows 11 · PowerShell 5.1 · %TEMP% 비어 있음",
+   "names": [
+    "hong"
+   ],
+   "expected": "[5/10] 받은 파일 확인 · J-AV-02 · Windows 11 · PowerShell 5.1 · %TEMP% 비어 있음",
+   "secrets": [],
+   "note": "평범한 진단 글은 그대로"
+  },
+  {
+   "id": "B20-name-crlf-lines",
+   "input": "USER=hongtester\r\nlog: /Users/hongtester/.local/bin\r\nhongtester done",
+   "names": [
+    "hongtester"
+   ],
+   "expected": "USER=~user\r\nlog: ~/.local/bin\r\n~user done",
+   "secrets": [
+    "hongtester"
+   ],
+   "note": "CRLF 줄"
+  },
+  {
+   "id": "B21-name-across-two-markers",
+   "input": "~user~user ok",
+   "names": [
+    "r~u"
+   ],
+   "expected": "~user~user ok",
+   "secrets": [],
+   "note": "표식 글자로만 된 이름(두 표식에 걸침) = 표식 그대로"
+  },
+  {
+   "id": "B22-email-over-marker",
+   "input": "~user@example.com",
+   "names": [],
+   "expected": "<이메일 지움>",
+   "secrets": [],
+   "note": "구조 규칙이 표식에 반쯤 걸치면 표식까지 한 덩이(이름 0개여도 같은 규칙)"
+  },
+  {
+   "id": "B23-korean-before-anchor",
+   "input": "확인C:\\Users\\hong\\x · 값sk-abcdefgh12345678 · 토큰Bearer abcDEF1234567890",
+   "names": [],
+   "expected": "확인~\\x · 값<키 지움> · 토큰Bearer <토큰 지움>",
+   "secrets": [
+    "hong",
+    "abcdefgh12345678",
+    "abcDEF1234567890"
+   ],
+   "note": "한글 바로 뒤의 규칙 머리 — 낱말 경계 = ASCII(.NET \\b 차이 · 세 구현 차등 시험이 찾음)"
+  },
+  {
+   "id": "B24-ignorable-char-name",
+   "input": "x ~﻿user y",
+   "names": [
+    "~﻿user"
+   ],
+   "expected": "x ~user y",
+   "secrets": [],
+   "note": "이름에 무시 글자(U+FEFF) — 바뀐 글과 앞 글을 서수로 견준다(PowerShell -ceq 는 같다고 본다)"
+  },
+  {
+   "id": "C1-chain-name-after-marker",
+   "input": "rxxxxxx",
+   "names": [
+    "rx"
+   ],
+   "expected": "~userxxxxx",
+   "secrets": [
+    "rx"
+   ],
+   "note": "교차 검증 2차 서버 #2 — 표식 끝 글자와 다음 글자가 이름을 이뤄도 한 번에 끝난다(되풀이 6회 상한 500 없음)"
+  },
+  {
+   "id": "C2-tilde-run-tilde-name",
+   "input": "~~~~~~~~~~~~~~~~~~~~",
+   "names": [
+    "~~~~~~~~"
+   ],
+   "expected": "~user~user~~~~",
+   "secrets": [],
+   "note": "물결표 줄 + 물결표 이름 — 겹쳐 찾지 않는다(교차 검증 2차 서버 #3 꼴의 작은 판)"
+  },
+  {
+   "id": "C3-name-glued-to-input-marker",
+   "input": "cd ~userkim/x",
+   "names": [
+    "userkim"
+   ],
+   "expected": "cd ~userkim/x",
+   "secrets": [],
+   "note": "한계: 원문에 이미 있던 표식 글자(~user)에 맞붙은 이름은 이름 자리가 아니다 — 멱등과 양립 불가"
+  },
+  {
+   "id": "C4-name-with-tilde",
+   "input": "path HONGGI~1 done · TEMP=C:\\Users\\HONGGI~1\\AppData",
+   "names": [
+    "HONGGI~1"
+   ],
+   "expected": "path ~user done · TEMP=~\\AppData",
+   "secrets": [
+    "HONGGI"
+   ],
+   "note": "이름에 물결표(윈 8.3 짧은 이름 꼴) — ~ 는 표식 보호에서 뺐다"
+  },
+  {
+   "id": "C5-chain-installer-r3",
+   "input": "rssssss",
+   "names": [
+    "rs"
+   ],
+   "expected": "~usersssss",
+   "secrets": [
+    "rs"
+   ],
+   "note": "교차 검증 3차 설치기 #1 — 표식 끝 r + s 연쇄 · 상한 때문에 중단되지 않는다"
+  },
+  {
+   "id": "C6-chain-long",
+   "input": "USER=rs\nrssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssss",
+   "names": [
+    "rs"
+   ],
+   "expected": "USER=~user\n~usersssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssss",
+   "secrets": [
+    "rs"
+   ],
+   "note": "더 긴 연쇄(300) — 몇 회가 걸려도 정상 요청은 실패로 치지 않는다"
+  },
+  {
+   "id": "C7-shorter-name-before-marker",
+   "input": "hong~user x",
+   "names": [
+    "hong~u",
+    "hong"
+   ],
+   "expected": "~user~user x",
+   "secrets": [
+    "hong"
+   ],
+   "note": "긴 이름이 표식에 걸치면 그 앞 조각에서 짧은 이름을 다시 찾는다"
+  },
+  {
+   "id": "C8-second-pass-needed",
+   "input": "mail 홍서연@example.com",
+   "names": [
+    "홍서연"
+   ],
+   "expected": "mail <이메일 지움>",
+   "secrets": [
+    "홍서연"
+   ],
+   "note": "되풀이 2회째가 꼭 필요한 꼴 — 1회 ~user@example.com → 2회 <이메일 지움>"
+  }
+ ]
+}

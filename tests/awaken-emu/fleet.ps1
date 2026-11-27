@@ -55,6 +55,10 @@ Write-Log ("TEST default master cap=" + $MasterAwakeCapSec + "s poll=" + $Master
 $FleetPollSec = 0; $FleetAwakeTries = 3; $FleetWaitTries = 2
 $ChildAwakeGaps = @(0, 0, 0); $ChildAwakeGraceSec = 2; $ChildAwakeCapSec = 8
 $MasterAwakeCapSec = 2; $MasterAwakePollSec = 0; $MasterRetryCapSec = 2
+# (0.3.50 · 자동 복원 경합 — tests/wake-restore-race-run.sh 가 쓴다) 복원 대기 간격·상한과 [8/10] 의 rotate 판정을 바깥에서 준다 · 없으면 실물 값(간격만 0)
+$RestoreSettlePollSec = if ($env:EMU_RESTORE_POLL) { [int]$env:EMU_RESTORE_POLL } else { 0 }
+if ($env:EMU_RESTORE_CAP) { $RestoreSettleCapSec = [int]$env:EMU_RESTORE_CAP }
+if ($env:EMU_ROTATE_PLAN) { $script:RotatePlan = $env:EMU_ROTATE_PLAN }
 # 자식 자리 세션 기록(jsonl) 자리 = $env:USERPROFILE/.cys/claude/projects — 가짜 cys 가 SB/home 아래에 만든다(installer-awaken-jsonl)
 #   screen-lies    = 화면은 답한 모양인데 세션 기록이 없다(2026-09-16 샌드박스 5차 거짓 양성) → Return 3회 → child-fail
 #   stale-session  = 같은 폴더에 기준선 전 지난 설치의 깬 기록만 있다 → 세지 않고 Return 1회 → 새 기록으로 확인

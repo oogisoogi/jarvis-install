@@ -911,8 +911,37 @@ function Get-UserPathSeedDirs {
     if (-not $KeepApp) { $d += $CysDir.TrimEnd('\'); $d += $CysDirOld.TrimEnd('\') }
     return $d
 }
+# 🔴사용자 PATH 읽기·쓰기는 레지스트리 값 그대로(검증 F1 · 설치기 bootstrap.ps1 8373efb·F7 과 같은 꼴) — 앞 판은
+#   [Environment]::Get/SetEnvironmentVariable 로 읽고 써서 %USERPROFILE%·%JAVA_HOME% 참조를 펼친 글자로 굳히고 값 종류를
+#   REG_SZ 로 바꿨다. 재설치 줄(reinstall.ps1 → 이 파일 -KeepApp)이 매번 그 길을 지나 설치기의 보존을 무력하게 했다.
+#   읽기 = 펼치지 않은 원래 글자 · 쓰기 = 이미 있는 값 종류 그대로(값이 없을 때만 REG_EXPAND_SZ) · 쓴 뒤 「환경이 바뀌었다」 알림.
+function Get-UserPathValue {
+    $k = [Microsoft.Win32.Registry]::CurrentUser.OpenSubKey('Environment', $false)
+    if ($null -eq $k) { return $null }
+    try {
+        $v = $k.GetValue('Path', $null, [Microsoft.Win32.RegistryValueOptions]::DoNotExpandEnvironmentNames)
+        if ($null -eq $v) { return $null }
+        return [string]$v
+    } finally { $k.Close() }
+}
+function Get-UserPathKind([string]$Existing, [string]$Value) {
+    # 설치기와 같은 규칙 — 원래 REG_SZ 면 REG_SZ · 그 밖(REG_EXPAND_SZ · 값 없음) = REG_EXPAND_SZ
+    if ($Existing -ceq 'String') { return 'String' }
+    return 'ExpandString'
+}
+function Set-UserPathValue($value) {
+    $k = [Microsoft.Win32.Registry]::CurrentUser.CreateSubKey('Environment')
+    try {
+        $existing = ''
+        try { $existing = [string]$k.GetValueKind('Path') } catch { $existing = '' }
+        $kind = [Microsoft.Win32.RegistryValueKind](Get-UserPathKind $existing ([string]$value))
+        $k.SetValue('Path', [string]$value, $kind)
+    } finally { $k.Close() }
+    # 레지스트리에 직접 쓰면 알림(WM_SETTINGCHANGE)이 안 간다 — 없는 사용자 변수 하나를 지워 .NET 이 늘 보내는 알림만 보낸다(값 변화 0)
+    try { [Environment]::SetEnvironmentVariable('JARVIS_ENV_REFRESH', $null, 'User') } catch { }
+}
 function Test-UserPathSeed {
-    $u = [Environment]::GetEnvironmentVariable('Path','User')
+    $u = Get-UserPathValue
     if (-not $u) { return $false }
     $seeds = @(Get-UserPathSeedDirs)
     foreach ($p in ($u -split ';')) {
@@ -2219,7 +2248,7 @@ function Remove-UserPathSeed {
     # ⚠사용자 Path 만 건드린다. 시스템 Path 는 손대지 않는다(관리자 권한이 필요하고 우리 것이 아니다).
     if (-not (Test-UserPathSeed)) { return }
     try {
-        $u = [Environment]::GetEnvironmentVariable('Path','User')
+        $u = Get-UserPathValue
         $seeds = @(Get-UserPathSeedDirs)
         $keep = @()
         foreach ($p in ($u -split ';')) {
@@ -2227,7 +2256,7 @@ function Remove-UserPathSeed {
             if ($seeds -contains [Environment]::ExpandEnvironmentVariables($p).TrimEnd('\')) { continue }
             $keep += $p
         }
-        [Environment]::SetEnvironmentVariable('Path', ($keep -join ';'), 'User')
+        Set-UserPathValue ($keep -join ';')
         $script:Removed++; Write-Host '  지움: 사용자 실행 경로 등록 (시스템 쪽은 그대로)'
     } catch { $script:KeptFail++; Write-Host ("  [남음] 사용자 실행 경로 등록 — " + $_.Exception.Message) }
 }

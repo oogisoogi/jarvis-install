@@ -88,6 +88,8 @@ HELP_API_URL="http://127.0.0.1:$T_PORT"
 REMOTE_HELP_POLL_SEC=0
 RH_TMP="$(mktemp -d -t rh-test)"
 RH_ID=TEST2345
+# 제품에서는 ack 앞에 늘 보고(modeReport)가 이름 묶음을 적는다 — 그 자리를 빈 묶음으로 채운다(없으면 「넘침」 = 결과 통째 가림 · TICKET=scrub-v3-port-1116)
+printf %s "{\"names\":[],\"overflow\":false}" > "$RH_TMP/names"
 . "$T_SNIP"' >> "$SB/window.txt" 2>&1
 }
 tick() { inst <<'EOF'

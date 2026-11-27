@@ -87,6 +87,21 @@ MUTANTS = [
      "[v0317] 창이 끝나면 몇 번만 확인한다", "checks"),
     ("window-key-revert", RS, "⊞ 윈도우 키(키보드 왼쪽 아래, Ctrl과 Alt 사이)를 누르고", "시작 단추를 누르고",
      "[v0317] 다시 하시는 법 첫 줄은 윈도우 키", "checks"),
+    # ── 0.3.50(TICKET=login-stall-whm7-1126) 대기 하트비트 표지(C1) · 첫 점검(C2) ──
+    ("0350-detail-drop", PS, "Send-Progress '3/10' 'wait' $w (Get-LoginWaitDetail ($clipSends + $typedSends) $reopened) $null", "Send-Progress '3/10' 'wait' $w $null $null",
+     "[0.3.50] 3/10 wait 하트비트는 설치기 진행 표지", "checks"),
+    ("0350-detail-drop-emu", PS, "Send-Progress '3/10' 'wait' $w (Get-LoginWaitDetail ($clipSends + $typedSends) $reopened) $null", "Send-Progress '3/10' 'wait' $w $null $null",
+     "[0.3.50 대기 표지] 하트비트마다 sweep·code·reopen 만", "emu"),
+    ("0350-presence-leak", PS, "    $parts += ('reopen=' + $(if ($Reopened) { '1' } else { '0' }))\n", "    $parts += ('reopen=' + $(if ($Reopened) { '1' } else { '0' }))\n    if ($script:LoginCtrlC) { $parts += 'cc=1' }\n",
+     "[0.3.50] 대기 표지는 키보드·마우스·브라우저·Ctrl+C 를 싣지 않는다", "checks"),
+    ("0350-reopen-drop", PS, "    $parts += ('reopen=' + $(if ($Reopened) { '1' } else { '0' }))\n", "    $parts += 'reopen=0'\n",
+     "[0.3.50 대기 표지] 다시 연 뒤의 하트비트는 reopen=1", "emu"),
+    ("0350-code-drop", PS, "    $parts += ('code=' + $(if ($CodeSends -gt 0) { '1' } else { '0' }))\n", "    $parts += 'code=0'\n",
+     "[0.3.50 대기 표지] 코드를 넣은 뒤의 하트비트는 code=1", "emu"),
+    ("0350-early-drop", PS, "if ((-not $earlySaid) -and ($w -ge $LoginEarlyCheckSec) -and ($w -lt $LoginCheckpointSec)) {", "if ($false) {",
+     "[0.3.50 첫 점검] 5분 점검보다 앞에 한 번", "emu"),
+    ("0350-early-late", PS, "$LoginEarlyCheckSec  = 90 ", "$LoginEarlyCheckSec  = 300 ",
+     "[0.3.50] 첫 점검은 5분 점검보다 앞에 한 번", "checks"),
 ]
 
 

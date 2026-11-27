@@ -1,3 +1,8 @@
 # 뮤턴트 앵커가 여러 줄이라 줄바꿈이 바뀌면 한 곳도 안 걸린다(러너 5차 실측 2026-09-08).
 # 윈도우 체크아웃이 CRLF 로 바꾸지 못하게 못박는다.
 tests/*.py text eol=lf
+# 공용 가림 벡터 — 맥·윈 시험이 파일 sha256 을 고정값으로 대조한다(서버 사본과 같은 바이트).
+# 윈도우 체크아웃이 CRLF 로 바꾸면 W6c 가 붉다(windows-latest 러너 5.1·7 실측 2026-11-16 · TICKET=scrub-span-fix-1116).
+tests/scrub-vectors.json text eol=lf
+# 가림 v3 공용 벡터·참조 모델 사본 — 세 구현 시험이 sha256 을 고정값으로 대조한다(split/model 과 같은 바이트 · TICKET=scrub-v3-port-1116).
+tests/scrub-v3/model/* text eol=lf

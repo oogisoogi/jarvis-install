@@ -49,7 +49,7 @@ cnt() { grep -cE -- "$2" "$1" 2>/dev/null; }
 left() { pgrep -f "$BASE/.*$1" 2>/dev/null | wc -l | tr -d ' '; }
 
 echo "== v0.3.17 [3/10] 새 창 로그인 =="
-for s in slow-approve instant-return hang hang-ask file-only no-status file-not-logged stale-file status-hang inline closing-quiet closing-loud clip-inject clip-stale clip-junk clip-repeat clip-many; do
+for s in slow-approve instant-return reopen-hang hang hang-ask file-only no-status file-not-logged stale-file status-hang inline closing-quiet closing-loud clip-inject clip-stale clip-junk clip-repeat clip-many; do
   SB="$BASE/$s"; mkdir -p "$SB"
   run_ps "$EMU/login.ps1" -Src "$PS" -Scenario "$s" -Sb "$SB" >"$SB/out.txt" 2>"$SB/err.txt"
   L="$SB/home/install-jarvis/bootstrap.log"; R="$SB/home/install-jarvis/env-report.md"
@@ -82,10 +82,25 @@ for s in slow-approve instant-return hang hang-ask file-only no-status file-not-
       has "$L" 'login fail answer: no-console-input' && has "$R" '^- 상한에서 받은 답: no-console-input'
       t $? "[무한 대기] 상한 실패에서 묻는다 — 콘솔 입력이 없으면 그 사실을 표지로 적는다" "답 표지가 없다"
       [ "$(cnt "$L" '\[5분 점검\]')" = "1" ]; t $? "[무한 대기] 5분 점검은 한 번만 말한다" "$(cnt "$L" '\[5분 점검\]')번"
+      # 0.3.50 C2 — 첫 점검은 한 번 · 5분 점검보다 앞 · 「다시 실행하지 마십시오」를 함께 말한다
+      e1="$(grep -nE '\[1초 점검\]' "$L" | head -1 | cut -d: -f1)"; e5="$(grep -nE '\[5분 점검\]' "$L" | head -1 | cut -d: -f1)"
+      [ "$(cnt "$L" '\[1초 점검\]')" = "1" ] && [ "$(cnt "$L" '설치를 다시 실행하지 마십시오')" = "1" ] && [ -n "$e1" ] && [ -n "$e5" ] && [ "$e1" -lt "$e5" ]
+      t $? "[0.3.50 첫 점검] 5분 점검보다 앞에 한 번 · 다시 실행하지 말라고 한다" "첫 점검 $(cnt "$L" '\[1초 점검\]')번 · 다시 실행 문구 $(cnt "$L" '설치를 다시 실행하지 마십시오')번 · 줄 ${e1:-없음}/${e5:-없음}"
+      # 0.3.50 C1 — 대기 하트비트 detail = 설치기 자신의 진행만(sweep·code·reopen) · 키보드·마우스·브라우저 표지 0
+      #   (sweep 의 env=no = 이 시험을 부른 셸에 CLAUDE_CONFIG_DIR 이 있을 때 붙는 후보 — 있어도 없어도 맞는 모양)
+      w0="$(grep -c '^3/10|wait|' "$SB/progress" 2>/dev/null)"; wbad="$(grep '^3/10|wait|' "$SB/progress" 2>/dev/null | grep -cvE '^3/10\|wait\|[0-9]+\|(sweep=[A-Za-z0-9=,_-]+ )?code=[01] reopen=[01]$')"
+      [ "${w0:-0}" -ge 3 ] && [ "$wbad" = "0" ] && grep -qxE '3/10\|wait\|[0-9]+\|sweep=default=no(,env=no)? code=0 reopen=0' "$SB/progress"
+      t $? "[0.3.50 대기 표지] 하트비트마다 sweep·code·reopen 만 싣는다" "wait 줄 ${w0:-0} · 모양 어긋남 ${wbad:-?} · 첫 줄 $(grep -m1 '|wait|' "$SB/progress" 2>/dev/null)"
       has "$L" '스스로 푸는 법: 새 PowerShell 창을 열고 claude 를 입력해 Enter' && [ "$(cnt "$L" '스스로 푸는 법')" = "1" ]
       t $? "[무한 대기] 로그인이 끝내 안 되면 스스로 푸는 법(새 창에서 claude 직접)을 한 번 말한다" "$(cnt "$L" '스스로 푸는 법')번"
       ! grep -q '1) 열려 있는 Claude 탭' "$SB/err.txt"; t $? "[무한 대기] 기다리는 동안 설치 창에 카드를 되풀이하지 않는다" "되풀이됐다"
       [ "$(left 'sleep 3071')" = "0" ]; t $? "[무한 대기] 끝낸 창이 남지 않는다" "남은 대기 프로세스 $(left 'sleep 3071')개"
+      ;;
+    reopen-hang)
+      # 0.3.50 C1 — 코드가 안 받아져 한 번 더 연 뒤의 기다림이 하트비트에 「reopen=1」로 남는다(20분 끝 보고 전에 창을 닫아도 갈린다)
+      [ "$calls" = "2" ] && [ "$n2" = "1" ] && grep -qE '^3/10\|wait\|[0-9]+\|(sweep=[A-Za-z0-9=,_-]+ )?code=0 reopen=1$' "$SB/progress"
+      t $? "[0.3.50 대기 표지] 다시 연 뒤의 하트비트는 reopen=1 을 싣는다" "승인 창 ${calls}번 · J-LOGIN-02 ${n2}회 · wait 줄: $(grep -c '|wait|' "$SB/progress" 2>/dev/null)"
+      [ "$(left 'sleep 3079')" = "0" ]; t $? "[0.3.50 대기 표지] 다시 연 창도 남지 않는다" "남은 대기 프로세스 $(left 'sleep 3079')개"
       ;;
     hang-ask)
       has "$L" 'login fail answer: no-approval-screen \(key=2\)' && has "$R" '^- 상한에서 받은 답: no-approval-screen'
@@ -152,6 +167,8 @@ for s in slow-approve instant-return hang hang-ask file-only no-status file-not-
       lines="$(cat "$SB/lines" 2>/dev/null || echo 0)"
       [ "$lines" = "1" ] && [ "$(cnt "$L" 'login code sent from clipboard')" = "1" ]
       t $? "[클립보드 같은 코드] 받아들여지지 않은 같은 코드는 한 번만 넣는다" "넣은 줄 ${lines}"
+      grep -qE '^3/10\|wait\|[0-9]+\|(sweep=[A-Za-z0-9=,_-]+ )?code=1 reopen=0$' "$SB/progress" && ! grep -qE 'EMUbad|EMUgood' "$SB/progress"
+      t $? "[0.3.50 대기 표지] 코드를 넣은 뒤의 하트비트는 code=1 만 싣는다(원문 없음)" "$(grep '|wait|' "$SB/progress" 2>/dev/null | tail -1)"
       ;;
     clip-many)
       lines="$(cat "$SB/lines" 2>/dev/null || echo 0)"

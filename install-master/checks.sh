@@ -243,6 +243,9 @@ T = [
  ('master-<state> ×2',    None,                                                       s_rx('10/10', 'info', 'awaken:master-'), 0),
  ('end awaken:auto',      r"'10/10' 'end' .*'awaken:auto'",                           s_rx('10/10', 'end', 'awaken:auto'), 1),
  ('info manual-fallback', r"'10/10' 'info' .*'awaken:manual-fallback'",               s_rx('10/10', 'info', 'awaken:manual-fallback'), 1),
+ # user-reports-fix-1119 — [10/10] 대기 중 사람 Ctrl+C = info 표식(J-UNK-00 아님). 윈 = Invoke-StepFleet finally · 맥 = fleet_on_interrupt.
+ #   (맥 전용 짝 awaken:owner-window-closed = 창 닫기 — 윈은 창과 함께 프로세스가 끝나 보낼 자리가 없다 · 이 표는 ps1 자리 기준이라 행 없음)
+ ('info owner-interrupt', r"'10/10' 'info' .*'awaken:owner-interrupt'",               s_rx('10/10', 'info', 'awaken:owner-interrupt'), 1),
  ('1/10 start',           r"Send-Progress '1/10' 'start'",                            s_rx('1/10', 'start'), 1),
  ('1/10 end',             r"Send-Progress '1/10' 'end'",                              s_rx('1/10', 'end'), 1),
  ('1/10 info env',        r"Send-Progress '1/10' 'info' .*Get-InstallEnv",            s_rx('1/10', 'info'), 1),
@@ -261,6 +264,7 @@ T = [
  ('10/10 start(선점)',    r"Send-Progress '10/10' 'start' \$null 'awaken:claim-denied'", s_rx('10/10', 'start', 'awaken:claim-denied'), 1),
  ('10/10 end(감싸개)',    r"Send-Progress '10/10' 'end' \(\[int\]\$fleetSwAll",        s_rx('10/10', 'end', 'rc='), 1),
  ('10/10 end(선점 앱)',   r"'10/10' 'end' .*'awaken:app-'",                           s_rx('10/10', 'end', 'awaken:app-'), 1),
+ ('9/10 info app-launch(윈 전용 · 맥에 관리자 창 갈래 없음 · 0.3.50)', r"Send-Progress '9/10' 'info' \$null \('app-launch plan='", None, 0),
  ('5~8/10 start(반복)',   r"Send-Progress \$st\.Step 'start'",                        None, 0),
  ('5~8/10 end(반복)',     r"Send-Progress \$st\.Step 'end'",                          None, 0),
 ]
@@ -283,12 +287,12 @@ for ev in ('start', 'end'):
     if not (lit or var): bad.append('sh 없음: 5~8/10 %s(반복 변수 또는 단계 넷)' % ev)
 extra = [P[i].strip()[:80] for i in range(len(P)) if i not in used]
 if extra: bad.append('표에 없는 ps1 부르는 자리 %d: %s' % (len(extra), ' | '.join(extra[:3])))
-if len(P) != 38: bad.append('ps1 부르는 자리 %d줄(표 = 38 · 0.3.35 F10 에서 32→34 · r2 F3 윈 짝 34→35 · 0.3.38 윈 직접 받기 대기 35→36 · 1.1.8 U5 윈 롤백 자산 36→38)' % len(P))
+if len(P) != 40: bad.append('ps1 부르는 자리 %d줄(표 = 40 · 0.3.35 F10 에서 32→34 · r2 F3 윈 짝 34→35 · 0.3.38 윈 직접 받기 대기 35→36 · 1.1.8 U5 윈 롤백 자산 36→38 · 사람 중단 표식 38→39 · 0.3.50 앱 창 판정 info 39→40)' % len(P))
 print('ps1 부르는 자리 %d줄 · sh 부르는 자리 %d줄 · 문제 %d' % (len(P), len(S), len(bad)))
 for b in bad[:14]: print('  - ' + b)
 sys.exit(1 if bad else 0)
 PYEOF
-  ck "[맥동등 전송] ps1 진행 전송 38자리(윈 전용 3 · 단계 변수 4줄 × 5~8 넷 전개 시 50건)가 sh 에 전건 있다(윈 전용은 사유 행)(표 대조 · 표에 없는 ps1 자리도 붉음)" $? "$(head -8 "${TMPDIR:-/tmp}/mp-tx.$$" | tr '\n' '|' | cut -c1-420)"
+  ck "[맥동등 전송] ps1 진행 전송 40자리(윈 전용 4 · 단계 변수 4줄 × 5~8 넷 전개 시 51건)가 sh 에 전건 있다(윈 전용은 사유 행)(표 대조 · 표에 없는 ps1 자리도 붉음)" $? "$(head -8 "${TMPDIR:-/tmp}/mp-tx.$$" | tr '\n' '|' | cut -c1-420)"
   rm -f "${TMPDIR:-/tmp}/mp-tx.$$"
   # 레버 — JARVIS_NO_PROGRESS=1 이면 한 바이트도 안 나간다 · 대조군(레버 끔)에서는 실제로 보내려 한다(레버 축이 비어 있지 않다는 증명)
   #   ⚠이 파일 머리의 export JARVIS_NO_PROGRESS=1 이 대조군까지 눈멀게 하지 않도록 대조군은 env -u 로 뺀다
@@ -528,6 +532,64 @@ axes_0332() {
   codegrep "$SH" '^INSTALLER_VERSION="0\.3\.(3[2-9]|[4-9][0-9])"'; ck "[0332 판번] 맥 0.3.32 이상" $? "판번이 안 올랐다"
   codegrep "$PS" "^\\\$InstallerVersion       = '0\.3\.(3[2-9]|[4-9][0-9])'"; ck "[0332 판번] 윈 0.3.32 이상" $? "판번이 안 올랐다"
 }
+review_1115_axes() {
+  # review-fix-jarvis-1115(2026-11-15 적대 검토 확정 지적 수리) — 실물 함수 시험 두 OS. 각 축은 고치기 전 판(d2a56b2)에서 붉음을 확인했다.
+  echo "== review-1115 — PATH 값 종류 · 설정 파일 바꿔 끼우기 · trust-seed 합치기 · J-RM-01 · 함수형 원격 명령 · 첨부 지우기 · 폴링 출처 헤더 =="
+  if [ -f "$DIR/../tests/review-1115-mac.sh" ]; then
+    bash "$DIR/../tests/review-1115-mac.sh" --dir "$DIR" >/dev/null 2>&1
+    ck "[review-1115 맥] 글자 첨부는 지운 뒤 · 못 지우면 안 보냄 · 폴링 GET 에 출처 헤더(그 밖 GET 은 없음)" $? "bash tests/review-1115-mac.sh 로 자세히"
+  else
+    sk "[review-1115 맥] 실물 함수 시험" "시험 파일을 못 찾았다"
+  fi
+  if command -v pwsh >/dev/null 2>&1 && [ -f "$DIR/../tests/review-1115-win.ps1" ]; then
+    pwsh -NoProfile -File "$DIR/../tests/review-1115-win.ps1" -Dir "$DIR" >/dev/null 2>&1
+    ck "[review-1115 윈] PATH 원래 글자·값 종류 · 설정 파일 바꿔 끼우기 · trust-seed 합치기 · J-RM-01 정상 갈래 · 함수형 명령(정해진 모듈만) · 첨부 지우기 · 폴링 헤더" $? "pwsh -NoProfile -File tests/review-1115-win.ps1 -Dir install-master 로 자세히"
+  else
+    sk "[review-1115 윈] 실물 함수 시험" "pwsh 또는 시험 파일이 없다"
+  fi
+}
+fleet_owner_interrupt_axes() {
+  # user-reports-fix-1119(사용자 보고 11-19 맥 기기 10/10 J-UNK-00) — [10/10] 대기를 사람이 멈춘 끝(Ctrl+C · 맥 창 닫기)은 info 표식 · J-UNK-00 아님.
+  #   진짜 실패(대기 밖 rc≠0 · 대기 밖 창 닫기 · [10/10] rc=10)는 J-UNK-00 그대로. 고치기 전 판(aca9d2d)에서 맥 ⓐⓑⓓⓓ2 · 윈 ⓕ 붉음 확인.
+  echo "== 사람이 멈춘 [10/10] 대기 — owner-interrupt · owner-window-closed · 진짜 실패 J-UNK-00 유지 =="
+  if [ -f "$DIR/../tests/fleet-owner-interrupt-run.sh" ]; then
+    bash "$DIR/../tests/fleet-owner-interrupt-run.sh" --dir "$DIR" >/dev/null 2>&1
+    ck "[사람 중단 10/10] Ctrl+C·창 닫기 = info 표식(J-UNK-00 0) · 진짜 실패 셋 = J-UNK-00 1 · 윈 짝(pwsh 있으면)" $? "bash tests/fleet-owner-interrupt-run.sh 로 자세히"
+  else
+    sk "[사람 중단 10/10] 행동 시험" "시험 파일을 못 찾았다"
+  fi
+}
+fleet_wait_heartbeat_axes() {
+  # 0.3.50(사용자 진행 기록 11-19·11-26) — [10/10] 7분 자동 각성 고리가 말없이 서 있어 사람이 Ctrl+C·창 닫기로 멈췄다 ⇒ 1분마다(2초 × 30) 한 줄 · 마지막 바퀴에는 안 찍음 · 맥·윈 짝.
+  #   정적 축 = 그 고리 안(「…부르는지 지켜봅니다」 줄 ~ 성공 판정 줄 사이 · 주석 밖)에 알림 글이 있다 · 행동 축 = tests/fleet-wait-heartbeat-run.sh(고치기 전 판 753f899 에서 맥·윈 ①④ 붉음 확인).
+  echo "== [10/10] 7분 자동 각성 고리의 1분 알림 =="
+  local a b
+  a="$(awk '/^[[:space:]]*#/{next} /자비스가 깨어나 동료들을 부르는지 지켜봅니다/{f=1} f&&/^  if declaration_seen "\$live"; then/{exit} f' "$SH" | grep -cE '동료 자리를 기다리는 중입니다 \(')"
+  b="$(awk '/^[[:space:]]*#/{next} /자비스가 깨어나 동료들을 부르는지 지켜봅니다/{f=1} f&&/^    if \(Test-DeclarationSeen \$live\) \{/{exit} f' "$PS" | grep -cE '동료 자리를 기다리는 중입니다 \(')"
+  [ "${a:-0}" -ge 1 ] && [ "${b:-0}" -ge 1 ]
+  ck "[0.3.50 7분 고리 알림] 맥 step_fleet · 윈 Step-Fleet 의 자동 각성 고리 안에 1분 알림 한 줄(주석 밖)" $? "맥 ${a:-0}곳 · 윈 ${b:-0}곳"
+  if [ -f "$DIR/../tests/fleet-wait-heartbeat-run.sh" ]; then
+    bash "$DIR/../tests/fleet-wait-heartbeat-run.sh" --dir "$DIR" >/dev/null 2>&1
+    ck "[0.3.50 7분 고리 알림] 1분 넘게 기다리면 줄 1개+ · 1분 안에 서면 0개 · 마지막 바퀴 0개 · 윈 짝(pwsh 있으면)" $? "bash tests/fleet-wait-heartbeat-run.sh 로 자세히"
+  else
+    sk "[0.3.50 7분 고리 알림] 행동 시험" "시험 파일을 못 찾았다"
+  fi
+}
+if [ "${CHECKS_ONLY:-}" = "fleet-wait-heartbeat" ]; then
+  fleet_wait_heartbeat_axes
+  printf '\n통과 %s · 실패 %s%s\n' "$pass" "$fail" "$([ "$skip" -gt 0 ] && printf ' · 건너뜀 %s' "$skip")"
+  [ "$fail" -eq 0 ]; exit $?
+fi
+if [ "${CHECKS_ONLY:-}" = "fleet-owner-interrupt" ]; then
+  fleet_owner_interrupt_axes
+  printf '\n통과 %s · 실패 %s%s\n' "$pass" "$fail" "$([ "$skip" -gt 0 ] && printf ' · 건너뜀 %s' "$skip")"
+  [ "$fail" -eq 0 ]; exit $?
+fi
+if [ "${CHECKS_ONLY:-}" = "review-1115" ]; then
+  review_1115_axes
+  printf '\n통과 %s · 실패 %s%s\n' "$pass" "$fail" "$([ "$skip" -gt 0 ] && printf ' · 건너뜀 %s' "$skip")"
+  [ "$fail" -eq 0 ]; exit $?
+fi
 if [ "${CHECKS_ONLY:-}" = "login-keep" ]; then
   # 0.3.36: 재설치 길 로그인·이전 대화 남기기 — 실물 윈 지우개 흉내 + 맥 함수 떼기 + 정적(약 3분 · pwsh 필요).
   #   「되돌리면 붉어진다」는 tests/login-keep-mutate.py 가 잰다.
@@ -911,7 +973,7 @@ echo "== 단계 2 — cys 설치 대행 [5]~[9] =="
 # (installer-0321-pin) 1.0.1 발행(2026-09-16) 실측값이 채워졌다 — 아래 두 축은 이제 **초록이어야 한다**(자리표가 남으면 붉다).
 #   ⚠이 축은 **형식만** 본다(64자리인가·숫자인가). 한 글자 틀린 값도 여기서는 통과하므로, 값이 릴리스와 같은지는 tests/win-pin-release.sh 가 릴리스를 때려서 진다.
 codegrep "$PS" 'CysWinBytes    = [0-9]+$'; ck "[5] 설치 파일 크기 핀(= cysr v1.0.1 setup.exe · 숫자)" $? "받다 끊긴 파일을 정상으로 본다(자리표가 남았다)"
-codegrep "$PS" "CysVersion     = '1\\.1\\.19'"; ck "[5] 윈 판본 핀 정확값(= cysr v1.1.19)" $? "이름표만 새 판본이고 실제로 받는 판본은 옛것이다"
+codegrep "$PS" "CysVersion     = '1\\.1\\.20'"; ck "[5] 윈 판본 핀 정확값(= cysr v1.1.20)" $? "이름표만 새 판본이고 실제로 받는 판본은 옛것이다"
 codegrep "$PS" "CysWinSha256   = '[0-9a-f]{64}'"; ck "[5] 윈 설치 파일 sha256 핀(= 릴리스 SHA256SUMS 줄 · 64자리)" $? "지문이 없으면 모든 설치가 지문 불일치로 멈춘다(자리표가 남았다)"
 no_code "$PS" 'TBD-1\.0\.1' && no_code "$SH" 'TBD-1\.0\.1'
 ck "[v0320] 핀 자리표(TBD-1.0.1)가 두 설치기에 남지 않았다" $? "발행값이 아직 안 채워졌다 — 이대로 배포하면 cys 받기가 반드시 실패한다"
@@ -1338,7 +1400,8 @@ codegrep "$PS" 'msg -match .\^\\\[\\d\+/\\d\+\\\]'; ck "[기록] 단계 표시�
 echo "== 공개판 조건 (인터넷에 그대로 노출된다) =="
 # 두 스크립트는 배포 사이트에서 받아 실행된다 ⇒ 내부 용어가 한 글자도 없어야 한다.
 # 이 축은 **의도적으로 주석까지 센다** — 레포를 연 사람도 그 낱말을 본다.
-TERMS='박사님|설치 자비스|슬라이스|미실측|T-M[0-9]|T-W[0-9]|F-W[0-9]|\bagy\b|codex|fable|봉합|§|\[master#'
+TERMS='박사님|설치 자비스|슬라이스|미실측|T-M[0-9]|T-W[0-9]|F-W[0-9]|\bagy\b|codex|fable|봉합|§|\[master#|TICKET='
+# 0.3.50(독립 검증 재검 N-c): 내부 티켓 이름(TICKET=…)이 공개 파일 주석에 8줄 새었다가 지운 뒤 — 다시 새지 않게 같은 잣대에 넣는다.
 # 🔴이 축은 **죽어 있었다**(2026-09-09 발견 · 내부 용어 7건을 심어도 초록이었다).
 #   까닭 = `ck "… $(basename …)" $?` — `$?` 는 앞의 `[ ]` 가 아니라 **`basename` 의 성공**을 잰다
 #   (인자 확장 중에 명령치환이 그 자리에서 `$?` 를 0 으로 덮는다). ⇒ rc 를 변수에 먼저 담는다.
@@ -1577,7 +1640,8 @@ grep -q '미리보기) 아무것도 하지 않았습니다' "$PS"; ck "[1] ps1 �
 #   System Properties → …」 뒤에 우리 문장 「창을 새로 열고 다시」 → 새 창에도 없으니 무한 반복.
 #   맥 [2] 축(seed_local_bin_path)의 윈도우 짝. 한쪽만 고치면 갈라진다(위 ⑼⑽ 과 같은 형태).
 [ "$(grep -c 'Seed-LocalBinPath' "$PS")" -ge 2 ]; ck "[F-W18] ps1 사용자 PATH 심기 정의+호출" $? "정의만 있고 부르지 않거나 아예 없다"
-codegrep "$PS" "SetEnvironmentVariable\('Path',[^)]*'User'\)"; ck "[F-W18] ps1 이 사용자 PATH 에 실제로 쓴다" $? "등록 명령이 없다 — 새 창에서 못 잡는다"
+# review-fix-jarvis-1115: 쓰기가 레지스트리 SetValue('Path', …, 값 종류)로 바뀌었다(REG_EXPAND_SZ 유지) — 옛 꼴·새 꼴 어느 쪽이든 「실제로 쓴다」를 잰다
+codegrep "$PS" "SetEnvironmentVariable\('Path',[^)]*'User'\)|\\\$k\.SetValue\('Path', \[string\]\\\$value, \\\$kind\)"; ck "[F-W18] ps1 이 사용자 PATH 에 실제로 쓴다" $? "등록 명령이 없다 — 새 창에서 못 잡는다"
 codegrep "$PS" 'ExpandEnvironmentVariables'; ck "[F-W18] ps1 PATH 비교가 %USERPROFILE% 표기를 편다" $? "손으로 넣은 다른 표기와 중복 누적된다"
 codegrep "$PS" 'Path.*Machine'; ck "[F-W18] ps1 시스템 PATH 는 읽기만(권한 상승 0)" $? "같음"
 no_code "$PS" "SetEnvironmentVariable\('Path',[^)]*'Machine'\)"; ck "[F-W18] ps1 시스템 PATH 에는 쓰지 않는다" $? "관리자 권한 상승 경로가 열린다"
@@ -1797,7 +1861,8 @@ if [ -f "$RESET" ]; then
   awk '/Remove-OurHooks/{if(!h)h=NR} /Drop .cysr 프로그램. \$CysDir/{a=NR} END{exit !(h&&a&&h<a)}' "$RESET"
   ck "[제거] 훅 제거가 앱 삭제보다 먼저" $? "훅을 고칠 수단이 먼저 사라진다"
   # 사용자 Path 만 건드린다 — 시스템 Path 는 관리자 권한이 필요하고 우리 것이 아니다.
-  codegrep "$RESET" "SetEnvironmentVariable\('Path', .*'User'\)"; ck "[제거] 사용자 경로만 되돌린다" $? "역연산이 없다"
+  #   (0.3.46 · 검증 F1: 쓰기가 사용자 레지스트리 HKCU\Environment 의 SetValue('Path', …, 값 종류)로 바뀌었다 — 옛 꼴·새 꼴 어느 쪽이든 「사용자 쪽에 되돌려 쓴다」를 잰다)
+  { codegrep "$RESET" "SetEnvironmentVariable\('Path', .*'User'\)" || { codegrep "$RESET" "CurrentUser\.CreateSubKey\('Environment'\)" && codegrep "$RESET" "\\\$k\.SetValue\('Path', \[string\]\\\$value, \\\$kind\)"; }; }; ck "[제거] 사용자 경로만 되돌린다" $? "역연산이 없다"
   no_code "$RESET" "SetEnvironmentVariable\('Path'[^)]*'Machine'\)"; ck "[제거] 시스템 경로는 안 건드린다" $? "시스템 PATH 를 고친다"
   codegrep "$RESET" 'KeptFail'; ck "[제거] 못 지운 것을 센다" $? "실패를 안 센다"
   codegrep "$RESET" 'return 7'; ck "[제거] 못 지운 것이 있으면 실패로 끝낸다" $? "반쯤 지운 위에 설치가 얹힌다"
@@ -2075,7 +2140,7 @@ count_or_fail "$PS" 'pending \+= ,@\(\$cfg, \$k\)'; rc=$?; n="$COUNT_N"; w="$(wh
 ck "[R4] 윈이 홈에 넣은 키를 두 갈래 다 적어 둔다" $? "한 갈래가 기록 없이 넣는다($w)"
 # 🔴3차 검토 N4 — 목록에 적는 것은 **쓰고 되읽은 뒤**여야 한다. 앞 판은 쓰기 전에 적어, 되돌린 판에서도
 #   목록에 남았다(기록이 사실과 어긋난다). ⇒ 순서를 앵커로 못박는다.
-awk '/Write-TextNoBom \$cfg \(\$o \| ConvertTo-Json/{if(!a)a=NR} /foreach \(\$e in \$pending\)/{if(!b)b=NR} END{exit !(a&&b&&a<b)}' "$PS"
+awk '/Write-TextNoBom(Atomic)? \$cfg \(\$o \| ConvertTo-Json/{if(!a)a=NR} /foreach \(\$e in \$pending\)/{if(!b)b=NR} END{exit !(a&&b&&a<b)}' "$PS"
 ck "[R4] 윈은 쓰고 나서 소유 목록에 적는다" $? "쓰기 전에 적어 두면 되돌린 판에서 기록만 남는다"
 codegrep "$PS" "Properties\['hasTrustDialogAccepted'\]"; ck "[R4] 윈이 홈의 기존 값을 보고 비켜 간다" $? "있는 값을 덮는다(원래 false 였던 안전 선택을 뒤집는다)"
 codegrep "$SH" 'plutil -extract "projects\.\$HOME\.hasTrustDialogAccepted"'; ck "[R4] 맥도 홈의 기존 값을 보고 비켜 간다" $? "같음"
@@ -2529,7 +2594,7 @@ ck "[핀] 설치기(맥) 코드의 판본 문자열이 전부 핀 판본이다" 
 
 # ── ⓕ-2 맥 저희 판 전환 (2026-09-15) ────────────────────────────────
 #   애플 실리콘 맥은 우리 릴리스 zip 을 받아 풀어 넣는다. 인텔·자산 없음만 원작자 판으로 간다.
-codegrep "$SH" 'CYS_FORK_VERSION="1\.1\.19"'; ck "[전환] 맥 저희 판 판본 핀(= cysr v1.1.19)" $? "판본 핀이 없다"
+codegrep "$SH" 'CYS_FORK_VERSION="1\.1\.20"'; ck "[전환] 맥 저희 판 판본 핀(= cysr v1.1.20)" $? "판본 핀이 없다"
 codegrep "$SH" 'CYS_FORK_DIR="https://github\.com/oogisoogi/cys-ro/releases/download/v'; ck "[전환] 저희 판은 판본이 박힌 우리 릴리스 자리에서 받는다" $? "다른 자리를 가리킨다"
 # (installer-0321-pin) 1.0.1 발행(2026-09-16) 실측값이 채워졌다 — 아래 세 축은 이제 **초록이어야 한다**(자리표가 남으면 붉다 · 이 축도 형식만 본다).
 codegrep "$SH" 'CYS_FORK_BYTES="?[0-9]+"?$'; ck "[전환] 저희 판 크기 핀(숫자)" $? "크기가 안 맞아 매번 멈춘다(자리표가 남았다)"
@@ -2970,6 +3035,16 @@ ck "[v0317] 기다리는 동안 설치 창에 카드를 되풀이하지 않는�
 count_or_fail "$PS" '\[5분 점검\]'; n="$COUNT_N"
 [ "$n" = "1" ] && codegrep "$PS" '^                        \$checkpointSaid = \$true'
 ck "[v0317] 5분 점검은 한 번만 말한다" $? "점검 문구 ${n}곳 · 또는 한 번 말한 표시가 없다"
+# ── 0.3.50(TICKET=login-stall-whm7-1126 · 11-25 윈 실기 정체 기기): 대기 하트비트 표지(C1) · 첫 점검(C2) ──
+#   흉내 축 = tests/v0317-emu-run.sh 의 「[0.3.50 …]」 · 되돌리면 붉어지는 것 = tests/v0317-mutate.py 의 0350-* 뮤턴트
+codegrep "$PS" "Send-Progress '3/10' 'wait' \\\$w \(Get-LoginWaitDetail "
+ck "[0.3.50] 3/10 wait 하트비트는 설치기 진행 표지(sweep·code·reopen)를 싣는다" $? "하트비트 detail 이 다시 비었다 — 20분 전에 끝난 회차의 꼴을 못 가른다"
+wd_body="$(awk '/^function Get-LoginWaitDetail/{f=1} f&&/^function /&&!/Get-LoginWaitDetail/{exit} f' "$PS" 2>/dev/null | grep -vE '^[[:space:]]*#')"
+[ -n "$wd_body" ] && ! printf '%s\n' "$wd_body" | grep -qE 'Presence|Browser|InputCount|LoginCtrlC|LoginTypedKeys|Get-UserIdleMs|\$pres'
+ck "[0.3.50] 대기 표지는 키보드·마우스·브라우저·Ctrl+C 를 싣지 않는다(고지 범위 · 0.3.43 결정)" $? "함수가 없거나 사람 입력·브라우저를 읽는다"
+e_sec="$(sed -nE 's/^\$LoginEarlyCheckSec[[:space:]]*=[[:space:]]*([0-9]+).*/\1/p' "$PS" | head -1)"; c_sec="$(sed -nE 's/^\$LoginCheckpointSec[[:space:]]*=[[:space:]]*([0-9]+).*/\1/p' "$PS" | head -1)"
+[ -n "$e_sec" ] && [ -n "$c_sec" ] && [ "$e_sec" -lt "$c_sec" ] && codegrep "$PS" "^[[:space:]]+Say '     설치를 다시 실행하지 마십시오" && codegrep "$PS" 'if \(\(-not \$earlySaid\) -and \(\$w -ge \$LoginEarlyCheckSec\) -and \(\$w -lt \$LoginCheckpointSec\)\)'
+ck "[0.3.50] 첫 점검은 5분 점검보다 앞에 한 번 · 다시 실행하지 말라고 한다" $? "첫 점검 ${e_sec:-없음}초 / 5분 점검 ${c_sec:-없음}초 · 또는 문구·한 번 표시가 없다"
 count_from_or_fail 'Invoke-LoginFailQuestion' -- sh -c "grep -vE '^[[:space:]]*#' \"\$1\" | grep -v 'function Invoke-LoginFailQuestion'" _ "$PS"; n="$COUNT_N"
 awk '/^[[:space:]]*if \(\$timedOut\) \{$/{a=NR} a&&NR<=a+3&&/\$ans = Invoke-LoginFailQuestion/{ok=1} END{exit !ok}' "$PS" && [ "$n" = "1" ]
 ck "[v0317] 숫자 질문은 상한에 닿은 실패에서만 한다" $? "부르는 자리 ${n}곳 — 성공 경로에 손이 늘거나 질문이 사라졌다"
@@ -2991,8 +3066,8 @@ for f in "$PS" "$RESET" "$REIN_PS"; do
   codegrep "$f" '1\) ⊞ 윈도우 키\(키보드 왼쪽 아래, Ctrl과 Alt 사이\)를 누르고 powershell' && no_code "$f" '시작 단추를 누르고'; rc=$?
   ck "[v0317] 다시 하시는 법 첫 줄은 윈도우 키(사이트와 같은 말) · $(basename "$f")" "$rc" "(${GREP_WHY})"
 done
-codegrep "$PS" "^\\\$InstallerVersion *= '0\.3\.49'" && codegrep "$SH" '^INSTALLER_VERSION="0\.3\.49"'
-ck "[v0322] 판본 0.3.49(두 설치기 · 한 릴리스 = 한 판번)" $? "보고의 판본이 갈린다"
+codegrep "$PS" "^\\\$InstallerVersion *= '0\.3\.50'" && codegrep "$SH" '^INSTALLER_VERSION="0\.3\.50"'
+ck "[v0322] 판본 0.3.50(두 설치기 · 한 릴리스 = 한 판번)" $? "보고의 판본이 갈린다"
 # 확인 명령 한 번에도 상한 — 없으면 벤더 도구가 멈추는 순간 20분 상한까지 함께 멈춘다(외부 검토 1차 지적 채택).
 awk '/^function Get-LoginStatusText/{f=1}
      f&&/Start-Process -FilePath \$exe -ArgumentList .auth.,.status. .*-RedirectStandardOutput/{s=1}
@@ -3151,6 +3226,13 @@ if [ -f "$DIR/../tests/wake-rc-run.sh" ]; then
   ck "[wake RC] 본부 자비스 wake.sh·wake.ps1·창 폴백이 RC 설정 파일(~/.cys/seat-settings/master-wake.json)을 쓰고 --settings 로 넘긴다(없으면 종전 인자 · 사용자 settings.json 무변 · 실제로 돌림 · 두 OS)" $? "설치·갱신 직후 본부 자비스 RC 가 꺼진 채 뜬다(tests/wake-rc-run.sh)"
 else
   ck "[wake RC] tests/wake-rc-run.sh 가 있다" 1 "시험 파일 없음"
+fi
+# 관리자 창에서 설치해도 앱 창은 일반 권한으로(0.3.50 · 윈 · 11-25 rc3 실기 cys-app TokenElevation=1) — 운영자 노트북(jarvis-cys-app=HighestAvailable)은 종전대로
+if [ -f "$DIR/../tests/app-unelevate-run.sh" ]; then
+  bash "$DIR/../tests/app-unelevate-run.sh" --dir "$DIR" >/dev/null 2>&1
+  ck "[앱 일반 권한] 윈: 관리자 설치기면 explorer 경유로 앱 창을 내려 띄운다 · 10초 안 앱 없음·예외 = 종전 기동 · jarvis-cys-app=HighestAvailable·탐색기 없음·관리자 아님 = 종전 · 토큰 env 0 · 이 세션·그 파일의 앱만 셈(Path 없으면 CIM)(실제로 돌림 · 돌연변이 7종)" $? "관리자 PowerShell 로 설치하면 앱만 관리자로 떠 끌어 놓기가 막힌다(tests/app-unelevate-run.sh)"
+else
+  ck "[앱 일반 권한] tests/app-unelevate-run.sh 가 있다" 1 "시험 파일 없음"
 fi
 # 시험용 함수 묶음(JARVIS_LIB_ONLY=1)은 진행 전송을 라이브로 못 보낸다(0.3.36 · 시험 시간대 라이브 도착 2건 뒤 · 두 OS)
 if [ -f "$DIR/../tests/lib-only-no-live.sh" ]; then
@@ -3345,6 +3427,12 @@ axes_0331
 axes_0332
 
 mac_parity_axes
+
+review_1115_axes
+
+fleet_owner_interrupt_axes
+
+fleet_wait_heartbeat_axes
 
 printf '\n통과 %s · 실패 %s%s\n' "$pass" "$fail" "$([ "$skip" -gt 0 ] && printf ' · 건너뜀 %s' "$skip")"
 [ "$fail" -eq 0 ]

@@ -61,10 +61,31 @@ RULE='────────────────────────�
 new_box() { printf '%s\n' "$RULE" "> $1" "$RULE" '  ? for shortcuts'; }
 welcome() { printf '%s\n' ' Claude Code' ' Welcome back!' ''; }
 replied() { welcome; printf '%s\n' '> [Pasted text #1 +529 lines]' '⏺ DIRECTIVE-ACK'; new_box ''; }
+# ── 데몬 자동 복원 흉내(0.3.50 · 맥 VM rc3 링 기록의 모양) ──
+#   restore-race  = 복원 단계 running 동안 worker 가 먼저 서고, status 를 RACE_MASTER_AT 번째 물을 때 지난 master(surface:5)가 되살아난다
+#                   (단계는 아직 running — cso 가 남았다) · 그 뒤 master 자리 열기는 실물 cys 처럼 claim_denied 로 거절된다.
+#   restore-stuck = 단계가 끝내 running · master 자리는 안 선다(상한에 닿으면 종전대로 연다).
+#   restore-flaky = (독립 검증 N3) status 첫 두 번은 실패(rc 1) → 그 뒤 restore-race 와 같음 — 실패 한 번으로 기다림을 끝내지 않는가
+#   restore-unreadable = status 가 늘 실패(rc 1) — 연속 3번이면 기다림을 끝내고 종전대로 연다
+#   그 밖 시나리오 = status 가 빈 답(칸 없는 옛 cys 와 같다 → 기다리지 않음 = 종전 그대로).
+RACE_MASTER_AT=3
+restored_master() { case "$S" in restore-race|restore-flaky) [ "$(cat "$SB/statuscalls" 2>/dev/null || echo 0)" -ge "$RACE_MASTER_AT" ] ;; *) return 1 ;; esac; }
 case "$1" in
+  status)
+    case "$S" in
+      restore-unreadable) k=$(( $(cat "$SB/statuscalls" 2>/dev/null || echo 0) + 1 )); echo "$k" > "$SB/statuscalls"; echo "Error: daemon busy" >&2; exit 1 ;;
+      restore-race|restore-stuck|restore-flaky)
+        k=$(( $(cat "$SB/statuscalls" 2>/dev/null || echo 0) + 1 )); echo "$k" > "$SB/statuscalls"
+        if [ "$S" = restore-flaky ] && [ "$k" -le 2 ]; then echo '{"daemon":{"auto_restore":"done"}}'; echo "Error: timeout" >&2; exit 1; fi
+        # 실물 `cys status --json` 처럼 다듬은 JSON(칸 이름 뒤 「: 」) · 자리는 daemon 안
+        printf '{\n  "daemon": {\n    "auto_restore": "%s",\n    "version": "1.1.19"\n  },\n  "paused": false\n}\n' running ;;
+    esac
+    exit 0 ;;
   list)
     n=$(( $(cat "$SB/listcalls" 2>/dev/null || echo 0) + 1 )); echo "$n" > "$SB/listcalls"
     row 3 cso old-install
+    case "$S" in restore-race|restore-stuck|restore-flaky) row 4 worker-2 restored-worker ;; esac
+    restored_master && row 5 master restored-master
     if [ -f "$SB/opened" ]; then
       row 9 master jarvis
       if [ "$S" = "claim-denied" ]; then echo "warning: stale entry role=worker-9 skipped"; fi
@@ -89,6 +110,8 @@ case "$1" in
     printf '%s\n' "$@" > "$SB/newsurface-args"
     # 거절 문구는 cys 0.14.36 이 내는 거절 사유 글자를 따른다(자리 번호는 싣지 않는다 — 실물 명령 출력 모양은 아직 안 쟀다)
     if [ "$S" = "no-surface" ]; then echo "Error: claim_denied: privileged role held by live surface" >&2; exit 7; fi
+    # 되살아난 master 자리가 있으면 실물 데몬처럼 거절한다(rc3 링 seq 8985 와 같은 사유 글자)
+    if restored_master; then echo "Error: claim_denied: privileged role held by live surface" >&2; exit 7; fi
     touch "$SB/opened"
     # 자비스 자리가 열린 순간 마스터 자리가 무엇을 하는지 — 시나리오가 정한다
     case "$S" in

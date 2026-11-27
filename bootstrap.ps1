@@ -47,6 +47,41 @@ param(
 #   $env:JARVIS_LIB_ONLY = '' 로 비워도(시험 관용구) 라이브 차단(Get-ProgressUrl · $HelpApiUrl)은 풀리지 않는다. 사람이 쓰는 설치 = $false = 무변화.
 $script:JarvisLibOnly = ($env:JARVIS_LIB_ONLY -eq '1')
 
+# 🔴2026-11-11: 윈도우 10 미만(7·8·8.1)은 **가장 먼저** 친절하게 멈춘다.
+#   왜: 클로드 코드는 윈도우 10 1809 이상만 지원한다(공식 문서 code.claude.com/docs/en/setup 「System requirements」
+#     · 2026-11-11 확인). 그 아래에서 끝까지 가면 [2/10] 공식 설치기에서 뜻 모를 오류로 끝난다.
+#   판 판별 = 레지스트리 CurrentBuildNumber(윈도우 10 첫 빌드 = 10240 · 8.1 = 9600 · 8 = 9200 · 7 = 7601).
+#     [Environment]::OSVersion 은 쓰지 않는다 — Windows PowerShell(.NET Framework)에서는 호환 모드일 때 틀린 판을
+#     돌려줄 수 있다(learn.microsoft.com/dotnet/api/system.environment.osversion 「Remarks」 · 2026-11-11 확인).
+#     그 틀린 값(6.2)으로 막으면 멀쩡한 윈도우 10 을 막는다 ⇒ 레지스트리를 못 읽으면 막지 않고 지나간다(fail-open).
+#   이 블록은 PowerShell 2.0 문법만 쓴다(윈도우 7·8.1 기본 PowerShell 은 2.0·4.0).
+#   ⚠단 PowerShell 은 파일 전체를 먼저 해석하므로, 파일 어딘가에 옛 PowerShell 이 못 읽는 문법이 있으면 이 블록까지 오지 못한다 — 윈 실기 몫.
+#     겨냥 = 윈도우 8·8.1 기본(PowerShell 3.0·4.0): 파일에 PS5 전용 해석 문법(class·enum·using)을 넣지 않는다(tests/winver-gate-run.sh ⓔ).
+#     윈도우 7 기본(PowerShell 2.0)은 설치 줄의 irm 이 없어 이 파일을 받기 전에 끝난다 — 그 갈래의 안내는 설치 줄 쪽 몫이다(이 블록 밖).
+function Test-WinTooOld([int]$Build) {
+    return (($Build -gt 0) -and ($Build -lt 10240))
+}
+function Get-WinTooOldLines([int]$Build) {
+    return @(
+        '',
+        ('이 컴퓨터의 윈도우(빌드 ' + $Build + ')에는 자비스를 설치할 수 없습니다. 자비스는 윈도우 10 이상이 필요합니다.'),
+        '윈도우 10 또는 11 컴퓨터에서 받은 설치 줄을 붙여 넣어 주십시오.',
+        '붙여 넣을 때는 창 안에서 마우스 오른쪽 단추를 한 번 누르면 됩니다.',
+        '이 컴퓨터의 설정은 아무것도 바꾸지 않았습니다(받아 둔 설치 파일 1개만 사용자 폴더에 남아 있습니다).',
+        ''
+    )
+}
+if ((-not $script:JarvisLibOnly) -and ([Environment]::OSVersion.Platform -eq [PlatformID]::Win32NT)) {
+    $winBuildNo = 0
+    try {
+        $winBuildNo = [int]((Get-ItemProperty -Path 'HKLM:\SOFTWARE\Microsoft\Windows NT\CurrentVersion' -Name 'CurrentBuildNumber' -ErrorAction Stop).CurrentBuildNumber)
+    } catch { $winBuildNo = 0 }
+    if (Test-WinTooOld $winBuildNo) {
+        foreach ($winOldLine in (Get-WinTooOldLines $winBuildNo)) { Write-Host $winOldLine }
+        exit 1
+    }
+}
+
 # 🔴2026-09-17(c8 · 09-17 19:49 실기 · 도움 7NBPKA79 · J-PATH-01 오판정):
 #   64비트 윈도우에서 시작 메뉴의 「Windows PowerShell (x86)」(32비트 프로세스)로 이 파일을 열면
 #   [1-1] 환경 보고는 64bit=True 를 정확히 찍으면서도(OS 판정) 그 32비트 프로세스 안에서
@@ -145,7 +180,10 @@ $CysDisplayName = 'cysr'
 # 0.3.46(2026-11-22): cysr 1.1.16 핀(발행 2026-11-22 · 값 = 발행 자산 실물 실측 · 릴리스 SHA256SUMS.txt 대조 = tests/win-pin-release.sh) · 코드 변경 0 — 핀 값과 판번만
 # 0.3.47(2026-11-23): 설치·갱신 직후 본부 자비스(master)만 RC 켬(write_master_wake_settings · Write-MasterWakeSettings) · cysr 1.1.17 핀(값 = 태그 런 release 45072298565 의 발행 자산 · 릴리스 공개 전이라 SHA256SUMS.txt 대조는 공개 뒤 tests/win-pin-release.sh)
 # 0.3.49(2026-11-25): cysr 1.1.19 핀(발행 2026-11-25 · 값 = 공개 릴리스 v1.1.19 SHA256SUMS.txt(그 파일 자신의 sha256 = c41c6ff3f51203f4b877df4dee795fc5721610c69e30e9fce30f19d9d3086125 · 1162 B · 13행) 줄과 바이트 일치) · 코드 변경 0 — 핀 값과 판번만
-$CysVersion     = '1.1.19'
+# 0.3.50(2026-11-26 · 후보): 가림 v3 이식 + 미발행 r13 고침 편입(r13/scrub-v3-port 에서 「0.3.46(2026-11-15)」로 적혔던 판 — 공개된 적 없음 · 라이브 0.3.46(11-22)과 다른 판): 11-15 적대 검토 확정 지적 수리(사용자 PATH 값 종류 유지 · 설정 파일 바꿔 끼우기 · trust-seed 합치기 · J-RM-01 정상 갈래 · 함수형 원격 명령 · 글자 첨부 지우기 · 폴링 출처 헤더) + 윈도우 10 미만 맨 앞 멈춤 · 가림 v3 · 사람이 멈춘 대기 끝 = info 표식
+#   0.3.50 에 함께 든 것: 윈 [3/10] 90초 첫 점검·「다시 실행하지 마십시오」·대기 하트비트 표지(50267f8) · 윈 관리자 창 설치에서도 [9/10] 앱 창을 일반 권한으로(1d078f1) · [9/10] 데몬 자동 복원이 끝나기를 기다린 뒤 master 자리(맥 76a1231 · 윈 3cc4031)
+#   핀 = cysr 1.1.20(발행 2026-11-26 · 값 = 공개 릴리스 v1.1.20 SHA256SUMS.txt(그 파일 자신의 sha256 = 2659189a094d8b42a90b359c421acbe6bd5fb2a9dfd0f4f3072ca3419739ba06) 줄과 바이트 일치 · 같은 값 = 묶음 2a pin1120.py)
+$CysVersion     = '1.1.20'
 $CysDownloadDir = "https://github.com/oogisoogi/cys-ro/releases/download/v${CysVersion}/"
 # ✅아래 세 값 = v1.1.6 재절단 드래프트 릴리스(2026-09-26 · 릴리스 id 396787705 · 대상 커밋 76d2b5e9) 의 자산에서 **실측으로 채웠다**(첫 절단 값(a8ab563b · 140837194 · 릴리스 id 396500235)을 대신한다).
 #   출처 = 릴리스 SHA256SUMS.txt(그 파일 자신의 sha256 = ca54d259b460340f33541181b1711e0183e036dc6a1c3110771480c2496b4ff2 · 1157 B · 13행 · 재절단 드래프트 자산) · 크기·지문은 릴리스 API 자산 digest·SUMS 줄·인증 받기 실물 sha256 과 대조(3/3 일치).
@@ -157,8 +195,8 @@ $CysDownloadDir = "https://github.com/oogisoogi/cys-ro/releases/download/v${CysV
 #   `${CysVersion}` 를 그대로 두는 것이 정본이다 — 판을 올릴 때 이름이 함께 따라 오르고, 뮤턴트 M508 이 그 따라오름을 잰다.
 #   지금 값은 풀면 cysr_1.1.6_x64-setup.exe = 릴리스 자산 이름과 글자 그대로 같다.
 $CysWinFile     = "cysr_${CysVersion}_x64-setup.exe"
-$CysWinBytes    = 159061211
-$CysWinSha256   = '93f3105d89d6b52cb517bc82235610ecfe3e1b47683a9e0e28db631e27ffd16b'   # 릴리스 v1.1.19 SHA256SUMS.txt 의 그 줄과 바이트 일치(tests/win-pin-release.sh 가 릴리스를 때려 다시 잰다)
+$CysWinBytes    = 159094396
+$CysWinSha256   = 'b27fcffff778a9d5b25fec102be9e71efd9dd739d12afffeff4ce31e28b28630'   # 릴리스 v1.1.20 SHA256SUMS.txt 의 그 줄과 바이트 일치(tests/win-pin-release.sh 가 릴리스를 때려 다시 잰다)
 $CysDownloadUrl = $CysDownloadDir + $CysWinFile
 
 $LoginPollInterval = 2     # 초 — 승인 프로세스가 끝난 뒤 로그인을 다시 확인하는 간격
@@ -170,10 +208,14 @@ $LoginConfirmTries = 3     # 승인 프로세스가 끝난 뒤 몇 번 확인하
 $LoginSayInterval  = 60    # 초 — 기다리는 동안 설치 창 제목의 경과(분)를 고치는 간격
 $LoginWaitTimeout  = 1200  # 초 (20분) — 승인 대기 자체의 상한 · 벽시계로 잰다 (그 뒤 질문 1분 + 확인 3회 ⇒ 최악 약 21분으로 닫힌다)
 $LoginCheckpointSec  = 300 # 초 (5분) — 브라우저에 로그인 화면이 떴는지 한 번 묻는 자리
+# 0.3.50(11-25 윈 실기): 사람은 로그인 창을 연 지 62초·123초 만에 설치를 다시 시작했다(진행 기록 관측)
+#   — 첫 도움말이 5분에야 나와서다. ⇒ 그보다 앞에 한 번 더 말한다(5분 점검은 그대로 둔다).
+$LoginEarlyCheckSec  = 90  # 초 — 첫 점검(주소 붙여넣기 + 「다시 실행하지 마십시오」) 자리 · $LoginCheckpointSec 보다 작아야 말한다
 $LoginStatusEverySec = 30  # 초 — 로그인 창이 살아 있는 동안 확인 명령을 부르는 간격(로그인 파일은 5초마다 본다)
 $LoginAskWaitSec     = 60  # 초 — 상한에 닿았을 때 숫자 하나를 기다리는 상한
 $LoginStatusWaitMs   = 20000 # ms — 확인 명령 한 번의 상한(벤더 도구가 멈춰도 20분 상한이 살아 있게)
 $LoginTickMs         = 2000  # ms — 로그인을 기다리는 한 바퀴(이 사이에 복사된 코드·설치 창에 붙여넣은 코드·로그인 파일을 본다)
+$LoginProgressEverySec = 60  # 초 — 로그인 대기 하트비트(3/10 wait) 간격(계약 3절 · 0.3.50 에서 상수로 뺐다 — 흉내 시험이 짧게 잰다)
 $LoginClipMaxSends   = 3     # 한 번 연 로그인에서 복사된 코드를 넣는 최대 횟수(같은 코드는 한 번만 · 서로 다른 코드만 센다)
 $LoginTypedMaxSends  = 3     # 한 번 연 로그인에서 설치 창에 붙여넣은 코드를 넣는 최대 횟수
 # 🔴로그인 카드(2026-09-14 워크숍 · 로그인 막힘 9건) — 승인을 두 번 누르거나 주소창 주소를 붙여넣어 코드가 무효가 됐다(사진 · 400).
@@ -189,7 +231,7 @@ $LoginCardLines = @(
     '     3) 「코드를 로그인에 넣었습니다」가 안 나오면: 이 설치 창을 한 번 누르고 마우스 오른쪽 단추로 붙여넣은 뒤 Enter 를 누르십시오 — 5분 안에.',
     '     브라우저가 안 열리면: 이 설치 창에 보이는 https:// 주소를 복사해 브라우저 주소창에 붙여넣으십시오.',
     '     주소를 마우스로 긁을 수 없으면: 이 설치 창에서 Alt+Space → E → K 를 누른 뒤 주소를 끌어 선택하고 Enter 를 누르십시오(복사됩니다).',
-    '     이 설치 창은 닫지 마십시오. 기다리셔도 됩니다 — 20분 뒤 저절로 다음 안내가 나옵니다.'
+    '     이 설치 창은 닫지 마시고, 설치를 다시 실행하지도 마십시오(다시 하면 로그인 화면이 처음부터 다시 열립니다). 기다리셔도 됩니다 — 20분 뒤 저절로 다음 안내가 나옵니다.'
 )
 # 로그인이 끝내 안 됐을 때 사람이 스스로 푸는 길(윈도우 · 2026-09-15 샌드박스에서 이 길로 로그인이 됐다)
 $LoginSelfFixLines = @(
@@ -460,6 +502,44 @@ function Write-TextNoBom($path, $text) {
     $full = $ExecutionContext.SessionState.Path.GetUnresolvedProviderPathFromPSPath($path)
     $enc = New-Object System.Text.UTF8Encoding($false)
     [System.IO.File]::WriteAllText($full, $text, $enc)
+}
+
+# 남의 설정 파일(~\.claude.json · ~\.claude\settings.json)은 제자리에 쓰지 않는다 — 옆에 다 쓴 뒤 바꿔 끼운다(review-fix-jarvis-1115 · c0-input-3).
+#   WriteAllText 는 파일을 먼저 비우고 쓴다 ⇒ 쓰는 도중 실패(디스크 가득 · 백신 차단)하면 참가자의 설정이 잘린 채 남았다.
+#   바꿔 끼우기 전에 실패하면 원래 파일은 한 바이트도 바뀌지 않는다 · 임시 파일은 지우고 같은 예외를 다시 던진다(부르는 쪽 catch 그대로).
+#   🔴임시 이름은 실행마다 다르고 **새로 만들기만** 한다(검증 F9) — 고정 이름(.jarvis-tmp)은 그 자리에 미리 놓인 링크를 따라
+#     링크가 가리키는 파일을 새 설정 글로 덮었다. CreateNew 는 그 이름에 무엇이든(링크 포함) 이미 있으면 실패한다.
+function New-TextFileExclusive($path, $text) {
+    $bytes = (New-Object System.Text.UTF8Encoding($false)).GetBytes([string]$text)
+    $fs = New-Object System.IO.FileStream($path, [System.IO.FileMode]::CreateNew, [System.IO.FileAccess]::Write, [System.IO.FileShare]::None)
+    try { $fs.Write($bytes, 0, $bytes.Length); $fs.Flush() } finally { $fs.Dispose() }
+}
+# 바꿔 끼우기 한 번(시험이 이 함수만 바꿔 끼워 실패 갈래를 만든다)
+function Invoke-FileSwap($Tmp, $Full) {
+    # ⚠백업 이름 자리는 진짜 null([NullString]::Value) — $null 은 빈 글로 바뀌어 Replace 가 던진다(help-attempts.json 과 같은 함정)
+    if ([System.IO.File]::Exists($Full)) { [System.IO.File]::Replace($Tmp, $Full, [NullString]::Value) } else { [System.IO.File]::Move($Tmp, $Full) }
+}
+function Write-TextNoBomAtomic($path, $text) {
+    $full = $ExecutionContext.SessionState.Path.GetUnresolvedProviderPathFromPSPath($path)
+    $tmp = $full + '.jarvis-tmp-' + [guid]::NewGuid().ToString('N')
+    $written = $false
+    try {
+        New-TextFileExclusive $tmp $text
+        $written = $true   # 임시 파일을 끝까지 다 썼다 — 이 뒤의 실패만 「바꿔 끼우기 실패」다
+        Invoke-FileSwap $tmp $full
+    } catch {
+        # 🔴원래 자리가 비었는데 새 내용이 임시 이름에만 있으면 지우지 않고 원래 자리로 옮긴다(검증 F2 · ReplaceFile 오류
+        #   1176 = 원래 파일은 이미 없고 새 내용은 임시 이름에만 · 1177 = 원래 파일은 다른 이름으로 숨음). 지우면 설정 자리가 빈다.
+        #   옮겨 살렸으면 던지지 않는다 — 부르는 쪽의 되읽기 확인(→ 실패면 사본 복원)이 그대로 판정한다.
+        #   ⚠**임시 파일을 끝까지 쓴 뒤의 실패에서만**($written · 2차 검증 N1) — 쓰기 도중 실패한 반쪽 글을 원래 자리(원래 파일이 없던
+        #   새 컴퓨터의 settings.json·.claude.json)로 옮기면 깨진 설정이 「성공」으로 남는다 ⇒ 그때는 지우고 던진다(앞 판과 같은 깨끗한 실패).
+        if ($written -and -not [System.IO.File]::Exists($full) -and [System.IO.File]::Exists($tmp)) {
+            try { [System.IO.File]::Move($tmp, $full); Write-Log ('atomic-write: 바꿔 끼우기 실패 뒤 임시 파일을 원래 자리로 옮김 - ' + (Redact $full)); return }
+            catch { Write-Log ('atomic-write: 원래 자리가 비었고 옮기기도 실패 — 새 내용은 ' + (Redact $tmp) + ' 에 남김'); throw }
+        }
+        Remove-Item -LiteralPath $tmp -Force -ErrorAction SilentlyContinue
+        throw
+    }
 }
 
 # 사람 손 계수 — 「개입 목록」을 기억이 아니라 로그에서 만든다(맥판과 같은 축).
@@ -1848,8 +1928,39 @@ function Seed-LocalBinPath {
 #   설치가 끝난 뒤 새 창의 자비스가 「cys」를 찾지 못했다 ⇒ Seed-LocalBinPath 와 같은 규칙으로 **사용자** PATH 에만 멱등으로 넣는다(관리자 권한 0).
 #   ⚠읽기·쓰기를 두 함수로 뺀 까닭 = 맥 흉내에는 사용자 환경변수 자리가 없다(.NET 이 무시한다) — 흉내가 이 둘만 바꿔 끼워 규칙을 잰다.
 #   ⚠지우는 쪽 = reset-clean.ps1 Remove-UserPathSeed(프로그램까지 지울 때만 · -KeepApp 이면 남긴다).
-function Get-UserPathValue { return [Environment]::GetEnvironmentVariable('Path', 'User') }
-function Set-UserPathValue($value) { [Environment]::SetEnvironmentVariable('Path', $value, 'User') }
+#   🔴읽기·쓰기는 레지스트리 값 그대로다(review-fix-jarvis-1115 · c0-data-2) — 앞 판은 [Environment]::Get/SetEnvironmentVariable 를 썼다.
+#     그 읽기는 %USERPROFILE%·%JAVA_HOME% 같은 참조를 **펼친** 값을 주고 그 쓰기는 REG_SZ 로 저장해, 설치 한 번에 사용자 PATH 의
+#     참조가 모두 글자 경로로 굳었다(윈도우 기본 PATH 의 %USERPROFILE%\AppData\Local\Microsoft\WindowsApps 포함 · 되돌릴 기록 없음).
+#   ⇒ 읽기 = 펼치지 않은 원래 글자 · 쓰기 = 원래 값 종류 유지(REG_EXPAND_SZ 였거나 % 가 있으면 REG_EXPAND_SZ) · 쓴 뒤 「환경이 바뀌었다」 알림.
+#   비교(이미 있는가)는 부르는 쪽이 항목마다 ExpandEnvironmentVariables 로 펼쳐서 한다(앞 판 그대로).
+function Get-UserPathValue {
+    $k = [Microsoft.Win32.Registry]::CurrentUser.OpenSubKey('Environment', $false)
+    if ($null -eq $k) { return $null }
+    try {
+        $v = $k.GetValue('Path', $null, [Microsoft.Win32.RegistryValueOptions]::DoNotExpandEnvironmentNames)
+        if ($null -eq $v) { return $null }
+        return [string]$v
+    } finally { $k.Close() }
+}
+function Get-UserPathKind([string]$Existing, [string]$Value) {
+    # 돌려주는 것 = 'ExpandString' | 'String' — **이미 있는 값의 종류를 그대로 지킨다**(레지스트리 없이 재는 규칙 · 검증 F7):
+    #   원래 REG_SZ 면 % 가 있어도 REG_SZ(그 % 는 글자 그대로라는 뜻 — 종류를 바꾸면 펼쳐지기 시작해 뜻이 바뀐다) ·
+    #   값이 아예 없을 때만 윈도우 기본인 REG_EXPAND_SZ. $Value 는 규칙에 쓰지 않는다(부르는 쪽 모양 유지).
+    if ($Existing -ceq 'String') { return 'String' }
+    return 'ExpandString'
+}
+function Set-UserPathValue($value) {
+    $k = [Microsoft.Win32.Registry]::CurrentUser.CreateSubKey('Environment')
+    try {
+        $existing = ''
+        try { $existing = [string]$k.GetValueKind('Path') } catch { $existing = '' }
+        $kind = [Microsoft.Win32.RegistryValueKind](Get-UserPathKind $existing ([string]$value))
+        $k.SetValue('Path', [string]$value, $kind)
+    } finally { $k.Close() }
+    # 레지스트리에 직접 쓰면 「환경이 바뀌었다」 알림(WM_SETTINGCHANGE)이 가지 않는다 — 새 창이 옛 PATH 를 물려받는다.
+    #   .NET 의 사용자 환경변수 쓰기는 쓴 뒤 늘 그 알림을 보낸다 ⇒ 없는 이름 하나를 지우는 것으로 알림만 보낸다(값 변화 0 · Add-Type 0).
+    try { [Environment]::SetEnvironmentVariable('JARVIS_ENV_REFRESH', $null, 'User') } catch { Write-Log ('path-notify: ' + $_.Exception.Message) }
+}
 function Seed-CysPath($dir) {
     if (-not $dir) { return $false }
     $want = ([string]$dir).TrimEnd('\')
@@ -2853,6 +2964,20 @@ function Update-LoginPresence($pr) {
         }
     }
 }
+# 0.3.50: 60초 대기 하트비트의 detail — 지금은 「어디까지 왔나」가 20분 실패 끝에만 남아,
+#   그 전에 창을 닫거나 다시 실행한 회차(11-25 윈 실기 3회)는 꼴을 못 갈랐다. ⇒ 설치기 **자신의 진행**만 싣는다.
+#   싣는 것: sweep = 로그인 창을 열기 전 프로필 확인 결과(3/10 end 에 이미 싣는 값과 같은 글자) ·
+#            code = 설치기가 코드를 로그인 입력에 넣은 적이 있나(0/1 · 횟수·원문 없음) · reopen = 코드가 안 받아져 한 번 더 열었나(0/1).
+#   ⛔싣지 않는 것: 키보드·마우스·브라우저·Ctrl+C(고지 범위 = 「시간 안에 안 끝나면 키보드·마우스 사용 여부만」 · 0.3.43 운영 결정) · 코드·주소·계정 원문.
+function Get-LoginWaitDetail([int]$CodeSends, [bool]$Reopened) {
+    $parts = @()
+    if ($script:LoginSweep) { $parts += ('sweep=' + ([string]$script:LoginSweep -replace '[^A-Za-z0-9=,_-]', '')) }
+    $parts += ('code=' + $(if ($CodeSends -gt 0) { '1' } else { '0' }))
+    $parts += ('reopen=' + $(if ($Reopened) { '1' } else { '0' }))
+    $d = ($parts -join ' ')
+    if ($d.Length -gt 160) { $d = $d.Substring(0, 160) }
+    return $d
+}
 function Resolve-LoginPresence($pr) {
     # 돌려주는 것 = @{ Tag; Input; Browser } — Tag: away(사람 입력 없음) · no-browser(사람은 있었는데 브라우저 흔적 없음) · browser-seen · unmeasured
     $bw = if ($pr.ClaudeTitleSec -ge 0) { ('Claude 제목 창 보임(' + $pr.ClaudeTitleSec + '초) · 새로 뜬 브라우저 ' + $pr.NewBrowser + '개') }
@@ -3044,6 +3169,7 @@ function Step-Login {
                 Set-LoginStage ('wait (installer-fed · pid ' + $loginProc.Id + ')')
                 $sw = [System.Diagnostics.Stopwatch]::StartNew()
                 $checkpointSaid = $false
+                $earlySaid = $false
                 $nextStatus = $LoginStatusEverySec
                 $nextTitle = 0
                 $nextProgress = 0
@@ -3131,6 +3257,18 @@ function Step-Login {
                         }
                         break
                     }
+                    # 0.3.50 첫 점검 — 한 번만 · 5분 점검보다 앞일 때만. 브라우저를 봤는지로 가르지 않는다(Say 는 보내는 기록에도 적힌다 · 0.3.43 결정 = 브라우저 판단은 보내지 않음).
+                    if ((-not $earlySaid) -and ($w -ge $LoginEarlyCheckSec) -and ($w -lt $LoginCheckpointSec)) {
+                        $earlySaid = $true
+                        # 코드를 이미 로그인에 넣었으면(복사·붙여넣기 전송 1회+) 「안 보이면 주소를 붙여넣으십시오」는 맞지 않는다 — 말하지 않는다(독립 검증 N5).
+                        if (($clipSends + $typedSends) -eq 0) {
+                            Say ('     [' + $LoginEarlyCheckSec + '초 점검] 브라우저에 로그인 화면이 안 보이면 이 설치 창에 보이는 https:// 주소를 복사해 브라우저 주소창에 붙여넣으십시오.')
+                            Say '     설치를 다시 실행하지 마십시오 — 다시 하면 로그인 화면이 처음부터 다시 열립니다. 이 창에서 그대로 기다리시면 됩니다.'
+                            Write-Log 'login early check shown'
+                        } else {
+                            Write-Log 'login early check skipped: code already sent'
+                        }
+                    }
                     # 한 번만 묻는다 — 브라우저가 안 열린 사람은 여기서 스스로 풀 수 있다(주소는 로그인 창에 있다).
                     if ((-not $checkpointSaid) -and ($w -ge $LoginCheckpointSec)) {
                         $checkpointSaid = $true
@@ -3144,8 +3282,8 @@ function Step-Login {
                     }
                     # 60초마다 대기 진행을 알린다(계약 3절 · 서버 쪽이 정체를 알아본다).
                     if ($w -ge $nextProgress) {
-                        $nextProgress = $w + 60
-                        Send-Progress '3/10' 'wait' $w $null $null
+                        $nextProgress = $w + $LoginProgressEverySec
+                        Send-Progress '3/10' 'wait' $w (Get-LoginWaitDetail ($clipSends + $typedSends) $reopened) $null
                         if ($w -ge 180) { Send-EvidenceOnce 'stall' }   # v0.3.18 — 로그인 대기 3분 이상 = 정체 증거
                     }
                     # 5분마다 로그인 창을 한 장 찍어 둔다(최대 4 · 계약 3절 · 원인 분류용 · 보고가 열리면 첨부).
@@ -3400,7 +3538,7 @@ function Set-ClaudePrefs {
                 }
             }
         }
-        Write-TextNoBom $cfg ($o | ConvertTo-Json -Depth 20)
+        Write-TextNoBomAtomic $cfg ($o | ConvertTo-Json -Depth 20)
         # 쓴 뒤에 되읽어서 확인한다 — 못 읽으면 사본으로 되돌린다(우리가 남의 설정을 깨고 끝내지 않는다).
         try {
             $back = Get-Content $cfg -Raw -Encoding UTF8 | ConvertFrom-Json
@@ -3442,7 +3580,7 @@ function Set-ClaudeSettings {
         if (-not $o.PSObject.Properties['theme']) {
             $o | Add-Member -NotePropertyName theme -NotePropertyValue 'dark' -Force
         }
-        Write-TextNoBom $sf ($o | ConvertTo-Json -Depth 20)
+        Write-TextNoBomAtomic $sf ($o | ConvertTo-Json -Depth 20)
         Write-Log "seed: settings.json skipDangerousModePermissionPrompt=true · remoteControlAtStartup=false (되돌리기 = $(Redact $sf) 의 두 줄 삭제)"
         return $true
     } catch {
@@ -3575,7 +3713,7 @@ function Undo-TrustSeed($cfg, $key) {
             $ex.Value.PSObject.Properties.Remove('hasTrustDialogAccepted')
         }
         if (@($ex.Value.PSObject.Properties).Count -eq 0) { $prj.Value.PSObject.Properties.Remove($key) }
-        Write-TextNoBom $cfg ($o | ConvertTo-Json -Depth 20)
+        Write-TextNoBomAtomic $cfg ($o | ConvertTo-Json -Depth 20)
         # 🔴🔴**되돌렸다고 말하기 전에 되돌아갔는지 본다**(4차 검토 BLOCK N4 확정 2026-09-10 · 맥판과 같다).
         #   앞 판은 쓰기만 하고 `$true` 도 안 돌려줬다 — 부르는 쪽은 결과와 무관하게 추적 목록을 비우고
         #   「도로 뺐습니다」라고 말했다. 디스크가 꽉 차면 기록 쓰기와 되쓰기가 **함께** 실패한다 ⇒
@@ -3603,6 +3741,20 @@ function Undo-TrustSeed($cfg, $key) {
         return 'unknown'
     }
 }
+# 지난 실행이 적어 둔 기록 줄 + 이번 줄(겹치면 한 번) — 기록은 통째로 다시 쓰므로 앞 줄을 읽어 합쳐야 지워지지 않는다
+#   (review-fix-jarvis-1115 · c0-data-7: 앞 판은 이번 실행 줄만으로 덮어써, 1차 실행이 넣은 개인 프로필 홈 키 기록이 사라졌다 —
+#   제거기는 그 키를 남의 것으로 읽어 영영 남긴다). 파일을 못 읽으면 던진다(부르는 쪽 = 기록 실패로 처리 · 모르는 기록을 덮지 않는다).
+function Merge-TrustSeedLines([string[]]$New) {
+    $all = New-Object System.Collections.Generic.List[string]
+    if (Test-Path -LiteralPath $TrustSeedFile) {
+        $old = Get-Content -LiteralPath $TrustSeedFile -Raw -Encoding UTF8 -ErrorAction Stop
+        if ($null -ne $old) {
+            foreach ($l in ($old -split "`r?`n")) { if ($l.Trim() -and -not $all.Contains($l)) { $all.Add($l) } }
+        }
+    }
+    foreach ($l in $New) { if ($l -and -not $all.Contains($l)) { $all.Add($l) } }
+    return ,([string[]]$all.ToArray())
+}
 function Set-AllProfiles {
     $seeded = @()
     foreach ($t in (Get-ProfileTargets)) {
@@ -3622,11 +3774,12 @@ function Set-AllProfiles {
         $lines = @()
         foreach ($e in $script:TrustSeeded) { $lines += ($e[0] + "`t" + $e[1]) }
         if ($lines.Count -gt 0) {
-            Write-TextNoBom $TrustSeedFile (($lines -join "`r`n") + "`r`n")
+            $merged = Merge-TrustSeedLines $lines
+            Write-TextNoBomAtomic $TrustSeedFile (($merged -join "`r`n") + "`r`n")
             # 쓴 것을 되읽어 확인한다 — 「썼다」는 다시 읽어 있을 때만 참이다.
             $back = Get-Content $TrustSeedFile -Raw -Encoding UTF8 -ErrorAction Stop
-            if (($null -eq $back) -or ($back.Split("`n").Where({ $_.Trim() }).Count -lt $lines.Count)) { throw '되읽기 확인 실패' }
-            Write-Log ("trust seed record: " + $lines.Count + " 줄 -> " + (Redact $TrustSeedFile))
+            if (($null -eq $back) -or ($back.Split("`n").Where({ $_.Trim() }).Count -lt $merged.Count)) { throw '되읽기 확인 실패' }
+            Write-Log ("trust seed record: " + $lines.Count + " 줄(지난 기록 합쳐 " + $merged.Count + " 줄) -> " + (Redact $TrustSeedFile))
         }
     } catch {
         Write-Log ("trust seed record failed -> rollback: " + $_.Exception.Message)
@@ -3652,7 +3805,7 @@ function Set-AllProfiles {
             foreach ($e in $stuck) { $lines2 += ($e[0] + "`t" + $e[1]) }
             $ok2 = $false
             try {
-                Write-TextNoBom $TrustSeedFile (($lines2 -join "`r`n") + "`r`n")
+                Write-TextNoBomAtomic $TrustSeedFile (((Merge-TrustSeedLines $lines2) -join "`r`n") + "`r`n")
                 $chk = Get-Content $TrustSeedFile -Raw -Encoding UTF8 -ErrorAction Stop
                 if ($null -ne $chk -and $chk.Trim()) { $ok2 = $true }
             } catch { $ok2 = $false }
@@ -3922,7 +4075,12 @@ function Step-InstallCys {
             # 되돌릴 파일이 실제로 만들어졌을 때에만 지운다. 백업이 없으면 손대지 않는다.
             if (Test-Path $bkFile) {
                 Remove-Item $key -Recurse -Force -ErrorAction SilentlyContinue
-                Write-JCode 'J-RM-01' '지난 설치의 자국이 남아 있어 정리했습니다'
+                # 🔴정상 진행 갈래다 — Write-JCode 를 부르지 않는다(review-fix-jarvis-1115 · c0-data-6). 그것은 이번 실행의 코드($script:JCode)를
+                #   채우고 실패 이벤트·실패 증거를 보내므로, 뒤 단계가 코드 없이 막히면 J-UNK-00 대신 J-RM-01 이 보고·기록되고
+                #   성공으로 끝나도 끝맺음에 「진단 코드: J-RM-01」이 찍혔다. 화면 두 줄·기록 한 줄은 그대로 남긴다(찾아보기 주소 포함).
+                Say ("     진단 코드: J-RM-01 — 지난 설치의 자국이 남아 있어 정리했습니다")
+                Say ("     이 코드로 찾아보실 수 있습니다: " + $HelpCodeUrl + 'J-RM-01')
+                Write-Log 'jcode-note J-RM-01 지난 설치의 자국이 남아 있어 정리했습니다 (정상 진행 · 실패 코드 아님)'
             Say '[6/10] 지난 설치의 목록 항목만 정리했습니다 (프로그램 실체가 없어 설치가 멈추는 것을 막기 위해서입니다).'
                 Say "     되돌리려면 이 파일을 두 번 누르십시오: $(Redact $bkFile)"
                 Write-Log "removed stale uninstall entry · backup=$(Redact $bkFile)"
@@ -4593,6 +4751,158 @@ function Get-CysWindowOpenHint {
     }
     return '창이 안 보이면 시작 메뉴에서 cysr 를 찾아 눌러 주세요.'
 }
+# ── 0.3.50(윈): 관리자 창에서 돈 설치기가 앱 창을 일반 권한으로 내려 띄운다 ──
+#   까닭 = Start-Process 는 부르는 쪽 토큰을 그대로 물려준다 ⇒ 관리자 PowerShell 로 설치하면 cys-app **만** 관리자로 떴다
+#   (11-25 윈 rc3 실기 · bootstrap.log 「cys app start」 줄 · cys-app TokenElevation=1 · cysd·claude 는 0 — cysd 는 예약 작업 cysd(LeastPrivilege)가 띄운다).
+#   관리자 앱 창에는 일반 권한 탐색기의 끌어 놓기가 막히고(UIPI) 일반 권한 도구로 창을 옮기거나 끌 수 없다.
+#   길 = 탐색기에 맡긴다 — `explorer.exe "<앱>"` 은 이미 떠 있는 바탕화면 탐색기(로그온 사용자의 일반 토큰)에게 실행을 넘긴다.
+#     ⚠문서화된 계약이 아니라 널리 쓰는 관행이다 ⇒ 결과를 믿지 않고 잰다: 10초 안에 앱 프로세스가 안 보이면 종전대로 직접 띄운다
+#       (창이 아예 안 뜨는 것보다 관리자 창이 낫다). ⚠늦게 뜬 탐색기 쪽 사본이 접힌다고 기대하지 않는다 — 앱의 single-instance(tauri-plugin-single-instance 2.4.2 윈 구현)는
+#       뮤텍스가 이미 있고 **그 사본의 숨은 창을 찾았을 때만** 두 번째를 끝낸다 ⇒ 10초 마감 뒤 늦게 뜨면 창 두 개(관리자·일반)가 남을 수 있다(독립 검증 R2 · 실기 미측).
+#       그래도 코드로 두 번째 사본을 막지 않는다 — 막다가 창이 0 이 되는 쪽이 더 나쁘다(설계 판단 11-26).
+#     ⚠인자는 못 넘긴다 — 앱 창은 인자 없이 뜨므로 문제없다. 환경은 탐색기 것이다(사용자 Path 추가는 WM_SETTINGCHANGE 알림으로 탐색기가 이미 다시 읽었다 · 토큰 env 는 애초에 안 넘어간다).
+#   버린 길(표 = docs/win-unelevate-0350.md): 임시 예약 작업 /RL LIMITED(기본 우선순위 7·실행 제한 72시간이 앱을 죽인다·남는 작업·사용자 이름 필요) ·
+#     runas /trustlevel:0x20000(진짜 일반 토큰이 아니라 제한 토큰 — WebView2·자식 프로세스가 깨질 수 있다).
+#   🔴운영자 노트북 방침(「cysr 은 항상 관리자 모드」 · 10-27)과 부딪히지 않는다: 그 기기는 로그온 예약 작업 jarvis-cys-app 이
+#     RunLevel=HighestAvailable 로 앱을 띄운다(11-23 윈 master 실측) ⇒ 그 작업이 관리자로 서 있으면 **종전대로**(설치기 토큰 그대로) 띄운다.
+#     ⚠예약 작업 cysd 의 RunLevel 은 판별에 못 쓴다 — `cys daemon install`(/F) 이 설치·온보딩 때마다 LeastPrivilege 로 덮는다(cys.rs cysd_task_xml).
+#   돌려주는 값(순수 · 시험 = tests/app-unelevate-run.sh) = 'plain'(관리자 아님 · 종전) · 'keep:device-admin'(기기 방침 = 관리자) ·
+#     'keep:no-shell'(이 세션에 탐색기가 없음 · 넘길 곳이 없다) · 'keep:other-user'(바탕화면 탐색기의 주인이 이 설치기 계정이 아님) ·
+#     'keep:owner-unknown'(탐색기 주인을 못 읽음) · 'explorer'(내려 띄운다).
+#   🔴주인 비교(독립 검증 R1): 표준 사용자 바탕화면에서 다른(관리자) 계정 자격으로 연 관리자 창이면, 앱은 그 관리자 계정 자리에 깔렸는데
+#     탐색기는 표준 사용자 것이다 ⇒ 넘기면 앱이 **다른 사용자**로 뜨거나(데몬·설정과 어긋남) 탐색기 오류 창이 남는다 ⇒ 종전대로(설치기 계정 그대로).
+function Get-AppLaunchPlan([bool]$Elevated, [string]$AppTaskRunLevel, [bool]$ShellUp, [string]$ShellOwner = 'same') {
+    if (-not $Elevated) { return 'plain' }
+    if ($AppTaskRunLevel -eq 'HighestAvailable') { return 'keep:device-admin' }
+    if (-not $ShellUp) { return 'keep:no-shell' }
+    if ($ShellOwner -eq 'other') { return 'keep:other-user' }
+    if ($ShellOwner -ne 'same') { return 'keep:owner-unknown' }
+    return 'explorer'
+}
+# 이 설치기가 관리자 토큰으로 도는가 — UAC 가 거른 토큰이면 IsInRole(Administrator)=False(1-6 행과 같은 물음) · 못 재면 $false(= 종전 동작).
+function Test-SelfElevated {
+    try {
+        $p = New-Object Security.Principal.WindowsPrincipal([Security.Principal.WindowsIdentity]::GetCurrent())
+        return [bool]$p.IsInRole([Security.Principal.WindowsBuiltInRole]::Administrator)
+    } catch { return $false }
+}
+# 예약 작업 jarvis-cys-app 의 RunLevel 글자(HighestAvailable · LeastPrivilege) · 작업이 없거나 못 읽으면 ''.
+function Get-AppTaskRunLevel {
+    try {
+        $xml = (& schtasks /Query /TN jarvis-cys-app /XML 2>&1) -join "`n"
+        if ($LASTEXITCODE -ne 0) { return '' }
+        $m = [regex]::Match($xml, '<RunLevel>\s*(\w+)\s*</RunLevel>')
+        if ($m.Success) { return $m.Groups[1].Value }
+    } catch { }
+    return ''
+}
+# 이 로그온 세션에 바탕화면 탐색기가 떠 있는가(다른 세션의 탐색기에 넘기면 남의 화면에 뜬다).
+function Test-DesktopShellUp {
+    try {
+        $sid = (Get-Process -Id $PID -ErrorAction Stop).SessionId
+        return (@(Get-Process -Name 'explorer' -ErrorAction SilentlyContinue | Where-Object { $_.SessionId -eq $sid }).Count -gt 0)
+    } catch { return $false }
+}
+# 프로세스 주인 SID · 이 설치기 계정 SID — 못 읽으면 ''(관리자 토큰이라 CIM GetOwnerSid 가 남의 프로세스도 읽는다 · 시험이 바꿔 끼우는 자리).
+function Get-ProcOwnerSid([int]$Id) {
+    try {
+        $w = Get-CimInstance -ClassName Win32_Process -Filter ('ProcessId=' + $Id) -ErrorAction Stop
+        if (-not $w) { return '' }
+        $r = Invoke-CimMethod -InputObject $w -MethodName GetOwnerSid -ErrorAction Stop
+        return [string]$r.Sid
+    } catch { return '' }
+}
+function Get-SelfUserSid {
+    try { return [string][Security.Principal.WindowsIdentity]::GetCurrent().User.Value } catch { return '' }
+}
+# 이 세션 바탕화면 탐색기의 주인이 이 설치기 계정인가 → 'same'(읽힌 주인이 **전부** 이 계정) · 'other'(읽힌 주인 중 **하나라도** 다른 계정 — 보수 판정 · 독립 검증 재검 R2-1)
+#   · 'unknown'(하나도 못 읽음 · 내 SID 도 못 읽음). 한 사용자 기기(대다수)는 전부 같아 동작이 바뀌지 않는다.
+function Get-DesktopShellOwner {
+    try {
+        $me = Get-SelfUserSid
+        if (-not $me) { return 'unknown' }
+        $sid = (Get-Process -Id $PID -ErrorAction Stop).SessionId
+        $seen = 0; $others = 0
+        foreach ($e in @(Get-Process -Name 'explorer' -ErrorAction SilentlyContinue | Where-Object { $_.SessionId -eq $sid })) {
+            $o = Get-ProcOwnerSid ([int]$e.Id)
+            if (-not $o) { continue }
+            $seen++
+            if (-not [string]::Equals($o, $me, [StringComparison]::OrdinalIgnoreCase)) { $others++ }
+        }
+        if ($others -gt 0) { return 'other' }
+        if ($seen -gt 0) { return 'same' }
+        return 'unknown'
+    } catch { return 'unknown' }
+}
+# 이 세션에서 **그 실행 파일**로 도는 앱 프로세스가 있는가 — 이름만 보면 다른 로그온 세션(원격 데스크톱)·다른 설치 자리의
+#   같은 이름 앱까지 성공으로 센다(이종 검토 1R 지적 · Get-Process -Name 은 세션을 거르지 않는다).
+#   Path 가 비면(32비트 PowerShell 이 64비트 앱의 모듈을 못 읽는다 — 64비트 재실행을 못 한 -Command 갈래 · 이종 검토 2R 지적) 운영체제 목록(CIM Win32_Process)의
+#   ExecutablePath 로 한 번 더 본다 · 그래도 못 읽으면 세지 않는다(= 10초 뒤 종전 기동 · 창 0 보다 낫다).
+function Test-CysAppProcUp([string]$Exe, [int]$SessionId) {
+    $names = @('cys-app', 'cysr', [IO.Path]::GetFileNameWithoutExtension($Exe)) | Select-Object -Unique
+    foreach ($p in @(Get-Process -Name $names -ErrorAction SilentlyContinue | Where-Object { $_.SessionId -eq $SessionId })) {
+        $path = [string]$p.Path
+        if (-not $path) {
+            try { $path = [string](Get-CimInstance -ClassName Win32_Process -Filter ('ProcessId=' + [int]$p.Id) -ErrorAction Stop).ExecutablePath } catch { $path = '' }
+        }
+        if ($path -and [string]::Equals($path, $Exe, [StringComparison]::OrdinalIgnoreCase)) { return $true }
+    }
+    return $false
+}
+# 마감 재기 = 벽시계(Stopwatch) — 잠 합계로 재면 조회·CIM 시간이 더해져 10초가 늘어난다(독립 검증 N2) · 시험이 바꿔 끼우는 자리.
+function Get-ShellWaitElapsedMs($Sw) { return [long]$Sw.ElapsedMilliseconds }
+# 탐색기에 앱 실행을 넘기고, 10초 안에 이 세션·그 파일의 앱 프로세스가 보이면 $true(탐색기 자신의 종료 코드는 뜻이 없어 보지 않는다).
+#   ⚠보이는 것은 「떴다」까지다 — 일반 권한인지는 여기서 재지 않는다(로그도 「탐색기에 넘김」으로만 적는다 · 권한 = 실기 대본 docs/win-unelevate-0350.md 4절).
+#   마감(10초) 시점에도 한 번 더 본다 — 마지막 대기 중에 뜬 앱을 놓치고 관리자 사본을 또 띄우지 않게(이종 검토 1R 지적).
+function Start-CysAppViaShell([string]$Exe) {
+    # Join-Path 는 드라이브를 해석하다 실패하면 빈 값을 낸다 ⇒ 글자로만 잇는다 · WINDIR 이 비면 이름으로(PATH)
+    $explorer = if ($env:WINDIR) { [IO.Path]::Combine($env:WINDIR, 'explorer.exe') } else { 'explorer.exe' }
+    $sid = (Get-Process -Id $PID -ErrorAction Stop).SessionId
+    [void](Start-Process -FilePath $explorer -ArgumentList ('"' + $Exe + '"') -ErrorAction Stop)
+    $sw = [System.Diagnostics.Stopwatch]::StartNew()
+    while ($true) {
+        if (Test-CysAppProcUp $Exe $sid) { return $true }
+        if ((Get-ShellWaitElapsedMs $sw) -ge 10000) { return $false }   # 마감 시점에도 위에서 한 번 더 봤다
+        Start-Sleep -Milliseconds 500
+    }
+}
+# 앱 창이 실제로 관리자 토큰으로 떴는가 — '1' 관리자 · '0' 일반 · '?' 못 잼(앱이 아직 안 보임 · Add-Type·토큰 읽기 실패 · 윈도우 아님).
+#   0.3.50: 깨끗한 윈(관리자 계정·UAC 켬) 실기 기기가 없어 **첫 실사용 설치가 이 갈래의 실기**다 ⇒ 판정 줄과 함께 진행 보고 info 1건으로 남긴다(개인정보 0 · 글자 = 판정 이름과 0/1/?).
+function Get-CysAppElevation([string]$Exe) {
+    try {
+        $mySess = (Get-Process -Id $PID -ErrorAction Stop).SessionId
+        $app = @(Get-Process -Name 'cys-app', 'cysr' -ErrorAction SilentlyContinue | Where-Object { ($_.SessionId -eq $mySess) -and $_.Path -and [string]::Equals([string]$_.Path, $Exe, [StringComparison]::OrdinalIgnoreCase) }) | Select-Object -First 1
+        if (-not $app) { return '?' }
+        if (-not ('Jarvis.TokElev' -as [type])) {
+            Add-Type -Namespace Jarvis -Name TokElev -ErrorAction Stop -MemberDefinition @'
+[System.Runtime.InteropServices.DllImport("kernel32.dll")] static extern System.IntPtr OpenProcess(int a, bool b, int p);
+[System.Runtime.InteropServices.DllImport("advapi32.dll")] static extern bool OpenProcessToken(System.IntPtr h, int a, out System.IntPtr t);
+[System.Runtime.InteropServices.DllImport("advapi32.dll")] static extern bool GetTokenInformation(System.IntPtr t, int c, out int v, int l, out int r);
+[System.Runtime.InteropServices.DllImport("kernel32.dll")] static extern bool CloseHandle(System.IntPtr h);
+public static int Of(int pid) {
+    System.IntPtr h = OpenProcess(0x1000, false, pid);
+    if (h == System.IntPtr.Zero) { return -1; }
+    try {
+        System.IntPtr t;
+        if (!OpenProcessToken(h, 8, out t)) { return -1; }
+        try { int v; int r; if (!GetTokenInformation(t, 20, out v, 4, out r)) { return -1; } return v; } finally { CloseHandle(t); }
+    } finally { CloseHandle(h); }
+}
+'@
+        }
+        $v = [int][Jarvis.TokElev]::Of([int]$app.Id)
+        if ($v -eq 1) { return '1' }
+        if ($v -eq 0) { return '0' }
+        return '?'
+    } catch { return '?' }
+}
+function Send-AppLaunchInfo([string]$Plan, [string]$Exe) {
+    # plain(관리자 아닌 설치 · 대다수) = 일반 토큰이 정해져 있다 ⇒ 재지 않고 0 — Add-Type 컴파일(5.1 csc 시간·백신 검사 표면)을 관리자 설치에만 붙인다(독립 검증 재검 N-b).
+    try {
+        $e = if ($Plan -eq 'plain') { '0' } else { Get-CysAppElevation $Exe }
+        Send-Progress '9/10' 'info' $null ('app-launch plan=' + $Plan + ' elevated=' + $e) $null
+    } catch { }
+}
 # 앱 창을 띄운다 — 이미 떠 있으면 **재기동하지 않고 앞으로만** 가져온다(살아 있는 자리를 죽이지 않는다 ·
 #   맥판 raise_cys_app_window 가 2026-09-17 연수 2건에서 같은 까닭으로 생겼다).
 #   돌려주는 값 = 'raised'(이미 떠 있던 창을 앞으로) · 'started'(새로 띄웠다) · ''(못 했다).
@@ -4608,12 +4918,36 @@ function Start-CysAppWindow {
     }
     $exe = Get-CysAppExe
     if (-not $exe) { Write-Log 'cys app start: exe not found'; return '' }
+    # 0.3.50: 관리자 창에서 돈 설치기면 앱을 일반 권한으로 내려 띄운다(Get-AppLaunchPlan 머리 주석) — 판단 재료 셋을 여기서 한 번 잰다
+    #   (관리자가 아니면 나머지 둘은 묻지 않는다 — 일반 설치에 schtasks·프로세스 목록 비용 0 · 동작 = 종전 그대로).
+    $elev = Test-SelfElevated
+    $taskRl = if ($elev) { Get-AppTaskRunLevel } else { '' }
+    $shellUp = if ($elev) { Test-DesktopShellUp } else { $false }
+    $shellOwner = if ($elev -and $shellUp -and ($taskRl -ne 'HighestAvailable')) { Get-DesktopShellOwner } else { 'same' }
+    $plan = Get-AppLaunchPlan $elev $taskRl $shellUp $shellOwner
+    Write-Log ('cys app launch plan: ' + $plan)
+    if ($plan -eq 'explorer') {
+        try {
+            if (Invoke-WithoutCysTxnEnv { Start-CysAppViaShell $exe }) {
+                Write-Log ('cys app start (handed to explorer): ' + (Redact $exe))
+                Send-AppLaunchInfo $plan $exe
+                return 'started'
+            }
+            Write-Log 'cys app unelevate: no app process within 10s - direct start (inherits this elevated token)'
+            $plan = 'explorer>direct'   # 진행 보고 info 가 「탐색기에 넘겼으나 직접 기동으로 넘어감」을 가르게
+        } catch {
+            Write-Log ('cys app unelevate failed (fail-open to direct start): ' + $_.Exception.Message)
+            $plan = 'explorer>direct'
+        }
+    }
     try {
         Invoke-WithoutCysTxnEnv { [void](Start-Process -FilePath $exe -ErrorAction Stop) }   # 1.1.8 U5: 앱 창 = 오래 사는 자식 · 토큰 env 0
         Write-Log ('cys app start: ' + (Redact $exe))
+        Send-AppLaunchInfo $plan $exe
         return 'started'
     } catch {
         Write-Log ('cys app start failed: ' + $_.Exception.Message)
+        Send-AppLaunchInfo $plan $exe
         return ''
     }
 }
@@ -4736,6 +5070,8 @@ function Step-Wake {
     #   (시각 검사도 함께 두지만, 지우는 쪽이 먼저다 — 검사 하나에만 기대면 그 검사가 눈이 멀 때 거짓 초록이 된다.)
     Clear-MasterMark
     Move-OldRound
+    # ★데몬의 자동 복원이 끝나기(또는 지난 master 자리가 되살아나기)를 기다린 **뒤에** 기준선을 찍고 자리를 연다(Wait-AutoRestoreSettled 머리 주석).
+    [void](Wait-AutoRestoreSettled $cli)
     Set-FleetBaseline $cli
     $wakeFile = Join-Path $JarvisHome 'wake.ps1'
     # 앞 단계에서 자리 잡기가 끝나지 않았으면 cys 안에 창을 열 수 없다.
@@ -5006,6 +5342,59 @@ function Set-FleetBaseline {
         Write-Log ('fleet baseline surfaces: ' + ($script:BaselineSurfaces -join ' '))
     } catch {
         Write-Log ('fleet baseline FAILED: ' + $_.Exception.Message + ' -> 좌석 판정 안 함')
+    }
+}
+# 🔴🔴**데몬이 지난 자리를 되살리는 동안 master 자리를 열지 않는다**(0.3.50 · 맥판 wait_auto_restore_settled 짝 · 맥 VM rc3 실기 11-25).
+#   [8/10] 이 데몬을 새로 띄우면 데몬은 지난 자리를 명부 순서대로 하나씩 되살린다(자리마다 각성 확인 · 한 자리 10초 남짓).
+#   그 도중에 기준선을 찍고 master 자리를 열면, 뒤이어 오는 데몬의 master 되살리기가 거절돼 옛 master 대화(--resume)가 사라진다
+#   (맥 rc3 링: 06:50:08 worker 되살림 → 06:50:10 설치기 새 master → 06:50:18 되살리기 role.claim_denied).
+#   윈 rc3 는 순서가 달라 피했을 뿐 같은 자리다 ⇒ 맥과 같은 끝 조건:
+#   ⓐ 단계(cys status --json 의 daemon.auto_restore)가 running·retry_wait·held 가 아님(칸 없음·못 읽음 = 기다리지 않음 = 종전)
+#   ⓑ 살아 있는 master 자리가 보임(이어 여는 자리는 claim_denied → 이어 받기 갈래) ⓒ 상한 $RestoreSettleCapSec(= cys rotate 복원 대기 기본 120s) → 종전대로 연다.
+$RestoreSettleCapSec = 120
+$RestoreSettlePollSec = 1
+function Get-AutoRestorePhase([string]$Cli) {
+    # running|retry_wait|held|done|off · 칸 없음(옛 cys) = '' · 조회 실패(상한·rc≠0 = Invoke-CysCapped 가 $null) = '?'(맥 짝 · 독립 검증 N3)
+    $o = Invoke-CysCapped $Cli 'status --json' $DaemonProbeCapMs
+    if ($null -eq $o) { return '?' }
+    $m = [regex]::Match([string]$o, '"auto_restore"\s*:\s*"([a-z_]*)"')
+    if ($m.Success) { return $m.Groups[1].Value }
+    return ''
+}
+function Wait-AutoRestoreSettled([string]$Cli) {
+    # $true = 끝남(ⓐ·ⓑ) · $false = 상한(ⓒ) · 화면 줄은 실제로 기다릴 때만 한 줄
+    $sw = [System.Diagnostics.Stopwatch]::StartNew()
+    $polls = 0; $said = $false; $fails = 0
+    while ($true) {
+        $ph = Get-AutoRestorePhase $Cli
+        $secs = [int]$sw.Elapsed.TotalSeconds
+        # 조회 실패 한 번으로 끝내지 않는다 — **연속 3번**일 때만 끝(맥 짝 · 독립 검증 N3)
+        if ($ph -eq '?') {
+            $fails++
+            if ($fails -ge 3) { Write-Log "auto-restore wait: settled phase=unreadable fails=$fails polls=$polls waited=${secs}s"; return $true }
+            if ($secs -ge $RestoreSettleCapSec) { Write-Log "auto-restore wait: cap ${RestoreSettleCapSec}s phase=unreadable polls=$polls -> open seat anyway"; return $false }
+            $polls++; Start-Sleep -Seconds $RestoreSettlePollSec; continue
+        }
+        $fails = 0
+        if (@('running', 'retry_wait', 'held') -notcontains $ph) {
+            Write-Log ("auto-restore wait: settled phase=" + $(if ($ph) { $ph } else { 'unknown' }) + " polls=$polls waited=${secs}s")
+            return $true
+        }
+        $mref = Get-MasterSeatRef $Cli
+        if ($mref) {
+            Write-Log "auto-restore wait: master restored ($mref) phase=$ph polls=$polls waited=${secs}s"
+            return $true
+        }
+        if ($secs -ge $RestoreSettleCapSec) {
+            Write-Log "auto-restore wait: cap ${RestoreSettleCapSec}s phase=$ph polls=$polls -> open seat anyway"
+            return $false
+        }
+        if (-not $said) {
+            Say ("     cysr 이 지난 자비스 창들을 되살리는 중입니다 — 끝나기를 기다립니다(최대 " + [int]($RestoreSettleCapSec / 60) + "분).")
+            $said = $true
+        }
+        $polls++
+        Start-Sleep -Seconds $RestoreSettlePollSec
     }
 }
 function Get-LiveRoles {
@@ -5415,7 +5804,23 @@ function Set-FleetNeedsMaster {
 function Invoke-StepFleet([string]$SurfaceRef) {
     Send-Progress '10/10' 'start' $null $null $null
     $fleetSwAll = [System.Diagnostics.Stopwatch]::StartNew()
-    $rc = @(Step-Fleet $SurfaceRef)[-1]
+    # ★user-reports-fix-1119(맥 fleet_on_interrupt 짝): [10/10] 대기 중 사람이 Ctrl+C 로 멈춘 끝을 운영이 가를 수 있게 info 표식을 남긴다.
+    #   실측(pwsh 7 · 가상 터미널): Ctrl+C 는 catch 를 거치지 않고 finally 만 돈다 ⇒ 「정상으로 돌아오지도, 오류로 나가지도 않은」 끝 = 사람 중단.
+    #   J-UNK-00 은 원래 안 나간다(끝맺음 채우기 조건 = ReachedWake 전만) · 화면·끝맺음 문구는 바꾸지 않는다.
+    #   ⚠창 닫기는 이 프로세스와 함께 끝나 finally 도 못 돈다(아래 [9/10] 뒤 주석과 같음) — 윈은 Ctrl+C 갈래만 잡힌다.
+    $fleetReturned = $false; $fleetThrew = $false
+    try {
+        $rc = @(Step-Fleet $SurfaceRef)[-1]
+        $fleetReturned = $true
+    } catch {
+        $fleetThrew = $true
+        throw
+    } finally {
+        if ((-not $fleetReturned) -and (-not $fleetThrew)) {
+            Write-Log 'fleet: interrupted by owner (Ctrl-C) - seats left running'
+            Send-Progress '10/10' 'info' ([int]$fleetSwAll.Elapsed.TotalSeconds) 'awaken:owner-interrupt' $null
+        }
+    }
     Send-Progress '10/10' 'end' ([int]$fleetSwAll.Elapsed.TotalSeconds) ('rc=' + $rc) $null
     return $rc
 }
@@ -5453,6 +5858,10 @@ function Step-Fleet {
         $live = @(Get-LiveRoles $cli)
         if ($live.Count -ge $FleetRoles.Count) { break }
         Start-Sleep -Seconds $FleetPollSec   # 먼저 보고 나서 기다린다 — 이미 섰으면 한 번도 기다리지 않는다
+        # 0.3.50: 이 7분 고리도 1분마다(2초 × 30) 한 줄 — 말없이 멈춘 화면이 사람의 Ctrl-C·창 닫기를 불렀다(맥 짝 · 뒤 6분 고리와 같은 꼴 · 마지막 바퀴에는 찍지 않는다).
+        if (((($i + 1) % 30) -eq 0) -and (($i + 1) -lt $FleetAwakeTries)) {
+            Say ("   동료 자리를 기다리는 중입니다 ($([int]((($i + 1) * $FleetPollSec) / 60))분 지남 · 최대 $([int](($FleetAwakeTries * $FleetPollSec) / 60))분 · 사람이 하실 일은 없습니다).")
+        }
     }
     # ★성공의 근거 = 자식 좌석. 우리가 연 master 자리는 근거가 못 된다(아래 Test-DeclarationSeen 머리 주석).
     if (Test-DeclarationSeen $live) {
@@ -5571,7 +5980,7 @@ function Step-Fleet {
 #   글자 칸은 `\z` 로 끝을 못박아 다시 만든다. 이름·글자·판본 비교는 대소문자를 가르는 -ceq·-cmatch·-ccontains 만 쓴다.
 # ⚠PowerShell 은 `'true' -eq $true` 를 참으로 본다 ⇒ 칸마다 **형(type)을 먼저** 본다.
 # ⚠이 절은 맥에서 PowerShell 없이 **정적 검사 + 맥판과의 대조**로만 증명했다 — 윈도우 실기가 필요한 축은 내부 문서.
-$InstallerVersion       = '0.3.49'   # 보고의 installer_version · $BootstrapVersion 은 화면 머리글 용도 그대로(보내지 않는다)
+$InstallerVersion       = '0.3.50'   # 보고의 installer_version · $BootstrapVersion 은 화면 머리글 용도 그대로(보내지 않는다)
 # 0.3.36: JARVIS_HELP_API_URL = CI·흉내가 도움 보고를 로컬로 돌리는 손잡이(맥 짝 · 사람이 쓰는 길이 아니다 · 없으면 종전 주소 — tests/help-url-lever.sh).
 $HelpApiUrl             = if ($env:JARVIS_HELP_API_URL) { [string]$env:JARVIS_HELP_API_URL } else { 'https://jarvis-install.godmeyou.kr' }
 # 🔴0.3.36(이종 검토): 시험용 함수 묶음은 도움 보고(/api/help)·닫기도 라이브로 못 보낸다(맥 HELP_API_URL 짝) — 가짜 서버는 읽은 뒤 덮어쓴다.
@@ -5596,7 +6005,7 @@ $script:NoticeShown     = $false
 $script:ReachedWake     = $false
 $script:RhId            = ''
 $script:RhClientToken   = ''
-$script:RhNames         = [string[]]@()
+$script:RhNames         = @{ names = [string[]]@(); overflow = $false }   # 보고를 열 때 수확한 이름 묶음(가림 v3 · 넘침을 같이 들고 다닌다)
 $script:RhLastAnswer    = ''
 
 # 허용 명령 표 — ai-jarvis `web-install/docs/command-table.json` 과 바이트 동일(here-string 이라 끝 줄바꿈 하나만 빠진다 · 시험이 잰다).
@@ -5844,6 +6253,9 @@ function Invoke-RemoteHelpHttp($Method, $Path, $Body) {
     if ($script:RhClientToken -and ($Path -like '*/ack' -or $Path -like '*/close')) { $headers['x-help-client'] = $script:RhClientToken }
     # 첨부도 같은 출처 헤더가 필요하다 — 보고를 연 설치기만 그 보고에 자료를 더할 수 있다(계약 1절).
     if ($script:RhClientToken -and ($Path -like '*/attach')) { $headers['x-help-client'] = $script:RhClientToken }
+    # 폴링(GET /api/help/<번호>)도 같은 헤더 — 서버는 이 헤더가 맞는 폴링에만 운영팀 촬영 요청을 싣는다(계약 5절 ② ·
+    #   review-fix-jarvis-1115 c1-input-2 의 윈판 형제: 앞 판은 붙이지 않아 원격 해결 대기 중 촬영 요청이 30분 뒤 사라졌다).
+    if ($script:RhClientToken -and $Method -ceq 'GET' -and $script:RhId -and $Path -ceq ('/api/help/' + $script:RhId)) { $headers['x-help-client'] = $script:RhClientToken }
     $request = @{ Uri = ($HelpApiUrl + $Path); Method = $Method; UseBasicParsing = $true; TimeoutSec = 20; Headers = $headers; ErrorAction = 'Stop' }
     if ($null -ne $Body) {
         $request['Body'] = [System.Text.Encoding]::UTF8.GetBytes([string]$Body)
@@ -5864,38 +6276,499 @@ function Invoke-RemoteHelpHttp($Method, $Path, $Body) {
     }
 }
 
-# ── 1차 스크럽 — 서버 src/scrub.ts 와 같은 규칙 · 서버가 한 번 더 지운다 ──
-function Get-RemoteHelpNames([string]$Text, [string[]]$Known) {
-    $names = New-Object System.Collections.Generic.List[string]
-    $add = {
-        param($raw)
-        if ($names.Count -ge 64) { return }
-        $value = (([string]$raw).Trim()) -replace '["'']', ''
-        if ($value.Length -ge 2 -and -not $names.Contains($value)) { $names.Add($value) }
-        $segment = ((($value -split '[\\/]')[-1])).Trim()
-        if ($segment.Length -ge 2 -and $names.Count -lt 64 -and -not $names.Contains($segment)) { $names.Add($segment) }
-    }
-    foreach ($k in $Known) { if ($k) { & $add $k } }
-    $pattern = '\b(?:USERNAME|USERPROFILE|LOGNAME|USER|HOME)\b[ \t]*[=:][ \t]*([^\r\n]+)|\bwhoami\b[ \t]*[:=>][ \t]*([^\r\n]+)|(?:^|\n)[ \t]*([A-Za-z][A-Za-z0-9.-]{1,63}\\[A-Za-z0-9._-]{2,63})[ \t]*(?:\r?\n|$)'
-    foreach ($m in [regex]::Matches($Text, $pattern, 'IgnoreCase')) {
-        if ($names.Count -ge 64) { break }
-        if ($m.Groups[1].Success) { & $add $m.Groups[1].Value } elseif ($m.Groups[2].Success) { & $add $m.Groups[2].Value } else { & $add $m.Groups[3].Value }
-    }
-    $sorted = @($names | Sort-Object -Property Length -Descending)
-    return ,([string[]]$sorted)
+# ── 가림 v3 · 「둘로 가름」 — 정본 = 참조 모델 split/model(scrub-v3.js · harvest.js · pipeline.js · attach-strict.js) ──
+#   서버 src/scrub.ts · 맥 JXA 와 같은 입력에 코드 단위까지 같은 출력(공용 벡터 = tests/scrub-v3/model/vectors-v3.json · vectors-split.json · 시험 = tests/scrub-v3-win.mjs).
+#   한 문장: 「가릴 자리」를 원문(정리한 글)의 위치 목록으로 계산한다 — 이름은 원문에서 한 번(모든 자리 · 겹침 포함 · Aho–Corasick 선형) ·
+#   결과 글에서 이름을 다시 찾지 않는다 · 구조 규칙은 결과에 다시 걸리는 것이 없을 때까지 넓히기만(재확인 8회) · 한도 밖이면 칸 통째 가림(<전부 지움>).
+#   ⚠포팅 주의(설계 부록 E): 이름 구간 = 모델의 스택 합치기 · 합치기·자리 옮김은 정렬 없이 · 변수 이름은 대소문자만 다른 것 금지(PowerShell 은 같은 변수) ·
+#     문자열 비교·찾기는 전부 서수(Ordinal) — PowerShell -eq/-ceq·String.IndexOf(string)·StartsWith(string) 은 문화권 비교라 NUL·U+FEFF 를 무시한다(pwsh 7.6 실측).
+#   ⚠제한 언어 모드(형식 생성 불가)·시계 고장 = 던지지 않고 닫힌 실패(<전부 지움>) — 원문을 보내지 않는다(설계 물음 5 ⓑ).
+$script:RhScrubMarks = @('<이메일 지움>', 'Bearer <토큰 지움>', '<키 지움>', '~', '~', '~user', '<전부 지움>')   # 순위 0..6 = 이메일 · Bearer · 키 · 윈 집 · 유닉스 집 · 이름 · 통째
+$script:RhScrubFull = '<전부 지움>'
+$script:RhScrubNameRank = 5
+$script:RhScrubFullRank = 6
+$script:RhScrubNamesMax = 256          # 서로 다른 이름 수(가림 함수 한도)
+$script:RhScrubNameUnitsMax = 262144   # 이름 글자 합(코드 단위)
+$script:RhScrubRescansMax = 8          # 구조 재확인에서 「바뀐」 횟수 상한
+$script:RhHarvestMax = 64              # 수확 한도 — 넘으면 넘침(그 묶음으로 가리는 칸은 통째 가림)
+$script:RhFieldUnitsMax = 4194304      # 칸 하나의 크기 문지기(코드 단위 · 파일은 읽기 전에 바이트 수로) — 실행 시간·메모리의 진짜 뚜껑
+$script:RhScrubBudgetMs = 20000        # 칸마다 벽시계 예산(신호 · 뚜껑 아님 — 단계 경계에서만 확인)
+# 구조 규칙 원문 = 모델 RULE_SOURCES 그대로(엔진 중립 · i 플래그·\b·\s·\w 없음 · 낱말 경계 = (?<![A-Za-z0-9_]) — .NET 에 뒤보기가 있다)
+$script:RhScrubRuleSources = @(
+    '[A-Za-z0-9._%+-]{1,64}@[A-Za-z0-9-]{1,63}(?:\.[A-Za-z0-9-]{1,63})*\.[A-Za-z]{2,63}',
+    '(?<![A-Za-z0-9_])[Bb][Ee][Aa][Rr][Ee][Rr][\t\n\v\f\r \u0085\u00a0\u1680\u180e\u2000-\u200a\u2028\u2029\u202f\u205f\u3000\ufeff]+[A-Za-z0-9._~+/=-]+',
+    '(?<![A-Za-z0-9_])sk-[A-Za-z0-9_-]{8,}',
+    '(?<![A-Za-z0-9_])[A-Za-z]:(?:\\{1,2}|/)[Uu][Ss][Ee][Rr][Ss](?:\\{1,2}|/)[^\\/\r\n"''<>|:*?]+',
+    '(?<!/Users/)(?:/Users/)+[^/\t\n\v\f\r "''<>]+'
+)
+# 수확 문법 = 모델 harvest.js NAME_LINES 그대로 · 셋째 가지의 줄 끝 = 앞보기(먹지 않는다 · 3R 발견 4) — 모델의 `$`(JS 비-여러줄 = 글 끝)를 \z 로 적었다
+#   (.NET 의 `$` 는 마지막 줄바꿈 앞에도 맞는데, 그 자리는 \r?\n 가지가 이미 덮어 뜻은 같다 · 읽는 이가 헷갈리지 않게 \z)
+$script:RhHarvestSource = '(?<![A-Za-z0-9_])(?:[Uu][Ss][Ee][Rr][Nn][Aa][Mm][Ee]|[Uu][Ss][Ee][Rr][Pp][Rr][Oo][Ff][Ii][Ll][Ee]|[Ll][Oo][Gg][Nn][Aa][Mm][Ee]|[Uu][Ss][Ee][Rr]|[Hh][Oo][Mm][Ee])[ \t]*[=:][ \t]*([^\r\n]+)|(?<![A-Za-z0-9_])[Ww][Hh][Oo][Aa][Mm][Ii][ \t]*[:=>][ \t]*([^\r\n]+)|(?:^|\n)[ \t]*([A-Za-z][A-Za-z0-9.-]{1,63}\\[A-Za-z0-9._-]{2,63})[ \t]*(?=\r?\n|\z)'
+# 넓은 빈칸(모델 harvest.js WS_SET) — 앞뒤 빈칸 떼기와 「빈칸뿐인 이름」 판정에 쓴다
+$script:RhWideBlank = [char[]]@(9, 10, 11, 12, 13, 32, 0x85, 0xA0, 0x1680, 0x180E, 0x2000, 0x2001, 0x2002, 0x2003, 0x2004, 0x2005, 0x2006, 0x2007, 0x2008, 0x2009, 0x200A, 0x2028, 0x2029, 0x202F, 0x205F, 0x3000, 0xFEFF)
+$script:RhScrubRules = $null
+$script:RhHarvestRe = $null
+$script:RhLoneSurrogateRe = $null
+
+function Initialize-RemoteHelpScrub {
+    # 규칙 객체는 한 번만 만든다(실패하면 던진다 — 부르는 쪽이 닫힌 실패로 받는다)
+    if ($null -ne $script:RhScrubRules) { return }
+    $rules = New-Object 'System.Collections.Generic.List[System.Text.RegularExpressions.Regex]'
+    foreach ($source in $script:RhScrubRuleSources) { $rules.Add((New-Object System.Text.RegularExpressions.Regex $source)) }
+    $script:RhHarvestRe = New-Object System.Text.RegularExpressions.Regex $script:RhHarvestSource
+    $script:RhLoneSurrogateRe = New-Object System.Text.RegularExpressions.Regex '[\uD800-\uDBFF](?![\uDC00-\uDFFF])|(?<![\uD800-\uDBFF])[\uDC00-\uDFFF]'
+    $script:RhScrubRules = $rules
 }
 
-function Invoke-RemoteHelpScrub([string]$Text, [string[]]$Names) {
-    if ($null -eq $Text) { return '' }
-    if ($null -ne $Names -and $Names.Count -gt 0) {
-        $Text = [regex]::Replace($Text, (($Names | ForEach-Object { [regex]::Escape($_) }) -join '|'), '~user')
+function Get-RemoteHelpScrubStopReason($ErrorRecord) {
+    # 확인 자리(예산·시계)가 던진 까닭(RhScrubStop:<까닭>) — 그 밖의 예외는 'error'
+    $e = $ErrorRecord.Exception
+    while ($null -ne $e) {
+        $m = [string]$e.Message
+        if ($m.StartsWith('RhScrubStop:', [System.StringComparison]::Ordinal)) { return $m.Substring(12) }
+        $e = $e.InnerException
     }
-    $Text = [regex]::Replace($Text, '[A-Za-z0-9._%+-]{1,64}@[A-Za-z0-9-]{1,63}(?:\.[A-Za-z0-9-]{1,63})*\.[A-Za-z]{2,63}', '<이메일 지움>')
-    $Text = [regex]::Replace($Text, '\bBearer\s+[A-Za-z0-9._~+/=-]+', 'Bearer <토큰 지움>', 'IgnoreCase')
-    $Text = [regex]::Replace($Text, '\bsk-[A-Za-z0-9_-]{8,}', '<키 지움>')
-    $Text = [regex]::Replace($Text, '\b[A-Za-z]:(?:\\{1,2}|/)Users(?:\\{1,2}|/)[^\\/\r\n"''<>|:*?]+', '~', 'IgnoreCase')
-    $Text = [regex]::Replace($Text, '/Users/[^/\s"''<>]+', '~')
-    return $Text
+    return 'error'
+}
+
+function Get-RemoteHelpTidy([string]$Value) {
+    # 0단계 정리 — 순서가 명세다: ① NUL 제거 → ② **그 결과에** 짝 잃은 서러게이트를 U+FFFD 로(한 번의 훑기로 합치지 않는다 · 설계 검토 2회차 발견 1)
+    $clean = $Value.Replace(([string][char]0), '')
+    return $script:RhLoneSurrogateRe.Replace($clean, ([string][char]0xFFFD))
+}
+
+function Get-RemoteHelpStructStreams([string]$Text, $Tick) {
+    # 규칙마다의 일치 목록(왼쪽부터 · 겹치지 않게) — 목록 하나 = @{ S; E; R } · 규칙 하나가 끝날 때마다 확인 자리
+    $streams = New-Object System.Collections.ArrayList
+    for ($ruleAt = 0; $ruleAt -lt $script:RhScrubRules.Count; $ruleAt++) {
+        $hitS = New-Object 'System.Collections.Generic.List[int]'
+        $hitE = New-Object 'System.Collections.Generic.List[int]'
+        foreach ($m in $script:RhScrubRules[$ruleAt].Matches($Text)) { $hitS.Add($m.Index); $hitE.Add($m.Index + $m.Length) }
+        [void]$streams.Add(@{ S = $hitS; E = $hitE; R = $ruleAt })
+        if ($null -ne $Tick) { & $Tick }
+    }
+    return ,$streams
+}
+
+function Get-RemoteHelpNameStream([string]$Text, $Names, $Tick) {
+    # 이름이 덮는 원문 구간(겹친 것·맞닿은 것은 한 구간 · 왼쪽부터) — Aho–Corasick + 모델 nameSpans 의 스택 합치기(부록 E · 뮤턴트 M21 이 지킨다)
+    $spanS = New-Object 'System.Collections.Generic.List[int]'
+    $spanE = New-Object 'System.Collections.Generic.List[int]'
+    $stream = @{ S = $spanS; E = $spanE; R = $script:RhScrubNameRank }
+    if ($Names.Count -eq 0) { return $stream }
+    $goto = New-Object 'System.Collections.Generic.Dictionary[long,int]'
+    $fail = New-Object 'System.Collections.Generic.List[int]'
+    $longest = New-Object 'System.Collections.Generic.List[int]'
+    $kids = New-Object 'System.Collections.Generic.List[System.Collections.Generic.List[int]]'
+    $fail.Add(0); $longest.Add(0); $kids.Add((New-Object 'System.Collections.Generic.List[int]'))
+    $to = 0
+    foreach ($name in $Names) {
+        $state = 0
+        for ($c = 0; $c -lt $name.Length; $c++) {
+            $unit = [int]$name[$c]
+            $key = ([long]$state * 65536) + $unit
+            if (-not $goto.TryGetValue($key, [ref]$to)) {
+                $to = $fail.Count
+                $fail.Add(0); $longest.Add(0); $kids.Add((New-Object 'System.Collections.Generic.List[int]'))
+                $goto[$key] = $to
+                $kids[$state].Add($unit)
+            }
+            $state = $to
+        }
+        if ($name.Length -gt $longest[$state]) { $longest[$state] = $name.Length }
+    }
+    $queue = New-Object 'System.Collections.Generic.List[int]'
+    foreach ($unit in $kids[0]) { $queue.Add($goto[[long]$unit]) }
+    $via = 0
+    for ($head = 0; $head -lt $queue.Count; $head++) {
+        $state = $queue[$head]
+        foreach ($unit in $kids[$state]) {
+            $to = $goto[([long]$state * 65536) + $unit]
+            $f = $fail[$state]
+            while ($f -ne 0 -and -not $goto.ContainsKey(([long]$f * 65536) + $unit)) { $f = $fail[$f] }
+            if ($goto.TryGetValue(([long]$f * 65536) + $unit, [ref]$via) -and $via -ne $to) { $fail[$to] = $via } else { $fail[$to] = 0 }
+            if ($longest[$fail[$to]] -gt $longest[$to]) { $longest[$to] = $longest[$fail[$to]] }
+            $queue.Add($to)
+        }
+    }
+    $failA = $fail.ToArray()
+    $longA = $longest.ToArray()
+    $chars = $Text.ToCharArray()
+    $n = $chars.Length
+    # 뿌리 상태에서는 어느 이름의 첫 글자가 나올 때까지 .NET 이 건너뛴다(뿌리에서 갈 곳 없는 글자는 상태를 바꾸지 않는다 = 뜻 같음 · 보통 글의 반복이 준다)
+    $rootChars = New-Object char[] ($kids[0].Count)
+    for ($c = 0; $c -lt $kids[0].Count; $c++) { $rootChars[$c] = [char]$kids[0][$c] }
+    $state = 0
+    $nextTick = 65535
+    for ($i = 0; $i -lt $n; $i++) {
+        if ($state -eq 0) {
+            $i = $Text.IndexOfAny($rootChars, $i)
+            if ($i -lt 0) { break }
+        }
+        if ($null -ne $Tick -and $i -ge $nextTick) { & $Tick; $nextTick = $i + 65536 }   # 확인 자리 — 65,536 글자마다
+        $unit = [int]$chars[$i]
+        while ($state -ne 0 -and -not $goto.ContainsKey(([long]$state * 65536) + $unit)) { $state = $failA[$state] }
+        if ($goto.TryGetValue(([long]$state * 65536) + $unit, [ref]$to)) { $state = $to } else { $state = 0 }
+        $len = $longA[$state]
+        if ($len -eq 0) { continue }
+        $start = $i + 1 - $len   # 여기서 끝나는 가장 긴 이름 하나면 충분 — 같은 끝의 더 짧은 이름은 그 안에 든다
+        $top = $spanS.Count - 1
+        while ($top -ge 0 -and $spanE[$top] -ge $start) {
+            if ($spanS[$top] -lt $start) { $start = $spanS[$top] }
+            $spanS.RemoveAt($top); $spanE.RemoveAt($top)
+            $top--
+        }
+        $spanS.Add($start); $spanE.Add($i + 1)
+    }
+    return $stream
+}
+
+function Merge-RemoteHelpStreams($Streams, $Work) {
+    # 시작 자리 순 목록 여러 개를 한 번 훑어 덩이로(정렬 없음 · 선형) — 겹치거나 맞닿으면 한 덩이 · 순위 = 가장 작은 것.
+    #   목록 = @{ S; E; R }(R = 그 목록 전체의 순위) 또는 @{ S; E; RL }(RL = 구간마다의 순위). $Work[0] = 걸음 수.
+    $runS = New-Object 'System.Collections.Generic.List[int]'
+    $runE = New-Object 'System.Collections.Generic.List[int]'
+    $runR = New-Object 'System.Collections.Generic.List[int]'
+    $count = $Streams.Count
+    $heads = New-Object int[] $count
+    $cs = -1; $ce = -1; $cr = 0
+    while ($true) {
+        $pick = -1
+        $pickStart = 0
+        for ($k = 0; $k -lt $count; $k++) {
+            $h = $heads[$k]
+            if ($h -lt $Streams[$k].S.Count) {
+                $st = $Streams[$k].S[$h]
+                if ($pick -lt 0 -or $st -lt $pickStart) { $pick = $k; $pickStart = $st }
+            }
+        }
+        if ($pick -lt 0) { break }
+        $h = $heads[$pick]
+        $s = $pickStart
+        $e = $Streams[$pick].E[$h]
+        if ($Streams[$pick].ContainsKey('RL')) { $r = $Streams[$pick].RL[$h] } else { $r = $Streams[$pick].R }
+        $heads[$pick] = $h + 1
+        $Work[0]++
+        if ($cs -ge 0 -and $s -le $ce) {
+            if ($e -gt $ce) { $ce = $e }
+            if ($r -lt $cr) { $cr = $r }
+        } else {
+            if ($cs -ge 0) { $runS.Add($cs); $runE.Add($ce); $runR.Add($cr) }
+            $cs = $s; $ce = $e; $cr = $r
+        }
+    }
+    if ($cs -ge 0) { $runS.Add($cs); $runE.Add($ce); $runR.Add($cr) }
+    return @{ S = $runS; E = $runE; RL = $runR }
+}
+
+function Get-RemoteHelpRendered([string]$Text, $Runs) {
+    # 덩이마다 표식 하나로 바꾼 글 + 표식 자리(가린 글 좌표) — 글은 Substring 조각으로만 넘긴다(pwsh 7 의 메서드 인자 검사 비용 · 부록 E)
+    $count = $Runs.S.Count
+    $markS = New-Object int[] $count
+    $markE = New-Object int[] $count
+    $sb = New-Object System.Text.StringBuilder
+    $cursor = 0
+    for ($k = 0; $k -lt $count; $k++) {
+        [void]$sb.Append($Text.Substring($cursor, $Runs.S[$k] - $cursor))
+        $markS[$k] = $sb.Length
+        [void]$sb.Append($script:RhScrubMarks[$Runs.RL[$k]])
+        $markE[$k] = $sb.Length
+        $cursor = $Runs.E[$k]
+    }
+    [void]$sb.Append($Text.Substring($cursor))
+    return @{ Text = $sb.ToString(); MS = $markS; ME = $markE }
+}
+
+function Get-RemoteHelpOriginalStream($Found, $Runs, $Rendered, $Work) {
+    # 가린 글의 구간(한 규칙 = 왼쪽부터)을 원문 구간으로 — 표식에 닿은 쪽은 그 덩이 끝까지 · 손가락 둘은 앞으로만(선형 · 이분 탐색 없음)
+    $outS = New-Object 'System.Collections.Generic.List[int]'
+    $outE = New-Object 'System.Collections.Generic.List[int]'
+    $markS = $Rendered.MS
+    $markE = $Rendered.ME
+    $markCount = $markS.Length
+    $ptrA = -1
+    $ptrB = -1
+    for ($j = 0; $j -lt $Found.S.Count; $j++) {
+        $from = $Found.S[$j]
+        $last = $Found.E[$j] - 1
+        $Work[0]++
+        while ($ptrA + 1 -lt $markCount -and $markS[$ptrA + 1] -le $from) { $ptrA++; $Work[0]++ }
+        if ($ptrB -lt $ptrA) { $ptrB = $ptrA }
+        while ($ptrB + 1 -lt $markCount -and $markS[$ptrB + 1] -le $last) { $ptrB++; $Work[0]++ }
+        if ($ptrA -lt 0) { $start = $from } elseif ($from -lt $markE[$ptrA]) { $start = $Runs.S[$ptrA] } else { $start = $Runs.E[$ptrA] + ($from - $markE[$ptrA]) }
+        if ($ptrB -lt 0) { $end = $last + 1 } elseif ($last -lt $markE[$ptrB]) { $end = $Runs.E[$ptrB] } else { $end = $Runs.E[$ptrB] + ($last - $markE[$ptrB]) + 1 }
+        $outS.Add($start); $outE.Add($end)
+    }
+    return @{ S = $outS; E = $outE; R = $Found.R }
+}
+
+function New-RemoteHelpScrubFull([string]$Text, [string]$Reason, [int]$Rescans, [long]$Work) {
+    if ($Text.Length -eq 0) { return @{ Text = ''; Full = $false; Reason = $null; RunS = @(); RunE = @(); RunR = @(); MarkS = @(); MarkE = @(); MarkR = @(); Rescans = 0; Work = 0 } }
+    return @{ Text = $script:RhScrubFull; Full = $true; Reason = $Reason; RunS = @(0); RunE = @($Text.Length); RunR = @($script:RhScrubFullRank); MarkS = @(0); MarkE = @($script:RhScrubFull.Length); MarkR = @($script:RhScrubFullRank); Rescans = $Rescans; Work = $Work }
+}
+
+function Invoke-RemoteHelpScrub($Text, $Names, $Tick = $null) {
+    # 가림 v3(모델 scrubV3) — 던지지 않는다. 돌려주는 것 = @{ Text; Full; Reason; RunS·RunE·RunR(원문 좌표 장부); MarkS·MarkE·MarkR(가린 글 좌표); Rescans; Work }
+    #   $Names = 이름 글자열 목록(부르는 쪽은 늘 수확 묶음의 Names 를 넘긴다 — 빈칸뿐인 이름을 거르는 것은 수확이다 · LIMITS L16)
+    #   $Tick  = 확인 자리(예산·시계) — 넘겼으면 RhScrubStop:<까닭> 으로 던진다 · 결과 글과 무관
+    $source = ''
+    if ($null -ne $Text) { $source = [string]$Text }
+    $tidy = $source
+    $rescans = 0
+    $work = New-Object long[] 1
+    try {
+        Initialize-RemoteHelpScrub
+        $tidy = Get-RemoteHelpTidy $source
+        if ($null -ne $Tick) { & $Tick }   # 확인 자리 — 정리 뒤
+        $seen = New-Object 'System.Collections.Generic.HashSet[string]' ([System.StringComparer]::Ordinal)
+        $list = New-Object 'System.Collections.Generic.List[string]'
+        $units = 0
+        foreach ($raw in @($Names)) {
+            if ($null -eq $raw) { continue }
+            $name = Get-RemoteHelpTidy ([string]$raw)
+            if ($name.Length -gt 0 -and $seen.Add($name)) { $list.Add($name); $units += $name.Length }
+        }
+        if ($tidy.Length -eq 0) { return (New-RemoteHelpScrubFull '' $null 0 0) }
+        if ($list.Count -gt $script:RhScrubNamesMax -or $units -gt $script:RhScrubNameUnitsMax) { return (New-RemoteHelpScrubFull $tidy 'names' 0 0) }
+        $streams = New-Object System.Collections.ArrayList
+        [void]$streams.Add((Get-RemoteHelpNameStream $tidy $list $Tick))
+        foreach ($st in (Get-RemoteHelpStructStreams $tidy $Tick)) { [void]$streams.Add($st) }
+        $runs = Merge-RemoteHelpStreams $streams $work
+        for (; ; $rescans++) {
+            $rendered = Get-RemoteHelpRendered $tidy $runs
+            if ($null -ne $Tick) { & $Tick }   # 확인 자리 — 재확인 한 바퀴마다
+            $found = Get-RemoteHelpStructStreams $rendered.Text $Tick
+            $any = $false
+            foreach ($st in $found) { if ($st.S.Count -gt 0) { $any = $true; break } }
+            if (-not $any) {
+                $markR = New-Object int[] $runs.RL.Count
+                for ($k = 0; $k -lt $runs.RL.Count; $k++) { $markR[$k] = $runs.RL[$k] }
+                return @{ Text = $rendered.Text; Full = $false; Reason = $null; RunS = $runs.S.ToArray(); RunE = $runs.E.ToArray(); RunR = $runs.RL.ToArray(); MarkS = $rendered.MS; MarkE = $rendered.ME; MarkR = $markR; Rescans = $rescans; Work = $work[0] }
+            }
+            if ($rescans -eq $script:RhScrubRescansMax) { return (New-RemoteHelpScrubFull $tidy 'rescans' $rescans $work[0]) }
+            $widen = New-Object System.Collections.ArrayList
+            [void]$widen.Add($runs)
+            foreach ($st in $found) { [void]$widen.Add((Get-RemoteHelpOriginalStream $st $runs $rendered $work)) }
+            $runs = Merge-RemoteHelpStreams $widen $work
+        }
+    } catch {
+        return (New-RemoteHelpScrubFull $tidy (Get-RemoteHelpScrubStopReason $_) $rescans $work[0])
+    }
+}
+
+function Get-RemoteHelpTrimWide([string]$Value) {
+    $a = 0
+    $b = $Value.Length
+    while ($a -lt $b -and [Array]::IndexOf($script:RhWideBlank, $Value[$a]) -ge 0) { $a++ }
+    while ($b -gt $a -and [Array]::IndexOf($script:RhWideBlank, $Value[$b - 1]) -ge 0) { $b-- }
+    return $Value.Substring($a, $b - $a)
+}
+
+function ConvertTo-RemoteHelpNameSet($Known) {
+    # 받은 이름 = 배열(넘침 아님) 또는 묶음 @{ names; overflow }(ConvertFrom-Json 의 객체도) — 던지지 않는다.
+    #   모델과 같은 해석: 배열 → 넘침 아님 · 배열이 아닌 객체 → overflow 가 참(bool)일 때만 넘침 · names 가 목록이 아니면 이름 없음(NamesOk = $false)
+    $out = @{ Names = @(); Overflow = $false; IsSet = $false; NamesOk = $false }
+    if ($null -eq $Known -or $Known -is [string]) { return $out }
+    if ($Known -is [System.Collections.IList]) { $out.Names = @($Known); $out.NamesOk = $true; return $out }
+    $names = $null; $over = $null
+    if ($Known -is [System.Collections.IDictionary]) { $names = $Known['names']; $over = $Known['overflow'] }
+    elseif ($Known -is [System.Management.Automation.PSCustomObject]) { $names = $Known.names; $over = $Known.overflow }
+    else { return $out }
+    $out.IsSet = $true
+    $out.Overflow = (($over -is [bool]) -and $over)
+    if ($names -is [System.Collections.IList]) { $out.Names = @($names); $out.NamesOk = $true }
+    return $out
+}
+
+function Get-RemoteHelpNames($Text, $Known) {
+    # 이름 수확(모델 harvest) → @{ Names = <긴 것 먼저>; Overflow }
+    #   ★알려진 이름($Known)은 **원본 그대로** 합친다(설계 검토 발견 1 — 앞 판은 Trim·따옴표 제거·2자 이상을 $Known 에도 적용해
+    #     한 글자 계정 `q` 와 `O'Brien` 꼴 계정을 잃었다). 버리는 것 = 정리 뒤 빈 글자열 · 넓은 빈칸뿐인 글자열 · 글자열이 아닌 것뿐.
+    #   손질(앞뒤 빈칸 · 따옴표 제거 · 마지막 경로 조각 · 2자 이상)은 「더 얻는 이름」 만 만든다 · 표시 값은 따옴표를 떼기 전의 꼴도 이름.
+    #   합친 뒤에 한도 64 — 65번째 새 이름에서 넘침(받은 묶음이 이미 넘쳤으면 넘침) · 상한에 닿아도 표시 줄 훑기를 멈추지 않는다(3R 발견 3).
+    Initialize-RemoteHelpScrub
+    $given = ConvertTo-RemoteHelpNameSet $Known
+    $list = New-Object 'System.Collections.Generic.List[string]'
+    $seen = New-Object 'System.Collections.Generic.HashSet[string]' ([System.StringComparer]::Ordinal)
+    $state = @{ Overflow = ($given.IsSet -and $given.Overflow) }
+    $put = {
+        param([string]$value)
+        if ($seen.Contains($value)) { return }
+        if ($list.Count -ge $script:RhHarvestMax) { $state.Overflow = $true; return }
+        [void]$seen.Add($value)
+        $list.Add($value)
+    }
+    $add = {
+        param([string]$raw)
+        $whole = Get-RemoteHelpTrimWide (Get-RemoteHelpTidy $raw)
+        $value = $whole.Replace('"', '').Replace("'", '')
+        if ($whole.Length -ge 2) { & $put $whole }
+        $cutWhole = [Math]::Max($whole.LastIndexOf([char]'\'), $whole.LastIndexOf([char]'/'))
+        $piece = Get-RemoteHelpTrimWide ($whole.Substring($cutWhole + 1))
+        if ($piece.Length -ge 2) { & $put $piece }
+        if ($value.Length -ge 2) { & $put $value }
+        $cut = [Math]::Max($value.LastIndexOf([char]'\'), $value.LastIndexOf([char]'/'))
+        $piece = Get-RemoteHelpTrimWide ($value.Substring($cut + 1))
+        if ($piece.Length -ge 2) { & $put $piece }
+    }
+    # ① 알려진 이름 원본 — 손질하지 않는다
+    foreach ($name in $given.Names) {
+        if (-not ($name -is [string])) { continue }
+        $raw = Get-RemoteHelpTidy $name
+        if ($raw.Length -gt 0 -and (Get-RemoteHelpTrimWide $raw).Length -gt 0) { & $put $raw }
+    }
+    # ② 알려진 이름에서 손질로 더 얻는 것
+    foreach ($name in $given.Names) { if (($name -is [string]) -and $name.Length -gt 0) { & $add $name } }
+    # ③ 글의 표시 줄(입력 전체를 정리한 뒤)
+    $source = ''
+    if ($null -ne $Text) { $source = Get-RemoteHelpTidy ([string]$Text) }
+    foreach ($m in $script:RhHarvestRe.Matches($source)) {
+        if ($state.Overflow) { break }
+        if ($m.Groups[1].Success) { & $add $m.Groups[1].Value } elseif ($m.Groups[2].Success) { & $add $m.Groups[2].Value } else { & $add $m.Groups[3].Value }
+    }
+    # 긴 것 먼저(같은 길이는 넣은 차례 — 모델의 안정 정렬과 같다 · 가림 결과는 순서와 무관)
+    $byLength = New-Object 'System.Collections.Generic.SortedDictionary[int,System.Collections.Generic.List[string]]'
+    foreach ($name in $list) {
+        $bucket = $null
+        if (-not $byLength.TryGetValue(-$name.Length, [ref]$bucket)) { $bucket = New-Object 'System.Collections.Generic.List[string]'; $byLength[-$name.Length] = $bucket }
+        $bucket.Add($name)
+    }
+    $sorted = New-Object 'System.Collections.Generic.List[string]'
+    foreach ($bucket in $byLength.Values) { $sorted.AddRange($bucket) }
+    return @{ Names = [string[]]$sorted.ToArray(); Overflow = [bool]$state.Overflow }
+}
+
+function Get-RemoteHelpCutTail([string]$Text, $MaxBytes) {
+    # 끝에서부터 MaxBytes(UTF-8) 이하 — 서러게이트 짝을 가르지 않는다 · 선형(모델 cutTail)
+    $size = 0
+    $at = $Text.Length
+    while ($at -gt 0) {
+        $low = [int]$Text[$at - 1]
+        $pair = ($low -ge 0xDC00 -and $low -le 0xDFFF -and $at -ge 2 -and [int]$Text[$at - 2] -ge 0xD800 -and [int]$Text[$at - 2] -le 0xDBFF)
+        if ($pair) { $bytes = 4; $step = 2 }
+        else {
+            $step = 1
+            if ($low -lt 0x80) { $bytes = 1 } elseif ($low -lt 0x800) { $bytes = 2 } else { $bytes = 3 }
+        }
+        if ($size + $bytes -gt $MaxBytes) { break }
+        $size += $bytes
+        $at -= $step
+    }
+    return $Text.Substring($at)
+}
+
+function Get-RemoteHelpCutHead([string]$Text, $MaxBytes) {
+    $size = 0
+    $at = 0
+    $n = $Text.Length
+    while ($at -lt $n) {
+        $unit = [int]$Text[$at]
+        $pair = ($unit -ge 0xD800 -and $unit -le 0xDBFF -and $at + 1 -lt $n -and [int]$Text[$at + 1] -ge 0xDC00 -and [int]$Text[$at + 1] -le 0xDFFF)
+        if ($pair) { $bytes = 4; $step = 2 }
+        else {
+            $step = 1
+            if ($unit -lt 0x80) { $bytes = 1 } elseif ($unit -lt 0x800) { $bytes = 2 } else { $bytes = 3 }
+        }
+        if ($size + $bytes -gt $MaxBytes) { break }
+        $size += $bytes
+        $at += $step
+    }
+    return $Text.Substring(0, $at)
+}
+
+function Get-RemoteHelpScrubClock {
+    # 기본 시계(ms) — 제한 언어 모드에서는 Stopwatch 를 못 불러 던진다 → 까닭 clock(닫힌 실패)
+    return ([System.Diagnostics.Stopwatch]::GetTimestamp() * 1000.0 / [System.Diagnostics.Stopwatch]::Frequency)
+}
+
+function Test-RemoteHelpScrubNumber($Value) {
+    if (-not ($Value -is [double] -or $Value -is [int] -or $Value -is [long] -or $Value -is [single] -or $Value -is [decimal])) { return $false }
+    $d = [double]$Value
+    return (-not ([double]::IsNaN($d) -or [double]::IsInfinity($d)))
+}
+
+function Invoke-RemoteHelpScrubField($Text, $Names, $MaxBytes = $null, [string]$Keep = 'tail', $BudgetMs = $null, $Clock = $null, $UnitsMax = $null) {
+    # 칸 하나의 처리(모델 pipeline.scrubField) — 순서가 명세다(까닭도 이 차례 · 둘 이상 걸리면 앞의 것):
+    #   빈 글 = 빈 글(문지기·시계를 보지 않는 유일한 예외) → ⓪ 문지기 ㉠ 넘친 수확의 묶음이면 통째(harvest) ㉡ 크기 상한을 넘으면 통째(size)
+    #   → 시계를 처음 읽음(고장이면 clock) → ① 받은 글 **전체**를 가림(도중에 예산 확인) → ② 그 뒤에 자름(UTF-8 바이트 · 글자를 가르지 않음) → 마지막 예산 확인
+    #   통째 표식(15바이트)은 자르지 않는다. 돌려주는 것 = @{ Text; Full; Reason; Truncated; Result(가림 장부 · 통째면 $null) }
+    $source = ''
+    $full = { param($why) if ($source.Length -eq 0) { return @{ Text = ''; Full = $false; Reason = $null; Truncated = $false; Result = $null } }; return @{ Text = $script:RhScrubFull; Full = $true; Reason = $why; Truncated = $false; Result = $null } }
+    try {
+        if ($null -ne $Text) { $source = [string]$Text }
+        if ($source.Length -eq 0) { return (& $full $null) }
+        $set = ConvertTo-RemoteHelpNameSet $Names
+        if ($set.IsSet -and $set.Overflow) { return (& $full 'harvest') }
+        $limit = $script:RhFieldUnitsMax
+        if ($null -ne $UnitsMax) { $limit = [int]$UnitsMax }
+        if ($source.Length -gt $limit) { return (& $full 'size') }
+        $tick = $null
+        if ($null -ne $BudgetMs) {
+            if (-not (Test-RemoteHelpScrubNumber $BudgetMs) -or [double]$BudgetMs -lt 0) { return (& $full 'clock') }
+            $read = $Clock
+            if ($null -eq $read) { $read = { Get-RemoteHelpScrubClock } }
+            $budget = @{ Read = $read; Last = $null; Started = $null; Limit = [double]$BudgetMs }
+            $readClock = {
+                $now = $null
+                try { $now = & $budget.Read } catch { throw 'RhScrubStop:clock' }
+                if (-not (Test-RemoteHelpScrubNumber $now)) { throw 'RhScrubStop:clock' }
+                $now = [double]$now
+                if ($null -ne $budget.Last -and $now -lt $budget.Last) { throw 'RhScrubStop:clock' }
+                $budget.Last = $now
+                return $now
+            }
+            $budget.Started = & $readClock   # 시계를 처음 읽는다 — 고장이면 여기서 clock
+            $tick = { if ((& $readClock) - $budget.Started -gt $budget.Limit) { throw 'RhScrubStop:budget' } }
+        }
+        $result = Invoke-RemoteHelpScrub $source $set.Names $tick
+        if ($result.Full) { return (& $full $result.Reason) }
+        if ($null -eq $MaxBytes) {
+            if ($null -ne $tick) { & $tick }
+            return @{ Text = $result.Text; Full = $false; Reason = $null; Truncated = $false; Result = $result }
+        }
+        if ($Keep -ceq 'head') { $kept = Get-RemoteHelpCutHead $result.Text ([int]$MaxBytes) } else { $kept = Get-RemoteHelpCutTail $result.Text ([int]$MaxBytes) }
+        if ($null -ne $tick) { & $tick }   # 자르기까지가 예산 안이다
+        return @{ Text = $kept; Full = $false; Reason = $null; Truncated = ($kept.Length -lt $result.Text.Length); Result = $result }
+    } catch {
+        return (& $full (Get-RemoteHelpScrubStopReason $_))
+    }
+}
+
+function ConvertTo-RemoteHelpAttachment($Bytes, $Known, $MaxBytes = 921600, $BudgetMs = $null, $Clock = $null, $UnitsMax = $null) {
+    # 글 첨부(모델 installerAttachment · 추정 없음) — 종류와 무관하게 전부 이 길(기록 · 설치 창 글자 · 환경 보고 · 프로세스 목록):
+    #   빈 바이트 = $null(보내지 않음) → 크기 상한을 넘으면 읽지 않고 통째(size) → **엄격한 UTF-8 하나**로 읽음(UTF8Encoding($false,$true) ·
+    #   UTF-16 은 머리표가 있어도 읽지 않는다 = 닫힌 실패 decode · master 결정 11-16) → NUL 글자가 있으면 통째(nul) → 맨 앞 U+FEFF 를 전부 뗌
+    #   (뗀 뒤 비면 $null) → 이름 묶음 = 수확(그 글, $Known) → 칸 처리(전체 가림 → 끝에서 $MaxBytes 로 자름).
+    #   돌려주는 것 = @{ Bytes(보낼 UTF-8 · 머리표 없음); Text; Full; Reason; Names; Overflow; Result } — 닫힌 실패면 <전부 지움> 한 낱말을 보낸다.
+    $given = ConvertTo-RemoteHelpNameSet $Known
+    if ($given.IsSet -and -not $given.NamesOk) { $given = @{ Names = @(); Overflow = $false; IsSet = $true; NamesOk = $true } }   # 모델 openNames — names 가 목록이 아닌 묶음 = 빈 묶음
+    $send = {
+        param([string]$out, $why, $set, $result)
+        $names = $given.Names; $over = $given.Overflow
+        if ($null -ne $set) { $names = $set.Names; $over = $set.Overflow }
+        return @{ Bytes = [System.Text.Encoding]::UTF8.GetBytes($out); Text = $out; Full = ($null -ne $why); Reason = $why; Names = $names; Overflow = $over; Result = $result }
+    }
+    try {
+        if ($null -eq $Bytes -or $Bytes.Length -eq 0) { return $null }
+        $limit = $script:RhFieldUnitsMax
+        if ($null -ne $UnitsMax) { $limit = [int]$UnitsMax }
+        if ($Bytes.Length -gt $limit) { return (& $send $script:RhScrubFull 'size' $null $null) }
+        $strict = New-Object System.Text.UTF8Encoding($false, $true)
+        $text = $null
+        try { $text = $strict.GetString([byte[]]$Bytes) } catch { return (& $send $script:RhScrubFull 'decode' $null $null) }
+        if ($text.IndexOf([char]0) -ge 0) { return (& $send $script:RhScrubFull 'nul' $null $null) }
+        $lead = 0
+        while ($lead -lt $text.Length -and [int]$text[$lead] -eq 0xFEFF) { $lead++ }
+        if ($lead -gt 0) { $text = $text.Substring($lead) }
+        if ($text.Length -eq 0) { return $null }   # 머리표뿐인 파일 = 빈 파일과 같다
+        $found = Get-RemoteHelpNames $text @{ names = $given.Names; overflow = $given.Overflow }
+        $field = Invoke-RemoteHelpScrubField $text @{ names = $found.Names; overflow = $found.Overflow } $MaxBytes 'tail' $BudgetMs $Clock $UnitsMax
+        $why = $null
+        if ($field.Full) { $why = $field.Reason }
+        return (& $send $field.Text $why $found $field.Result)
+    } catch {
+        return (& $send $script:RhScrubFull 'error' $null $null)
+    }
 }
 
 function Get-RemoteHelpTailBytes([string]$Text, [int]$Max) {
@@ -6325,7 +7198,16 @@ function Invoke-RemoteHelpLaunch($Entry, [string[]]$Argv, [string]$RealPath, [in
             param($name, $params, $cwd)
             Set-Location -LiteralPath $cwd
             $state = @{ Ok = $true }
-            $command = Get-Command -Name $name -CommandType Cmdlet -ErrorAction Stop
+            # 표의 cmdlet 줄 가운데 net.check(Test-NetConnection · NetTCPIP)·av.status(Get-MpComputerStatus · Defender/ConfigDefender)는
+            #   윈도우에서 **함수**(스크립트·CDXML)다 — Cmdlet 으로만 찾으면 늘 던져 한 번도 돌지 못했다(review-fix-jarvis-1115 · c0-ops-2).
+            #   함수는 그 이름을 내놓기로 정해진 운영체제 모듈에서 온 것만 받는다(같은 이름의 다른 함수는 실행하지 않는다).
+            $fnModules = @{ 'Test-NetConnection' = @('NetTCPIP'); 'Get-MpComputerStatus' = @('Defender', 'ConfigDefender') }
+            $command = Get-Command -Name $name -CommandType Cmdlet -ErrorAction SilentlyContinue | Select-Object -First 1
+            if ($null -eq $command -and $fnModules.ContainsKey($name)) {
+                $command = Get-Command -Name $name -CommandType Function -ErrorAction SilentlyContinue |
+                    Where-Object { $fnModules[$name] -contains [string]$_.ModuleName } | Select-Object -First 1
+            }
+            if ($null -eq $command) { throw ('명령을 찾지 못했습니다: ' + $name) }
             $text = & $command @params 2>&1 | ForEach-Object { if ($_ -is [System.Management.Automation.ErrorRecord]) { $state.Ok = $false }; $_ } | Out-String -Width 160
             [pscustomobject]@{ Output = $text; Rc = $(if ($state.Ok) { 0 } else { 1 }) }
         } -ArgumentList $Argv[0], $params, $cwd
@@ -6407,7 +7289,11 @@ function Invoke-RemoteHelpCommand([long]$Seq, $Entry, [string[]]$Argv) {
     $output = [string]$run.Output
     $rc = $run.Rc
     if ($run.TimedOut) { $output = $output + "`ntimeout:" + $RemoteHelpCmdTimeout + 's'; $rc = $null }
-    $tail = Get-RemoteHelpTailBytes (Invoke-RemoteHelpScrub $output $script:RhNames) 4096
+    #   칸 처리(가림 v3) — 이름 묶음 = 보고 때 묶음(넘침 보존) + 이 결과 글에서 다시 수확(맥 modeAck · 서버 ackCommand 와 같은 꼴 · 검증 H2) ·
+    #   전체를 가린 뒤 끝 4KB · 수확이 던지면(제한 언어 모드) 넘친 묶음 = 통째 가림
+    try { $cmdFound = Get-RemoteHelpNames $output $script:RhNames; $cmdNames = @{ names = $cmdFound.Names; overflow = $cmdFound.Overflow } }
+    catch { $cmdNames = @{ names = [string[]]@(); overflow = $true } }
+    $tail = (Invoke-RemoteHelpScrubField $output $cmdNames 4096 'tail' $script:RhScrubBudgetMs).Text
     if ((Send-RemoteHelpAck $Seq 'ran' $rc $tail) -eq 410) { return 3 }
     return 0
 }
@@ -6498,13 +7384,32 @@ function Save-RemoteHelpToken([string]$Token) {
     }
 }
 
+function Get-RemoteHelpLogTail([string]$LogText, [bool]$Over) {
+    # 보고 log_tail — 기록 전체를 보고 묶음($script:RhNames)으로 가린 뒤 끝 200줄 → 끝 128,000 바이트(가림 앞에서 줄이지 않는다 · 검증 H1)
+    if ($Over) { return $script:RhScrubFull }
+    $field = Invoke-RemoteHelpScrubField $LogText $script:RhNames $null 'tail' $script:RhScrubBudgetMs
+    if ($field.Full) { return $field.Text }
+    $lines = $field.Text.Split([char]10)
+    $kept = $field.Text
+    if ($lines.Count -gt 200) { $kept = [string]::Join("`n", $lines, $lines.Count - 200, 200) }
+    return (Get-RemoteHelpCutTail $kept 128000)
+}
+
 function Send-RemoteHelpReport {
     # 돌려주는 것 = $true 보고 번호를 받았다
     $envText = ''
     $logText = ''
     try { if (Test-Path -LiteralPath $ReportFile) { $envText = [System.IO.File]::ReadAllText($ReportFile, [System.Text.Encoding]::UTF8) } } catch { }
     # 기록 파일은 UTF-8 로 쓰였다(Write-Log · v0.3.18) — 같은 글자표로 읽는다
-    try { if (Test-Path -LiteralPath $LogFile) { $logText = (@(Get-Content -LiteralPath $LogFile -Tail 200 -Encoding UTF8 -ErrorAction Stop) -join "`n") } } catch { }
+    #   가림 v3(검증 H1): 기록 **전체**로 수확·가린 뒤에 끝 200줄로 자른다(맥 modeReport · 서버 help-core 와 같은 순서) — 앞 판은 200줄로 먼저 잘라
+    #   창 밖 표시 줄에서만 알 수 있는 이름이 남았다. 크기 문지기 = 파일 바이트 수가 칸 상한을 넘으면 읽지 않고 log_tail 통째 가림(size).
+    $logOver = $false
+    try {
+        if (Test-Path -LiteralPath $LogFile) {
+            if ((New-Object System.IO.FileInfo($LogFile)).Length -gt $script:RhFieldUnitsMax) { $logOver = $true }
+            else { $logText = (@(Get-Content -LiteralPath $LogFile -Encoding UTF8 -ErrorAction Stop) -join "`n") }
+        }
+    } catch { }
     # 멈춘 단계 = 이 실행이 마지막으로 찍은 [n/10]
     $step = '0/10'
     for ($i = $script:StepLog.Count - 1; $i -ge 0; $i--) {
@@ -6513,14 +7418,16 @@ function Send-RemoteHelpReport {
     # 이 컴퓨터가 아는 로그인 이름 — 표시 없이 나와도 지운다(서버는 표시된 이름만 안다)
     $known = @($env:USERNAME, (Split-Path -Leaf $env:USERPROFILE))
     try { $known += [System.Security.Principal.WindowsIdentity]::GetCurrent().Name } catch { }
-    $script:RhNames = Get-RemoteHelpNames ($envText + "`n" + $logText) $known
+    # 이름 묶음(가림 v3) — 알려진 이름은 원본 그대로 · 넘치면 두 칸 모두 통째 가림 · 수확이 던지면(제한 언어 모드 = 형식 생성 불가) 넘친 묶음 = 두 칸 통째 가림(원문을 보내지 않는다)
+    try { $found = Get-RemoteHelpNames ($envText + "`n" + $logText) $known; $script:RhNames = @{ names = $found.Names; overflow = $found.Overflow } }
+    catch { Write-Log ('remote help: name harvest failed (두 칸 통째 가림): ' + $_.Exception.GetType().Name); $script:RhNames = @{ names = [string[]]@(); overflow = $true } }
     $fields = [ordered]@{
         code              = $script:JCode
         step              = $step
         os                = 'win'
         installer_version = $InstallerVersion
-        env_report        = (Get-RemoteHelpHeadBytes (Invoke-RemoteHelpScrub $envText $script:RhNames) 96000)
-        log_tail          = (Get-RemoteHelpTailBytes (Invoke-RemoteHelpScrub $logText $script:RhNames) 128000)
+        env_report        = (Invoke-RemoteHelpScrubField $envText $script:RhNames 96000 'head' $script:RhScrubBudgetMs).Text
+        log_tail          = (Get-RemoteHelpLogTail $logText $logOver)
         notice_shown      = $true
     }
     $body = $fields | ConvertTo-Json -Compress
@@ -6529,6 +7436,7 @@ function Send-RemoteHelpReport {
     foreach ($fit in @(@{ Name = 'log_tail'; Tail = $true }, @{ Name = 'env_report'; Tail = $false })) {
         if ([System.Text.Encoding]::UTF8.GetByteCount($body) -le $RemoteHelpReportMaxBytes) { break }
         $full = [string]$fields[$fit.Name]
+        if ([string]::Equals($full, $script:RhScrubFull, [System.StringComparison]::Ordinal)) { continue }   # 통째 표식(15바이트)은 자르지 않는다(가림 v3 명시 예외)
         $lo = 0; $hi = [System.Text.Encoding]::UTF8.GetByteCount($full)
         while ($lo -lt $hi) {
             $mid = [int][math]::Ceiling(($lo + $hi) / 2)
@@ -7426,13 +8334,53 @@ function Get-FileBytesCapped($path, $max) {
         return $tail
     } catch { return $null }
 }
+# 글자 첨부(기록·설치 창 글자·환경 보고·프로세스 목록)는 보내기 전에 이 컴퓨터에서 지운다 — 보고 본문과 같은 가림 함수·같은 이름 묶음.
+#   가림 v3 「둘로 가름」(모델 installerAttachment): **추정 없음** — 파일 크기 문지기(읽기 전) → 파일 전체를
+#   엄격한 UTF-8 하나로 읽음(머리표 EF BB BF 는 뗀다 · UTF-16 은 머리표가 있어도 읽지 않는다) → NUL 이면 닫음 → 전체를 가림 → 끝에서 $max 바이트로 자름.
+#   이름 묶음 = 보고를 열 때 수확한 묶음($script:RhNames · 넘침 보존) + 이 컴퓨터의 계정 이름 원본 + 이 파일에서 다시 수확.
+#   ⚠닫힌 실패(크기 · 틀린 UTF-8 · NUL · 넘침 · 예산 · 시계 · 읽기 실패)면 `<전부 지움>` 한 낱말을 보낸다(파일이 있었다는 사실만 · 원문 0) ·
+#     파일이 없거나 비었거나 머리표뿐이면 $null(보내지 않음).
+function Get-RemoteHelpAttachKnown {
+    $set = ConvertTo-RemoteHelpNameSet $script:RhNames
+    $names = New-Object 'System.Collections.Generic.List[object]'
+    foreach ($n in $set.Names) { $names.Add($n) }
+    if ($env:USERNAME) { $names.Add([string]$env:USERNAME) }
+    if ($env:USERPROFILE) { $names.Add([string](Split-Path -Leaf $env:USERPROFILE)) }
+    return @{ names = $names.ToArray(); overflow = [bool]$set.Overflow }
+}
+function Get-ScrubbedTextBytes($path, $max) {
+    $label = ''
+    try {
+        if (-not (Test-Path -LiteralPath $path)) { return $null }
+        $label = Split-Path -Leaf $path
+        # 크기 문지기 — 읽기 전에 바이트 수로(UTF-8 은 바이트 수 ≥ 코드 단위 수)
+        $info = New-Object System.IO.FileInfo($path)
+        if ($info.Length -eq 0) { return $null }
+        if ($info.Length -gt $script:RhFieldUnitsMax) { Write-Log ('attach masked whole (size): ' + $label); return [System.Text.Encoding]::UTF8.GetBytes($script:RhScrubFull) }
+        # 쓰는 중인 기록 파일도 읽히게 쓰기 공유로 연다 · 바이트 그대로 읽는다(글자셋 판정은 ConvertTo-RemoteHelpAttachment 의 엄격한 UTF-8 하나)
+        $fs = New-Object System.IO.FileStream($path, [System.IO.FileMode]::Open, [System.IO.FileAccess]::Read, [System.IO.FileShare]'ReadWrite, Delete')
+        $ms = New-Object System.IO.MemoryStream
+        try { $fs.CopyTo($ms) } finally { $fs.Dispose() }
+        $sent = ConvertTo-RemoteHelpAttachment $ms.ToArray() (Get-RemoteHelpAttachKnown) $max $script:RhScrubBudgetMs
+        if ($null -eq $sent) { return $null }
+        if ($sent.Full) { Write-Log ('attach masked whole (' + $sent.Reason + '): ' + $label) }
+        return [byte[]]$sent.Bytes
+    } catch {
+        Write-Log ('attach scrub failed (통째 가림을 보냄): ' + $label + ' - ' + $_.Exception.GetType().Name)
+        return [System.Text.Encoding]::UTF8.GetBytes($script:RhScrubFull)
+    }
+}
 function Get-ProcTreeBytes {
+    # 프로세스 목록도 글 첨부와 같은 길(가린 뒤 보냄 · 실행 파일 이름에 든 계정 이름·집 경로를 지운다)
     try {
         $tree = @(Get-ProcTree $PID)
         $lines = @('# 실행 중인 프로그램(뿌리 ' + $PID + ')')
         foreach ($t in $tree) { $lines += (('  ' * [int]$t.Depth) + [string]$t.Id + ' ' + [string]$t.Name) }
-        return [System.Text.Encoding]::UTF8.GetBytes(($lines -join "`r`n"))
-    } catch { return $null }
+        $sent = ConvertTo-RemoteHelpAttachment ([System.Text.Encoding]::UTF8.GetBytes(($lines -join "`r`n"))) (Get-RemoteHelpAttachKnown) $AttachMaxBytes $script:RhScrubBudgetMs
+        if ($null -eq $sent) { return $null }
+        if ($sent.Full) { Write-Log ('attach masked whole (' + $sent.Reason + '): proc-tree.txt') }
+        return [byte[]]$sent.Bytes
+    } catch { return [System.Text.Encoding]::UTF8.GetBytes($script:RhScrubFull) }
 }
 function Send-Attachment($kind, $filename, $bytes) {
     # 돌려주는 것 = $true 보냈다. 보고가 없으면(x-help-client 없음) 아무것도 안 한다.
@@ -7449,9 +8397,9 @@ function Send-Attachment($kind, $filename, $bytes) {
 function Send-FailAttachments {
     # 보고가 열린 직후 부른다 — 계약 3절 순서 · 각각 fail-open. 로그인 창 그림은 대기 중 찍어 둔 것을 쓴다.
     if (-not $script:RhId) { return }
-    [void](Send-Attachment 'log_full' 'bootstrap.log' (Get-FileBytesCapped $LogFile $AttachMaxBytes))
+    [void](Send-Attachment 'log_full' 'bootstrap.log' (Get-ScrubbedTextBytes $LogFile $AttachMaxBytes))
     if ($script:TranscriptOn) { try { Stop-Transcript | Out-Null } catch { }; $script:TranscriptOn = $false }
-    [void](Send-Attachment 'console_text' 'transcript.txt' (Get-FileBytesCapped $TranscriptFile $AttachMaxBytes))
+    [void](Send-Attachment 'console_text' 'transcript.txt' (Get-ScrubbedTextBytes $TranscriptFile $AttachMaxBytes))
     # 🔴v0.3.20 — 전체 화면을 붙이던 자리다. 쓰시는 분의 다른 창이 함께 나가므로 **찍는 것만 설치 창 한정**으로 바꿨다.
     #   Get-ScreenJpeg 함수는 남겨 두되 **부르는 자리는 0** 이다(시험이 그 0 을 센다).
     #   ⚠칸 이름(kind)은 'screen_png' 그대로 둔다 — 첨부 6종과 그 순서는 **서버 계약(3절)**이고 우리가 혼자 바꿀 자리가 아니다.
@@ -7464,7 +8412,7 @@ function Send-FailAttachments {
         Write-Log 'attach: login window capture 없음(로그인 창이 살아 있지 않았거나 못 찍었다)'
     }
     [void](Send-Attachment 'proc_tree' 'proc-tree.txt' (Get-ProcTreeBytes))
-    [void](Send-Attachment 'env_full' 'env-report.md' (Get-FileBytesCapped $ReportFile $AttachMaxBytes))
+    [void](Send-Attachment 'env_full' 'env-report.md' (Get-ScrubbedTextBytes $ReportFile $AttachMaxBytes))
 }
 
 # ── 콘솔 빠른 편집(QuickEdit) 끄기 (2026-09-16) ─────────

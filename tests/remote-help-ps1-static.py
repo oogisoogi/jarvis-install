@@ -156,8 +156,15 @@ def checks(path):
     ck("ps1-timeout", "$done = Wait-Job -Job $job -Timeout $RemoteHelpCmdTimeout" in launch and re.search(r"^\$RemoteHelpCmdTimeout\s*=\s*60\b", src, re.M)
        and "\"`ntimeout:\" + $RemoteHelpCmdTimeout + 's'; $rc = $null" in cmd, "60초 상한·시간 초과 표기가 없다")
     scrubfn = fn(src, "Invoke-RemoteHelpScrub")
-    ck("ps1-scrub", "(Invoke-RemoteHelpScrub $envText $script:RhNames)" in report and "(Invoke-RemoteHelpScrub $logText $script:RhNames)" in report
-       and "Invoke-RemoteHelpScrub $output $script:RhNames" in cmd and all(t in scrubfn for t in ("<이메일 지움>", "Bearer <토큰 지움>", "<키 지움>", "'~user'")),
+    renderfn = fn(src, "Get-RemoteHelpRendered")
+    # 가림 v3(scrub-v3-port-1116) — 보고 두 칸·명령 결과 = 칸 처리(Invoke-RemoteHelpScrubField · 수확 묶음째 · 전체를 가린 뒤 자름) · 표식 = $script:RhScrubMarks
+    ck("ps1-scrub", "(Invoke-RemoteHelpScrubField $envText $script:RhNames 96000 'head' $script:RhScrubBudgetMs).Text" in report
+       and "(Get-RemoteHelpLogTail $logText $logOver)" in report
+       and "Invoke-RemoteHelpScrubField $LogText $script:RhNames $null 'tail' $script:RhScrubBudgetMs" in fn(src, "Get-RemoteHelpLogTail")
+       and "Get-RemoteHelpNames $output $script:RhNames" in cmd
+       and "(Invoke-RemoteHelpScrubField $output $cmdNames 4096 'tail' $script:RhScrubBudgetMs).Text" in cmd
+       and "$script:RhScrubMarks = @('<이메일 지움>', 'Bearer <토큰 지움>', '<키 지움>', '~', '~', '~user', '<전부 지움>')" in src
+       and "Get-RemoteHelpRendered $tidy $runs" in scrubfn and "$script:RhScrubMarks[$Runs.RL[$k]]" in renderfn,
        "보고·결과를 스크럽하지 않는다")
     ck("ps1-report-size", re.search(r"^\$RemoteHelpReportMaxBytes\s*=\s*240000\b", src, re.M)
        and ordered(report, "$body = $fields | ConvertTo-Json -Compress", "@(@{ Name = 'log_tail'; Tail = $true }, @{ Name = 'env_report'; Tail = $false })",
@@ -217,7 +224,7 @@ MUTANTS = [
     ("P6 명령 글로 이어 실행", "            $text = & $command @params 2>&1", "            $text = Invoke-Expression ($name + ' ' + ($params.Values -join ' ')) 2>&1", "ps1-no-shell"),
     ("P7 표 판본 비교 제거", "        if (-not ($m.table_version -is [string]) -or -not ($m.table_version -ceq $table.version)) {\n            if ((Send-RemoteHelpDecline $seq 'table_version') -eq 3) { return 3 }\n            continue\n        }\n", "", "ps1-version-decline"),
     ("P8 경로 성분 경계 제거", "        if (-not ($real -ieq $root) -and -not $real.StartsWith($root.TrimEnd('\\') + '\\', [System.StringComparison]::OrdinalIgnoreCase)) { return @{ Real = ''; Rule = 'path_outside' } }\n", "", "ps1-boundary"),
-    ("P9 보고 스크럽 제거", "        env_report        = (Get-RemoteHelpHeadBytes (Invoke-RemoteHelpScrub $envText $script:RhNames) 96000)", "        env_report        = (Get-RemoteHelpHeadBytes $envText 96000)", "ps1-scrub"),
+    ("P9 보고 스크럽 제거", "        env_report        = (Invoke-RemoteHelpScrubField $envText $script:RhNames 96000 'head' $script:RhScrubBudgetMs).Text", "        env_report        = (Get-RemoteHelpHeadBytes $envText 96000)", "ps1-scrub"),
     ("P10 실행 직전 재계산 제거", "        if ($real.Rule -or -not ($real.Real -ieq $first.Real)) { return (Send-RemoteHelpDecline $Seq 'path_changed') }\n", "", "ps1-toctou"),
     ("P11 출처 헤더 제거", "    if ($script:RhClientToken -and ($Path -like '*/ack' -or $Path -like '*/close')) { $headers['x-help-client'] = $script:RhClientToken }\n", "", "ps1-header"),
     ("P12 고지 없이 보냄", "    if ($script:NoticeShown) { Invoke-RemoteHelp }", "    Invoke-RemoteHelp", "ps1-wire-closing"),
